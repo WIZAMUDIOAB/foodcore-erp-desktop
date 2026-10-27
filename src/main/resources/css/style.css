@@ -1,0 +1,87 @@
+/* ==========================================================================
+   FoodCore ERP - Hoja de Estilos Personalizada (Complementaria a AtlantaFX)
+   ========================================================================== */
+
+.root {
+    -color-primary: #e63946;
+    -color-secondary: #457b9d;
+    -color-bg-subtle: #f8f9fa;
+    -fx-font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+.brand-title {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1d3557;
+}
+
+.brand-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6c757d;
+}
+
+.card-mesa {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dee2e6;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 15px;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 5, 0, 0, 2);
+}
+
+.card-mesa:hover {
+    -fx-border-color: #457b9d;
+    -fx-effect: dropshadow(three-pass-box, rgba(69,123,157,0.25), 8, 0, 0, 3);
+}
+
+.mesa-libre {
+    -fx-border-color: #2a9d8f;
+    -fx-border-width: 2px;
+}
+
+.mesa-ocupada {
+    -fx-border-color: #e76f51;
+    -fx-border-width: 2px;
+}
+
+/* Tarjetas de comandas KDS */
+.kds-card {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 12px;
+    -fx-pref-width: 280px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 6, 0, 0, 2);
+}
+
+.kds-tiempo-verde {
+    -fx-border-color: #2a9d8f;
+    -fx-border-width: 3px;
+}
+
+.kds-tiempo-amarillo {
+    -fx-border-color: #e9c46a;
+    -fx-border-width: 3px;
+}
+
+.kds-tiempo-rojo {
+    -fx-border-color: #e63946;
+    -fx-border-width: 3px;
+}
+
+/* Catálogo POS */
+.pos-item-btn {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #ced4da;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px;
+    -fx-alignment: center;
+    -fx-cursor: hand;
+}
+
+.pos-item-btn:hover {
+    -fx-border-color: #1d3557;
+    -fx-background-color: #f1faee;
+}

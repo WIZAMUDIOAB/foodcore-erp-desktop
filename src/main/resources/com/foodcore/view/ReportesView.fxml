@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.foodcore.controller.ReportesController"
+      spacing="15.0" style="-fx-padding: 20px; -fx-background-color: #f8f9fa;">
+
+    <HBox alignment="CENTER_LEFT" spacing="15.0">
+        <Label text="REPORTES Y ANALÍTICA GERENCIAL (IU17 / CU13)" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Actualizar Gráficos" onAction="#cargarDatos" style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-cursor: hand;"/>
+    </HBox>
+
+    <Separator/>
+
+    <HBox spacing="20.0" VBox.vgrow="ALWAYS">
+        <!-- Gráfico de Barras: Ventas por Día -->
+        <VBox spacing="10.0" HBox.hgrow="ALWAYS" style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px;">
+            <Label text="Ventas por Día (S/)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <BarChart fx:id="barChartVentas" legendVisible="false" VBox.vgrow="ALWAYS">
+                <xAxis>
+                    <CategoryAxis label="Fecha"/>
+                </xAxis>
+                <yAxis>
+                    <NumberAxis label="Monto Total (S/)"/>
+                </yAxis>
+            </BarChart>
+        </VBox>
+
+        <!-- Gráfico Circular: Platos de Baja Rotación -->
+        <VBox spacing="10.0" HBox.hgrow="ALWAYS" style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px;">
+            <Label text="Ranking de Platos de Baja Rotación (CU13)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <PieChart fx:id="pieChartBajaRotacion" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </HBox>
+
+</VBox>

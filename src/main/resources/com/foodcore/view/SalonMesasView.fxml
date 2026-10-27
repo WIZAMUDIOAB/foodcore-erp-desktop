@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.foodcore.controller.SalonMesasController"
+      spacing="15.0" style="-fx-padding: 20px; -fx-background-color: #f8f9fa;">
+
+    <HBox alignment="CENTER_LEFT" spacing="20.0">
+        <Label text="SALÓN Y MESAS EN VIVO" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        
+        <HBox alignment="CENTER" spacing="8.0">
+            <Label style="-fx-background-color: #2a9d8f; -fx-min-width: 16px; -fx-min-height: 16px; -fx-background-radius: 8px;"/>
+            <Label text="Mesa Libre"/>
+            <Region prefWidth="15.0"/>
+            <Label style="-fx-background-color: #e63946; -fx-min-width: 16px; -fx-min-height: 16px; -fx-background-radius: 8px;"/>
+            <Label text="Mesa Ocupada"/>
+        </HBox>
+
+        <Button text="Refrescar Salón" onAction="#cargarMesas" style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-cursor: hand;"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- Cuadrícula de Mesas Interactivas -->
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
+        <FlowPane fx:id="flowMesas" hgap="20.0" vgap="20.0" style="-fx-padding: 10px;"/>
+    </ScrollPane>
+
+</VBox>

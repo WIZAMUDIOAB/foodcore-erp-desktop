@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.foodcore.controller.MozoOrderController"
+            prefHeight="650.0" prefWidth="800.0" style="-fx-background-color: #f8f9fa;">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="15.0" style="-fx-padding: 15px; -fx-background-color: #1d3557;">
+            <Label fx:id="lblTituloMesa" text="COMANDA RÁPIDA (IU07) - MESA 01" style="-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"/>
+        </HBox>
+    </top>
+
+    <center>
+        <VBox spacing="10.0" style="-fx-padding: 15px;">
+            <Label text="Seleccione Platos para Agregar a la Comanda:" style="-fx-font-weight: bold;"/>
+            <ScrollPane fitToWidth="true" prefHeight="220.0" style="-fx-background-color: transparent;">
+                <TilePane fx:id="tilePlatos" hgap="10.0" vgap="10.0" style="-fx-padding: 5px;"/>
+            </ScrollPane>
+
+            <Separator/>
+
+            <Label text="Platos en Comanda:" style="-fx-font-weight: bold;"/>
+            <TableView fx:id="tblItems" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="colPlato" text="Plato" prefWidth="240.0"/>
+                    <TableColumn fx:id="colCantidad" text="Cant" prefWidth="60.0"/>
+                    <TableColumn fx:id="colPrecio" text="Precio Unit" prefWidth="90.0"/>
+                    <TableColumn fx:id="colNotas" text="Notas de Preparación (ej: sin cremas)" prefWidth="250.0"/>
+                </columns>
+            </TableView>
+
+            <HBox spacing="10.0" alignment="CENTER_LEFT">
+                <TextField fx:id="txtNotaEspecial" promptText="Escriba indicación para el plato seleccionado (ej: 'sin mayonesa', 'bien cocido')..." HBox.hgrow="ALWAYS"/>
+                <Button text="Aplicar Nota" onAction="#handleAplicarNota" style="-fx-background-color: #457b9d; -fx-text-fill: white;"/>
+            </HBox>
+        </VBox>
+    </center>
+
+    <bottom>
+        <VBox spacing="10.0" style="-fx-padding: 15px; -fx-background-color: white; -fx-border-color: #dee2e6; -fx-border-width: 1 0 0 0;">
+            <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                <Label text="Total Comanda:" style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+                <Label fx:id="lblTotal" text="S/ 0.00" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #e63946;"/>
+            </HBox>
+            <Button text="DESPACHAR COMANDA A COCINA (SOCKET TCP 9090)" onAction="#handleEnviarComanda"
+                    maxWidth="Infinity" prefHeight="48.0"
+                    style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-cursor: hand; -fx-background-radius: 6px;"/>
+        </VBox>
+    </bottom>
+
+</BorderPane>
