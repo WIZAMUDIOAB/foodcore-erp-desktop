@@ -8,6 +8,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
@@ -16,8 +17,12 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.TilePane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.math.BigDecimal;
@@ -45,7 +50,7 @@ public class MozoOrderController {
 
     public void setNumeroMesa(String mesa) {
         this.mesa = mesa;
-        lblTituloMesa.setText("COMANDA RÁPIDA (IU07) - MESA " + mesa);
+        lblTituloMesa.setText("Comanda de Salón · Mesa " + mesa);
     }
 
     @FXML
@@ -73,23 +78,36 @@ public class MozoOrderController {
                 Platform.runLater(() -> {
                     tilePlatos.getChildren().clear();
                     for (Producto p : productos) {
-                        Button btn = new Button(p.getNombre() + "\nS/ " + p.getPrecioVenta());
-                        btn.setPrefSize(130, 75);
-                        btn.setWrapText(true);
-                        btn.setStyle("-fx-background-color: white; -fx-border-color: #adb5bd; -fx-background-radius: 6px; -fx-border-radius: 6px; -fx-cursor: hand; -fx-font-weight: bold;");
+                        Button btn = new Button();
+                        btn.setPrefSize(165, 95);
+                        btn.getStyleClass().add("surface-card-interactive");
+
+                        VBox cardBox = new VBox(4.0);
+                        cardBox.setAlignment(Pos.TOP_LEFT);
+
+                        Label lblNombre = new Label(p.getNombre());
+                        lblNombre.setWrapText(true);
+                        lblNombre.setMaxWidth(145);
+                        lblNombre.setStyle("-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: #11141a;");
+
+                        Region spacer = new Region();
+                        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+                        Label lblPrecio = new Label("S/ " + p.getPrecioVenta());
+                        lblPrecio.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #d94e34;");
+
+                        cardBox.getChildren().addAll(lblNombre, spacer, lblPrecio);
+                        btn.setGraphic(cardBox);
+                        btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+
+                        AnimationUtils.attachTactileFeedback(btn);
                         btn.setOnAction(e -> agregarPlato(p));
                         tilePlatos.getChildren().add(btn);
                     }
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    Button btn = new Button("Hamburguesa Clásica\nS/ 15.00");
-                    btn.setPrefSize(130, 75);
-                    btn.setOnAction(ev -> {
-                        Producto demo = new Producto(1, 1, "HAM-01", "Hamburguesa Clásica", "", new BigDecimal("15.00"), BigDecimal.ZERO, true);
-                        agregarPlato(demo);
-                    });
-                    tilePlatos.getChildren().add(btn);
+                    tilePlatos.getChildren().clear();
                 });
             }
         }).start();
@@ -130,10 +148,10 @@ public class MozoOrderController {
                 sel.setCantidad(sel.getCantidad() - 1);
                 sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
                 tblItems.refresh();
+                calcularTotal();
             } else {
-                items.remove(sel);
+                handleQuitarPlato();
             }
-            calcularTotal();
         }
     }
 

@@ -85,7 +85,7 @@
                         <columns>
                             <TableColumn fx:id="colInsCodigo" text="Código" prefWidth="80.0"/>
                             <TableColumn fx:id="colInsNombre" text="Insumo" prefWidth="220.0"/>
-                            <TableColumn fx:id="colInsUnidad" text="U.M." prefWidth="65.0"/>
+                            <TableColumn fx:id="colInsUnidad" text="U.M." prefWidth="80.0"/>
                             <TableColumn fx:id="colInsStock" text="Stock Actual" prefWidth="95.0"/>
                             <TableColumn fx:id="colInsMinimo" text="Stock Mín." prefWidth="85.0"/>
                             <TableColumn fx:id="colInsCosto" text="Costo Unit" prefWidth="90.0"/>

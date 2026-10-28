@@ -6,11 +6,11 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.MozoOrderController"
-            prefHeight="700.0" prefWidth="880.0" style="-fx-background-color: -color-bg-base;">
+            prefHeight="690.0" prefWidth="900.0" style="-fx-background-color: -color-bg-base;">
 
     <!-- Topbar Superior -->
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="view-topbar">
+        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="view-topbar" style="-fx-padding: 12px 24px;">
             <VBox spacing="2.0">
                 <Label fx:id="lblTituloMesa" text="Comanda de Salón · Mesa 01" styleClass="view-heading"/>
                 <Label text="Seleccione los platos para remitir a línea de cocina" styleClass="view-subheading"/>
@@ -22,10 +22,10 @@
     </top>
 
     <center>
-        <VBox spacing="12.0" style="-fx-padding: 18px;">
+        <VBox spacing="12.0" style="-fx-padding: 16px 22px;">
             <Label text="Platos Rápidos de la Carta:" style="-fx-font-weight: 800; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
-            <ScrollPane fitToWidth="true" prefHeight="190.0" style="-fx-background-color: transparent;">
-                <TilePane fx:id="tilePlatos" hgap="10.0" vgap="10.0" style="-fx-padding: 4px;"/>
+            <ScrollPane fitToWidth="true" prefHeight="135.0" style="-fx-background-color: transparent;">
+                <TilePane fx:id="tilePlatos" hgap="12.0" vgap="12.0" prefColumns="5" style="-fx-padding: 4px;"/>
             </ScrollPane>
 
             <Separator style="-fx-opacity: 0.6;"/>
@@ -40,13 +40,13 @@
                         style="-fx-background-color: #fee2e2; -fx-text-fill: #dc2626; -fx-font-weight: 700; -fx-font-size: 11px; -fx-padding: 4px 10px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
             </HBox>
 
-            <!-- Tabla de Items de Comanda -->
+            <!-- Tabla de Items de Comanda (Anchos Calibrados sin Recorte) -->
             <TableView fx:id="tblItems" VBox.vgrow="ALWAYS">
                 <columns>
-                    <TableColumn fx:id="colPlato" text="Plato" prefWidth="240.0"/>
-                    <TableColumn fx:id="colCantidad" text="Cant." prefWidth="55.0"/>
-                    <TableColumn fx:id="colPrecio" text="P. Unit" prefWidth="80.0"/>
-                    <TableColumn fx:id="colNotas" text="Indicaciones de Cocina" prefWidth="320.0"/>
+                    <TableColumn fx:id="colPlato" text="Plato" prefWidth="230.0"/>
+                    <TableColumn fx:id="colCantidad" text="Cant." prefWidth="75.0"/>
+                    <TableColumn fx:id="colPrecio" text="P. Unit" prefWidth="85.0"/>
+                    <TableColumn fx:id="colNotas" text="Indicaciones de Cocina" prefWidth="330.0"/>
                 </columns>
             </TableView>
 
@@ -72,13 +72,13 @@
 
     <bottom>
         <HBox alignment="CENTER_RIGHT" spacing="16.0"
-              style="-fx-padding: 16px 24px; -fx-background-color: -color-bg-surface; -fx-border-color: -color-border-subtle; -fx-border-width: 1px 0 0 0;">
+              style="-fx-padding: 14px 24px; -fx-background-color: -color-bg-surface; -fx-border-color: -color-border-subtle; -fx-border-width: 1px 0 0 0;">
             <VBox alignment="CENTER_RIGHT" spacing="2.0">
                 <Label text="Total Comanda:" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                 <Label fx:id="lblTotal" text="S/ 0.00" style="-fx-font-size: 22px; -fx-font-weight: 800; -fx-text-fill: -color-brand-ember;"/>
             </VBox>
             <Button text="Enviar Comanda a Cocina" onAction="#handleEnviarComanda"
-                    prefHeight="46.0" prefWidth="280.0" styleClass="btn-emerald"/>
+                    prefHeight="44.0" prefWidth="260.0" styleClass="btn-emerald"/>
         </HBox>
     </bottom>
 

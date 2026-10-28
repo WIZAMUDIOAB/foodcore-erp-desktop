@@ -457,3 +457,8 @@
 .combo-box:focused {
     -fx-border-color: -color-brand-ember;
 }
+
+
+.surface-card-interactive {
+    -fx-padding: 8px 10px;
+}

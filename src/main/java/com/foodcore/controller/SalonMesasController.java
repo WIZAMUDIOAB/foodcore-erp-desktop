@@ -129,7 +129,9 @@ public class SalonMesasController {
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setTitle("Comanda de Salón - Mesa " + mesa);
 
-            Scene scene = new Scene(root, 880, 700);
+            Scene scene = new Scene(root, 920, 710);
+            stage.setMinWidth(900);
+            stage.setMinHeight(680);
             scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
 
             AnimationUtils.animateModalEnter(root);

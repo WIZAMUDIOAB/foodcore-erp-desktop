@@ -6,8 +6,8 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.CobroModalController"
-      spacing="10.0" prefWidth="520.0" prefHeight="650.0"
-      style="-fx-background-color: -color-bg-base; -fx-padding: 16px 24px 20px 24px;">
+      spacing="10.0" prefWidth="520.0" 
+      style="-fx-background-color: -color-bg-base; -fx-padding: 14px 22px 16px 22px;">
 
     <!-- Encabezado de Cobro -->
     <VBox spacing="1.0">

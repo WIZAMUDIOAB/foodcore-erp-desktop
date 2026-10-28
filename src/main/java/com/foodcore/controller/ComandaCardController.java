@@ -59,11 +59,15 @@ public class ComandaCardController {
     public void agregarPlato(String producto, int cantidad, String notas) {
         VBox itemBox = new VBox(3);
         Label lblPlato = new Label(cantidad + "x  " + producto);
+        lblPlato.setWrapText(true);
+        lblPlato.setMaxWidth(265);
         lblPlato.setStyle("-fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #f9fafb;");
         itemBox.getChildren().add(lblPlato);
 
         if (notas != null && !notas.trim().isEmpty()) {
             Label lblNota = new Label("↳ Nota: " + notas);
+            lblNota.setWrapText(true);
+            lblNota.setMaxWidth(265);
             lblNota.setStyle("-fx-background-color: rgba(245, 158, 11, 0.14); -fx-text-fill: #fcd34d; -fx-padding: 2px 6px; -fx-background-radius: 4px; -fx-font-size: 11px; -fx-font-weight: 600;");
             itemBox.getChildren().add(lblNota);
         }
