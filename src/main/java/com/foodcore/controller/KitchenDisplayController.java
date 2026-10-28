@@ -4,6 +4,7 @@ import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
+import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.google.gson.JsonArray;
@@ -62,19 +63,12 @@ public class KitchenDisplayController {
                     }
 
                     if (pedidos.isEmpty()) {
-                        // Comanda de ejemplo inicial si la BD está limpia
-                        crearTarjetaDemo("03", "COM-0001", "PENDIENTE", new String[][]{
-                            {"Hamburguesa Doble Queso", "2", "Sin cebolla"},
-                            {"Papas Fritas Grandes", "1", "Extra crocantes"}
-                        });
+                        lblContadorActivas.setText("Comandas en Cocina: 0");
                     }
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    crearTarjetaDemo("03", "COM-0001", "PENDIENTE", new String[][]{
-                        {"Hamburguesa Doble Queso", "2", "Sin cebolla"},
-                        {"Papas Fritas Grandes", "1", "Extra crocantes"}
-                    });
+                    lblContadorActivas.setText("Comandas en Cocina: 0");
                 });
             }
         }).start();
@@ -115,6 +109,7 @@ public class KitchenDisplayController {
                     actualizarContador(-1);
                 });
 
+                AnimationUtils.animateModalEnter(cardNode);
                 flowComandas.getChildren().add(cardNode);
                 actualizarContador(1);
             } catch (IOException e) {
@@ -133,29 +128,6 @@ public class KitchenDisplayController {
 
             for (DetallePedido d : detalles) {
                 cardCtrl.agregarPlato(d.getNombreProducto(), d.getCantidad(), d.getNotasPreparacion());
-            }
-
-            cardCtrl.setOnDespachadoListener(c -> {
-                flowComandas.getChildren().remove(c.getCardContainer());
-                actualizarContador(-1);
-            });
-
-            flowComandas.getChildren().add(cardNode);
-            actualizarContador(1);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void crearTarjetaDemo(String mesa, String comanda, String estado, String[][] platos) {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ComandaCard.fxml"));
-            Parent cardNode = loader.load();
-            ComandaCardController cardCtrl = loader.getController();
-            cardCtrl.initData(mesa, comanda, estado);
-
-            for (String[] plato : platos) {
-                cardCtrl.agregarPlato(plato[0], Integer.parseInt(plato[1]), plato[2]);
             }
 
             cardCtrl.setOnDespachadoListener(c -> {

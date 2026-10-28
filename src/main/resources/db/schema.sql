@@ -434,9 +434,3 @@ INSERT INTO receta (id_producto, id_insumo, cantidad_necesaria) VALUES
 (6, 8, 60.00),
 (6, 5, 40.00);
 
--- 8. Caja Inicial Abierta de Prueba
-INSERT INTO caja (id_caja, id_usuario_apertura, nombre_caja, monto_apertura, fecha_apertura, estado) VALUES
-(1, 2, 'Caja Principal - Turno Mañana', 150.00, CURRENT_TIMESTAMP, 'ABIERTA');
-
-INSERT INTO movimiento_caja (id_caja, id_usuario, tipo_movimiento, monto, concepto) VALUES
-(1, 2, 'INGRESO', 150.00, 'Apertura de caja con fondo inicial para sencillo');
