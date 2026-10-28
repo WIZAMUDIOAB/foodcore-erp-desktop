@@ -340,26 +340,31 @@ CREATE TABLE costo_operativo (
 -- DATOS SEMILLA (SEEDS)
 -- ============================================================================
 
--- 1. Roles (4 Roles Principales)
+-- 1. Roles (5 Roles del Sistema)
 INSERT INTO rol (id_rol, nombre, descripcion, estado) VALUES
-(1, 'Gerente', 'Control total gerencial, reportes y configuraci贸n', TRUE),
-(2, 'Administrador', 'Gesti贸n de caja, compras, inventario y personal', TRUE),
-(3, 'Mozo', 'Toma de pedidos en sal贸n y env铆o de comandas', TRUE),
-(4, 'Cocinero', 'Visualizaci贸n de comandas en KDS y despacho', TRUE);
+(1, 'Gerente', 'Control total gerencial, reportes y supervisi髇', TRUE),
+(2, 'Administrador', 'Gesti髇 t閏nica de caja, almac閚, recetas y personal', TRUE),
+(3, 'Mozo', 'Toma de pedidos en sal髇 y despacho de comandas', TRUE),
+(4, 'Cocinero', 'Visualizaci髇 de comandas en KDS y despacho', TRUE),
+(5, 'Cajero', 'Atenci髇 en terminal POS, apertura y arqueo de caja', TRUE);
 
 -- 2. Empleados y Usuarios Iniciales
 INSERT INTO empleado (id_empleado, dni, nombres, apellidos, telefono, cargo, sueldo_base, fecha_ingreso, estado) VALUES
 (1, '70001001', 'Carlos', 'Zambrano Ramos', '987654321', 'Gerente General', 3500.00, '2024-01-01', TRUE),
 (2, '70001002', 'Lucia', 'Fernandez Torres', '987654322', 'Administradora de Turno', 2200.00, '2024-01-15', TRUE),
 (3, '70001003', 'Mateo', 'Quispe Morales', '987654323', 'Mozo Principal', 1200.00, '2024-02-01', TRUE),
-(4, '70001004', 'Rosa', 'Medina Sanchez', '987654324', 'Jefa de Cocina', 1800.00, '2024-02-01', TRUE);
+(4, '70001004', 'Rosa', 'Medina Sanchez', '987654324', 'Jefa de Cocina', 1800.00, '2024-02-01', TRUE),
+(5, '70001005', 'Valeria', 'Rios Castro', '987654325', 'Cajera Principal', 1500.00, '2024-02-15', TRUE);
 
--- Contrase帽as en texto plano inicial para entorno de desarrollo local (admin123, mozo123, cocina123)
+-- Contrase馻s para entorno local (*123)
 INSERT INTO usuario (id_usuario, id_empleado, id_rol, username, password_hash, activo) VALUES
-(1, 1, 1, 'gerente', 'admin123', TRUE),
+(1, 1, 1, 'gerente', 'gerente123', TRUE),
 (2, 2, 2, 'admin', 'admin123', TRUE),
 (3, 3, 3, 'mozo1', 'mozo123', TRUE),
-(4, 4, 4, 'cocina1', 'cocina123', TRUE);
+(4, 4, 4, 'cocina1', 'cocina123', TRUE),
+(5, 5, 5, 'cajero', 'cajero123', TRUE),
+(6, 3, 3, 'mozo', 'mozo123', TRUE),
+(7, 4, 4, 'cocinero', 'cocinero123', TRUE);
 
 -- 3. Clientes Semilla
 INSERT INTO cliente (id_cliente, tipo_documento, numero_documento, nombre_razon_social, direccion, telefono, email) VALUES

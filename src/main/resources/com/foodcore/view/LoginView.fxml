@@ -41,7 +41,7 @@
             <!-- Cuentas de Acceso Rapido -->
             <VBox spacing="3.0">
                 <Label text="CUENTAS DEMO:" style="-fx-text-fill: #4b5563; -fx-font-size: 10px; -fx-font-weight: 700; -fx-letter-spacing: 0.05em;"/>
-                <Label text="admin / cajero / mozo / cocinero (pass: *123)" style="-fx-text-fill: #8c96a5; -fx-font-size: 10px;"/>
+                <Label text="admin / cajero / mozo / cocinero / gerente (pass: *123)" style="-fx-text-fill: #8c96a5; -fx-font-size: 10px;"/>
             </VBox>
         </VBox>
 
