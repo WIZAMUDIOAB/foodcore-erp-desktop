@@ -22,6 +22,9 @@ public class App extends Application {
         // Aplicar tema moderno AtlantaFX (PrimerLight)
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
 
+        // Iniciar Servidor TCP de Sockets en segundo plano para sincronizacion en tiempo real con Cocina
+        try { com.foodcore.util.ServidorSockets.getInstance().iniciar(); } catch (Exception ignored) {}
+
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
             Parent root = loader.load();

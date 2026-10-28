@@ -48,12 +48,32 @@ public class ComandaCardController {
         lblEstado.setText("Estado: " + estado);
         if ("EN_PREPARACION".equalsIgnoreCase(estado)) {
             btnIniciar.setDisable(true);
-            btnIniciar.setText("Preparando...");
+            btnIniciar.setText("En Cocina");
+            lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #f59e0b;");
+        } else if ("LISTO".equalsIgnoreCase(estado)) {
+            btnIniciar.setDisable(true);
+            btnIniciar.setText("Listo");
+            lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #10b981;");
         }
     }
 
     public void setIdPedido(int idPedido) {
         this.idPedido = idPedido;
+    }
+
+    public int getIdPedido() {
+        return idPedido;
+    }
+
+    public void setSegundosTranscurridos(int segundos) {
+        this.segundosTranscurridos = Math.max(0, segundos);
+        actualizarEstiloTiempo();
+    }
+
+    public void stopTimer() {
+        if (timer != null) {
+            timer.stop();
+        }
     }
 
     public void agregarPlato(String producto, int cantidad, String notas) {
@@ -75,31 +95,36 @@ public class ComandaCardController {
     }
 
     private void iniciarTemporizador() {
+        actualizarEstiloTiempo();
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             segundosTranscurridos++;
-            int min = segundosTranscurridos / 60;
-            int sec = segundosTranscurridos % 60;
-            lblTiempo.setText(String.format("%02d:%02d min", min, sec));
-
-            String baseCard = "-fx-background-color: #161920; -fx-background-radius: 10px; -fx-padding: 14px; -fx-border-width: 2px; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 3);";
-
-            // Semaforo KDS de Alto Rendimiento
-            if (min >= 10) {
-                // Alerta critica roja (> 10 min)
-                cardContainer.setStyle(baseCard + " -fx-border-color: #ef4444;");
-                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #ef4444; -fx-font-size: 14px; -fx-background-color: rgba(239, 68, 68, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
-            } else if (min >= 5) {
-                // Alerta intermedia ambar (5 a 10 min)
-                cardContainer.setStyle(baseCard + " -fx-border-color: #f59e0b;");
-                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #f59e0b; -fx-font-size: 14px; -fx-background-color: rgba(245, 158, 11, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
-            } else {
-                // Tiempo optimo verde (< 5 min)
-                cardContainer.setStyle(baseCard + " -fx-border-color: #10b981;");
-                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #10b981; -fx-font-size: 14px; -fx-background-color: rgba(16, 185, 129, 0.14); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
-            }
+            actualizarEstiloTiempo();
         }));
         timer.setCycleCount(Timeline.INDEFINITE);
         timer.play();
+    }
+
+    private void actualizarEstiloTiempo() {
+        int min = segundosTranscurridos / 60;
+        int sec = segundosTranscurridos % 60;
+        lblTiempo.setText(String.format("%02d:%02d min", min, sec));
+
+        String baseCard = "-fx-background-color: #161920; -fx-background-radius: 10px; -fx-padding: 14px; -fx-border-width: 2px; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 3);";
+
+        // Semaforo KDS de Alto Rendimiento
+        if (min >= 10) {
+            // Alerta critica roja (> 10 min)
+            cardContainer.setStyle(baseCard + " -fx-border-color: #ef4444;");
+            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #ef4444; -fx-font-size: 14px; -fx-background-color: rgba(239, 68, 68, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+        } else if (min >= 5) {
+            // Alerta intermedia ambar (5 a 10 min)
+            cardContainer.setStyle(baseCard + " -fx-border-color: #f59e0b;");
+            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #f59e0b; -fx-font-size: 14px; -fx-background-color: rgba(245, 158, 11, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+        } else {
+            // Tiempo optimo verde (< 5 min)
+            cardContainer.setStyle(baseCard + " -fx-border-color: #10b981;");
+            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #10b981; -fx-font-size: 14px; -fx-background-color: rgba(16, 185, 129, 0.14); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+        }
     }
 
     @FXML
@@ -121,7 +146,7 @@ public class ComandaCardController {
 
     @FXML
     public void handleDespachar(ActionEvent event) {
-        if (timer != null) timer.stop();
+        stopTimer();
         lblEstado.setText("Estado: LISTO / DESPACHADO");
         lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #10b981;");
 

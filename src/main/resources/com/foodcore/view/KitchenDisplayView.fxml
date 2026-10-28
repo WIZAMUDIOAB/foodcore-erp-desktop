@@ -22,6 +22,7 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="lblSocketStatus" text="Socket TCP: Activo"
                    style="-fx-text-fill: #10b981; -fx-font-weight: 700; -fx-font-size: 12px;"/>
+            <Button text="↻ Actualizar Comandas" onAction="#handleRefrescar" style="-fx-background-color: #2563eb; -fx-text-fill: #ffffff; -fx-font-weight: 700; -fx-font-size: 12px; -fx-padding: 8px 14px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
             <Button text="+ Simular Comanda" onAction="#handleSimularComanda"
                     style="-fx-background-color: #272d38; -fx-text-fill: #f1f5f9; -fx-font-weight: 700; -fx-font-size: 12px; -fx-padding: 8px 14px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
         </HBox>

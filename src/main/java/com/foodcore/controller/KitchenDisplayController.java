@@ -10,6 +10,8 @@ import com.foodcore.util.ServidorSockets;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -17,13 +19,20 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
+import javafx.util.Duration;
 
-import java.awt.*;
+import java.awt.Toolkit;
 import java.io.IOException;
 import java.sql.Connection;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class KitchenDisplayController {
+
+    private static final Logger LOGGER = Logger.getLogger(KitchenDisplayController.class.getName());
 
     @FXML private FlowPane flowComandas;
     @FXML private Label lblSocketStatus;
@@ -31,11 +40,32 @@ public class KitchenDisplayController {
 
     private int contadorComandas = 0;
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
+    private Timeline autoSyncTimer;
+
+    private static class ComandaDTO {
+        final int idPedido;
+        final String mesa;
+        final String comandaCode;
+        final String estado;
+        final int segundos;
+        final List<DetallePedido> detalles;
+
+        ComandaDTO(int idPedido, String mesa, String comandaCode, String estado, int segundos, List<DetallePedido> detalles) {
+            this.idPedido = idPedido;
+            this.mesa = mesa;
+            this.comandaCode = comandaCode;
+            this.estado = estado;
+            this.segundos = segundos;
+            this.detalles = detalles;
+        }
+    }
 
     @FXML
     public void initialize() {
         iniciarServidorSockets();
         cargarComandasDesdeBD();
+        iniciarAutoSincronizacion();
     }
 
     private void iniciarServidorSockets() {
@@ -44,101 +74,180 @@ public class KitchenDisplayController {
         server.iniciar();
     }
 
+    private void iniciarAutoSincronizacion() {
+        // Auto-sincronización periódica cada 4 segundos con la BD
+        autoSyncTimer = new Timeline(new KeyFrame(Duration.seconds(4), event -> sincronizarNuevasComandas()));
+        autoSyncTimer.setCycleCount(Timeline.INDEFINITE);
+        autoSyncTimer.play();
+    }
+
+    @FXML
+    public void handleRefrescar(ActionEvent event) {
+        cargarComandasDesdeBD();
+    }
+
     private void cargarComandasDesdeBD() {
         new Thread(() -> {
             try (Connection conn = ConexionBD.getConnection()) {
                 List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
+                List<ComandaDTO> listaComandas = new ArrayList<>();
+
+                for (Pedido p : pedidos) {
+                    List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
+                    String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
+                    int seg = 0;
+                    if (p.getFechaHora() != null) {
+                        seg = (int) Math.max(0, java.time.Duration.between(p.getFechaHora(), LocalDateTime.now()).getSeconds());
+                    }
+                    listaComandas.add(new ComandaDTO(p.getIdPedido(), p.getNumeroMesa(), comandaCode, p.getEstado(), seg, detalles));
+                }
+
                 Platform.runLater(() -> {
+                    // Detener temporizadores de tarjetas previas
+                    for (ComandaCardController c : tarjetasActivas.values()) {
+                        c.stopTimer();
+                    }
+                    tarjetasActivas.clear();
                     flowComandas.getChildren().clear();
                     contadorComandas = 0;
 
-                    for (Pedido p : pedidos) {
-                        try {
-                            List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
-                            String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
-                            crearTarjetaComanda(p.getIdPedido(), p.getNumeroMesa(), comandaCode, p.getEstado(), detalles);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
+                    for (ComandaDTO c : listaComandas) {
+                        crearTarjetaComanda(c.idPedido, c.mesa, c.comandaCode, c.estado, c.segundos, c.detalles);
                     }
 
-                    if (pedidos.isEmpty()) {
-                        lblContadorActivas.setText("Comandas en Cocina: 0");
-                    }
+                    actualizarContador(0);
                 });
             } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error al cargar comandas desde BD", e);
                 Platform.runLater(() -> {
-                    lblContadorActivas.setText("Comandas en Cocina: 0");
+                    lblContadorActivas.setText("Comandas en Cocina: " + contadorComandas);
                 });
+            }
+        }).start();
+    }
+
+    private void sincronizarNuevasComandas() {
+        new Thread(() -> {
+            try (Connection conn = ConexionBD.getConnection()) {
+                List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
+                Set<Integer> idsActivosEnBD = new HashSet<>();
+                List<ComandaDTO> nuevasComandas = new ArrayList<>();
+
+                for (Pedido p : pedidos) {
+                    idsActivosEnBD.add(p.getIdPedido());
+                    if (!tarjetasActivas.containsKey(p.getIdPedido())) {
+                        List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
+                        String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
+                        int seg = 0;
+                        if (p.getFechaHora() != null) {
+                            seg = (int) Math.max(0, java.time.Duration.between(p.getFechaHora(), LocalDateTime.now()).getSeconds());
+                        }
+                        nuevasComandas.add(new ComandaDTO(p.getIdPedido(), p.getNumeroMesa(), comandaCode, p.getEstado(), seg, detalles));
+                    }
+                }
+
+                // Identificar comandas que ya fueron despachadas o cobradas en otra terminal
+                List<Integer> idsAEliminar = new ArrayList<>();
+                for (Integer id : tarjetasActivas.keySet()) {
+                    if (id > 0 && !idsActivosEnBD.contains(id)) {
+                        idsAEliminar.add(id);
+                    }
+                }
+
+                if (!nuevasComandas.isEmpty() || !idsAEliminar.isEmpty()) {
+                    Platform.runLater(() -> {
+                        // Eliminar comandas que ya no están activas
+                        for (Integer id : idsAEliminar) {
+                            ComandaCardController card = tarjetasActivas.remove(id);
+                            if (card != null) {
+                                card.stopTimer();
+                                flowComandas.getChildren().remove(card.getCardContainer());
+                                actualizarContador(-1);
+                            }
+                        }
+
+                        // Agregar nuevas comandas
+                        for (ComandaDTO c : nuevasComandas) {
+                            if (!tarjetasActivas.containsKey(c.idPedido)) {
+                                crearTarjetaComanda(c.idPedido, c.mesa, c.comandaCode, c.estado, c.segundos, c.detalles);
+                                try {
+                                    Toolkit.getDefaultToolkit().beep();
+                                } catch (Exception ignored) {}
+                            }
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                // Silencioso en auto-sync periódico
             }
         }).start();
     }
 
     private void procesarMensajeSocket(JsonObject json) {
         if (json.has("accion") && "NUEVA_COMANDA".equals(json.get("accion").getAsString())) {
+            int idPed = json.has("idPedido") ? json.get("idPedido").getAsInt() : 0;
+            if (idPed > 0 && tarjetasActivas.containsKey(idPed)) {
+                return; // Ya está mostrada en pantalla
+            }
+
             String mesa = json.has("mesa") ? json.get("mesa").getAsString() : "01";
             String comanda = json.has("numeroComanda") ? json.get("numeroComanda").getAsString() : "COM-AUTO";
-            int idPed = json.has("idPedido") ? json.get("idPedido").getAsInt() : 0;
 
             try {
-                // Notificación auditiva de cocina
                 Toolkit.getDefaultToolkit().beep();
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ComandaCard.fxml"));
-            try {
-                Parent cardNode = loader.load();
-                ComandaCardController cardCtrl = loader.getController();
-                cardCtrl.initData(mesa, comanda, "PENDIENTE");
-                cardCtrl.setIdPedido(idPed);
+            List<DetallePedido> detalles = new ArrayList<>();
+            if (json.has("items")) {
+                JsonArray items = json.getAsJsonArray("items");
+                for (JsonElement el : items) {
+                    JsonObject obj = el.getAsJsonObject();
+                    String prod = obj.get("producto").getAsString();
+                    int cant = obj.get("cantidad").getAsInt();
+                    String notas = obj.has("notas") ? obj.get("notas").getAsString() : "";
 
-                if (json.has("items")) {
-                    JsonArray items = json.getAsJsonArray("items");
-                    for (JsonElement el : items) {
-                        JsonObject obj = el.getAsJsonObject();
-                        String prod = obj.get("producto").getAsString();
-                        int cant = obj.get("cantidad").getAsInt();
-                        String notas = obj.has("notas") ? obj.get("notas").getAsString() : "";
-                        cardCtrl.agregarPlato(prod, cant, notas);
-                    }
+                    DetallePedido dp = new DetallePedido();
+                    dp.setNombreProducto(prod);
+                    dp.setCantidad(cant);
+                    dp.setNotasPreparacion(notas);
+                    detalles.add(dp);
                 }
-
-                cardCtrl.setOnDespachadoListener(c -> {
-                    flowComandas.getChildren().remove(c.getCardContainer());
-                    actualizarContador(-1);
-                });
-
-                AnimationUtils.animateModalEnter(cardNode);
-                flowComandas.getChildren().add(cardNode);
-                actualizarContador(1);
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+
+            crearTarjetaComanda(idPed, mesa, comanda, "PENDIENTE", 0, detalles);
         }
     }
 
-    private void crearTarjetaComanda(int idPedido, String mesa, String comanda, String estado, List<DetallePedido> detalles) {
+    private void crearTarjetaComanda(int idPedido, String mesa, String comanda, String estado, int segundos, List<DetallePedido> detalles) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ComandaCard.fxml"));
             Parent cardNode = loader.load();
             ComandaCardController cardCtrl = loader.getController();
             cardCtrl.initData(mesa, comanda, estado);
             cardCtrl.setIdPedido(idPedido);
+            cardCtrl.setSegundosTranscurridos(segundos);
 
             for (DetallePedido d : detalles) {
                 cardCtrl.agregarPlato(d.getNombreProducto(), d.getCantidad(), d.getNotasPreparacion());
             }
 
             cardCtrl.setOnDespachadoListener(c -> {
+                if (idPedido > 0) {
+                    tarjetasActivas.remove(idPedido);
+                }
                 flowComandas.getChildren().remove(c.getCardContainer());
                 actualizarContador(-1);
             });
 
+            if (idPedido > 0) {
+                tarjetasActivas.put(idPedido, cardCtrl);
+            }
+
+            AnimationUtils.animateModalEnter(cardNode);
             flowComandas.getChildren().add(cardNode);
             actualizarContador(1);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Error al instanciar tarjeta de comanda", e);
         }
     }
 
