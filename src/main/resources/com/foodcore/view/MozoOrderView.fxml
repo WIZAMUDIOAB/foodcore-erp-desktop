@@ -6,37 +6,59 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.MozoOrderController"
-            prefHeight="650.0" prefWidth="800.0" style="-fx-background-color: #f8f9fa;">
+            prefHeight="680.0" prefWidth="850.0" style="-fx-background-color: #f8f9fa;">
 
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="15.0" style="-fx-padding: 15px; -fx-background-color: #1d3557;">
+        <HBox alignment="CENTER_LEFT" spacing="15.0" style="-fx-padding: 12px 20px; -fx-background-color: #1d3557;">
             <Label fx:id="lblTituloMesa" text="COMANDA RÁPIDA (IU07) - MESA 01" style="-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="lblMozo" text="Mozo: Turno Activo" style="-fx-text-fill: #a8dadc; -fx-font-weight: bold;"/>
         </HBox>
     </top>
 
     <center>
         <VBox spacing="10.0" style="-fx-padding: 15px;">
             <Label text="Seleccione Platos para Agregar a la Comanda:" style="-fx-font-weight: bold;"/>
-            <ScrollPane fitToWidth="true" prefHeight="220.0" style="-fx-background-color: transparent;">
+            <ScrollPane fitToWidth="true" prefHeight="210.0" style="-fx-background-color: transparent;">
                 <TilePane fx:id="tilePlatos" hgap="10.0" vgap="10.0" style="-fx-padding: 5px;"/>
             </ScrollPane>
 
             <Separator/>
 
-            <Label text="Platos en Comanda:" style="-fx-font-weight: bold;"/>
+            <HBox alignment="CENTER_LEFT" spacing="10.0">
+                <Label text="Platos en Comanda:" style="-fx-font-weight: bold;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="+ Cantidad" onAction="#handleAumentarCantidad" style="-fx-background-color: #e9ecef; -fx-font-size: 11px;"/>
+                <Button text="- Cantidad" onAction="#handleDisminuirCantidad" style="-fx-background-color: #e9ecef; -fx-font-size: 11px;"/>
+                <Button text="Quitar Plato" onAction="#handleQuitarPlato" style="-fx-background-color: #fee2e2; -fx-text-fill: #e63946; -fx-font-size: 11px;"/>
+            </HBox>
+
             <TableView fx:id="tblItems" VBox.vgrow="ALWAYS">
                 <columns>
-                    <TableColumn fx:id="colPlato" text="Plato" prefWidth="240.0"/>
+                    <TableColumn fx:id="colPlato" text="Plato" prefWidth="250.0"/>
                     <TableColumn fx:id="colCantidad" text="Cant" prefWidth="60.0"/>
                     <TableColumn fx:id="colPrecio" text="Precio Unit" prefWidth="90.0"/>
-                    <TableColumn fx:id="colNotas" text="Notas de Preparación (ej: sin cremas)" prefWidth="250.0"/>
+                    <TableColumn fx:id="colNotas" text="Notas de Preparación de Cocina" prefWidth="300.0"/>
                 </columns>
             </TableView>
 
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <TextField fx:id="txtNotaEspecial" promptText="Escriba indicación para el plato seleccionado (ej: 'sin mayonesa', 'bien cocido')..." HBox.hgrow="ALWAYS"/>
-                <Button text="Aplicar Nota" onAction="#handleAplicarNota" style="-fx-background-color: #457b9d; -fx-text-fill: white;"/>
-            </HBox>
+            <!-- Notas Rápidas Predefinidas -->
+            <VBox spacing="6.0" style="-fx-background-color: white; -fx-padding: 10px; -fx-background-radius: 6px; -fx-border-color: #dee2e6; -fx-border-radius: 6px;">
+                <HBox spacing="8.0" alignment="CENTER_LEFT">
+                    <Label text="Notas Rápidas:" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #6c757d;"/>
+                    <Button text="Sin mayonesa" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                    <Button text="Sin cremas" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                    <Button text="Extra papas" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                    <Button text="Bien cocido" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                    <Button text="Gaseosa helada" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                    <Button text="Para llevar" onAction="#handleNotaRapida" style="-fx-background-color: #f1faee; -fx-font-size: 11px;"/>
+                </HBox>
+
+                <HBox spacing="10.0" alignment="CENTER_LEFT">
+                    <TextField fx:id="txtNotaEspecial" promptText="Escriba indicación manual para el plato seleccionado..." HBox.hgrow="ALWAYS"/>
+                    <Button text="Aplicar Nota" onAction="#handleAplicarNota" style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-font-weight: bold;"/>
+                </HBox>
+            </VBox>
         </VBox>
     </center>
 

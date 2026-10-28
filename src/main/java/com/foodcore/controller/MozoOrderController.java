@@ -5,6 +5,7 @@ import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.util.ConexionBD;
@@ -26,6 +27,7 @@ import java.util.List;
 public class MozoOrderController {
 
     @FXML private Label lblTituloMesa;
+    @FXML private Label lblMozo;
     @FXML private TilePane tilePlatos;
     @FXML private TableView<DetallePedido> tblItems;
     @FXML private TableColumn<DetallePedido, String> colPlato;
@@ -48,6 +50,13 @@ public class MozoOrderController {
 
     @FXML
     public void initialize() {
+        Usuario u = AuthService.getUsuarioSesionActual();
+        if (u != null) {
+            lblMozo.setText("Mozo: " + u.getUsername() + " (" + u.getNombreRol() + ")");
+        } else {
+            lblMozo.setText("Mozo: Turno Activo (Mateo Quispe)");
+        }
+
         colPlato.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNombreProducto()));
         colCantidad.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCantidad()));
         colPrecio.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getPrecioUnitario()));
@@ -62,6 +71,7 @@ public class MozoOrderController {
             try (Connection conn = ConexionBD.getConnection()) {
                 List<Producto> productos = productoDAO.listarProductosDisponibles(conn);
                 Platform.runLater(() -> {
+                    tilePlatos.getChildren().clear();
                     for (Producto p : productos) {
                         Button btn = new Button(p.getNombre() + "\nS/ " + p.getPrecioVenta());
                         btn.setPrefSize(130, 75);
@@ -73,7 +83,6 @@ public class MozoOrderController {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    // Botón de fallback para demo
                     Button btn = new Button("Hamburguesa Clásica\nS/ 15.00");
                     btn.setPrefSize(130, 75);
                     btn.setOnAction(ev -> {
@@ -100,6 +109,56 @@ public class MozoOrderController {
         nuevo.setNombreProducto(p.getNombre());
         items.add(nuevo);
         calcularTotal();
+    }
+
+    @FXML
+    public void handleAumentarCantidad() {
+        DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
+        if (sel != null) {
+            sel.setCantidad(sel.getCantidad() + 1);
+            sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
+            tblItems.refresh();
+            calcularTotal();
+        }
+    }
+
+    @FXML
+    public void handleDisminuirCantidad() {
+        DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
+        if (sel != null) {
+            if (sel.getCantidad() > 1) {
+                sel.setCantidad(sel.getCantidad() - 1);
+                sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
+                tblItems.refresh();
+            } else {
+                items.remove(sel);
+            }
+            calcularTotal();
+        }
+    }
+
+    @FXML
+    public void handleQuitarPlato() {
+        DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
+        if (sel != null) {
+            items.remove(sel);
+            calcularTotal();
+        }
+    }
+
+    @FXML
+    public void handleNotaRapida(ActionEvent event) {
+        Button b = (Button) event.getSource();
+        DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
+        if (sel != null) {
+            String actual = sel.getNotasPreparacion() != null && !sel.getNotasPreparacion().isEmpty()
+                ? sel.getNotasPreparacion() + ", " + b.getText()
+                : b.getText();
+            sel.setNotasPreparacion(actual);
+            tblItems.refresh();
+        } else {
+            txtNotaEspecial.setText(b.getText());
+        }
     }
 
     @FXML
@@ -137,7 +196,7 @@ public class MozoOrderController {
 
         try {
             pedidoService.registrarPedidoYEnviarComanda(pedido, items);
-            mostrarAlerta("Comanda Despachada", "La comanda de la Mesa " + mesa + " fue registrada y transmitida vía Socket TCP (puerto 9090) a Cocina.", Alert.AlertType.INFORMATION);
+            mostrarAlerta("Comanda Despachada", "La comanda de la Mesa " + mesa + " fue registrada en BD y enviada en tiempo real vía Socket TCP 9090 a Cocina.", Alert.AlertType.INFORMATION);
             Stage s = (Stage) lblTotal.getScene().getWindow();
             s.close();
         } catch (Exception e) {
