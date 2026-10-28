@@ -4,10 +4,12 @@ import com.foodcore.model.Caja;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.math.BigDecimal;
@@ -15,6 +17,11 @@ import java.util.Optional;
 
 public class ArqueoCajaController {
 
+    @FXML private VBox panelApertura;
+    @FXML private TextField txtAperturaNombre;
+    @FXML private TextField txtAperturaMonto;
+
+    @FXML private VBox panelArqueo;
     @FXML private Label lblNombreCaja;
     @FXML private Label lblFondoApertura;
     @FXML private Label lblTotalVentas;
@@ -35,24 +42,56 @@ public class ArqueoCajaController {
         new Thread(() -> {
             try {
                 Optional<Caja> opt = cajaService.obtenerCajaActiva();
-                if (opt.isPresent()) {
-                    cajaActual = opt.get();
-                    BigDecimal ventas = cajaService.calcularVentasTurno(cajaActual.getIdCaja());
-                    totalEsperado = cajaActual.getMontoApertura().add(ventas);
+                Platform.runLater(() -> {
+                    if (opt.isPresent()) {
+                        cajaActual = opt.get();
+                        try {
+                            BigDecimal ventas = cajaService.calcularVentasTurno(cajaActual.getIdCaja());
+                            totalEsperado = cajaActual.getMontoApertura().add(ventas);
 
-                    Platform.runLater(() -> {
-                        lblNombreCaja.setText(cajaActual.getNombreCaja());
-                        lblFondoApertura.setText("S/ " + cajaActual.getMontoApertura());
-                        lblTotalVentas.setText("S/ " + ventas);
-                        lblTotalEsperado.setText("S/ " + totalEsperado);
-                    });
-                } else {
-                    Platform.runLater(() -> lblNombreCaja.setText("No hay turno de caja abierto actualmente."));
-                }
+                            lblNombreCaja.setText(cajaActual.getNombreCaja());
+                            lblFondoApertura.setText("S/ " + cajaActual.getMontoApertura());
+                            lblTotalVentas.setText("S/ " + ventas);
+                            lblTotalEsperado.setText("S/ " + totalEsperado);
+
+                            panelApertura.setVisible(false);
+                            panelApertura.setManaged(false);
+                            panelArqueo.setVisible(true);
+                            panelArqueo.setManaged(true);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        cajaActual = null;
+                        panelArqueo.setVisible(false);
+                        panelArqueo.setManaged(false);
+                        panelApertura.setVisible(true);
+                        panelApertura.setManaged(true);
+                    }
+                });
             } catch (Exception e) {
-                Platform.runLater(() -> lblNombreCaja.setText("Error al consultar caja: " + e.getMessage()));
+                Platform.runLater(() -> mostrarAlerta("Error", "Error al consultar caja: " + e.getMessage(), Alert.AlertType.ERROR));
             }
         }).start();
+    }
+
+    @FXML
+    public void handleAbrirTurnoCaja(ActionEvent event) {
+        try {
+            String nombre = txtAperturaNombre.getText().trim();
+            BigDecimal fondo = new BigDecimal(txtAperturaMonto.getText().trim());
+
+            int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+            cajaService.abrirTurnoCaja(idUsuario, nombre, fondo);
+
+            mostrarAlerta("Caja Abierta", "Se abrió la caja exitosamente con fondo de S/ " + fondo, Alert.AlertType.INFORMATION);
+            cargarDatosCaja();
+
+        } catch (NumberFormatException e) {
+            mostrarAlerta("Validación", "Ingrese un monto numérico válido.", Alert.AlertType.WARNING);
+        } catch (Exception e) {
+            mostrarAlerta("Error", e.getMessage(), Alert.AlertType.ERROR);
+        }
     }
 
     @FXML
@@ -78,20 +117,27 @@ public class ArqueoCajaController {
     }
 
     @FXML
-    public void handleCerrarCaja() {
+    public void handleCerrarCaja(ActionEvent event) {
         if (cajaActual == null) {
             mostrarAlerta("Aviso", "No hay caja abierta para cerrar.", Alert.AlertType.WARNING);
             return;
         }
 
         try {
-            BigDecimal fisico = new BigDecimal(txtEfectivoFisico.getText().trim());
+            String txt = txtEfectivoFisico.getText().trim();
+            if (txt.isEmpty()) {
+                mostrarAlerta("Validación", "Debe ingresar el dinero físico contado en gaveta.", Alert.AlertType.WARNING);
+                return;
+            }
+            BigDecimal fisico = new BigDecimal(txt);
             int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
             cajaService.cerrarTurnoCaja(cajaActual.getIdCaja(), idUsuario, fisico);
 
             mostrarAlerta("Caja Cerrada", "El turno de caja se cerró exitosamente.", Alert.AlertType.INFORMATION);
             Stage stage = (Stage) txtEfectivoFisico.getScene().getWindow();
             stage.close();
+        } catch (NumberFormatException e) {
+            mostrarAlerta("Validación", "Ingrese un monto numérico válido.", Alert.AlertType.WARNING);
         } catch (Exception e) {
             mostrarAlerta("Error al Cerrar Caja", e.getMessage(), Alert.AlertType.ERROR);
         }

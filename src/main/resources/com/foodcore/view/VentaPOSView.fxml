@@ -25,8 +25,9 @@
             <HBox spacing="10.0" alignment="CENTER_LEFT">
                 <Label text="Catálogo de Platos y Bebidas" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <TextField fx:id="txtBuscar" promptText="Buscar producto..." prefWidth="250.0"/>
+                <TextField fx:id="txtBuscar" promptText="Buscar plato o bebida..." prefWidth="250.0"/>
             </HBox>
+            <HBox fx:id="boxCategorias" spacing="8.0" alignment="CENTER_LEFT" style="-fx-padding: 4px 0;"/>
             <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
                 <TilePane fx:id="tileProductos" hgap="12.0" vgap="12.0" prefColumns="3" style="-fx-padding: 5px;"/>
             </ScrollPane>
