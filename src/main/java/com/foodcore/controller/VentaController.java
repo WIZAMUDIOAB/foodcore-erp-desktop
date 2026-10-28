@@ -5,6 +5,7 @@ import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Producto;
+import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
@@ -14,13 +15,17 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.TilePane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -46,6 +51,10 @@ public class VentaController {
     @FXML private Label lblIgv;
     @FXML private Label lblTotal;
 
+    @FXML private Button btnEfectivo;
+    @FXML private Button btnTarjeta;
+    @FXML private Button btnYape;
+
     private final ObservableList<DetalleVenta> itemsVenta = FXCollections.observableArrayList();
     private final List<Producto> todosLosProductos = new ArrayList<>();
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
@@ -59,6 +68,11 @@ public class VentaController {
         colSubtotal.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getSubtotal()));
 
         tblDetalle.setItems(itemsVenta);
+
+        // Micro-interaccion tactil para botones de cobro
+        AnimationUtils.attachTactileFeedback(btnEfectivo);
+        AnimationUtils.attachTactileFeedback(btnTarjeta);
+        AnimationUtils.attachTactileFeedback(btnYape);
 
         // Doble clic para sumar cantidad
         tblDetalle.setRowFactory(tv -> {
@@ -81,7 +95,7 @@ public class VentaController {
         cargarCategorias();
         cargarCatalogoProductos();
 
-        // Configurar atajos de teclado F5, F6, F7 cuando el nodo se vincule a una Scene
+        // Atajos de teclado F5, F6, F7
         Platform.runLater(() -> {
             if (tblDetalle.getScene() != null) {
                 tblDetalle.getScene().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -105,7 +119,8 @@ public class VentaController {
         boxCategorias.getChildren().clear();
 
         Button btnTodos = new Button("Todos");
-        btnTodos.setStyle("-fx-background-color: #1d3557; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-cursor: hand;");
+        btnTodos.getStyleClass().addAll("category-chip", "category-chip-active");
+        AnimationUtils.attachTactileFeedback(btnTodos);
         btnTodos.setOnAction(e -> {
             categoriaFiltroSeleccionada = 0;
             actualizarEstiloBotonesCategorias(btnTodos);
@@ -119,7 +134,8 @@ public class VentaController {
                 Platform.runLater(() -> {
                     for (Categoria c : cats) {
                         Button btn = new Button(c.getNombre());
-                        btn.setStyle("-fx-background-color: #e9ecef; -fx-text-fill: #1d3557; -fx-background-radius: 15px; -fx-cursor: hand;");
+                        btn.getStyleClass().add("category-chip");
+                        AnimationUtils.attachTactileFeedback(btn);
                         btn.setOnAction(ev -> {
                             categoriaFiltroSeleccionada = c.getIdCategoria();
                             actualizarEstiloBotonesCategorias(btn);
@@ -136,10 +152,9 @@ public class VentaController {
     private void actualizarEstiloBotonesCategorias(Button activo) {
         boxCategorias.getChildren().forEach(node -> {
             if (node instanceof Button b) {
+                b.getStyleClass().remove("category-chip-active");
                 if (b == activo) {
-                    b.setStyle("-fx-background-color: #1d3557; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 15px; -fx-cursor: hand;");
-                } else {
-                    b.setStyle("-fx-background-color: #e9ecef; -fx-text-fill: #1d3557; -fx-background-radius: 15px; -fx-cursor: hand;");
+                    b.getStyleClass().add("category-chip-active");
                 }
             }
         });
@@ -173,10 +188,31 @@ public class VentaController {
             boolean coincideTexto = filtroTexto.isEmpty() || p.getNombre().toLowerCase().contains(filtroTexto) || p.getCodigo().toLowerCase().contains(filtroTexto);
 
             if (coincideCategoria && coincideTexto) {
-                Button btn = new Button(p.getNombre() + "\n\nS/ " + p.getPrecioVenta());
-                btn.setPrefSize(140, 95);
-                btn.setWrapText(true);
-                btn.setStyle("-fx-font-weight: bold; -fx-background-color: white; -fx-border-color: #adb5bd; -fx-background-radius: 8px; -fx-border-radius: 8px; -fx-cursor: hand; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.06), 4, 0, 0, 1);");
+                Button btn = new Button();
+                btn.setPrefSize(160, 105);
+                btn.getStyleClass().add("surface-card-interactive");
+
+                VBox content = new VBox(3.0);
+                content.setAlignment(Pos.TOP_LEFT);
+
+                Label lblNombre = new Label(p.getNombre());
+                lblNombre.setWrapText(true);
+                lblNombre.setStyle("-fx-font-weight: 700; -fx-text-fill: #11141a; -fx-font-size: 13px;");
+
+                Label lblCodigo = new Label(p.getCodigo() != null ? p.getCodigo() : "PLATO");
+                lblCodigo.setStyle("-fx-text-fill: #8c96a5; -fx-font-size: 10px; -fx-font-weight: 600;");
+
+                Region spacer = new Region();
+                VBox.setVgrow(spacer, Priority.ALWAYS);
+
+                Label lblPrecio = new Label("S/ " + p.getPrecioVenta());
+                lblPrecio.setStyle("-fx-font-size: 15px; -fx-font-weight: 800; -fx-text-fill: #d94e34;");
+
+                content.getChildren().addAll(lblNombre, lblCodigo, spacer, lblPrecio);
+                btn.setGraphic(content);
+                btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+
+                AnimationUtils.attachTactileFeedback(btn);
                 btn.setOnAction(e -> agregarProductoAVenta(p));
                 tileProductos.getChildren().add(btn);
             }
@@ -219,12 +255,10 @@ public class VentaController {
         for (DetalleVenta dv : itemsVenta) {
             total = total.add(dv.getSubtotal());
         }
-        // Subtotal = Total / 1.18, IGV = Total - Subtotal (Cálculo según SUNAT Perú IGV 18%)
-        BigDecimal divisor = new BigDecimal("1.18");
-        BigDecimal subtotal = total.divide(divisor, 2, RoundingMode.HALF_UP);
-        BigDecimal igv = total.subtract(subtotal);
+        BigDecimal base = total.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
+        BigDecimal igv = total.subtract(base);
 
-        lblSubtotal.setText("S/ " + subtotal.toString());
+        lblSubtotal.setText("S/ " + base.toString());
         lblIgv.setText("S/ " + igv.toString());
         lblTotal.setText("S/ " + total.toString());
     }
@@ -267,8 +301,14 @@ public class VentaController {
 
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setTitle("Finalizar Venta y Cobro - FoodCore POS");
-            stage.setScene(new Scene(root, 480, 620));
+            stage.setTitle("Finalizar Venta y Cobro - FoodCore");
+
+            Scene scene = new Scene(root, 490, 630);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+
+            AnimationUtils.animateModalEnter(root);
+
+            stage.setScene(scene);
             stage.setResizable(false);
             stage.showAndWait();
 
@@ -282,10 +322,17 @@ public class VentaController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ArqueoCajaView.fxml"));
             Parent root = loader.load();
+
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setTitle("Arqueo y Cierre de Caja");
-            stage.setScene(new Scene(root, 520, 580));
+            stage.setTitle("Control de Caja y Turnos");
+
+            Scene scene = new Scene(root, 520, 580);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+
+            AnimationUtils.animateModalEnter(root);
+
+            stage.setScene(scene);
             stage.showAndWait();
         } catch (IOException e) {
             mostrarAlerta("Error", "No se pudo abrir el arqueo: " + e.getMessage(), Alert.AlertType.ERROR);
@@ -293,10 +340,10 @@ public class VentaController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert a = new Alert(tipo);
-        a.setTitle(titulo);
-        a.setHeaderText(null);
-        a.setContentText(mensaje);
-        a.showAndWait();
+        Alert alert = new Alert(tipo);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
+        alert.showAndWait();
     }
 }

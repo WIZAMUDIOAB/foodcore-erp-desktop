@@ -4,6 +4,7 @@ import com.foodcore.App;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
+import com.foodcore.util.AnimationUtils;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -29,7 +30,7 @@ public class LoginController {
 
     @FXML
     public void initialize() {
-        // Enfoque inicial
+        AnimationUtils.attachTactileFeedback(btnLogin);
     }
 
     @FXML
@@ -41,7 +42,7 @@ public class LoginController {
             Usuario u = authService.login(username, password);
             lblMensaje.setVisible(false);
 
-            // Redirigir según el rol o al Dashboard Principal
+            // Redirigir al Dashboard Principal
             App.setRoot("MainDashboardView");
 
         } catch (NegocioException e) {
@@ -56,10 +57,17 @@ public class LoginController {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MarcacionAsistenciaView.fxml"));
             Parent root = loader.load();
+
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setTitle("Control de Asistencia - Marcación Rápida");
-            stage.setScene(new Scene(root, 480, 520));
+            stage.setTitle("Control de Asistencia - Marcación por DNI");
+
+            Scene scene = new Scene(root, 490, 560);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+
+            AnimationUtils.animateModalEnter(root);
+
+            stage.setScene(scene);
             stage.setResizable(false);
             stage.showAndWait();
         } catch (IOException e) {

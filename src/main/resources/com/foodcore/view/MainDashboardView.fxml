@@ -6,59 +6,69 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.MainDashboardController"
-            prefHeight="750.0" prefWidth="1200.0" style="-fx-background-color: #f8f9fa;">
+            prefHeight="750.0" prefWidth="1200.0" style="-fx-background-color: -color-bg-base;">
 
-    <!-- Barra Lateral Izquierda de Navegación -->
+    <!-- Barra Lateral Izquierda de Navegacion (Command Rail) -->
     <left>
-        <VBox prefWidth="250.0" spacing="10.0" style="-fx-background-color: #1d3557; -fx-padding: 20px 15px;">
-            <VBox spacing="4.0">
-                <Label text="FOODCORE ERP" style="-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 20px;"/>
-                <Label text="Fast Food S.A.C." style="-fx-text-fill: #a8dadc; -fx-font-size: 12px;"/>
+        <VBox prefWidth="255.0" spacing="6.0" styleClass="sidebar-container" style="-fx-padding: 22px 14px;">
+            <!-- Brand & Identity -->
+            <VBox spacing="4.0" style="-fx-padding: 0 8px 14px 8px;">
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <Label text="FoodCore" styleClass="sidebar-brand-title"/>
+                    <Label text="PRO" styleClass="sidebar-brand-badge"/>
+                </HBox>
+                <Label text="Fast Food S.A.C. · Terminal LAN" style="-fx-text-fill: #6b7280; -fx-font-size: 11px;"/>
             </VBox>
 
-            <Separator opacity="0.3"/>
+            <Separator style="-fx-opacity: 0.12;"/>
 
-            <Label text="MÓDULOS DEL SISTEMA" style="-fx-text-fill: #8d99ae; -fx-font-size: 11px; -fx-font-weight: bold;"/>
+            <!-- Seccion de Operaciones -->
+            <Label text="OPERACIONES Y VENTAS" styleClass="sidebar-section-header"/>
 
-            <Button fx:id="btnNavPOS" text="1. Punto de Venta (POS)" onAction="#handleNavPOS"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
+            <Button fx:id="btnNavPOS" text="Punto de Venta" onAction="#handleNavPOS"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
 
-            <Button fx:id="btnNavSalon" text="2. Salón y Mesas (Mozo)" onAction="#handleNavSalon"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
+            <Button fx:id="btnNavSalon" text="Salón y Mesas" onAction="#handleNavSalon"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
 
-            <Button fx:id="btnNavKDS" text="3. Monitor Cocina (KDS)" onAction="#handleNavKDS"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
+            <Button fx:id="btnNavKDS" text="Línea de Cocina (KDS)" onAction="#handleNavKDS"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
 
-            <Button fx:id="btnNavReportes" text="4. Reportes Gerenciales" onAction="#handleNavReportes"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
+            <!-- Seccion de Gestion y Auditoria -->
+            <Label text="GESTIÓN Y RECURSOS" styleClass="sidebar-section-header"/>
 
-            <Button fx:id="btnNavAsistencia" text="5. Control de Asistencia" onAction="#handleNavAsistencia"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
+            <Button fx:id="btnNavReportes" text="Analítica y Reportes" onAction="#handleNavReportes"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
 
-            <Button fx:id="btnNavMantenimiento" text="⚙ Base de Datos y Catálogo" onAction="#handleNavMantenimiento"
-                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
-                    style="-fx-background-color: transparent; -fx-text-fill: #a8dadc; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;"/>
+            <Button fx:id="btnNavAsistencia" text="Reloj de Asistencia" onAction="#handleNavAsistencia"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
+
+            <Button fx:id="btnNavMantenimiento" text="Base de Datos y Stock" onAction="#handleNavMantenimiento"
+                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
 
             <Region VBox.vgrow="ALWAYS"/>
 
-            <Separator opacity="0.3"/>
+            <Separator style="-fx-opacity: 0.12;"/>
 
-            <VBox spacing="6.0">
-                <Label fx:id="lblUsuarioLogueado" text="Usuario: Administrador" style="-fx-text-fill: #f1faee; -fx-font-size: 12px; -fx-font-weight: bold;"/>
-                <Button text="Cerrar Sesión" onAction="#handleCerrarSesion" maxWidth="Infinity"
-                        style="-fx-background-color: #e63946; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+            <!-- Perfil de Sesion Activa -->
+            <VBox spacing="8.0" style="-fx-padding: 6px 4px 0 4px;">
+                <HBox alignment="CENTER_LEFT" spacing="10.0"
+                      style="-fx-background-color: #161920; -fx-padding: 10px; -fx-background-radius: 8px;">
+                    <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblUsuarioLogueado" text="Administrador"
+                               style="-fx-text-fill: #f9fafb; -fx-font-weight: 700; -fx-font-size: 12px;"/>
+                        <Label text="Sesión autorizada" style="-fx-text-fill: #10b981; -fx-font-size: 10px;"/>
+                    </VBox>
+                </HBox>
+                <Button text="Cerrar Sesión" onAction="#handleCerrarSesion" maxWidth="Infinity" prefHeight="32.0"
+                        style="-fx-background-color: transparent; -fx-text-fill: #9ca3af; -fx-font-size: 11px; -fx-cursor: hand; -fx-border-color: #272c36; -fx-border-radius: 6px;"/>
             </VBox>
         </VBox>
     </left>
 
-    <!-- Contenedor Central Dinámico -->
+    <!-- Contenedor Central Dinamico -->
     <center>
-        <StackPane fx:id="contentArea" style="-fx-background-color: #ffffff;"/>
+        <StackPane fx:id="contentArea" style="-fx-background-color: -color-bg-base;"/>
     </center>
 
 </BorderPane>

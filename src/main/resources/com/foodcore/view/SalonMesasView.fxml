@@ -6,28 +6,38 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.SalonMesasController"
-      spacing="15.0" style="-fx-padding: 20px; -fx-background-color: #f8f9fa;">
+      spacing="16.0" style="-fx-padding: 24px; -fx-background-color: -color-bg-base;">
 
-    <HBox alignment="CENTER_LEFT" spacing="20.0">
-        <Label text="SALÓN Y MESAS EN VIVO" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+    <!-- Topbar del Salon -->
+    <HBox alignment="CENTER_LEFT" spacing="16.0">
+        <VBox spacing="2.0">
+            <Label text="Salón y Comedores" styleClass="view-heading"/>
+            <Label text="Distribución de mesas y seguimiento de consumos en tiempo real" styleClass="view-subheading"/>
+        </VBox>
         <Region HBox.hgrow="ALWAYS"/>
-        
-        <HBox alignment="CENTER" spacing="8.0">
-            <Label style="-fx-background-color: #2a9d8f; -fx-min-width: 16px; -fx-min-height: 16px; -fx-background-radius: 8px;"/>
-            <Label text="Mesa Libre"/>
-            <Region prefWidth="15.0"/>
-            <Label style="-fx-background-color: #e63946; -fx-min-width: 16px; -fx-min-height: 16px; -fx-background-radius: 8px;"/>
-            <Label text="Mesa Ocupada"/>
+
+        <!-- Leyenda de Estados de Mesa -->
+        <HBox alignment="CENTER" spacing="12.0"
+              style="-fx-background-color: -color-bg-surface; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-border-color: -color-border-subtle; -fx-border-radius: 20px;">
+            <HBox alignment="CENTER" spacing="6.0">
+                <Label style="-fx-background-color: -color-accent-emerald; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
+                <Label text="Libre" style="-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
+            </HBox>
+            <Separator orientation="VERTICAL"/>
+            <HBox alignment="CENTER" spacing="6.0">
+                <Label style="-fx-background-color: -color-brand-ember; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
+                <Label text="En servicio" style="-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
+            </HBox>
         </HBox>
 
-        <Button text="Refrescar Salón" onAction="#cargarMesas" style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-cursor: hand;"/>
+        <Button text="⟳ Actualizar" onAction="#cargarMesas" styleClass="btn-secondary"/>
     </HBox>
 
-    <Separator/>
+    <Separator style="-fx-opacity: 0.6;"/>
 
-    <!-- Cuadrícula de Mesas Interactivas -->
+    <!-- Cuadricula de Mesas con Scroll -->
     <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
-        <FlowPane fx:id="flowMesas" hgap="20.0" vgap="20.0" style="-fx-padding: 10px;"/>
+        <FlowPane fx:id="flowMesas" hgap="16.0" vgap="16.0" style="-fx-padding: 6px;"/>
     </ScrollPane>
 
 </VBox>

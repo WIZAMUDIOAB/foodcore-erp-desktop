@@ -6,44 +6,53 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.KitchenDisplayController"
-            prefHeight="720.0" prefWidth="1100.0" style="-fx-background-color: #212529;">
+            prefHeight="720.0" prefWidth="1100.0" style="-fx-background-color: #0c0e12;">
 
-    <!-- Encabezado Oscuro de Cocina -->
+    <!-- Encabezado de Cocina KDS -->
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="20.0" style="-fx-padding: 15px 25px; -fx-background-color: #1a1d20;">
-            <Label text="KDS COCINA - MONITOR DE COMANDAS EN TIEMPO REAL (IU04/IU09)"
-                   style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #f8f9fa;"/>
+        <HBox alignment="CENTER_LEFT" spacing="20.0"
+              style="-fx-padding: 16px 24px; -fx-background-color: #12151b; -fx-border-color: #1e232d; -fx-border-width: 0 0 1px 0;">
+            <VBox spacing="2.0">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <Label text="Línea de Cocina" style="-fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: #ffffff;"/>
+                    <Label text="KDS EN VIVO" style="-fx-background-color: rgba(16, 185, 129, 0.15); -fx-text-fill: #10b981; -fx-font-weight: 800; -fx-font-size: 10px; -fx-padding: 2px 7px; -fx-background-radius: 999px;"/>
+                </HBox>
+                <Label text="Despacho de comandas en tiempo real vía TCP Sockets (Puerto 9090)" style="-fx-text-fill: #64748b; -fx-font-size: 11px;"/>
+            </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="lblSocketStatus" text="Socket TCP: Puerto 9090 [Activo]"
-                   style="-fx-text-fill: #2a9d8f; -fx-font-weight: bold;"/>
-            <Button text="Simular Nueva Comanda" onAction="#handleSimularComanda"
-                    style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-cursor: hand;"/>
+            <Label fx:id="lblSocketStatus" text="Socket TCP: Activo"
+                   style="-fx-text-fill: #10b981; -fx-font-weight: 700; -fx-font-size: 12px;"/>
+            <Button text="+ Simular Comanda" onAction="#handleSimularComanda"
+                    style="-fx-background-color: #272d38; -fx-text-fill: #f1f5f9; -fx-font-weight: 700; -fx-font-size: 12px; -fx-padding: 8px 14px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
         </HBox>
     </top>
 
     <!-- Contenedor Desplazable de Comandas Activas -->
     <center>
-        <ScrollPane fitToHeight="true" fitToWidth="false" style="-fx-background-color: transparent; -fx-padding: 15px;">
-            <FlowPane fx:id="flowComandas" hgap="20.0" vgap="20.0" style="-fx-background-color: transparent;"/>
+        <ScrollPane fitToHeight="true" fitToWidth="false" style="-fx-background-color: transparent; -fx-padding: 18px;">
+            <FlowPane fx:id="flowComandas" hgap="18.0" vgap="18.0" style="-fx-background-color: transparent;"/>
         </ScrollPane>
     </center>
 
+    <!-- Barra Inferior de Telemetria y Alertas de Tiempo -->
     <bottom>
-        <HBox alignment="CENTER_LEFT" spacing="20.0" style="-fx-padding: 10px 25px; -fx-background-color: #1a1d20;">
-            <HBox alignment="CENTER" spacing="8.0">
-                <Label style="-fx-background-color: #2a9d8f; -fx-min-width: 14px; -fx-min-height: 14px; -fx-background-radius: 7px;"/>
-                <Label text="0 a 5 min" style="-fx-text-fill: #ced4da; -fx-font-size: 12px;"/>
+        <HBox alignment="CENTER_LEFT" spacing="22.0"
+              style="-fx-padding: 12px 24px; -fx-background-color: #12151b; -fx-border-color: #1e232d; -fx-border-width: 1px 0 0 0;">
+            <HBox alignment="CENTER" spacing="7.0">
+                <Label style="-fx-background-color: #10b981; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
+                <Label text="0 a 5 min (A tiempo)" style="-fx-text-fill: #94a3b8; -fx-font-size: 12px;"/>
             </HBox>
-            <HBox alignment="CENTER" spacing="8.0">
-                <Label style="-fx-background-color: #e9c46a; -fx-min-width: 14px; -fx-min-height: 14px; -fx-background-radius: 7px;"/>
-                <Label text="5 a 10 min (Alerta)" style="-fx-text-fill: #ced4da; -fx-font-size: 12px;"/>
+            <HBox alignment="CENTER" spacing="7.0">
+                <Label style="-fx-background-color: #f59e0b; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
+                <Label text="5 a 10 min (Atención)" style="-fx-text-fill: #94a3b8; -fx-font-size: 12px;"/>
             </HBox>
-            <HBox alignment="CENTER" spacing="8.0">
-                <Label style="-fx-background-color: #e63946; -fx-min-width: 14px; -fx-min-height: 14px; -fx-background-radius: 7px;"/>
-                <Label text="&gt; 10 min (Crítico)" style="-fx-text-fill: #ced4da; -fx-font-size: 12px;"/>
+            <HBox alignment="CENTER" spacing="7.0">
+                <Label style="-fx-background-color: #ef4444; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
+                <Label text="&gt; 10 min (Crítico)" style="-fx-text-fill: #94a3b8; -fx-font-size: 12px;"/>
             </HBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="lblContadorActivas" text="Comandas en Cocina: 0" style="-fx-text-fill: #adb5bd; -fx-font-weight: bold;"/>
+            <Label fx:id="lblContadorActivas" text="Comandas en Cocina: 0"
+                   style="-fx-text-fill: #f1f5f9; -fx-font-weight: 800; -fx-font-size: 12px;"/>
         </HBox>
     </bottom>
 

@@ -3,84 +3,99 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.*?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.VentaController"
-            prefHeight="720.0" prefWidth="1100.0" style="-fx-background-color: #f8f9fa;">
+            prefHeight="720.0" prefWidth="1100.0" style="-fx-background-color: -color-bg-base;">
 
-    <!-- Encabezado Superior -->
+    <!-- Topbar Superior -->
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="15.0" style="-fx-padding: 12px 20px; -fx-background-color: #1d3557;">
-            <Label text="FOODCORE POS - TERMINAL DE VENTA TÁCTIL (IU06)" style="-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"/>
+        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="view-topbar">
+            <VBox spacing="2.0">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <Label text="Terminal de Ventas" styleClass="view-heading"/>
+                    <Label text="Caja Activa" style="-fx-background-color: #ecfdf5; -fx-text-fill: #059669; -fx-font-weight: bold; -fx-font-size: 10px; -fx-padding: 3px 8px; -fx-background-radius: 999px;"/>
+                </HBox>
+                <Label text="Emisión rápida de comandas, boletas y tickets de venta" styleClass="view-subheading"/>
+            </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Button text="Arqueo / Cierre de Caja (IU13)" onAction="#handleAbrirArqueo"
-                    style="-fx-background-color: #e63946; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+            <Button text="Arqueo y Cierre de Caja" onAction="#handleAbrirArqueo" styleClass="btn-secondary"/>
         </HBox>
     </top>
 
-    <!-- Centro: Catálogo Visual de Productos -->
+    <!-- Centro: Catalogo Visual de Productos -->
     <center>
-        <VBox spacing="10.0" style="-fx-padding: 15px;">
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Label text="Catálogo de Platos y Bebidas" style="-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+        <VBox spacing="14.0" style="-fx-padding: 20px;">
+            <!-- Buscador y Filtros -->
+            <HBox spacing="12.0" alignment="CENTER_LEFT">
+                <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código..." prefWidth="280.0" prefHeight="38.0"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <TextField fx:id="txtBuscar" promptText="Buscar plato o bebida..." prefWidth="250.0"/>
+                <HBox fx:id="boxCategorias" spacing="8.0" alignment="CENTER_LEFT"/>
             </HBox>
-            <HBox fx:id="boxCategorias" spacing="8.0" alignment="CENTER_LEFT" style="-fx-padding: 4px 0;"/>
+
+            <!-- Grilla de Productos -->
             <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
-                <TilePane fx:id="tileProductos" hgap="12.0" vgap="12.0" prefColumns="3" style="-fx-padding: 5px;"/>
+                <TilePane fx:id="tileProductos" hgap="12.0" vgap="12.0" prefColumns="4" style="-fx-padding: 4px;"/>
             </ScrollPane>
         </VBox>
     </center>
 
-    <!-- Panel Derecho: Comanda Activa y Cobro -->
+    <!-- Panel Lateral Derecho: Resumen de Pedido y Cobro -->
     <right>
-        <VBox prefWidth="420.0" spacing="12.0" style="-fx-padding: 15px; -fx-background-color: white; -fx-border-color: #dee2e6; -fx-border-width: 0 0 0 1;">
-            <Label text="Comanda y Cobro Activo" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+        <VBox prefWidth="430.0" spacing="14.0"
+              style="-fx-background-color: -color-bg-surface; -fx-padding: 20px; -fx-border-color: -color-border-subtle; -fx-border-width: 0 0 0 1;">
 
-            <!-- Tabla de Detalle de Venta -->
+            <HBox alignment="CENTER_LEFT">
+                <VBox spacing="2.0">
+                    <Label text="Comanda en Curso" style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
+                    <Label text="Doble clic en un ítem para aumentar cantidad" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-muted;"/>
+                </VBox>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="Quitar ítem" onAction="#handleEliminarItem"
+                        style="-fx-background-color: transparent; -fx-text-fill: #dc2626; -fx-font-weight: 600; -fx-font-size: 11px; -fx-cursor: hand;"/>
+            </HBox>
+
+            <!-- Tabla de Detalle -->
             <TableView fx:id="tblDetalle" VBox.vgrow="ALWAYS">
                 <columns>
-                    <TableColumn fx:id="colProducto" text="Producto" prefWidth="170.0"/>
-                    <TableColumn fx:id="colCantidad" text="Cant" prefWidth="60.0"/>
-                    <TableColumn fx:id="colPrecio" text="P. Unit" prefWidth="70.0"/>
+                    <TableColumn fx:id="colProducto" text="Producto" prefWidth="180.0"/>
+                    <TableColumn fx:id="colCantidad" text="Cant." prefWidth="55.0"/>
+                    <TableColumn fx:id="colPrecio" text="P. Unit" prefWidth="75.0"/>
                     <TableColumn fx:id="colSubtotal" text="Total" prefWidth="80.0"/>
                 </columns>
             </TableView>
 
-            <Button text="Eliminar Producto Seleccionado" onAction="#handleEliminarItem" maxWidth="Infinity" style="-fx-text-fill: #e63946;"/>
-
-            <!-- Totales e IGV al 18% -->
-            <VBox spacing="6.0" style="-fx-background-color: #f1faee; -fx-padding: 12px; -fx-background-radius: 6px;">
-                <HBox>
-                    <Label text="Subtotal:" style="-fx-font-size: 13px;"/>
+            <!-- Resumen Financiero -->
+            <VBox spacing="8.0" style="-fx-background-color: #f8fafc; -fx-padding: 16px; -fx-background-radius: 8px; -fx-border-color: -color-border-subtle; -fx-border-radius: 8px;">
+                <HBox alignment="CENTER_LEFT">
+                    <Label text="Subtotal Neto:" style="-fx-text-fill: -color-ink-secondary; -fx-font-size: 12px;"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblSubtotal" text="S/ 0.00" style="-fx-font-weight: bold; -fx-font-size: 13px;"/>
+                    <Label fx:id="lblSubtotal" text="S/ 0.00" style="-fx-font-weight: 600; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
                 </HBox>
-                <HBox>
-                    <Label text="IGV (18%):" style="-fx-font-size: 13px;"/>
+                <HBox alignment="CENTER_LEFT">
+                    <Label text="IGV (18%):" style="-fx-text-fill: -color-ink-secondary; -fx-font-size: 12px;"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblIgv" text="S/ 0.00" style="-fx-font-weight: bold; -fx-font-size: 13px;"/>
+                    <Label fx:id="lblIgv" text="S/ 0.00" style="-fx-font-weight: 600; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
                 </HBox>
-                <Separator/>
-                <HBox>
-                    <Label text="TOTAL A PAGAR:" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+                <Separator style="-fx-opacity: 0.5;"/>
+                <HBox alignment="CENTER_LEFT">
+                    <Label text="Total a Cobrar" style="-fx-font-size: 15px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblTotal" text="S/ 0.00" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #e63946;"/>
+                    <Label fx:id="lblTotal" text="S/ 0.00" style="-fx-font-size: 22px; -fx-font-weight: 800; -fx-text-fill: -color-brand-ember;"/>
                 </HBox>
             </VBox>
 
-            <!-- Botones Grandes de Cobro Rápido -->
+            <!-- Acciones de Cobro Inmediato -->
             <VBox spacing="8.0">
-                <Label text="Métodos de Pago Directos:" style="-fx-font-weight: bold;"/>
+                <Label text="MÉTODOS DE PAGO RÁPIDO" style="-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
                 <HBox spacing="8.0">
-                    <Button fx:id="btnEfectivo" text="Efectivo [F5]" onAction="#handleCobroEfectivo" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0"
-                            style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
-                    <Button fx:id="btnTarjeta" text="Tarjeta [F6]" onAction="#handleCobroTarjeta" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0"
-                            style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
-                    <Button fx:id="btnYape" text="Yape/Plin [F7]" onAction="#handleCobroYape" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0"
-                            style="-fx-background-color: #7209b7; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+                    <Button fx:id="btnEfectivo" text="Efectivo [F5]" onAction="#handleCobroEfectivo"
+                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="44.0" styleClass="btn-emerald"/>
+                    <Button fx:id="btnTarjeta" text="Tarjeta [F6]" onAction="#handleCobroTarjeta"
+                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="44.0" styleClass="btn-secondary"/>
+                    <Button fx:id="btnYape" text="Yape / Plin [F7]" onAction="#handleCobroYape"
+                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="44.0"
+                            style="-fx-background-color: #6d28d9; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 13px; -fx-background-radius: 7px; -fx-cursor: hand;"/>
                 </HBox>
             </VBox>
         </VBox>

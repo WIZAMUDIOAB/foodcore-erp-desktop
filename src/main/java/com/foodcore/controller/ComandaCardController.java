@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.google.gson.JsonObject;
@@ -36,6 +37,8 @@ public class ComandaCardController {
 
     @FXML
     public void initialize() {
+        AnimationUtils.attachTactileFeedback(btnIniciar);
+        AnimationUtils.attachTactileFeedback(btnDespachar);
         iniciarTemporizador();
     }
 
@@ -54,14 +57,14 @@ public class ComandaCardController {
     }
 
     public void agregarPlato(String producto, int cantidad, String notas) {
-        VBox itemBox = new VBox(2);
-        Label lblPlato = new Label(cantidad + "x " + producto);
-        lblPlato.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        VBox itemBox = new VBox(3);
+        Label lblPlato = new Label(cantidad + "x  " + producto);
+        lblPlato.setStyle("-fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #f9fafb;");
         itemBox.getChildren().add(lblPlato);
 
         if (notas != null && !notas.trim().isEmpty()) {
-            Label lblNota = new Label("  ↳ Nota: " + notas);
-            lblNota.setStyle("-fx-text-fill: #e63946; -fx-font-style: italic; -fx-font-size: 11px;");
+            Label lblNota = new Label("↳ Nota: " + notas);
+            lblNota.setStyle("-fx-background-color: rgba(245, 158, 11, 0.14); -fx-text-fill: #fcd34d; -fx-padding: 2px 6px; -fx-background-radius: 4px; -fx-font-size: 11px; -fx-font-weight: 600;");
             itemBox.getChildren().add(lblNota);
         }
         vboxItems.getChildren().add(itemBox);
@@ -74,19 +77,21 @@ public class ComandaCardController {
             int sec = segundosTranscurridos % 60;
             lblTiempo.setText(String.format("%02d:%02d min", min, sec));
 
-            // Cambio dinámico de color según tiempo transcurrido (Semáforo KDS)
+            String baseCard = "-fx-background-color: #161920; -fx-background-radius: 10px; -fx-padding: 14px; -fx-border-width: 2px; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 3);";
+
+            // Semaforo KDS de Alto Rendimiento
             if (min >= 10) {
-                // Alerta crítica roja (> 10 min)
-                cardContainer.setStyle("-fx-background-color: white; -fx-background-radius: 8px; -fx-padding: 12px; -fx-border-color: #e63946; -fx-border-width: 3px; -fx-border-radius: 8px;");
-                lblTiempo.setStyle("-fx-font-weight: bold; -fx-text-fill: #e63946; -fx-font-size: 13px;");
+                // Alerta critica roja (> 10 min)
+                cardContainer.setStyle(baseCard + " -fx-border-color: #ef4444;");
+                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #ef4444; -fx-font-size: 14px; -fx-background-color: rgba(239, 68, 68, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
             } else if (min >= 5) {
-                // Alerta intermedia amarilla (5 a 10 min)
-                cardContainer.setStyle("-fx-background-color: white; -fx-background-radius: 8px; -fx-padding: 12px; -fx-border-color: #e9c46a; -fx-border-width: 3px; -fx-border-radius: 8px;");
-                lblTiempo.setStyle("-fx-font-weight: bold; -fx-text-fill: #d4a373; -fx-font-size: 13px;");
+                // Alerta intermedia ambar (5 a 10 min)
+                cardContainer.setStyle(baseCard + " -fx-border-color: #f59e0b;");
+                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #f59e0b; -fx-font-size: 14px; -fx-background-color: rgba(245, 158, 11, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
             } else {
-                // Tiempo verde inicial (< 5 min)
-                cardContainer.setStyle("-fx-background-color: white; -fx-background-radius: 8px; -fx-padding: 12px; -fx-border-color: #2a9d8f; -fx-border-width: 3px; -fx-border-radius: 8px;");
-                lblTiempo.setStyle("-fx-font-weight: bold; -fx-text-fill: #2a9d8f; -fx-font-size: 13px;");
+                // Tiempo optimo verde (< 5 min)
+                cardContainer.setStyle(baseCard + " -fx-border-color: #10b981;");
+                lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #10b981; -fx-font-size: 14px; -fx-background-color: rgba(16, 185, 129, 0.14); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
             }
         }));
         timer.setCycleCount(Timeline.INDEFINITE);
@@ -96,8 +101,9 @@ public class ComandaCardController {
     @FXML
     public void handleIniciar(ActionEvent event) {
         lblEstado.setText("Estado: EN PREPARACIÓN");
+        lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #f59e0b;");
         btnIniciar.setDisable(true);
-        btnIniciar.setText("Preparando...");
+        btnIniciar.setText("En Cocina");
 
         if (idPedido > 0) {
             new Thread(() -> {
@@ -113,13 +119,14 @@ public class ComandaCardController {
     public void handleDespachar(ActionEvent event) {
         if (timer != null) timer.stop();
         lblEstado.setText("Estado: LISTO / DESPACHADO");
+        lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #10b981;");
 
         if (idPedido > 0) {
             new Thread(() -> {
                 try (Connection conn = ConexionBD.getConnection()) {
                     pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
 
-                    // Notificar por Sockets a salón/mozos
+                    // Notificar por Sockets a salon/mozos
                     JsonObject json = new JsonObject();
                     json.addProperty("accion", "PLATO_DESPACHADO");
                     json.addProperty("idPedido", idPedido);

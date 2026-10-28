@@ -6,145 +6,142 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.MantenimientoBDController"
-      spacing="15.0" style="-fx-padding: 20px; -fx-background-color: #f8f9fa;"
+      spacing="16.0" style="-fx-padding: 24px; -fx-background-color: -color-bg-base;"
       prefHeight="720.0" prefWidth="1050.0">
 
-    <!-- Encabezado del Módulo -->
-    <HBox alignment="CENTER_LEFT" spacing="15.0">
-        <VBox spacing="3.0">
-            <Label text="PANEL TÉCNICO DE PERSISTENCIA Y CATÁLOGO (INTEGRANTE 1)"
-                   style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-            <Label text="Gestión de 23 tablas, modelos base, inventario de insumos, recetas y salud del pool HikariCP"
-                   style="-fx-text-fill: #6c757d; -fx-font-size: 12px;"/>
+    <!-- Encabezado del Modulo -->
+    <HBox alignment="CENTER_LEFT" spacing="16.0">
+        <VBox spacing="2.0">
+            <Label text="Base de Datos y Catálogo" styleClass="view-heading"/>
+            <Label text="Control de platos, inventario de insumos, recetas y salud del pool HikariCP" styleClass="view-subheading"/>
         </VBox>
         <Region HBox.hgrow="ALWAYS"/>
-        <Label fx:id="lblEstadoBD" text="MySQL: Conectado"
-               style="-fx-background-color: #e6f4ea; -fx-text-fill: #2a9d8f; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold;"/>
+        <Label fx:id="lblEstadoBD" text="MySQL 8.0 · Conectado"
+               style="-fx-background-color: rgba(16, 185, 129, 0.12); -fx-text-fill: #059669; -fx-padding: 5px 12px; -fx-background-radius: 999px; -fx-font-weight: 700; -fx-font-size: 11px;"/>
     </HBox>
 
-    <Separator/>
+    <Separator style="-fx-opacity: 0.6;"/>
 
-    <!-- Pestañas de Gestión -->
+    <!-- Pestanas de Gestion -->
     <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
 
         <!-- TAB 1: PRODUCTOS / PLATOS -->
-        <Tab text="Platos y Catálogo">
-            <HBox spacing="15.0" style="-fx-padding: 15px 0 0 0;">
+        <Tab text="Platos y Carta">
+            <HBox spacing="16.0" style="-fx-padding: 16px 0 0 0;">
                 <!-- Tabla de Productos -->
                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                    <Label text="Platos Registrados en el Sistema:" style="-fx-font-weight: bold;"/>
+                    <Label text="Platos Registrados en el Sistema" style="-fx-font-weight: 800; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
                     <TableView fx:id="tblProductos" VBox.vgrow="ALWAYS">
                         <columns>
                             <TableColumn fx:id="colProdCodigo" text="Código" prefWidth="80.0"/>
-                            <TableColumn fx:id="colProdNombre" text="Nombre del Plato" prefWidth="200.0"/>
-                            <TableColumn fx:id="colProdCategoria" text="Categoría" prefWidth="140.0"/>
+                            <TableColumn fx:id="colProdNombre" text="Nombre del Plato" prefWidth="210.0"/>
+                            <TableColumn fx:id="colProdCategoria" text="Categoría" prefWidth="130.0"/>
                             <TableColumn fx:id="colProdPrecio" text="Precio (S/)" prefWidth="90.0"/>
                             <TableColumn fx:id="colProdDisponible" text="Disponible" prefWidth="90.0"/>
                         </columns>
                     </TableView>
                     <HBox spacing="10.0">
-                        <Button text="Alternar Disponibilidad" onAction="#handleAlternarDisponibilidad" style="-fx-background-color: #457b9d; -fx-text-fill: white;"/>
-                        <Button text="Refrescar Lista" onAction="#cargarProductos" style="-fx-background-color: #6c757d; -fx-text-fill: white;"/>
+                        <Button text="Alternar Disponibilidad" onAction="#handleAlternarDisponibilidad" styleClass="btn-secondary"/>
+                        <Button text="Refrescar Lista" onAction="#cargarProductos" styleClass="btn-secondary"/>
                     </HBox>
                 </VBox>
 
                 <!-- Formulario Agregar Plato -->
-                <VBox prefWidth="320.0" spacing="12.0" style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #dee2e6; -fx-border-radius: 8px;">
-                    <Label text="Registrar Nuevo Plato" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #1d3557;"/>
-                    <Separator/>
+                <VBox prefWidth="320.0" spacing="12.0" styleClass="surface-card" style="-fx-padding: 18px;">
+                    <Label text="Registrar Nuevo Plato" style="-fx-font-weight: 800; -fx-font-size: 14px; -fx-text-fill: -color-ink-primary;"/>
+                    <Separator style="-fx-opacity: 0.5;"/>
                     <VBox spacing="4.0">
-                        <Label text="Código:"/>
+                        <Label text="Código:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtProdCodigo" promptText="ej: HAM-03"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Nombre del Plato:"/>
+                        <Label text="Nombre del Plato:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtProdNombre" promptText="ej: Hamburguesa BBQ Suprema"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Categoría:"/>
+                        <Label text="Categoría:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <ComboBox fx:id="cmbProdCategoria" maxWidth="Infinity" promptText="Seleccione..."/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Precio de Venta (S/):"/>
+                        <Label text="Precio de Venta (S/):" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtProdPrecio" promptText="0.00"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Descripción:"/>
+                        <Label text="Descripción:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextArea fx:id="txtProdDesc" prefHeight="70.0" wrapText="true" promptText="Detalles de preparación..."/>
                     </VBox>
-                    <Button text="Guardar Plato en BD" onAction="#handleGuardarProducto" maxWidth="Infinity" prefHeight="40.0"
-                            style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+                    <Button text="Guardar Plato en Carta" onAction="#handleGuardarProducto" maxWidth="Infinity" prefHeight="42.0" styleClass="btn-emerald"/>
                 </VBox>
             </HBox>
         </Tab>
 
-        <!-- TAB 2: INSUMOS Y ALMACÉN -->
+        <!-- TAB 2: INSUMOS Y ALMACEN -->
         <Tab text="Insumos y Stock">
-            <HBox spacing="15.0" style="-fx-padding: 15px 0 0 0;">
+            <HBox spacing="16.0" style="-fx-padding: 16px 0 0 0;">
                 <!-- Tabla de Insumos -->
                 <VBox spacing="10.0" HBox.hgrow="ALWAYS">
-                    <Label text="Almacén de Materias Primas e Insumos:" style="-fx-font-weight: bold;"/>
+                    <Label text="Almacén de Materias Primas e Insumos" style="-fx-font-weight: 800; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
                     <TableView fx:id="tblInsumos" VBox.vgrow="ALWAYS">
                         <columns>
                             <TableColumn fx:id="colInsCodigo" text="Código" prefWidth="80.0"/>
                             <TableColumn fx:id="colInsNombre" text="Insumo" prefWidth="220.0"/>
-                            <TableColumn fx:id="colInsUnidad" text="U.M." prefWidth="70.0"/>
-                            <TableColumn fx:id="colInsStock" text="Stock Actual" prefWidth="100.0"/>
-                            <TableColumn fx:id="colInsMinimo" text="Stock Mín" prefWidth="90.0"/>
+                            <TableColumn fx:id="colInsUnidad" text="U.M." prefWidth="65.0"/>
+                            <TableColumn fx:id="colInsStock" text="Stock Actual" prefWidth="95.0"/>
+                            <TableColumn fx:id="colInsMinimo" text="Stock Mín." prefWidth="85.0"/>
                             <TableColumn fx:id="colInsCosto" text="Costo Unit" prefWidth="90.0"/>
                         </columns>
                     </TableView>
                     <HBox spacing="10.0" alignment="CENTER_LEFT">
-                        <Label text="Ajustar Stock Físico:" style="-fx-font-weight: bold;"/>
-                        <TextField fx:id="txtNuevoStock" promptText="Nuevo stock" prefWidth="120.0"/>
-                        <Button text="Aplicar Ajuste de Inventario" onAction="#handleAjustarStock" style="-fx-background-color: #e63946; -fx-text-fill: white;"/>
+                        <Label text="Ajustar Stock Físico:" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-secondary;"/>
+                        <TextField fx:id="txtNuevoStock" promptText="0.00" prefWidth="110.0"/>
+                        <Button text="Aplicar Ajuste" onAction="#handleAjustarStock" styleClass="btn-secondary"/>
                         <Region HBox.hgrow="ALWAYS"/>
-                        <Button text="Refrescar Insumos" onAction="#cargarInsumos" style="-fx-background-color: #6c757d; -fx-text-fill: white;"/>
+                        <Button text="Refrescar Insumos" onAction="#cargarInsumos" styleClass="btn-secondary"/>
                     </HBox>
                 </VBox>
 
                 <!-- Formulario Agregar Insumo -->
-                <VBox prefWidth="300.0" spacing="12.0" style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #dee2e6; -fx-border-radius: 8px;">
-                    <Label text="Registrar Nuevo Insumo" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #1d3557;"/>
-                    <Separator/>
+                <VBox prefWidth="300.0" spacing="12.0" styleClass="surface-card" style="-fx-padding: 18px;">
+                    <Label text="Registrar Nuevo Insumo" style="-fx-font-weight: 800; -fx-font-size: 14px; -fx-text-fill: -color-ink-primary;"/>
+                    <Separator style="-fx-opacity: 0.5;"/>
                     <VBox spacing="4.0">
-                        <Label text="Código Insumo:"/>
+                        <Label text="Código Insumo:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtInsCodigo" promptText="ej: INS-009"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Nombre del Insumo:"/>
+                        <Label text="Nombre:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtInsNombre" promptText="ej: Tocino Ahumado"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Unidad de Medida:"/>
+                        <Label text="Unidad de Medida:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <ComboBox fx:id="cmbInsUnidad" maxWidth="Infinity" promptText="GR, UND, ML..."/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Stock Inicial:"/>
+                        <Label text="Stock Inicial:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtInsStockInicial" promptText="100.00"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Stock Mínimo de Alerta:"/>
+                        <Label text="Stock Mínimo de Alerta:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtInsStockMinimo" promptText="20.00"/>
                     </VBox>
                     <VBox spacing="4.0">
-                        <Label text="Costo Unitario (S/):"/>
+                        <Label text="Costo Unitario (S/):" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                         <TextField fx:id="txtInsCosto" promptText="0.50"/>
                     </VBox>
-                    <Button text="Guardar Insumo" onAction="#handleGuardarInsumo" maxWidth="Infinity" prefHeight="40.0"
-                            style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+                    <Button text="Guardar Insumo" onAction="#handleGuardarInsumo" maxWidth="Infinity" prefHeight="42.0" styleClass="btn-emerald"/>
                 </VBox>
             </HBox>
         </Tab>
 
         <!-- TAB 3: RECETAS -->
         <Tab text="Composición de Recetas">
-            <VBox spacing="15.0" style="-fx-padding: 15px 0 0 0;">
-                <HBox spacing="15.0" alignment="CENTER_LEFT">
-                    <Label text="Seleccione Plato para ver y editar su Receta:" style="-fx-font-weight: bold;"/>
-                    <ComboBox fx:id="cmbRecetaPlato" prefWidth="300.0" onAction="#handleSeleccionarPlatoReceta"/>
+            <VBox spacing="14.0" style="-fx-padding: 16px 0 0 0;">
+                <HBox spacing="14.0" alignment="CENTER_LEFT">
+                    <Label text="Seleccione Plato:" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
+                    <ComboBox fx:id="cmbRecetaPlato" prefWidth="320.0" onAction="#handleSeleccionarPlatoReceta"/>
                     <Region HBox.hgrow="ALWAYS"/>
-                    <Button text="Eliminar Insumo de la Receta" onAction="#handleEliminarItemReceta" style="-fx-background-color: #e63946; -fx-text-fill: white;"/>
+                    <Button text="Eliminar Insumo de Receta" onAction="#handleEliminarItemReceta"
+                            style="-fx-background-color: #fee2e2; -fx-text-fill: #dc2626; -fx-font-weight: 700; -fx-padding: 7px 14px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
                 </HBox>
 
                 <!-- Tabla de Receta -->
@@ -157,41 +154,39 @@
                 </TableView>
 
                 <!-- Panel Agregar Insumo a la Receta -->
-                <HBox spacing="12.0" alignment="CENTER_LEFT" style="-fx-background-color: white; -fx-padding: 12px; -fx-background-radius: 8px;">
-                    <Label text="Agregar Insumo a la Receta:" style="-fx-font-weight: bold;"/>
-                    <ComboBox fx:id="cmbAgregarInsumo" prefWidth="250.0" promptText="Seleccione Insumo..."/>
-                    <TextField fx:id="txtCantidadReceta" promptText="Cantidad (ej: 150)" prefWidth="130.0"/>
-                    <Button text="Asociar a Receta" onAction="#handleAsociarInsumoReceta" style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold;"/>
+                <HBox spacing="12.0" alignment="CENTER_LEFT" styleClass="surface-card" style="-fx-padding: 14px;">
+                    <Label text="Agregar Insumo:" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
+                    <ComboBox fx:id="cmbAgregarInsumo" prefWidth="260.0" promptText="Seleccione Insumo..."/>
+                    <TextField fx:id="txtCantidadReceta" promptText="Cantidad (ej: 150)" prefWidth="140.0"/>
+                    <Button text="Asociar a Receta" onAction="#handleAsociarInsumoReceta" styleClass="btn-emerald"/>
                 </HBox>
             </VBox>
         </Tab>
 
         <!-- TAB 4: SALUD BD Y POOL HIKARICP -->
         <Tab text="Diagnóstico y Pool HikariCP">
-            <VBox spacing="20.0" style="-fx-padding: 20px; -fx-background-color: white; -fx-background-radius: 8px; -fx-border-color: #dee2e6; -fx-border-radius: 8px;">
-                <Label text="Monitor del Pool de Conexiones HikariCP (LAN)" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+            <VBox spacing="18.0" styleClass="surface-card" style="-fx-padding: 24px; -fx-margin: 16px 0 0 0;">
+                <Label text="Monitor del Pool de Conexiones HikariCP (LAN)" style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
 
-                <GridPane hgap="15.0" vgap="15.0">
-                    <Label text="Estado de Comunicación:" style="-fx-font-weight: bold;" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                    <Label fx:id="lblDiagnosticoEstado" text="Activo y Respondiendo" style="-fx-text-fill: #2a9d8f; -fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                <GridPane hgap="16.0" vgap="14.0">
+                    <Label text="Estado de Conexión:" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                    <Label fx:id="lblDiagnosticoEstado" text="Activo y Respondiendo" style="-fx-text-fill: -color-accent-emerald; -fx-font-weight: 800;" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
 
-                    <Label text="URL JDBC Destino:" style="-fx-font-weight: bold;" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                    <Label fx:id="lblDiagnosticoUrl" text="jdbc:mysql://localhost:3306/foodcore_db" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                    <Label text="URL JDBC Destino:" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                    <Label fx:id="lblDiagnosticoUrl" text="jdbc:mysql://localhost:3306/foodcore_db" style="-fx-font-weight: 600;" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
 
-                    <Label text="Métricas del Pool HikariCP:" style="-fx-font-weight: bold;" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                    <Label fx:id="lblDiagnosticoMetricas" text="Calculando..." GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    <Label text="Métricas del Pool HikariCP:" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                    <Label fx:id="lblDiagnosticoMetricas" text="Calculando..." style="-fx-font-weight: 600;" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
                 </GridPane>
 
-                <Separator/>
+                <Separator style="-fx-opacity: 0.5;"/>
 
-                <HBox spacing="15.0">
-                    <Button text="Ejecutar Test de Conexión (Ping)" onAction="#handleTestPing"
-                            style="-fx-background-color: #457b9d; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10px 18px; -fx-cursor: hand;"/>
-                    <Button text="Recargar Pool HikariCP" onAction="#handleRecargarPool"
-                            style="-fx-background-color: #1d3557; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10px 18px; -fx-cursor: hand;"/>
+                <HBox spacing="14.0">
+                    <Button text="Ejecutar Test de Conexión (Ping)" onAction="#handleTestPing" styleClass="btn-secondary"/>
+                    <Button text="Recargar Pool HikariCP" onAction="#handleRecargarPool" styleClass="btn-primary"/>
                 </HBox>
 
-                <Label text="Configuración en: src/main/resources/database.properties" style="-fx-text-fill: #adb5bd; -fx-font-size: 11px;"/>
+                <Label text="Configuración en: src/main/resources/database.properties" style="-fx-text-fill: -color-ink-muted; -fx-font-size: 11px;"/>
             </VBox>
         </Tab>
 

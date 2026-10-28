@@ -6,33 +6,38 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.ComandaCardController"
-      fx:id="cardContainer" prefWidth="290.0" spacing="8.0"
-      style="-fx-background-color: white; -fx-background-radius: 8px; -fx-padding: 12px; -fx-border-color: #2a9d8f; -fx-border-width: 3px; -fx-border-radius: 8px; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);">
+      fx:id="cardContainer" prefWidth="300.0" spacing="10.0"
+      style="-fx-background-color: #161920; -fx-background-radius: 10px; -fx-padding: 14px; -fx-border-color: #10b981; -fx-border-width: 2px; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 3);">
 
-    <!-- Encabezado de Tarjeta -->
+    <!-- Encabezado de Tarjeta KDS -->
     <HBox alignment="CENTER_LEFT" spacing="8.0">
-        <Label fx:id="lblNumeroMesa" text="MESA 04" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
+        <VBox spacing="1.0">
+            <Label fx:id="lblNumeroMesa" text="MESA 04"
+                   style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: #ffffff;"/>
+            <Label fx:id="lblNumeroComanda" text="Comanda #0012"
+                   style="-fx-font-size: 11px; -fx-text-fill: #94a3b8;"/>
+        </VBox>
         <Region HBox.hgrow="ALWAYS"/>
-        <Label fx:id="lblTiempo" text="00:00 min" style="-fx-font-weight: bold; -fx-text-fill: #2a9d8f; -fx-font-size: 13px;"/>
+        <Label fx:id="lblTiempo" text="00:00 min"
+               style="-fx-font-weight: 800; -fx-text-fill: #10b981; -fx-font-size: 14px; -fx-background-color: rgba(16, 185, 129, 0.12); -fx-padding: 4px 8px; -fx-background-radius: 6px;"/>
     </HBox>
 
-    <Label fx:id="lblNumeroComanda" text="Comanda #COM-0012" style="-fx-font-size: 12px; -fx-text-fill: #6c757d;"/>
-
-    <Separator/>
+    <Separator style="-fx-opacity: 0.15;"/>
 
     <!-- Lista de Platos a Preparar con Notas -->
-    <VBox fx:id="vboxItems" spacing="6.0" minHeight="120.0"/>
+    <VBox fx:id="vboxItems" spacing="8.0" minHeight="110.0"/>
 
-    <Separator/>
+    <Separator style="-fx-opacity: 0.15;"/>
 
-    <!-- Estado y Botones de Acción -->
-    <Label fx:id="lblEstado" text="Estado: PENDIENTE" style="-fx-font-weight: bold; -fx-font-size: 12px;"/>
+    <!-- Estado y Botones de Accion -->
+    <Label fx:id="lblEstado" text="Estado: PENDIENTE"
+           style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #94a3b8;"/>
 
     <HBox spacing="8.0">
-        <Button fx:id="btnIniciar" text="Iniciar" onAction="#handleIniciar" HBox.hgrow="ALWAYS" maxWidth="Infinity"
-                style="-fx-background-color: #e9c46a; -fx-text-fill: #1d3557; -fx-font-weight: bold; -fx-cursor: hand;"/>
-        <Button fx:id="btnDespachar" text="Listo / Despachar" onAction="#handleDespachar" HBox.hgrow="ALWAYS" maxWidth="Infinity"
-                style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+        <Button fx:id="btnIniciar" text="Iniciar" onAction="#handleIniciar" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="36.0"
+                style="-fx-background-color: #272d38; -fx-text-fill: #f3f4f6; -fx-font-weight: 700; -fx-cursor: hand; -fx-background-radius: 6px;"/>
+        <Button fx:id="btnDespachar" text="Listo / Despachar" onAction="#handleDespachar" HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="36.0"
+                style="-fx-background-color: #10b981; -fx-text-fill: white; -fx-font-weight: 800; -fx-cursor: hand; -fx-background-radius: 6px;"/>
     </HBox>
 
 </VBox>

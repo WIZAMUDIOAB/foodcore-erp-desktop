@@ -7,67 +7,61 @@
 
 <ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.ReportesController"
-            fitToWidth="true" style="-fx-background-color: #f8f9fa;">
+            fitToWidth="true" style="-fx-background-color: -color-bg-base;">
 
-    <VBox spacing="15.0" style="-fx-padding: 20px; -fx-background-color: #f8f9fa;">
+    <VBox spacing="18.0" style="-fx-padding: 24px; -fx-background-color: -color-bg-base;">
 
         <!-- Header y Filtros -->
-        <HBox alignment="CENTER_LEFT" spacing="15.0">
+        <HBox alignment="CENTER_LEFT" spacing="16.0">
             <VBox spacing="2.0">
-                <Label text="REPORTES Y ANALÍTICA GERENCIAL (IU17 / CU13)" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-                <Label text="Métricas comerciales, volumen de facturación y rotación de cartas" style="-fx-text-fill: #6c757d; -fx-font-size: 12px;"/>
+                <Label text="Analítica y Rendimiento" styleClass="view-heading"/>
+                <Label text="Métricas comerciales, rotación de carta e ingresos por canal de cobro" styleClass="view-subheading"/>
             </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label text="Periodo:" style="-fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-            <ComboBox fx:id="cmbPeriodo" prefWidth="180.0" prefHeight="35.0"
-                      style="-fx-font-size: 13px; -fx-background-radius: 6px;"/>
-            <Button text="⟳ Actualizar" onAction="#cargarDatos" prefHeight="35.0"
-                    style="-fx-background-color: #1d3557; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6px; -fx-cursor: hand;"/>
+            <Label text="Periodo:" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-primary; -fx-font-size: 12px;"/>
+            <ComboBox fx:id="cmbPeriodo" prefWidth="180.0" prefHeight="36.0"
+                      style="-fx-font-size: 13px; -fx-background-radius: 7px; -fx-border-color: -color-border-subtle; -fx-border-radius: 7px;"/>
+            <Button text="⟳ Actualizar" onAction="#cargarDatos" prefHeight="36.0" styleClass="btn-secondary"/>
         </HBox>
 
-        <Separator/>
+        <Separator style="-fx-opacity: 0.6;"/>
 
-        <!-- Tarjetas KPI -->
-        <HBox spacing="15.0">
+        <!-- Tarjetas KPI (Proximity & High Contrast Values) -->
+        <HBox spacing="14.0">
             <!-- KPI 1: Total Ventas -->
-            <VBox HBox.hgrow="ALWAYS" spacing="5.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px; -fx-border-width: 1px;">
-                <Label text="FACTURACIÓN TOTAL" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #6c757d;"/>
-                <Label fx:id="lblTotalVentas" text="S/ 0.00" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #2a9d8f;"/>
-                <Label text="Ingresos brutos cerrados" style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
+            <VBox HBox.hgrow="ALWAYS" spacing="4.0" styleClass="surface-card" style="-fx-padding: 16px;">
+                <Label text="FACTURACIÓN TOTAL" style="-fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
+                <Label fx:id="lblTotalVentas" text="S/ 0.00" style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -color-brand-ember;"/>
+                <Label text="Ingresos brutos cerrados" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
             </VBox>
 
             <!-- KPI 2: Cantidad Transacciones -->
-            <VBox HBox.hgrow="ALWAYS" spacing="5.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px; -fx-border-width: 1px;">
-                <Label text="VENTAS REALIZADAS" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #6c757d;"/>
-                <Label fx:id="lblCantidadVentas" text="0" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #457b9d;"/>
-                <Label text="Comandas y cobros liquidados" style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
+            <VBox HBox.hgrow="ALWAYS" spacing="4.0" styleClass="surface-card" style="-fx-padding: 16px;">
+                <Label text="VENTAS REALIZADAS" style="-fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
+                <Label fx:id="lblCantidadVentas" text="0" style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
+                <Label text="Comandas cobradas en caja" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
             </VBox>
 
             <!-- KPI 3: Ticket Promedio -->
-            <VBox HBox.hgrow="ALWAYS" spacing="5.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px; -fx-border-width: 1px;">
-                <Label text="TICKET PROMEDIO" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #6c757d;"/>
-                <Label fx:id="lblTicketPromedio" text="S/ 0.00" style="-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #e76f51;"/>
-                <Label text="Gasto promedio por mesa/cliente" style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
+            <VBox HBox.hgrow="ALWAYS" spacing="4.0" styleClass="surface-card" style="-fx-padding: 16px;">
+                <Label text="TICKET PROMEDIO" style="-fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
+                <Label fx:id="lblTicketPromedio" text="S/ 0.00" style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -color-accent-emerald;"/>
+                <Label text="Gasto promedio por mesa" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
             </VBox>
 
-            <!-- KPI 4: Plato Más Vendido -->
-            <VBox HBox.hgrow="ALWAYS" spacing="5.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px; -fx-border-width: 1px;">
-                <Label text="PLATO ESTRELLA (TOP 1)" style="-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #6c757d;"/>
-                <Label fx:id="lblPlatoEstrella" text="Sin ventas" wrapText="true" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-                <Label fx:id="lblPlatoEstrellaQty" text="0 unidades vendidas" style="-fx-font-size: 11px; -fx-text-fill: #adb5bd;"/>
+            <!-- KPI 4: Plato Mas Vendido -->
+            <VBox HBox.hgrow="ALWAYS" spacing="4.0" styleClass="surface-card" style="-fx-padding: 16px;">
+                <Label text="PLATO ESTRELLA" style="-fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
+                <Label fx:id="lblPlatoEstrella" text="Sin ventas" wrapText="true" style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
+                <Label fx:id="lblPlatoEstrellaQty" text="0 unidades vendidas" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
             </VBox>
         </HBox>
 
-        <!-- Gráficos Principales -->
-        <HBox spacing="15.0" prefHeight="420.0">
-            <!-- Gráfico de Barras: Ventas por Día -->
-            <VBox spacing="10.0" HBox.hgrow="ALWAYS" prefWidth="550.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px;">
-                <Label text="Evolución de Ventas Diarias (S/)" style="-fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #1d3557;"/>
+        <!-- Graficos Principales -->
+        <HBox spacing="16.0" prefHeight="430.0">
+            <!-- Grafico de Barras: Ventas por Dia -->
+            <VBox spacing="10.0" HBox.hgrow="ALWAYS" prefWidth="560.0" styleClass="surface-card" style="-fx-padding: 18px;">
+                <Label text="Evolución de Ventas por Fecha" style="-fx-font-weight: 800; -fx-font-size: 14px; -fx-text-fill: -color-ink-primary;"/>
                 <BarChart fx:id="barChartVentas" legendVisible="false" VBox.vgrow="ALWAYS">
                     <xAxis>
                         <CategoryAxis label="Fecha"/>
@@ -78,19 +72,18 @@
                 </BarChart>
             </VBox>
 
-            <!-- Gráfico Circular con Selector de Tab: Baja Rotación o Métodos de Pago -->
-            <VBox spacing="10.0" HBox.hgrow="ALWAYS" prefWidth="450.0"
-                  style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px; -fx-border-color: #e2e8f0; -fx-border-radius: 8px;">
+            <!-- Grafico Circular con Selector de Tab: Baja Rotacion o Metodos de Pago -->
+            <VBox spacing="10.0" HBox.hgrow="ALWAYS" prefWidth="440.0" styleClass="surface-card" style="-fx-padding: 18px;">
                 <TabPane tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
-                    <Tab text="Baja Rotación (CU13)">
-                        <VBox spacing="5.0" style="-fx-padding: 10px 0 0 0;">
-                            <Label text="Platos que requieren promociones o retiro" style="-fx-font-size: 11px; -fx-text-fill: #6c757d;"/>
+                    <Tab text="Baja Rotación">
+                        <VBox spacing="6.0" style="-fx-padding: 10px 0 0 0;">
+                            <Label text="Platos con menor volumen de venta en el periodo" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                             <PieChart fx:id="pieChartBajaRotacion" VBox.vgrow="ALWAYS"/>
                         </VBox>
                     </Tab>
-                    <Tab text="Métodos de Pago">
-                        <VBox spacing="5.0" style="-fx-padding: 10px 0 0 0;">
-                            <Label text="Distribución de ingresos por canal" style="-fx-font-size: 11px; -fx-text-fill: #6c757d;"/>
+                    <Tab text="Canales de Pago">
+                        <VBox spacing="6.0" style="-fx-padding: 10px 0 0 0;">
+                            <Label text="Distribución de facturación según método" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
                             <PieChart fx:id="pieChartMetodosPago" VBox.vgrow="ALWAYS"/>
                         </VBox>
                     </Tab>

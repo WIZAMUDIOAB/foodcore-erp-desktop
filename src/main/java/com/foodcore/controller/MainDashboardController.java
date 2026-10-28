@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.App;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
+import com.foodcore.util.AnimationUtils;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -26,9 +27,15 @@ public class MainDashboardController {
 
     @FXML
     public void initialize() {
+        // Adjuntar micro-interaccion tactil Emil Kowalski a cada control de navegacion
+        Button[] buttons = {btnNavPOS, btnNavSalon, btnNavKDS, btnNavReportes, btnNavAsistencia, btnNavMantenimiento};
+        for (Button btn : buttons) {
+            AnimationUtils.attachTactileFeedback(btn);
+        }
+
         Usuario act = AuthService.getUsuarioSesionActual();
         if (act != null) {
-            lblUsuarioLogueado.setText("Usuario: " + act.getUsername() + " (" + act.getNombreRol() + ")");
+            lblUsuarioLogueado.setText(act.getUsername() + " · " + act.getNombreRol());
             aplicarControlAcceso(act);
         } else {
             cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
@@ -115,23 +122,24 @@ public class MainDashboardController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
             Parent view = loader.load();
             contentArea.getChildren().setAll(view);
-            resetEstilosNav();
-            if (navBtnActivo != null) {
-                navBtnActivo.setStyle("-fx-background-color: #457b9d; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6px;");
-            }
+
+            // Transicion fluida de entrada (180ms - Emil Kowalski rule)
+            AnimationUtils.enterWithFadeSlide(view, 6.0, 0);
+
+            actualizarEstilosNav(navBtnActivo);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void resetEstilosNav() {
-        String base = "-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;";
-        btnNavPOS.setStyle(base);
-        btnNavSalon.setStyle(base);
-        btnNavKDS.setStyle(base);
-        btnNavReportes.setStyle(base);
-        btnNavAsistencia.setStyle(base);
-        btnNavMantenimiento.setStyle("-fx-background-color: transparent; -fx-text-fill: #a8dadc; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;");
+    private void actualizarEstilosNav(Button activo) {
+        Button[] buttons = {btnNavPOS, btnNavSalon, btnNavKDS, btnNavReportes, btnNavAsistencia, btnNavMantenimiento};
+        for (Button btn : buttons) {
+            btn.getStyleClass().remove("sidebar-nav-button-active");
+        }
+        if (activo != null && !activo.getStyleClass().contains("sidebar-nav-button-active")) {
+            activo.getStyleClass().add("sidebar-nav-button-active");
+        }
     }
 
     @FXML

@@ -6,65 +6,80 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.ArqueoCajaController"
-      spacing="15.0" prefWidth="520.0" prefHeight="600.0"
-      style="-fx-background-color: #f8f9fa; -fx-padding: 25px;">
+      spacing="16.0" prefWidth="520.0" prefHeight="600.0"
+      style="-fx-background-color: -color-bg-base; -fx-padding: 24px;">
 
-    <Label text="ARQUEO Y CUADRE DE CAJA (IU13)" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-    <Label text="Control de turnos, fondo de sencillo y cierre físico de caja:" style="-fx-text-fill: #6c757d;"/>
+    <VBox spacing="2.0">
+        <Label text="Arqueo y Cuadre de Caja" styleClass="view-heading"/>
+        <Label text="Control de turnos, fondo inicial de sencillo y balance físico" styleClass="view-subheading"/>
+    </VBox>
 
-    <Separator/>
+    <Separator style="-fx-opacity: 0.6;"/>
 
     <!-- PANEL DE APERTURA (Si no hay caja abierta) -->
-    <VBox fx:id="panelApertura" spacing="12.0" visible="false" managed="false"
-          style="-fx-background-color: white; -fx-padding: 20px; -fx-background-radius: 8px; -fx-border-color: #dee2e6; -fx-border-radius: 8px;">
-        <Label text="No hay ningún turno de caja abierto actualmente." style="-fx-text-fill: #e63946; -fx-font-weight: bold;"/>
-        <Label text="Para cobrar ventas en el POS, debe abrir un turno:" style="-fx-font-size: 12px;"/>
+    <VBox fx:id="panelApertura" spacing="14.0" visible="false" managed="false"
+          styleClass="surface-card" style="-fx-padding: 20px;">
+        <Label text="No hay ningún turno de caja abierto actualmente"
+               style="-fx-text-fill: -color-accent-rose; -fx-font-weight: 800; -fx-font-size: 14px;"/>
+        <Label text="Para habilitar cobros en el terminal POS, debe registrar la apertura:" style="-fx-font-size: 12px; -fx-text-fill: -color-ink-secondary;"/>
         <VBox spacing="4.0">
-            <Label text="Nombre de Caja:"/>
+            <Label text="Identificador de Caja:" style="-fx-font-weight: 700; -fx-font-size: 11px;"/>
             <TextField fx:id="txtAperturaNombre" text="Caja Principal 01"/>
         </VBox>
         <VBox spacing="4.0">
-            <Label text="Fondo Inicial de Apertura (Sencillo S/):"/>
-            <TextField fx:id="txtAperturaMonto" promptText="ej: 150.00" text="100.00"/>
+            <Label text="Fondo Inicial para Sencillo (S/):" style="-fx-font-weight: 700; -fx-font-size: 11px;"/>
+            <TextField fx:id="txtAperturaMonto" promptText="150.00" text="100.00"/>
         </VBox>
-        <Button text="ABRIR TURNO DE CAJA AHORA" onAction="#handleAbrirTurnoCaja"
-                maxWidth="Infinity" prefHeight="42.0"
-                style="-fx-background-color: #2a9d8f; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
+        <Button text="Abrir Turno de Caja" onAction="#handleAbrirTurnoCaja"
+                maxWidth="Infinity" prefHeight="44.0" styleClass="btn-emerald"/>
     </VBox>
 
     <!-- PANEL DE CIERRE / ARQUEO (Si hay caja abierta) -->
-    <VBox fx:id="panelArqueo" spacing="14.0" VBox.vgrow="ALWAYS">
-        <GridPane hgap="12.0" vgap="10.0" style="-fx-background-color: white; -fx-padding: 15px; -fx-background-radius: 8px;">
-            <Label text="Caja Activa:" GridPane.columnIndex="0" GridPane.rowIndex="0" style="-fx-font-weight: bold;"/>
-            <Label fx:id="lblNombreCaja" text="Caja Principal 01" GridPane.columnIndex="1" GridPane.rowIndex="0" style="-fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-
-            <Label text="Fondo de Apertura:" GridPane.columnIndex="0" GridPane.rowIndex="1" style="-fx-font-weight: bold;"/>
-            <Label fx:id="lblFondoApertura" text="S/ 0.00" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-
-            <Label text="Total Ventas del Turno:" GridPane.columnIndex="0" GridPane.rowIndex="2" style="-fx-font-weight: bold;"/>
-            <Label fx:id="lblTotalVentas" text="S/ 0.00" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
-
-            <Label text="Total Esperado en Sistema:" GridPane.columnIndex="0" GridPane.rowIndex="3" style="-fx-font-weight: bold; -fx-text-fill: #1d3557;"/>
-            <Label fx:id="lblTotalEsperado" text="S/ 0.00" GridPane.columnIndex="1" GridPane.rowIndex="3" style="-fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #2a9d8f;"/>
-        </GridPane>
-
-        <VBox spacing="6.0">
-            <Label text="Monto Físico Contado en Gaveta (S/):" style="-fx-font-weight: bold;"/>
-            <TextField fx:id="txtEfectivoFisico" promptText="0.00" prefHeight="42.0" onKeyReleased="#calcularDiferencia"
-                       style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+    <VBox fx:id="panelArqueo" spacing="16.0" VBox.vgrow="ALWAYS">
+        <!-- Tarjeta de Balance del Sistema -->
+        <VBox spacing="10.0" styleClass="surface-card" style="-fx-padding: 16px;">
+            <HBox alignment="CENTER_LEFT">
+                <Label text="Caja Activa:" style="-fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="lblNombreCaja" text="Caja Principal 01" style="-fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT">
+                <Label text="Fondo Inicial de Apertura:" style="-fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="lblFondoApertura" text="S/ 0.00" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-primary;"/>
+            </HBox>
+            <HBox alignment="CENTER_LEFT">
+                <Label text="Ventas Acumuladas en Turno:" style="-fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="lblTotalVentas" text="S/ 0.00" style="-fx-font-weight: 700; -fx-text-fill: -color-brand-ember;"/>
+            </HBox>
+            <Separator style="-fx-opacity: 0.5;"/>
+            <HBox alignment="CENTER_LEFT">
+                <Label text="Total Esperado en Sistema:" style="-fx-font-weight: 800; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="lblTotalEsperado" text="S/ 0.00" style="-fx-font-weight: 800; -fx-font-size: 18px; -fx-text-fill: -color-accent-emerald;"/>
+            </HBox>
         </VBox>
 
-        <HBox alignment="CENTER_LEFT" spacing="10.0" style="-fx-background-color: #e9ecef; -fx-padding: 12px; -fx-background-radius: 6px;">
-            <Label text="Diferencia (Sobrante / Faltante):" style="-fx-font-weight: bold;"/>
+        <!-- Conteo Fisico -->
+        <VBox spacing="6.0">
+            <Label text="Monto Físico Contado en Gaveta (S/):" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
+            <TextField fx:id="txtEfectivoFisico" promptText="0.00" prefHeight="44.0" onKeyReleased="#calcularDiferencia"
+                       style="-fx-font-size: 16px; -fx-font-weight: 800;"/>
+        </VBox>
+
+        <!-- Indicador de Diferencia -->
+        <HBox alignment="CENTER_LEFT" spacing="10.0"
+              style="-fx-background-color: -color-bg-surface; -fx-padding: 14px; -fx-background-radius: 8px; -fx-border-color: -color-border-subtle; -fx-border-radius: 8px;">
+            <Label text="Diferencia (Sobrante / Faltante):" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label fx:id="lblDiferencia" text="S/ 0.00" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2a9d8f;"/>
+            <Label fx:id="lblDiferencia" text="S/ 0.00" style="-fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: -color-accent-emerald;"/>
         </HBox>
 
         <Region VBox.vgrow="ALWAYS"/>
 
-        <Button text="CONFIRMAR Y CERRAR TURNO DE CAJA" onAction="#handleCerrarCaja"
-                maxWidth="Infinity" prefHeight="45.0"
-                style="-fx-background-color: #e63946; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px; -fx-background-radius: 6px; -fx-cursor: hand;"/>
+        <Button text="Confirmar y Cerrar Turno de Caja" onAction="#handleCerrarCaja"
+                maxWidth="Infinity" prefHeight="46.0" styleClass="btn-rose"/>
     </VBox>
 
 </VBox>
