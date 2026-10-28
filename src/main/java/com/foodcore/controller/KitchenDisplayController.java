@@ -41,6 +41,7 @@ public class KitchenDisplayController {
     private int contadorComandas = 0;
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
+    private final Set<Integer> comandasDespachadasLocal = Collections.synchronizedSet(new HashSet<>());
     private Timeline autoSyncTimer;
 
     private static class ComandaDTO {
@@ -83,16 +84,21 @@ public class KitchenDisplayController {
 
     @FXML
     public void handleRefrescar(ActionEvent event) {
+        comandasDespachadasLocal.clear();
         cargarComandasDesdeBD();
     }
 
     private void cargarComandasDesdeBD() {
         new Thread(() -> {
             try (Connection conn = ConexionBD.getConnection()) {
-                List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
+                // En KDS solo se consultan pedidos pendientes de preparacion o en coccion (REGISTRADO o EN_PREPARACION)
+                List<Pedido> pedidos = pedidoDAO.listarPedidosPendientesCocina(conn);
                 List<ComandaDTO> listaComandas = new ArrayList<>();
 
                 for (Pedido p : pedidos) {
+                    if (comandasDespachadasLocal.contains(p.getIdPedido())) {
+                        continue;
+                    }
                     List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
                     String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
                     int seg = 0;
@@ -129,12 +135,16 @@ public class KitchenDisplayController {
     private void sincronizarNuevasComandas() {
         new Thread(() -> {
             try (Connection conn = ConexionBD.getConnection()) {
-                List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
-                Set<Integer> idsActivosEnBD = new HashSet<>();
+                // Solo pedidos que sigan en preparacion en cocina
+                List<Pedido> pedidos = pedidoDAO.listarPedidosPendientesCocina(conn);
+                Set<Integer> idsPendientesEnBD = new HashSet<>();
                 List<ComandaDTO> nuevasComandas = new ArrayList<>();
 
                 for (Pedido p : pedidos) {
-                    idsActivosEnBD.add(p.getIdPedido());
+                    if (comandasDespachadasLocal.contains(p.getIdPedido())) {
+                        continue;
+                    }
+                    idsPendientesEnBD.add(p.getIdPedido());
                     if (!tarjetasActivas.containsKey(p.getIdPedido())) {
                         List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
                         String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
@@ -146,17 +156,17 @@ public class KitchenDisplayController {
                     }
                 }
 
-                // Identificar comandas que ya fueron despachadas o cobradas en otra terminal
+                // Identificar comandas que ya fueron despachadas, marcadas listas o cobradas
                 List<Integer> idsAEliminar = new ArrayList<>();
                 for (Integer id : tarjetasActivas.keySet()) {
-                    if (id > 0 && !idsActivosEnBD.contains(id)) {
+                    if (id > 0 && !idsPendientesEnBD.contains(id)) {
                         idsAEliminar.add(id);
                     }
                 }
 
                 if (!nuevasComandas.isEmpty() || !idsAEliminar.isEmpty()) {
                     Platform.runLater(() -> {
-                        // Eliminar comandas que ya no están activas
+                        // Eliminar comandas que salieron del flujo de cocina
                         for (Integer id : idsAEliminar) {
                             ComandaCardController card = tarjetasActivas.remove(id);
                             if (card != null) {
@@ -168,7 +178,7 @@ public class KitchenDisplayController {
 
                         // Agregar nuevas comandas
                         for (ComandaDTO c : nuevasComandas) {
-                            if (!tarjetasActivas.containsKey(c.idPedido)) {
+                            if (!tarjetasActivas.containsKey(c.idPedido) && !comandasDespachadasLocal.contains(c.idPedido)) {
                                 crearTarjetaComanda(c.idPedido, c.mesa, c.comandaCode, c.estado, c.segundos, c.detalles);
                                 try {
                                     Toolkit.getDefaultToolkit().beep();
@@ -186,8 +196,8 @@ public class KitchenDisplayController {
     private void procesarMensajeSocket(JsonObject json) {
         if (json.has("accion") && "NUEVA_COMANDA".equals(json.get("accion").getAsString())) {
             int idPed = json.has("idPedido") ? json.get("idPedido").getAsInt() : 0;
-            if (idPed > 0 && tarjetasActivas.containsKey(idPed)) {
-                return; // Ya está mostrada en pantalla
+            if (idPed > 0 && (tarjetasActivas.containsKey(idPed) || comandasDespachadasLocal.contains(idPed))) {
+                return; // Ya está mostrada en pantalla o fue despachada
             }
 
             String mesa = json.has("mesa") ? json.get("mesa").getAsString() : "01";
@@ -234,6 +244,7 @@ public class KitchenDisplayController {
             cardCtrl.setOnDespachadoListener(c -> {
                 if (idPedido > 0) {
                     tarjetasActivas.remove(idPedido);
+                    comandasDespachadasLocal.add(idPedido);
                 }
                 flowComandas.getChildren().remove(c.getCardContainer());
                 actualizarContador(-1);

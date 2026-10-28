@@ -13,6 +13,7 @@ public interface PedidoDAO {
     void insertarDetallePedido(Connection conn, DetallePedido detalle) throws SQLException;
     int crearComanda(Connection conn, Comanda comanda) throws SQLException;
     List<Pedido> listarPedidosActivos(Connection conn) throws SQLException;
+    List<Pedido> listarPedidosPendientesCocina(Connection conn) throws SQLException;
     List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException;
     void actualizarEstadoPedido(Connection conn, int idPedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoComanda(Connection conn, int idComanda, String nuevoEstado) throws SQLException;

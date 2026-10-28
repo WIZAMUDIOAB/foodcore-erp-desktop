@@ -74,7 +74,31 @@ public class PedidoDAOImpl implements PedidoDAO {
     @Override
     public List<Pedido> listarPedidosActivos(Connection conn) throws SQLException {
         List<Pedido> lista = new ArrayList<>();
+        // En Salón se listan pedidos activos en mesa (REGISTRADO, EN_PREPARACION o LISTO hasta que sea COBRADO)
         String sql = "SELECT * FROM pedido WHERE estado IN ('REGISTRADO', 'EN_PREPARACION', 'LISTO') ORDER BY id_pedido ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Pedido p = new Pedido();
+                p.setIdPedido(rs.getInt("id_pedido"));
+                p.setIdUsuario(rs.getInt("id_usuario"));
+                int c = rs.getInt("id_cliente");
+                p.setIdCliente(rs.wasNull() ? null : c);
+                p.setNumeroMesa(rs.getString("numero_mesa"));
+                p.setFechaHora(rs.getTimestamp("fecha_hora").toLocalDateTime());
+                p.setEstado(rs.getString("estado"));
+                p.setTotal(rs.getBigDecimal("total"));
+                lista.add(p);
+            }
+        }
+        return lista;
+    }
+
+    @Override
+    public List<Pedido> listarPedidosPendientesCocina(Connection conn) throws SQLException {
+        List<Pedido> lista = new ArrayList<>();
+        // En Cocina (KDS) SOLO se visualizan pedidos que requieren preparación activa (REGISTRADO o EN_PREPARACION)
+        String sql = "SELECT * FROM pedido WHERE estado IN ('REGISTRADO', 'EN_PREPARACION') ORDER BY id_pedido ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
