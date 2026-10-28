@@ -24,7 +24,6 @@ import javafx.util.Duration;
 import java.awt.Toolkit;
 import java.io.IOException;
 import java.sql.Connection;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -102,8 +101,11 @@ public class KitchenDisplayController {
                     List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
                     String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
                     int seg = 0;
-                    if (p.getFechaHora() != null) {
-                        seg = (int) Math.max(0, java.time.Duration.between(p.getFechaHora(), LocalDateTime.now()).getSeconds());
+                    if (p.getEpochMillis() > 0) {
+                        long diff = (System.currentTimeMillis() - p.getEpochMillis()) / 1000;
+                        if (diff >= 0 && diff < 28800) {
+                            seg = (int) diff;
+                        }
                     }
                     listaComandas.add(new ComandaDTO(p.getIdPedido(), p.getNumeroMesa(), comandaCode, p.getEstado(), seg, detalles));
                 }
@@ -149,8 +151,11 @@ public class KitchenDisplayController {
                         List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido());
                         String comandaCode = "COM-" + String.format("%04d", p.getIdPedido());
                         int seg = 0;
-                        if (p.getFechaHora() != null) {
-                            seg = (int) Math.max(0, java.time.Duration.between(p.getFechaHora(), LocalDateTime.now()).getSeconds());
+                        if (p.getEpochMillis() > 0) {
+                            long diff = (System.currentTimeMillis() - p.getEpochMillis()) / 1000;
+                            if (diff >= 0 && diff < 28800) {
+                                seg = (int) diff;
+                            }
                         }
                         nuevasComandas.add(new ComandaDTO(p.getIdPedido(), p.getNumeroMesa(), comandaCode, p.getEstado(), seg, detalles));
                     }

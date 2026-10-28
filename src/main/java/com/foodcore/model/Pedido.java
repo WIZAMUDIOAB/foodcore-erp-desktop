@@ -11,6 +11,7 @@ public class Pedido {
     private Integer idCliente;
     private String numeroMesa;
     private LocalDateTime fechaHora;
+    private long epochMillis;
     private String estado; // REGISTRADO, EN_PREPARACION, LISTO, ENTREGADO, COBRADO, ANULADO
     private BigDecimal total;
 
@@ -26,6 +27,7 @@ public class Pedido {
         this.estado = estado;
         this.total = total;
         this.fechaHora = LocalDateTime.now();
+        this.epochMillis = System.currentTimeMillis();
     }
 
     public int getIdPedido() { return idPedido; }
@@ -42,6 +44,9 @@ public class Pedido {
 
     public LocalDateTime getFechaHora() { return fechaHora; }
     public void setFechaHora(LocalDateTime fechaHora) { this.fechaHora = fechaHora; }
+
+    public long getEpochMillis() { return epochMillis; }
+    public void setEpochMillis(long epochMillis) { this.epochMillis = epochMillis; }
 
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }

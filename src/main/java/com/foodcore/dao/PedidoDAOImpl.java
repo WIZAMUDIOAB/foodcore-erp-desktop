@@ -85,7 +85,11 @@ public class PedidoDAOImpl implements PedidoDAO {
                 int c = rs.getInt("id_cliente");
                 p.setIdCliente(rs.wasNull() ? null : c);
                 p.setNumeroMesa(rs.getString("numero_mesa"));
-                p.setFechaHora(rs.getTimestamp("fecha_hora").toLocalDateTime());
+                Timestamp fa = rs.getTimestamp("fecha_hora");
+                if (fa != null) {
+                    p.setFechaHora(fa.toLocalDateTime());
+                    p.setEpochMillis(fa.getTime());
+                }
                 p.setEstado(rs.getString("estado"));
                 p.setTotal(rs.getBigDecimal("total"));
                 lista.add(p);
@@ -108,7 +112,11 @@ public class PedidoDAOImpl implements PedidoDAO {
                 int c = rs.getInt("id_cliente");
                 p.setIdCliente(rs.wasNull() ? null : c);
                 p.setNumeroMesa(rs.getString("numero_mesa"));
-                p.setFechaHora(rs.getTimestamp("fecha_hora").toLocalDateTime());
+                Timestamp fa = rs.getTimestamp("fecha_hora");
+                if (fa != null) {
+                    p.setFechaHora(fa.toLocalDateTime());
+                    p.setEpochMillis(fa.getTime());
+                }
                 p.setEstado(rs.getString("estado"));
                 p.setTotal(rs.getBigDecimal("total"));
                 lista.add(p);
