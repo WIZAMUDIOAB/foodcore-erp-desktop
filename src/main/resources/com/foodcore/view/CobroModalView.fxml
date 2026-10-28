@@ -6,25 +6,25 @@
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.CobroModalController"
-      spacing="14.0" prefWidth="490.0" prefHeight="630.0"
-      style="-fx-background-color: -color-bg-base; -fx-padding: 24px;">
+      spacing="10.0" prefWidth="520.0" prefHeight="650.0"
+      style="-fx-background-color: -color-bg-base; -fx-padding: 16px 24px 20px 24px;">
 
     <!-- Encabezado de Cobro -->
-    <VBox spacing="2.0">
-        <Label text="Liquidación y Cobro" styleClass="view-heading"/>
-        <Label text="Seleccione el comprobante, método de pago y calcule el cambio" styleClass="view-subheading"/>
+    <VBox spacing="1.0">
+        <Label text="Liquidación y Cobro" styleClass="view-heading" style="-fx-font-size: 17px;"/>
+        <Label text="Seleccione el comprobante, método de pago y calcule el cambio" styleClass="view-subheading" style="-fx-font-size: 11px;"/>
     </VBox>
 
     <Separator style="-fx-opacity: 0.6;"/>
 
     <!-- Cuadro de Total a Cobrar -->
-    <VBox spacing="2.0" style="-fx-background-color: #11141a; -fx-padding: 16px; -fx-background-radius: 8px;">
+    <VBox spacing="2.0" style="-fx-background-color: #11141a; -fx-padding: 12px 16px; -fx-background-radius: 8px;">
         <Label text="TOTAL A COBRAR" style="-fx-text-fill: #9ca3af; -fx-font-size: 10px; -fx-font-weight: 800; -fx-letter-spacing: 0.06em;"/>
         <Label fx:id="lblTotalCobro" text="S/ 0.00" style="-fx-text-fill: #ffffff; -fx-font-size: 26px; -fx-font-weight: 800;"/>
     </VBox>
 
     <!-- Tipo de Comprobante -->
-    <VBox spacing="6.0">
+    <VBox spacing="4.0">
         <Label text="Comprobante de Pago:" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
         <HBox spacing="14.0">
             <RadioButton fx:id="rbTicket" text="Ticket de Venta" selected="true">
@@ -39,24 +39,24 @@
 
     <!-- Datos del Cliente -->
     <HBox spacing="10.0">
-        <VBox spacing="4.0" prefWidth="150.0">
+        <VBox spacing="3.0" prefWidth="160.0">
             <Label text="Documento:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
-            <TextField fx:id="txtDocCliente" promptText="00000000" text="00000000"/>
+            <TextField fx:id="txtDocCliente" promptText="00000000" text="00000000" prefHeight="36.0"/>
         </VBox>
-        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+        <VBox spacing="3.0" HBox.hgrow="ALWAYS">
             <Label text="Razón Social / Nombre:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
-            <TextField fx:id="txtNombreCliente" promptText="CLIENTES VARIOS" text="CLIENTES VARIOS"/>
+            <TextField fx:id="txtNombreCliente" promptText="CLIENTES VARIOS" text="CLIENTES VARIOS" prefHeight="36.0"/>
         </VBox>
     </HBox>
 
     <!-- Metodo de Pago -->
-    <VBox spacing="4.0">
+    <VBox spacing="3.0">
         <Label text="Canal de Cobro:" style="-fx-font-weight: 700; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
-        <ComboBox fx:id="cmbMetodoPago" maxWidth="Infinity" prefHeight="38.0"/>
+        <ComboBox fx:id="cmbMetodoPago" maxWidth="Infinity" prefHeight="36.0"/>
     </VBox>
 
     <!-- Calculo de Efectivo y Vuelto -->
-    <VBox fx:id="boxEfectivo" spacing="10.0" styleClass="surface-card" style="-fx-padding: 14px;">
+    <VBox fx:id="boxEfectivo" spacing="8.0" styleClass="surface-card" style="-fx-padding: 12px 14px;">
         <Label text="Cálculo de Efectivo y Cambio" style="-fx-font-weight: 800; -fx-font-size: 12px; -fx-text-fill: -color-ink-primary;"/>
 
         <!-- Chips de Efectivo Rapido -->
@@ -70,7 +70,7 @@
         <HBox alignment="CENTER_LEFT" spacing="12.0">
             <VBox spacing="2.0">
                 <Label text="Monto Recibido:" style="-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: -color-ink-secondary;"/>
-                <TextField fx:id="txtMontoRecibido" promptText="0.00" prefWidth="130.0" prefHeight="38.0"
+                <TextField fx:id="txtMontoRecibido" promptText="0.00" prefWidth="130.0" prefHeight="36.0"
                            onKeyReleased="#handleCalcularVuelto" style="-fx-font-size: 15px; -fx-font-weight: 800;"/>
             </VBox>
             <Region HBox.hgrow="ALWAYS"/>
@@ -81,10 +81,10 @@
         </HBox>
     </VBox>
 
-    <Region VBox.vgrow="ALWAYS"/>
+    <Region VBox.vgrow="ALWAYS" minHeight="6.0"/>
 
     <!-- Boton Confirmar Cobro -->
     <Button text="Confirmar Cobro y Emitir Comprobante" onAction="#handleConfirmarCobro"
-            maxWidth="Infinity" prefHeight="46.0" styleClass="btn-emerald"/>
+            maxWidth="Infinity" prefHeight="44.0" styleClass="btn-emerald"/>
 
 </VBox>

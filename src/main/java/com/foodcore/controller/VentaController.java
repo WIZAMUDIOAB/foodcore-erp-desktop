@@ -303,7 +303,7 @@ public class VentaController {
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setTitle("Finalizar Venta y Cobro - FoodCore");
 
-            Scene scene = new Scene(root, 490, 630);
+            Scene scene = new Scene(root, 520, 670);
             scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
 
             AnimationUtils.animateModalEnter(root);

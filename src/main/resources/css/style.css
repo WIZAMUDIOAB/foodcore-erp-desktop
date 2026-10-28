@@ -438,3 +438,22 @@
     -fx-fill: -color-brand-ember;
     -fx-font-weight: 700;
 }
+
+
+.combo-box {
+    -fx-background-color: #ffffff;
+    -fx-border-color: -color-border-subtle;
+    -fx-border-radius: 7px;
+    -fx-background-radius: 7px;
+    -fx-font-size: 13px;
+    -fx-padding: 2px 6px;
+}
+
+.combo-box .list-cell {
+    -fx-text-fill: -color-ink-primary;
+    -fx-padding: 6px 8px;
+}
+
+.combo-box:focused {
+    -fx-border-color: -color-brand-ember;
+}
