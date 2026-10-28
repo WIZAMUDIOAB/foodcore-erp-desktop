@@ -22,6 +22,7 @@ public class MainDashboardController {
     @FXML private Button btnNavKDS;
     @FXML private Button btnNavReportes;
     @FXML private Button btnNavAsistencia;
+    @FXML private Button btnNavMantenimiento;
 
     @FXML
     public void initialize() {
@@ -58,6 +59,11 @@ public class MainDashboardController {
         cargarVista("/com/foodcore/view/MarcacionAsistenciaView.fxml", btnNavAsistencia);
     }
 
+    @FXML
+    public void handleNavMantenimiento(ActionEvent event) {
+        cargarVista("/com/foodcore/view/MantenimientoBDView.fxml", btnNavMantenimiento);
+    }
+
     private void cargarVista(String fxmlPath, Button navBtnActivo) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
@@ -79,6 +85,7 @@ public class MainDashboardController {
         btnNavKDS.setStyle(base);
         btnNavReportes.setStyle(base);
         btnNavAsistencia.setStyle(base);
+        btnNavMantenimiento.setStyle("-fx-background-color: transparent; -fx-text-fill: #a8dadc; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;");
     }
 
     @FXML
