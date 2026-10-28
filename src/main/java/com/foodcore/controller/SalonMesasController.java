@@ -2,6 +2,8 @@ package com.foodcore.controller;
 
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.model.DetallePedido;
+import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
@@ -22,12 +24,13 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.sql.Connection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class SalonMesasController {
+
+    private static final Logger LOGGER = Logger.getLogger(SalonMesasController.class.getName());
 
     @FXML private FlowPane flowMesas;
 
@@ -51,7 +54,7 @@ public class SalonMesasController {
                     pedidosActivosPorMesa.put(p.getNumeroMesa(), p);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.log(Level.SEVERE, "Error al consultar estado de mesas en BD", e);
             }
 
             Platform.runLater(() -> {
@@ -84,7 +87,7 @@ public class SalonMesasController {
 
                         topRow.getChildren().addAll(lblMesaTitle, sp, lblBadge);
 
-                        Label lblPedido = new Label("Comanda #" + pedidoActivo.getIdPedido());
+                        Label lblPedido = new Label("Comanda #" + pedidoActivo.getIdPedido() + " · " + pedidoActivo.getEstado());
                         lblPedido.setStyle("-fx-font-size: 11px; -fx-text-fill: #6b7280;");
 
                         Label lblTotalMesa = new Label("S/ " + pedidoActivo.getTotal());
@@ -141,7 +144,7 @@ public class SalonMesasController {
 
             cargarMesas();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Error al abrir toma de pedido", e);
         }
     }
 
@@ -149,26 +152,72 @@ public class SalonMesasController {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Gestión de Mesa " + mesa);
         alert.setHeaderText("Mesa " + mesa + " · Comanda Activa #" + pedido.getIdPedido() + " (Total: S/ " + pedido.getTotal() + ")");
-        alert.setContentText("Estado actual: " + pedido.getEstado() + "\nSeleccione la acción a realizar:");
+        alert.setContentText("Estado actual: " + pedido.getEstado() + "\nSeleccione la acción operativa a realizar:");
 
         ButtonType btnAgregarMas = new ButtonType("Agregar Más Platos");
-        ButtonType btnLiberar = new ButtonType("Liberar / Mesa Cobrada");
+        ButtonType btnCobrarMesa = new ButtonType("Cobrar y Facturar Mesa");
         ButtonType btnCancelar = new ButtonType("Cerrar", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-        alert.getButtonTypes().setAll(btnAgregarMas, btnLiberar, btnCancelar);
+        alert.getButtonTypes().setAll(btnAgregarMas, btnCobrarMesa, btnCancelar);
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent()) {
             if (result.get() == btnAgregarMas) {
                 abrirTomaPedido(mesa);
-            } else if (result.get() == btnLiberar) {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    pedidoDAO.actualizarEstadoPedido(conn, pedido.getIdPedido(), "COBRADO");
-                    cargarMesas();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+            } else if (result.get() == btnCobrarMesa) {
+                abrirLiquidacionFiscalMesa(mesa, pedido);
             }
+        }
+    }
+
+    private void abrirLiquidacionFiscalMesa(String mesa, Pedido pedido) {
+        try (Connection conn = ConexionBD.getConnection()) {
+            List<DetallePedido> detallesPed = pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
+            if (detallesPed.isEmpty()) {
+                Alert warn = new Alert(Alert.AlertType.WARNING, "El pedido no contiene ítems para facturar.");
+                warn.showAndWait();
+                return;
+            }
+
+            List<DetalleVenta> itemsParaFacturar = new ArrayList<>();
+            for (DetallePedido dp : detallesPed) {
+                DetalleVenta dv = new DetalleVenta(
+                    0,
+                    0,
+                    dp.getIdProducto(),
+                    dp.getCantidad(),
+                    dp.getPrecioUnitario(),
+                    dp.getSubtotal()
+                );
+                dv.setNombreProducto(dp.getNombreProducto());
+                itemsParaFacturar.add(dv);
+            }
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
+            Parent root = loader.load();
+
+            CobroModalController ctrl = loader.getController();
+            ctrl.setIdPedidoAsociado(pedido.getIdPedido());
+            ctrl.initData(pedido.getTotal(), "EFECTIVO", itemsParaFacturar, this::cargarMesas);
+
+            Stage stage = new Stage();
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setTitle("Liquidación y Facturación · Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ")");
+
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
+
+            AnimationUtils.animateModalEnter(root);
+
+            stage.setScene(scene);
+            stage.sizeToScene();
+            stage.setResizable(false);
+            stage.showAndWait();
+
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
+            Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + ex.getMessage());
+            err.showAndWait();
         }
     }
 }

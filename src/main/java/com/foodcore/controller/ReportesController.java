@@ -29,7 +29,7 @@ public class ReportesController {
     @FXML private PieChart pieChartMetodosPago;
 
     private final ReporteService reporteService = new ReporteService();
-    private final NumberFormat monedaFormat = NumberFormat.getCurrencyInstance(new Locale("es", "PE"));
+    private final NumberFormat monedaFormat = NumberFormat.getCurrencyInstance(Locale.of("es", "PE"));
 
     @FXML
     public void initialize() {

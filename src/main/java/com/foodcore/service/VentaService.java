@@ -14,7 +14,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Servicio transaccional de Ventas con control estricto ACID y descuento de inventario vía recetas.
+ * Servicio transaccional de Ventas con control estricto ACID, invariantes fiscales
+ * vía Value Object (DesgloseFiscal) y descuento atómico de inventario por recetas.
  */
 public class VentaService {
 
@@ -23,14 +24,34 @@ public class VentaService {
     private final VentaDAO ventaDAO = new VentaDAOImpl();
     private final CajaDAO cajaDAO = new CajaDAOImpl();
     private final InsumoDAO insumoDAO = new InsumoDAOImpl();
+    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
 
     /**
-     * Ejecuta el registro transaccional de una venta, emitiendo comprobante y descontando insumos.
+     * Ejecuta el registro transaccional de una venta, emitiendo comprobante,
+     * descontando insumos de Kardex y liquidando el pedido de salón si aplica.
      */
     public Venta registrarVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante) throws NegocioException, SQLException {
         if (detalles == null || detalles.isEmpty()) {
             throw new NegocioException("No se puede registrar una venta sin productos en el detalle.");
         }
+
+        // Recalcular total desde las líneas de detalle para garantizar integridad contable
+        BigDecimal sumaLineas = BigDecimal.ZERO;
+        for (DetalleVenta det : detalles) {
+            if (det.getCantidad() <= 0) {
+                throw new NegocioException("La cantidad de cada ítem de venta debe ser mayor a cero.");
+            }
+            BigDecimal subtotalLinea = det.getPrecioUnitario()
+                .multiply(BigDecimal.valueOf(det.getCantidad()))
+                .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+            det.setSubtotal(subtotalLinea);
+            sumaLineas = sumaLineas.add(subtotalLinea);
+        }
+
+        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(sumaLineas);
+        venta.setSubtotal(desglose.getSubtotalGravado());
+        venta.setIgv(desglose.getIgv());
+        venta.setTotal(desglose.getTotal());
 
         try (Connection conn = ConexionBD.getConnection()) {
             // 1. Validar que exista una caja abierta
@@ -47,7 +68,7 @@ public class VentaService {
                 int idVenta = ventaDAO.insertarVenta(conn, venta);
                 venta.setIdVenta(idVenta);
 
-                // 4. Insertar detalles y descontar insumos por receta
+                // 4. Insertar detalles y descontar insumos por receta con control de stock negativo
                 for (DetalleVenta detalle : detalles) {
                     detalle.setIdVenta(idVenta);
                     ventaDAO.insertarDetalleVenta(conn, detalle);
@@ -55,27 +76,33 @@ public class VentaService {
                     // Consultar receta del producto
                     List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
                     for (Receta rec : componentes) {
-                        BigDecimal cantidadTotalADescontar = rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(detalle.getCantidad()));
+                        BigDecimal cantidadTotalADescontar = rec.getCantidadNecesaria()
+                            .multiply(BigDecimal.valueOf(detalle.getCantidad()));
 
-                        // Descontar stock actual
+                        // Descontar stock actual (verifica stock_actual >= requerido atómicamente)
                         insumoDAO.descontarStock(conn, rec.getIdInsumo(), cantidadTotalADescontar);
 
-                        // Registrar movimiento de inventario de tipo SALIDA
+                        // Registrar movimiento en el Kardex de inventario
                         String motivo = "Venta #" + idVenta + " - Prod #" + detalle.getIdProducto() + " (" + detalle.getCantidad() + " und)";
                         insumoDAO.registrarMovimientoInventario(conn, rec.getIdInsumo(), "SALIDA", cantidadTotalADescontar, motivo, idVenta);
                     }
                 }
 
-                // 5. Emitir Comprobante de Pago
+                // 5. Emitir Comprobante de Pago Fiscal
                 if (comprobante != null) {
                     comprobante.setIdVenta(idVenta);
-                    comprobante.setTotal(venta.getTotal());
+                    comprobante.setTotal(desglose.getTotal());
                     ventaDAO.insertarComprobante(conn, comprobante);
                 }
 
-                // 6. Confirmar transacción
+                // 6. Si la venta proviene de una comanda de salón, marcar pedido como COBRADO en la misma transacción
+                if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
+                    pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
+                }
+
+                // 7. Confirmar transacción ACID
                 conn.commit();
-                LOGGER.info("Venta #" + idVenta + " registrada exitosamente con descuento de insumos.");
+                LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + desglose.getTotal() + ").");
                 return venta;
 
             } catch (Exception ex) {

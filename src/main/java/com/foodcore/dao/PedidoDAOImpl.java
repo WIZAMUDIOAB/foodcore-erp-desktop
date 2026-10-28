@@ -127,6 +127,21 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setInt(2, idPedido);
             ps.executeUpdate();
         }
+
+        String estadoComanda = "PENDIENTE";
+        if ("EN_PREPARACION".equalsIgnoreCase(nuevoEstado)) {
+            estadoComanda = "EN_PREPARACION";
+        } else if ("LISTO".equalsIgnoreCase(nuevoEstado)) {
+            estadoComanda = "LISTA";
+        } else if ("COBRADO".equalsIgnoreCase(nuevoEstado) || "ENTREGADO".equalsIgnoreCase(nuevoEstado)) {
+            estadoComanda = "DESPACHADA";
+        }
+        String sqlComanda = "UPDATE comanda SET estado = ? WHERE id_pedido = ?";
+        try (PreparedStatement psCom = conn.prepareStatement(sqlComanda)) {
+            psCom.setString(1, estadoComanda);
+            psCom.setInt(2, idPedido);
+            psCom.executeUpdate();
+        }
     }
 
     @Override

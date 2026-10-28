@@ -56,13 +56,16 @@ public class CajaDAOImpl implements CajaDAO {
 
     @Override
     public void cerrarCaja(Connection conn, int idCaja, int idUsuarioCierre, BigDecimal montoCierre, BigDecimal diferencia) throws SQLException {
-        String sql = "UPDATE caja SET id_usuario_cierre = ?, monto_cierre = ?, diferencia = ?, fecha_cierre = CURRENT_TIMESTAMP, estado = 'CERRADA' WHERE id_caja = ?";
+        String sql = "UPDATE caja SET id_usuario_cierre = ?, monto_cierre = ?, diferencia = ?, fecha_cierre = CURRENT_TIMESTAMP, estado = 'CERRADA' WHERE id_caja = ? AND estado = 'ABIERTA'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idUsuarioCierre);
             ps.setBigDecimal(2, montoCierre);
             ps.setBigDecimal(3, diferencia);
             ps.setInt(4, idCaja);
-            ps.executeUpdate();
+            int updated = ps.executeUpdate();
+            if (updated == 0) {
+                throw new SQLException("La caja #" + idCaja + " ya fue cerrada previamente por otro proceso.");
+            }
         }
     }
 
@@ -81,7 +84,8 @@ public class CajaDAOImpl implements CajaDAO {
 
     @Override
     public BigDecimal calcularTotalVentasTurno(Connection conn, int idCaja) throws SQLException {
-        String sql = "SELECT COALESCE(SUM(total), 0) FROM venta WHERE id_caja = ? AND estado = 'COMPLETADA'";
+        // Arqueo físico de gaveta: contabiliza exclusivamente las ventas liquidadas en EFECTIVO
+        String sql = "SELECT COALESCE(SUM(total), 0.00) FROM venta WHERE id_caja = ? AND estado = 'COMPLETADA' AND metodo_pago = 'EFECTIVO'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idCaja);
             try (ResultSet rs = ps.executeQuery()) {

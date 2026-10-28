@@ -1,6 +1,8 @@
 package com.foodcore.controller;
 
+import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComprobantePago;
+import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
@@ -29,6 +31,7 @@ public class CobroModalController {
     @FXML private TextField txtMontoRecibido;
     @FXML private Label lblVuelto;
 
+    private Integer idPedidoAsociado = null;
     private BigDecimal totalVenta = BigDecimal.ZERO;
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
@@ -59,16 +62,20 @@ public class CobroModalController {
     }
 
     public void initData(BigDecimal total, String metodoPreseleccionado, List<DetalleVenta> items, Runnable onExitosa) {
-        this.totalVenta = total;
+        this.totalVenta = total.setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
         this.itemsVenta = items;
         this.onVentaExitosa = onExitosa;
 
-        lblTotalCobro.setText("S/ " + total.toString());
+        lblTotalCobro.setText("S/ " + this.totalVenta);
         if (metodoPreseleccionado != null) {
             cmbMetodoPago.getSelectionModel().select(metodoPreseleccionado);
         }
-        txtMontoRecibido.setText(total.toString());
+        txtMontoRecibido.setText(this.totalVenta.toString());
         handleCalcularVuelto();
+    }
+
+    public void setIdPedidoAsociado(Integer idPedidoAsociado) {
+        this.idPedidoAsociado = idPedidoAsociado;
     }
 
     @FXML
@@ -104,9 +111,9 @@ public class CobroModalController {
                 return;
             }
             BigDecimal recibido = new BigDecimal(texto);
-            BigDecimal vuelto = recibido.subtract(totalVenta);
+            BigDecimal vuelto = recibido.subtract(totalVenta).setScale(2, RoundingMode.HALF_UP);
 
-            lblVuelto.setText("S/ " + vuelto.setScale(2, RoundingMode.HALF_UP));
+            lblVuelto.setText("S/ " + vuelto);
             if (vuelto.compareTo(BigDecimal.ZERO) < 0) {
                 lblVuelto.setStyle("-fx-text-fill: #e63946; -fx-font-weight: bold;");
             } else {
@@ -120,19 +127,13 @@ public class CobroModalController {
     @FXML
     public void handleConfirmarCobro(ActionEvent event) {
         try {
-            BigDecimal recibido = new BigDecimal(txtMontoRecibido.getText().trim());
-            if (recibido.compareTo(totalVenta) < 0 && "EFECTIVO".equals(cmbMetodoPago.getValue())) {
-                mostrarAlerta("Monto Insuficiente", "El monto recibido (S/ " + recibido + ") es menor al total a pagar (S/ " + totalVenta + ").", Alert.AlertType.WARNING);
-                return;
-            }
+            String metodo = cmbMetodoPago.getValue();
+            BigDecimal recibido = new BigDecimal(txtMontoRecibido.getText().trim())
+                .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
 
-            BigDecimal vuelto = recibido.subtract(totalVenta);
-            if (vuelto.compareTo(BigDecimal.ZERO) < 0) vuelto = BigDecimal.ZERO;
-
-            // Desglose tributario IGV al 18%
-            BigDecimal divisor = new BigDecimal("1.18");
-            BigDecimal subtotal = totalVenta.divide(divisor, 2, RoundingMode.HALF_UP);
-            BigDecimal igv = totalVenta.subtract(subtotal);
+            // Desglose e invariantes mediante Value Object de Dominio
+            DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(totalVenta);
+            BigDecimal vuelto = desglose.calcularVuelto(recibido, metodo);
 
             String tipoComp = "TICKET";
             String serie = "TCK";
@@ -144,29 +145,32 @@ public class CobroModalController {
                 serie = "F001";
             }
 
+            // Validar requisitos tributarios SUNAT (RUC 11 dígitos en Factura, DNI 8 en Boleta)
+            DesgloseFiscal.validarRequisitosComprobante(tipoComp, txtDocCliente.getText(), txtNombreCliente.getText());
+
             String numero = String.format("%06d", (int) (System.currentTimeMillis() % 1000000));
             int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
 
             Venta venta = new Venta(
                 0,
-                null,
+                idPedidoAsociado,
                 1,
                 idUsuario,
                 1,
-                subtotal,
-                igv,
-                totalVenta,
-                cmbMetodoPago.getValue(),
+                desglose.getSubtotalGravado(),
+                desglose.getIgv(),
+                desglose.getTotal(),
+                metodo,
                 recibido,
                 vuelto
             );
 
-            ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComp, serie, numero, totalVenta);
+            ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComp, serie, numero, desglose.getTotal());
 
-            // Registro transaccional en BD y descuento de insumos
+            // Registro transaccional ACID en BD, descuento de insumos y cierre de comanda si aplica
             ventaService.registrarVenta(venta, itemsVenta, comprobante);
 
-            // Mostrar el comprobante generado
+            // Mostrar el comprobante electrónico generado
             mostrarTicketImpresion(comprobante, venta, recibido, vuelto);
 
             if (onVentaExitosa != null) {
@@ -178,7 +182,9 @@ public class CobroModalController {
             stage.close();
 
         } catch (NumberFormatException e) {
-            mostrarAlerta("Validación", "Ingrese un monto recibido válido.", Alert.AlertType.WARNING);
+            mostrarAlerta("Validación", "Ingrese un monto recibido numérico válido.", Alert.AlertType.WARNING);
+        } catch (NegocioException ne) {
+            mostrarAlerta("Validación de Negocio / Fiscal", ne.getMessage(), Alert.AlertType.WARNING);
         } catch (Exception e) {
             mostrarAlerta("Error al Registrar Venta", e.getMessage(), Alert.AlertType.ERROR);
         }
