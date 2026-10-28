@@ -29,9 +29,55 @@ public class MainDashboardController {
         Usuario act = AuthService.getUsuarioSesionActual();
         if (act != null) {
             lblUsuarioLogueado.setText("Usuario: " + act.getUsername() + " (" + act.getNombreRol() + ")");
+            aplicarControlAcceso(act);
+        } else {
+            cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
         }
-        // Cargar vista inicial según convenga
-        cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
+    }
+
+    private void aplicarControlAcceso(Usuario user) {
+        if (user == null || user.getNombreRol() == null) {
+            cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
+            return;
+        }
+
+        String rol = user.getNombreRol().toUpperCase();
+
+        if (rol.contains("MOZO")) {
+            // Mozo: solo acceso a salon de pedidos y marcacion de asistencia
+            btnNavPOS.setVisible(false);
+            btnNavPOS.setManaged(false);
+            btnNavKDS.setVisible(false);
+            btnNavKDS.setManaged(false);
+            btnNavReportes.setVisible(false);
+            btnNavReportes.setManaged(false);
+            btnNavMantenimiento.setVisible(false);
+            btnNavMantenimiento.setManaged(false);
+            cargarVista("/com/foodcore/view/SalonMesasView.fxml", btnNavSalon);
+        } else if (rol.contains("COCIN")) {
+            // Cocinero: solo acceso al monitor de cocina KDS y asistencia
+            btnNavPOS.setVisible(false);
+            btnNavPOS.setManaged(false);
+            btnNavSalon.setVisible(false);
+            btnNavSalon.setManaged(false);
+            btnNavReportes.setVisible(false);
+            btnNavReportes.setManaged(false);
+            btnNavMantenimiento.setVisible(false);
+            btnNavMantenimiento.setManaged(false);
+            cargarVista("/com/foodcore/view/KitchenDisplayView.fxml", btnNavKDS);
+        } else if (rol.contains("CAJERO")) {
+            // Cajero: POS, Salon y Asistencia. Sin acceso a reportes ni mantenimiento BD
+            btnNavKDS.setVisible(false);
+            btnNavKDS.setManaged(false);
+            btnNavReportes.setVisible(false);
+            btnNavReportes.setManaged(false);
+            btnNavMantenimiento.setVisible(false);
+            btnNavMantenimiento.setManaged(false);
+            cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
+        } else {
+            // Administrador o Gerente: Acceso completo a todos los modulos
+            cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
+        }
     }
 
     @FXML

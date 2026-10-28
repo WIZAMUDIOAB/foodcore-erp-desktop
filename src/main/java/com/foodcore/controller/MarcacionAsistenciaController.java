@@ -44,16 +44,15 @@ public class MarcacionAsistenciaController {
     public void handleRegistrar(ActionEvent event) {
         String dni = txtDni.getText();
         try {
-            authService.marcarAsistenciaRapida(dni);
-            String hora = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            lblEstado.setStyle("-fx-text-fill: #2a9d8f;");
-            lblEstado.setText("¡Marcación Exitosa! Registrado a las " + hora);
+            String resultado = authService.marcarAsistenciaInteligente(dni);
+            lblEstado.setStyle("-fx-text-fill: #2a9d8f; -fx-font-size: 13px;");
+            lblEstado.setText(resultado);
             txtDni.clear();
         } catch (NegocioException e) {
-            lblEstado.setStyle("-fx-text-fill: #e63946;");
+            lblEstado.setStyle("-fx-text-fill: #e63946; -fx-font-size: 13px;");
             lblEstado.setText(e.getMessage());
         } catch (Exception e) {
-            lblEstado.setStyle("-fx-text-fill: #e63946;");
+            lblEstado.setStyle("-fx-text-fill: #e63946; -fx-font-size: 13px;");
             lblEstado.setText("Error al registrar marcación: " + e.getMessage());
         }
     }
