@@ -40,6 +40,10 @@
                     maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
                     style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 13px; -fx-cursor: hand;"/>
 
+            <Button fx:id="btnNavMantenimiento" text="⚙ Base de Datos y Catálogo" onAction="#handleNavMantenimiento"
+                    maxWidth="Infinity" prefHeight="40.0" alignment="BASELINE_LEFT"
+                    style="-fx-background-color: transparent; -fx-text-fill: #a8dadc; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;"/>
+
             <Region VBox.vgrow="ALWAYS"/>
 
             <Separator opacity="0.3"/>

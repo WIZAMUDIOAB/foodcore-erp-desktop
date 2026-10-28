@@ -4,10 +4,7 @@ import com.foodcore.model.Insumo;
 import com.foodcore.model.Receta;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,6 +57,55 @@ public class InsumoDAOImpl implements InsumoDAO {
     }
 
     @Override
+    public int crear(Connection conn, Insumo i) throws SQLException {
+        String sql = "INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual, stock_minimo, costo_unitario) " +
+                     "VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, i.getCodigo());
+            ps.setString(2, i.getNombre());
+            ps.setString(3, i.getUnidadMedida());
+            ps.setBigDecimal(4, i.getStockActual());
+            ps.setBigDecimal(5, i.getStockMinimo());
+            ps.setBigDecimal(6, i.getCostoUnitario());
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    int id = rs.getInt(1);
+                    i.setIdInsumo(id);
+                    return id;
+                }
+            }
+        }
+        throw new SQLException("No se pudo obtener el ID del insumo registrado.");
+    }
+
+    @Override
+    public void actualizar(Connection conn, Insumo i) throws SQLException {
+        String sql = "UPDATE insumo SET codigo = ?, nombre = ?, unidad_medida = ?, stock_actual = ?, stock_minimo = ?, costo_unitario = ? " +
+                     "WHERE id_insumo = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, i.getCodigo());
+            ps.setString(2, i.getNombre());
+            ps.setString(3, i.getUnidadMedida());
+            ps.setBigDecimal(4, i.getStockActual());
+            ps.setBigDecimal(5, i.getStockMinimo());
+            ps.setBigDecimal(6, i.getCostoUnitario());
+            ps.setInt(7, i.getIdInsumo());
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void actualizarStock(Connection conn, int idInsumo, BigDecimal nuevoStock) throws SQLException {
+        String sql = "UPDATE insumo SET stock_actual = ? WHERE id_insumo = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBigDecimal(1, nuevoStock);
+            ps.setInt(2, idInsumo);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
     public void descontarStock(Connection conn, int idInsumo, BigDecimal cantidadADescontar) throws SQLException {
         String sql = "UPDATE insumo SET stock_actual = stock_actual - ? WHERE id_insumo = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -82,6 +128,15 @@ public class InsumoDAOImpl implements InsumoDAO {
             } else {
                 ps.setNull(5, java.sql.Types.INTEGER);
             }
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void eliminar(Connection conn, int idInsumo) throws SQLException {
+        String sql = "DELETE FROM insumo WHERE id_insumo = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idInsumo);
             ps.executeUpdate();
         }
     }
