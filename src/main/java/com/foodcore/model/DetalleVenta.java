@@ -24,6 +24,11 @@ public class DetalleVenta {
         this.subtotal = subtotal;
     }
 
+    public DetalleVenta(int idDetalleVenta, int idVenta, int idProducto, String nombreProducto, int cantidad, BigDecimal precioUnitario, BigDecimal subtotal) {
+        this(idDetalleVenta, idVenta, idProducto, cantidad, precioUnitario, subtotal);
+        this.nombreProducto = nombreProducto;
+    }
+
     public int getIdDetalleVenta() { return idDetalleVenta; }
     public void setIdDetalleVenta(int idDetalleVenta) { this.idDetalleVenta = idDetalleVenta; }
 

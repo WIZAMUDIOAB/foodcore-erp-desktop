@@ -1,5 +1,8 @@
 package com.foodcore.dao;
 
+import com.foodcore.exception.InsumoNoEncontradoException;
+import com.foodcore.exception.StockInsuficienteException;
+import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Receta;
 
@@ -37,7 +40,8 @@ public class InsumoDAOImpl implements InsumoDAO {
         String sql = "SELECT r.*, i.nombre AS nombre_insumo, i.unidad_medida " +
                      "FROM receta r " +
                      "JOIN insumo i ON r.id_insumo = i.id_insumo " +
-                     "WHERE r.id_producto = ?";
+                     "WHERE r.id_producto = ? " +
+                     "ORDER BY r.id_insumo ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idProducto);
             try (ResultSet rs = ps.executeQuery()) {
@@ -64,8 +68,8 @@ public class InsumoDAOImpl implements InsumoDAO {
             ps.setString(1, i.getCodigo());
             ps.setString(2, i.getNombre());
             ps.setString(3, i.getUnidadMedida());
-            ps.setBigDecimal(4, i.getStockActual());
-            ps.setBigDecimal(5, i.getStockMinimo());
+            ps.setBigDecimal(4, i.getStockActual().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
+            ps.setBigDecimal(5, i.getStockMinimo().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(6, i.getCostoUnitario());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -87,8 +91,8 @@ public class InsumoDAOImpl implements InsumoDAO {
             ps.setString(1, i.getCodigo());
             ps.setString(2, i.getNombre());
             ps.setString(3, i.getUnidadMedida());
-            ps.setBigDecimal(4, i.getStockActual());
-            ps.setBigDecimal(5, i.getStockMinimo());
+            ps.setBigDecimal(4, i.getStockActual().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
+            ps.setBigDecimal(5, i.getStockMinimo().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(6, i.getCostoUnitario());
             ps.setInt(7, i.getIdInsumo());
             ps.executeUpdate();
@@ -99,29 +103,52 @@ public class InsumoDAOImpl implements InsumoDAO {
     public void actualizarStock(Connection conn, int idInsumo, BigDecimal nuevoStock) throws SQLException {
         String sql = "UPDATE insumo SET stock_actual = ? WHERE id_insumo = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setBigDecimal(1, nuevoStock);
+            ps.setBigDecimal(1, nuevoStock.setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setInt(2, idInsumo);
             ps.executeUpdate();
         }
     }
 
+    /**
+     * Descuenta stock atómicamente aplicando validación en base de datos ({@code stock_actual >= ?})
+     * para prevenir sobregiros bajo concurrencia (SPEC-FOODCORE-v1.0 §9.1).
+     */
     @Override
     public void descontarStock(Connection conn, int idInsumo, BigDecimal cantidadADescontar) throws SQLException {
-        String sql = "UPDATE insumo SET stock_actual = stock_actual - ? WHERE id_insumo = ?";
+        BigDecimal cantNorm = cantidadADescontar.setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+        String sql = "UPDATE insumo SET stock_actual = stock_actual - ? WHERE id_insumo = ? AND stock_actual >= ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setBigDecimal(1, cantidadADescontar);
+            ps.setBigDecimal(1, cantNorm);
             ps.setInt(2, idInsumo);
-            ps.executeUpdate();
+            ps.setBigDecimal(3, cantNorm);
+            int filasAfectadas = ps.executeUpdate();
+            if (filasAfectadas == 0) {
+                if (!existeInsumo(conn, idInsumo)) {
+                    throw new SQLException(new InsumoNoEncontradoException(idInsumo));
+                }
+                throw new SQLException(new StockInsuficienteException(idInsumo, cantNorm));
+            }
+        }
+    }
+
+    private boolean existeInsumo(Connection conn, int idInsumo) throws SQLException {
+        String sql = "SELECT 1 FROM insumo WHERE id_insumo = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idInsumo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 
     @Override
     public void registrarMovimientoInventario(Connection conn, int idInsumo, String tipo, BigDecimal cantidad, String motivo, Integer referenciaId) throws SQLException {
+        BigDecimal cantNorm = cantidad.setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
         String sql = "INSERT INTO movimiento_inventario (id_insumo, tipo, cantidad, motivo, referencia_id) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idInsumo);
             ps.setString(2, tipo);
-            ps.setBigDecimal(3, cantidad);
+            ps.setBigDecimal(3, cantNorm);
             ps.setString(4, motivo);
             if (referenciaId != null) {
                 ps.setInt(5, referenciaId);

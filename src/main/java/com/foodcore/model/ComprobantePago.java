@@ -9,6 +9,8 @@ public class ComprobantePago {
     private String tipoComprobante; // BOLETA, FACTURA, TICKET
     private String serie;
     private String numero;
+    private String documentoCliente;
+    private String nombreCliente;
     private LocalDateTime fechaEmision;
     private BigDecimal total;
 
@@ -22,6 +24,13 @@ public class ComprobantePago {
         this.numero = numero;
         this.total = total;
         this.fechaEmision = LocalDateTime.now();
+    }
+
+    public ComprobantePago(int idComprobante, int idVenta, String tipoComprobante, String serie, String numero,
+                           String documentoCliente, String nombreCliente, BigDecimal total) {
+        this(idComprobante, idVenta, tipoComprobante, serie, numero, total);
+        this.documentoCliente = documentoCliente;
+        this.nombreCliente = nombreCliente;
     }
 
     public int getIdComprobante() { return idComprobante; }
@@ -38,6 +47,15 @@ public class ComprobantePago {
 
     public String getNumero() { return numero; }
     public void setNumero(String numero) { this.numero = numero; }
+
+    public String getCorrelativo() { return numero; }
+    public void setCorrelativo(String correlativo) { this.numero = correlativo; }
+
+    public String getDocumentoCliente() { return documentoCliente; }
+    public void setDocumentoCliente(String documentoCliente) { this.documentoCliente = documentoCliente; }
+
+    public String getNombreCliente() { return nombreCliente; }
+    public void setNombreCliente(String nombreCliente) { this.nombreCliente = nombreCliente; }
 
     public LocalDateTime getFechaEmision() { return fechaEmision; }
     public void setFechaEmision(LocalDateTime fechaEmision) { this.fechaEmision = fechaEmision; }

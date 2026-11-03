@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class Venta {
     private int idVenta;
@@ -19,6 +20,7 @@ public class Venta {
     private BigDecimal montoRecibido;
     private BigDecimal vuelto;
     private String estado; // COMPLETADA, ANULADA
+    private String idempotencyKey = UUID.randomUUID().toString();
 
     private List<DetalleVenta> detalles = new ArrayList<>();
 
@@ -38,6 +40,7 @@ public class Venta {
         this.vuelto = vuelto;
         this.estado = "COMPLETADA";
         this.fechaHora = LocalDateTime.now();
+        this.idempotencyKey = UUID.randomUUID().toString();
     }
 
     public int getIdVenta() { return idVenta; }
@@ -78,6 +81,13 @@ public class Venta {
 
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = (idempotencyKey == null || idempotencyKey.isBlank())
+            ? UUID.randomUUID().toString()
+            : idempotencyKey.trim();
+    }
 
     public List<DetalleVenta> getDetalles() { return detalles; }
     public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles; }

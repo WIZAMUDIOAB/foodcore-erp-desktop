@@ -1,41 +1,72 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.*;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.tx.TransactionManager;
+import com.foodcore.tx.impl.JdbcTransactionManager;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Level;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- * Servicio transaccional de Ventas con control estricto ACID, invariantes fiscales
- * vía Value Object (DesgloseFiscal) y descuento atómico de inventario por recetas.
+ * Servicio transaccional de Ventas con control estricto ACID mediante {@link TransactionManager},
+ * idempotencia por {@code idempotency_key} (§8.1, §9.2), invariantes fiscales vía
+ * {@link DesgloseFiscal} y descuento atómico de inventario por recetas.
  */
 public class VentaService {
 
     private static final Logger LOGGER = Logger.getLogger(VentaService.class.getName());
+    private static final Map<String, Venta> REGISTRO_IDEMPOTENCIA = new ConcurrentHashMap<>();
 
-    private final VentaDAO ventaDAO = new VentaDAOImpl();
-    private final CajaDAO cajaDAO = new CajaDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final TransactionManager tx;
+    private final VentaDAO ventaDAO;
+    private final CajaDAO cajaDAO;
+    private final InsumoDAO insumoDAO;
+    private final PedidoDAO pedidoDAO;
+
+    public VentaService() {
+        this(new JdbcTransactionManager(), new VentaDAOImpl(), new CajaDAOImpl(), new InsumoDAOImpl(), new PedidoDAOImpl());
+    }
+
+    public VentaService(TransactionManager tx,
+                        VentaDAO ventaDAO,
+                        CajaDAO cajaDAO,
+                        InsumoDAO insumoDAO,
+                        PedidoDAO pedidoDAO) {
+        this.tx = tx;
+        this.ventaDAO = ventaDAO;
+        this.cajaDAO = cajaDAO;
+        this.insumoDAO = insumoDAO;
+        this.pedidoDAO = pedidoDAO;
+    }
 
     /**
-     * Ejecuta el registro transaccional de una venta, emitiendo comprobante,
-     * descontando insumos de Kardex y liquidando el pedido de salón si aplica.
+     * Ejecuta el registro transaccional e idempotente de una venta, emitiendo comprobante,
+     * descontando insumos de Kárdex y liquidando el pedido de salón si aplica.
      */
     public Venta registrarVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante) throws NegocioException, SQLException {
+        if (venta == null) {
+            throw new NegocioException("Los datos de la venta no pueden ser nulos.");
+        }
         if (detalles == null || detalles.isEmpty()) {
             throw new NegocioException("No se puede registrar una venta sin productos en el detalle.");
         }
 
-        // Recalcular total desde las líneas de detalle para garantizar integridad contable
+        // 1. Verificar idempotencia (SPEC-FOODCORE-v1.0 §8.1, §9.2)
+        String idemKey = venta.getIdempotencyKey();
+        if (idemKey != null && REGISTRO_IDEMPOTENCIA.containsKey(idemKey)) {
+            LOGGER.info("Idempotencia activada: devolviendo venta previamente procesada para clave " + idemKey);
+            return REGISTRO_IDEMPOTENCIA.get(idemKey);
+        }
+
+        // 2. Recalcular total desde las líneas de detalle con redondeo HALF_EVEN
         BigDecimal sumaLineas = BigDecimal.ZERO;
         for (DetalleVenta det : detalles) {
             if (det.getCantidad() <= 0) {
@@ -53,65 +84,56 @@ public class VentaService {
         venta.setIgv(desglose.getIgv());
         venta.setTotal(desglose.getTotal());
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            // 1. Validar que exista una caja abierta
+        // 3. Ejecutar unidad de trabajo atómica ACID vía TransactionManager (§7.1)
+        return tx.executeChecked(conn -> {
             Optional<Caja> cajaAbierta = cajaDAO.obtenerCajaAbierta(conn);
             if (cajaAbierta.isEmpty()) {
-                throw new NegocioException("Operación bloqueada: No existe un turno de caja 'ABIERTA'. Debe abrir caja antes de cobrar.");
+                throw new CajaCerradaException();
             }
             venta.setIdCaja(cajaAbierta.get().getIdCaja());
 
-            // 2. Iniciar transacción ACID
-            conn.setAutoCommit(false);
-            try {
-                // 3. Insertar cabecera de venta
-                int idVenta = ventaDAO.insertarVenta(conn, venta);
-                venta.setIdVenta(idVenta);
+            int idVenta = ventaDAO.insertarVenta(conn, venta);
+            venta.setIdVenta(idVenta);
 
-                // 4. Insertar detalles y descontar insumos por receta con control de stock negativo
-                for (DetalleVenta detalle : detalles) {
-                    detalle.setIdVenta(idVenta);
-                    ventaDAO.insertarDetalleVenta(conn, detalle);
+            for (DetalleVenta detalle : detalles) {
+                detalle.setIdVenta(idVenta);
+                ventaDAO.insertarDetalleVenta(conn, detalle);
 
-                    // Consultar receta del producto
-                    List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
-                    for (Receta rec : componentes) {
-                        BigDecimal cantidadTotalADescontar = rec.getCantidadNecesaria()
-                            .multiply(BigDecimal.valueOf(detalle.getCantidad()));
+                List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
+                for (Receta rec : componentes) {
+                    BigDecimal cantidadTotalADescontar = DesgloseFiscal.normalizarStock(
+                        rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(detalle.getCantidad()))
+                    );
 
-                        // Descontar stock actual (verifica stock_actual >= requerido atómicamente)
+                    try {
                         insumoDAO.descontarStock(conn, rec.getIdInsumo(), cantidadTotalADescontar);
-
-                        // Registrar movimiento en el Kardex de inventario
-                        String motivo = "Venta #" + idVenta + " - Prod #" + detalle.getIdProducto() + " (" + detalle.getCantidad() + " und)";
-                        insumoDAO.registrarMovimientoInventario(conn, rec.getIdInsumo(), "SALIDA", cantidadTotalADescontar, motivo, idVenta);
+                    } catch (SQLException se) {
+                        if (se.getCause() instanceof NegocioException ne) {
+                            throw ne;
+                        }
+                        throw se;
                     }
+
+                    String motivo = "Venta #" + idVenta + " - Prod #" + detalle.getIdProducto() + " (" + detalle.getCantidad() + " und)";
+                    insumoDAO.registrarMovimientoInventario(conn, rec.getIdInsumo(), "SALIDA", cantidadTotalADescontar, motivo, idVenta);
                 }
-
-                // 5. Emitir Comprobante de Pago Fiscal
-                if (comprobante != null) {
-                    comprobante.setIdVenta(idVenta);
-                    comprobante.setTotal(desglose.getTotal());
-                    ventaDAO.insertarComprobante(conn, comprobante);
-                }
-
-                // 6. Si la venta proviene de una comanda de salón, marcar pedido como COBRADO en la misma transacción
-                if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
-                    pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
-                }
-
-                // 7. Confirmar transacción ACID
-                conn.commit();
-                LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + desglose.getTotal() + ").");
-                return venta;
-
-            } catch (Exception ex) {
-                conn.rollback();
-                LOGGER.log(Level.SEVERE, "Transacción de venta abortada. Se ejecutó Rollback.", ex);
-                throw new SQLException("Error durante la transacción de venta: " + ex.getMessage(), ex);
-            } finally {
-                conn.setAutoCommit(true);
             }
-        }
+
+            if (comprobante != null) {
+                comprobante.setIdVenta(idVenta);
+                comprobante.setTotal(desglose.getTotal());
+                ventaDAO.insertarComprobante(conn, comprobante);
+            }
+
+            if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
+                pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
+            }
+
+            if (idemKey != null) {
+                REGISTRO_IDEMPOTENCIA.put(idemKey, venta);
+            }
+            LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + desglose.getTotal() + ").");
+            return venta;
+        });
     }
 }
