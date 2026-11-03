@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TerminalAuthService {
 
+    public static final String ACCION_AUTH_TERMINAL = "AUTH_TERMINAL";
     public static final long TTL_SEGUNDOS = 8L * 3600L; // 8 horas
     public static final int MAX_FRAME_BYTES = 1048576; // 1 MB
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");

@@ -131,7 +131,7 @@ public class ServidorSockets {
             JsonObject json = JsonParser.parseString(linea).getAsJsonObject();
             String type = json.has("type") ? json.get("type").getAsString() : "";
 
-            if ("HELLO".equalsIgnoreCase(type)) {
+            if ("HELLO".equalsIgnoreCase(type) || "AUTH_TERMINAL".equalsIgnoreCase(type)) {
                 String codigoTerminal = json.has("codigoTerminal") ? json.get("codigoTerminal").getAsString() : "";
                 String secreto = json.has("secreto") ? json.get("secreto").getAsString() : "";
                 try {
