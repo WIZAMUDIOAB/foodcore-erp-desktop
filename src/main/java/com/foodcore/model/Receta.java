@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public class Receta {
     private int idReceta;
     private int idProducto;
-    private int idInsumo;
+    private long idInsumo;
     private BigDecimal cantidadNecesaria;
 
     // Campos descriptivos
@@ -15,7 +15,7 @@ public class Receta {
 
     public Receta() {}
 
-    public Receta(int idReceta, int idProducto, int idInsumo, BigDecimal cantidadNecesaria) {
+    public Receta(int idReceta, int idProducto, long idInsumo, BigDecimal cantidadNecesaria) {
         this.idReceta = idReceta;
         this.idProducto = idProducto;
         this.idInsumo = idInsumo;
@@ -28,8 +28,8 @@ public class Receta {
     public int getIdProducto() { return idProducto; }
     public void setIdProducto(int idProducto) { this.idProducto = idProducto; }
 
-    public int getIdInsumo() { return idInsumo; }
-    public void setIdInsumo(int idInsumo) { this.idInsumo = idInsumo; }
+    public long getIdInsumo() { return idInsumo; }
+    public void setIdInsumo(long idInsumo) { this.idInsumo = idInsumo; }
 
     public BigDecimal getCantidadNecesaria() { return cantidadNecesaria; }
     public void setCantidadNecesaria(BigDecimal cantidadNecesaria) { this.cantidadNecesaria = cantidadNecesaria; }

@@ -9,13 +9,18 @@ public class Usuario {
     private String username;
     private String passwordHash;
     private boolean activo;
+    private int intentosFallidos;
+    private LocalDateTime bloqueadoHasta;
+    private boolean cambioPasswordRequerido;
+    private LocalDateTime ultimoLogin;
     private LocalDateTime fechaCreacion;
 
     // Relaciones descriptivas
     private String nombreRol;
     private String nombreEmpleado;
 
-    public Usuario() {}
+    public Usuario() {
+    }
 
     public Usuario(int idUsuario, int idEmpleado, int idRol, String username, String passwordHash, boolean activo) {
         this.idUsuario = idUsuario;
@@ -26,33 +31,112 @@ public class Usuario {
         this.activo = activo;
     }
 
-    public int getIdUsuario() { return idUsuario; }
-    public void setIdUsuario(int idUsuario) { this.idUsuario = idUsuario; }
+    public int getIdUsuario() {
+        return idUsuario;
+    }
 
-    public int getIdEmpleado() { return idEmpleado; }
-    public void setIdEmpleado(int idEmpleado) { this.idEmpleado = idEmpleado; }
+    public void setIdUsuario(int idUsuario) {
+        this.idUsuario = idUsuario;
+    }
 
-    public int getIdRol() { return idRol; }
-    public void setIdRol(int idRol) { this.idRol = idRol; }
+    public int getIdEmpleado() {
+        return idEmpleado;
+    }
 
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
+    public void setIdEmpleado(int idEmpleado) {
+        this.idEmpleado = idEmpleado;
+    }
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public int getIdRol() {
+        return idRol;
+    }
 
-    public boolean isActivo() { return activo; }
-    public void setActivo(boolean activo) { this.activo = activo; }
+    public void setIdRol(int idRol) {
+        this.idRol = idRol;
+    }
 
-    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
-    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+    public String getUsername() {
+        return username;
+    }
 
-    public String getNombreRol() { return nombreRol; }
-    public void setNombreRol(String nombreRol) { this.nombreRol = nombreRol; }
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
-    public String getNombreEmpleado() { return nombreEmpleado; }
-    public void setNombreEmpleado(String nombreEmpleado) { this.nombreEmpleado = nombreEmpleado; }
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public boolean isActivo() {
+        return activo;
+    }
+
+    public void setActivo(boolean activo) {
+        this.activo = activo;
+    }
+
+    public int getIntentosFallidos() {
+        return intentosFallidos;
+    }
+
+    public void setIntentosFallidos(int intentosFallidos) {
+        this.intentosFallidos = intentosFallidos;
+    }
+
+    public LocalDateTime getBloqueadoHasta() {
+        return bloqueadoHasta;
+    }
+
+    public void setBloqueadoHasta(LocalDateTime bloqueadoHasta) {
+        this.bloqueadoHasta = bloqueadoHasta;
+    }
+
+    public boolean isCambioPasswordRequerido() {
+        return cambioPasswordRequerido;
+    }
+
+    public void setCambioPasswordRequerido(boolean cambioPasswordRequerido) {
+        this.cambioPasswordRequerido = cambioPasswordRequerido;
+    }
+
+    public LocalDateTime getUltimoLogin() {
+        return ultimoLogin;
+    }
+
+    public void setUltimoLogin(LocalDateTime ultimoLogin) {
+        this.ultimoLogin = ultimoLogin;
+    }
+
+    public LocalDateTime getFechaCreacion() {
+        return fechaCreacion;
+    }
+
+    public void setFechaCreacion(LocalDateTime fechaCreacion) {
+        this.fechaCreacion = fechaCreacion;
+    }
+
+    public String getNombreRol() {
+        return nombreRol;
+    }
+
+    public void setNombreRol(String nombreRol) {
+        this.nombreRol = nombreRol;
+    }
+
+    public String getNombreEmpleado() {
+        return nombreEmpleado;
+    }
+
+    public void setNombreEmpleado(String nombreEmpleado) {
+        this.nombreEmpleado = nombreEmpleado;
+    }
 
     @Override
-    public String toString() { return username; }
+    public String toString() {
+        return username;
+    }
 }

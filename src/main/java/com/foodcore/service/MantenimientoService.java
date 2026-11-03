@@ -1,32 +1,40 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
-import com.foodcore.model.Categoria;
-import com.foodcore.model.Insumo;
-import com.foodcore.model.Producto;
-import com.foodcore.model.Receta;
+import com.foodcore.exception.StockInsuficienteException;
+import com.foodcore.model.*;
+import com.foodcore.tx.TransactionManager;
+import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Servicio de Mantenimiento de Catálogo, Insumos, Recetas y Diagnóstico de BD.
- * Diseñado y administrado por el Integrante 1 (Líder Técnico de Persistencia).
+ * Servicio de Mantenimiento de Catálogo, Insumos, Recetas, Kárdex (§8.2) y Diagnóstico de BD.
  */
 public class MantenimientoService {
 
+    private final TransactionManager tx;
     private final CategoriaDAO categoriaDAO = new CategoriaDAOImpl();
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final InsumoDAO insumoDAO = new InsumoDAOImpl();
     private final RecetaDAO recetaDAO = new RecetaDAOImpl();
 
-    // ==========================================
-    // 1. Gestión de Categorías
-    // ==========================================
+    public MantenimientoService() {
+        this(new JdbcTransactionManager());
+    }
+
+    public MantenimientoService(TransactionManager tx) {
+        this.tx = tx;
+    }
+
     public List<Categoria> listarCategorias() throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return categoriaDAO.listarTodas(conn);
@@ -46,9 +54,6 @@ public class MantenimientoService {
         }
     }
 
-    // ==========================================
-    // 2. Gestión de Productos / Platos
-    // ==========================================
     public List<Producto> listarProductos() throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return productoDAO.listarTodos(conn);
@@ -87,9 +92,6 @@ public class MantenimientoService {
         }
     }
 
-    // ==========================================
-    // 3. Gestión de Insumos y Almacén
-    // ==========================================
     public List<Insumo> listarInsumos() throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return insumoDAO.listarTodos(conn);
@@ -108,7 +110,7 @@ public class MantenimientoService {
         }
 
         try (Connection conn = ConexionBD.getConnection()) {
-            if (i.getIdInsumo() == 0) {
+            if (i.getIdInsumo() == 0L) {
                 insumoDAO.crear(conn, i);
             } else {
                 insumoDAO.actualizar(conn, i);
@@ -116,35 +118,97 @@ public class MantenimientoService {
         }
     }
 
-    public void registrarAjusteStock(int idInsumo, BigDecimal nuevoStock, String motivo) throws NegocioException, SQLException {
-        if (nuevoStock.compareTo(BigDecimal.ZERO) < 0) {
+    /**
+     * Registra un ajuste de stock (fijando nuevo saldo total) sincronizando {@code kardex_movimiento} (§8.2).
+     */
+    public void registrarAjusteStock(long idInsumo, BigDecimal nuevoStock, String motivo) throws NegocioException, SQLException {
+        if (nuevoStock == null || nuevoStock.compareTo(BigDecimal.ZERO) < 0) {
             throw new NegocioException("El stock no puede ser negativo.");
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                insumoDAO.actualizarStock(conn, idInsumo, nuevoStock);
-                insumoDAO.registrarMovimientoInventario(conn, idInsumo, "AJUSTE", nuevoStock, motivo, null);
-                conn.commit();
-            } catch (Exception ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
-            }
+        if (motivo == null || motivo.isBlank()) {
+            throw new NegocioException("La observación es obligatoria para todo ajuste de Kárdex (§8.2).");
         }
+        BigDecimal stockNorm = DesgloseFiscal.normalizarStock(nuevoStock);
+
+        tx.executeVoidChecked(conn -> {
+            Map<Long, BigDecimal> bloqueados = insumoDAO.lockearPorIds(conn, List.of(idInsumo));
+            if (!bloqueados.containsKey(idInsumo)) {
+                throw new InsumoNoEncontradoException(idInsumo);
+            }
+            BigDecimal saldoAnterior = bloqueados.get(idInsumo);
+            BigDecimal delta = stockNorm.subtract(saldoAnterior).setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+
+            insumoDAO.actualizarStock(conn, idInsumo, stockNorm);
+            insumoDAO.registrarMovimientoInventario(conn, idInsumo, "AJUSTE", delta, motivo, null);
+
+            Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
+            BigDecimal costo = ins != null && ins.getCostoUnitario() != null ? ins.getCostoUnitario() : BigDecimal.ZERO;
+            KardexMovimiento km = new KardexMovimiento(
+                0L, idInsumo, "AJUSTE", delta, saldoAnterior, stockNorm, costo, "AJUSTE_MANUAL", null, 1L, motivo, LocalDateTime.now()
+            );
+            insumoDAO.insertarKardex(conn, km);
+        });
     }
 
-    // ==========================================
-    // 4. Gestión de Recetas de Platos
-    // ==========================================
+    /**
+     * Registra un movimiento de Kárdex (ENTRADA, SALIDA, MERMA, DEVOLUCION, AJUSTE por delta)
+     * garantizando cantidad firmada según §8.2 y {@code saldo_posterior == stock_actual_disponible}.
+     */
+    public KardexMovimiento registrarMovimientoKardex(long idInsumo,
+                                                      String tipoMovimiento,
+                                                      BigDecimal magnitud,
+                                                      long idUsuario,
+                                                      String observacion) throws NegocioException, SQLException {
+        if (magnitud == null || magnitud.compareTo(BigDecimal.ZERO) == 0) {
+            throw new NegocioException("La cantidad del movimiento de Kárdex no puede ser cero ni nula.");
+        }
+        String tipo = tipoMovimiento != null ? tipoMovimiento.trim().toUpperCase() : "";
+        if ("AJUSTE".equals(tipo) && (observacion == null || observacion.isBlank())) {
+            throw new NegocioException("La observación es obligatoria para movimientos de tipo AJUSTE (§8.2).");
+        }
+
+        BigDecimal magNorm = DesgloseFiscal.normalizarStock(magnitud.abs());
+        BigDecimal cantidadFirmada;
+        switch (tipo) {
+            case "ENTRADA", "DEVOLUCION" -> cantidadFirmada = magNorm;
+            case "SALIDA", "MERMA" -> cantidadFirmada = magNorm.negate();
+            case "AJUSTE" -> cantidadFirmada = DesgloseFiscal.normalizarStock(magnitud);
+            default -> throw new NegocioException("Tipo de movimiento de Kárdex desconocido: " + tipo);
+        }
+
+        return tx.executeChecked(conn -> {
+            Map<Long, BigDecimal> bloqueados = insumoDAO.lockearPorIds(conn, List.of(idInsumo));
+            if (!bloqueados.containsKey(idInsumo)) {
+                throw new InsumoNoEncontradoException(idInsumo);
+            }
+            BigDecimal saldoAnterior = bloqueados.get(idInsumo);
+            BigDecimal saldoPosterior = saldoAnterior.add(cantidadFirmada)
+                .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+
+            if (saldoPosterior.compareTo(BigDecimal.ZERO) < 0) {
+                throw new StockInsuficienteException(idInsumo, cantidadFirmada.abs());
+            }
+
+            insumoDAO.actualizarStock(conn, idInsumo, saldoPosterior);
+            Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
+            BigDecimal costo = ins != null && ins.getCostoUnitario() != null ? ins.getCostoUnitario() : BigDecimal.ZERO;
+
+            KardexMovimiento km = new KardexMovimiento(
+                0L, idInsumo, tipo, cantidadFirmada, saldoAnterior, saldoPosterior,
+                costo, tipo, null, idUsuario, observacion, LocalDateTime.now()
+            );
+            insumoDAO.insertarKardex(conn, km);
+            return km;
+        });
+    }
+
     public List<Receta> listarRecetaPorProducto(int idProducto) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return recetaDAO.listarPorProducto(conn, idProducto);
         }
     }
 
-    public void asociarInsumoAReceta(int idProducto, int idInsumo, BigDecimal cantidad) throws NegocioException, SQLException {
+    public void asociarInsumoAReceta(int idProducto, long idInsumo, BigDecimal cantidad) throws NegocioException, SQLException {
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new NegocioException("La cantidad necesaria del insumo debe ser mayor a 0.");
         }
@@ -159,9 +223,6 @@ public class MantenimientoService {
         }
     }
 
-    // ==========================================
-    // 5. Diagnóstico de Salud de la BD (Health Check)
-    // ==========================================
     public boolean verificarSaludBD() {
         return ConexionBD.testConexion();
     }

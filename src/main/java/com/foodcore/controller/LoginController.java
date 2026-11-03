@@ -40,11 +40,16 @@ public class LoginController {
 
         try {
             Usuario u = authService.login(username, password);
+            if (u.isCambioPasswordRequerido()) {
+                lblMensaje.setText("CAMBIO DE CONTRASEÑA OBLIGATORIO: Actualice su clave inicial.");
+                lblMensaje.setVisible(true);
+                return;
+            }
             lblMensaje.setVisible(false);
 
-            // Redirigir al Dashboard Principal
-            App.setRoot("MainDashboardView");
-
+            if (App.getPrimaryStage() != null && App.getPrimaryStage().getScene() != null) {
+                App.setRoot("MainDashboardView");
+            }
         } catch (NegocioException e) {
             mostrarError(e.getMessage());
         } catch (Exception e) {
@@ -73,6 +78,10 @@ public class LoginController {
         } catch (IOException e) {
             mostrarError("No se pudo abrir la ventana de asistencia: " + e.getMessage());
         }
+    }
+
+    public Label getLblMensaje() {
+        return lblMensaje;
     }
 
     private void mostrarError(String mensaje) {

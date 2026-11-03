@@ -3,30 +3,32 @@ package com.foodcore.exception;
 import java.math.BigDecimal;
 
 /**
- * Excepción lanzada cuando un descuento de inventario viola la restricción de stock no negativo
- * (SPEC-FOODCORE-v1.0 §9.1).
+ * Excepción de dominio no verificada lanzada cuando un descuento de inventario viola
+ * la restricción de stock no negativo (SPEC-FOODCORE-v1.0 §9.1; REMEDIATION R-06, R-11).
  */
-public class StockInsuficienteException extends NegocioException {
+public class StockInsuficienteException extends RuntimeException {
 
-    private final int idInsumo;
+    private final CodigoError codigoError = CodigoError.STOCK_INSUFICIENTE;
+    private final long idInsumo;
     private final BigDecimal cantidadRequerida;
 
-    public StockInsuficienteException(int idInsumo, BigDecimal cantidadRequerida) {
-        super(
-            CodigoError.STOCK_INSUFICIENTE,
-            String.format("Stock insuficiente para el insumo #%d (requerido: %s).", idInsumo, cantidadRequerida)
-        );
+    public StockInsuficienteException(long idInsumo, BigDecimal cantidadRequerida) {
+        super(String.format("Stock insuficiente para el insumo #%d (requerido: %s).", idInsumo, cantidadRequerida));
         this.idInsumo = idInsumo;
         this.cantidadRequerida = cantidadRequerida;
     }
 
     public StockInsuficienteException(String message) {
-        super(CodigoError.STOCK_INSUFICIENTE, message);
-        this.idInsumo = -1;
+        super(message);
+        this.idInsumo = -1L;
         this.cantidadRequerida = BigDecimal.ZERO;
     }
 
-    public int getIdInsumo() {
+    public CodigoError getCodigoError() {
+        return codigoError;
+    }
+
+    public long getIdInsumo() {
         return idInsumo;
     }
 

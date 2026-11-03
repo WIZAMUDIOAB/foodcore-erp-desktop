@@ -1,6 +1,8 @@
 package com.foodcore;
 
 import atlantafx.base.theme.PrimerLight;
+import com.foodcore.config.FlywayMigrator;
+import com.foodcore.util.ServidorSockets;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -8,22 +10,31 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Punto de entrada principal para el ERP de Escritorio FoodCore.
  */
 public class App extends Application {
 
+    private static final Logger LOGGER = Logger.getLogger(App.class.getName());
     private static Stage primaryStage;
 
     @Override
     public void start(Stage stage) {
         primaryStage = stage;
-        // Aplicar tema moderno AtlantaFX (PrimerLight)
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
 
-        // Iniciar Servidor TCP de Sockets en segundo plano para sincronizacion en tiempo real con Cocina
-        try { com.foodcore.util.ServidorSockets.getInstance().iniciar(); } catch (Exception ignored) {}
+        // Paso 2 del bootstrap (§12, R-05): ejecutar migraciones Flyway versionadas
+        FlywayMigrator.migrateOnBootstrap();
+
+        // Iniciar Servidor TCP de Sockets en segundo plano para sincronización en tiempo real con Cocina
+        try {
+            ServidorSockets.getInstance().iniciar();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "No se pudo iniciar ServidorSockets en el arranque", e);
+        }
 
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
@@ -37,7 +48,7 @@ public class App extends Application {
             stage.setScene(scene);
             stage.show();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Error cargando vista inicial LoginView.fxml", e);
         }
     }
 

@@ -1,8 +1,17 @@
 package com.foodcore.model;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
+/**
+ * Entidad de Detalle de Pedido con estado individual de cocina y marcas temporales
+ * por ítem ({@code enviado_en}, {@code iniciado_en}, {@code listo_en}) según SPEC-FOODCORE-v1.0 (§5, §6.5, §8.5; R-08).
+ */
 public class DetallePedido {
+    public static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+
     private int idDetallePedido;
     private int idPedido;
     private int idProducto;
@@ -10,13 +19,21 @@ public class DetallePedido {
     private BigDecimal precioUnitario;
     private BigDecimal subtotal;
     private String notasPreparacion;
+    private String estadoCocina = "PENDIENTE"; // PENDIENTE | EN_PREPARACION | LISTO | ENTREGADO
+    private LocalDateTime enviadoEn;
+    private LocalDateTime iniciadoEn;
+    private LocalDateTime listoEn;
 
-    // Campo descriptivo
+    // Campos descriptivos para KDS
     private String nombreProducto;
+    private String numeroMesa;
 
-    public DetallePedido() {}
+    public DetallePedido() {
+        this.enviadoEn = LocalDateTime.now(ZONA_LIMA);
+    }
 
-    public DetallePedido(int idDetallePedido, int idPedido, int idProducto, int cantidad, BigDecimal precioUnitario, BigDecimal subtotal, String notasPreparacion) {
+    public DetallePedido(int idDetallePedido, int idPedido, int idProducto, int cantidad,
+                         BigDecimal precioUnitario, BigDecimal subtotal, String notasPreparacion) {
         this.idDetallePedido = idDetallePedido;
         this.idPedido = idPedido;
         this.idProducto = idProducto;
@@ -24,6 +41,28 @@ public class DetallePedido {
         this.precioUnitario = precioUnitario;
         this.subtotal = subtotal;
         this.notasPreparacion = notasPreparacion;
+        this.estadoCocina = "PENDIENTE";
+        this.enviadoEn = LocalDateTime.now(ZONA_LIMA);
+    }
+
+    public DetallePedido(int idDetallePedido, int idPedido, int idProducto, String nombreProducto, int cantidad,
+                         BigDecimal precioUnitario, BigDecimal subtotal, String notasPreparacion) {
+        this(idDetallePedido, idPedido, idProducto, cantidad, precioUnitario, subtotal, notasPreparacion);
+        this.nombreProducto = nombreProducto;
+    }
+
+    /**
+     * Calcula los segundos transcurridos desde {@code enviado_en} contra la hora actual en {@code America/Lima} (R-07, R-08).
+     */
+    public int calcularSegundosDesdeEnvio(LocalDateTime referenciaLima) {
+        if (enviadoEn == null || referenciaLima == null) {
+            return 0;
+        }
+        long diff = Duration.between(enviadoEn, referenciaLima).getSeconds();
+        if (diff < 0) {
+            return 0;
+        }
+        return (int) Math.min(diff, 28800L);
     }
 
     public int getIdDetallePedido() { return idDetallePedido; }
@@ -47,8 +86,23 @@ public class DetallePedido {
     public String getNotasPreparacion() { return notasPreparacion; }
     public void setNotasPreparacion(String notasPreparacion) { this.notasPreparacion = notasPreparacion; }
 
+    public String getEstadoCocina() { return estadoCocina; }
+    public void setEstadoCocina(String estadoCocina) { this.estadoCocina = estadoCocina; }
+
+    public LocalDateTime getEnviadoEn() { return enviadoEn; }
+    public void setEnviadoEn(LocalDateTime enviadoEn) { this.enviadoEn = enviadoEn; }
+
+    public LocalDateTime getIniciadoEn() { return iniciadoEn; }
+    public void setIniciadoEn(LocalDateTime iniciadoEn) { this.iniciadoEn = iniciadoEn; }
+
+    public LocalDateTime getListoEn() { return listoEn; }
+    public void setListoEn(LocalDateTime listoEn) { this.listoEn = listoEn; }
+
     public String getNombreProducto() { return nombreProducto; }
     public void setNombreProducto(String nombreProducto) { this.nombreProducto = nombreProducto; }
+
+    public String getNumeroMesa() { return numeroMesa; }
+    public void setNumeroMesa(String numeroMesa) { this.numeroMesa = numeroMesa; }
 
     @Override
     public String toString() {

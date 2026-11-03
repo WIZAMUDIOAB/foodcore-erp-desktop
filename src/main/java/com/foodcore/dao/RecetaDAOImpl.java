@@ -20,7 +20,7 @@ public class RecetaDAOImpl implements RecetaDAO {
                      "JOIN producto p ON r.id_producto = p.id_producto " +
                      "JOIN insumo i ON r.id_insumo = i.id_insumo " +
                      "WHERE r.id_producto = ? " +
-                     "ORDER BY i.nombre ASC";
+                     "ORDER BY r.id_insumo ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idProducto);
             try (ResultSet rs = ps.executeQuery()) {
@@ -28,7 +28,7 @@ public class RecetaDAOImpl implements RecetaDAO {
                     Receta r = new Receta();
                     r.setIdReceta(rs.getInt("id_receta"));
                     r.setIdProducto(rs.getInt("id_producto"));
-                    r.setIdInsumo(rs.getInt("id_insumo"));
+                    r.setIdInsumo(rs.getLong("id_insumo"));
                     r.setCantidadNecesaria(rs.getBigDecimal("cantidad_necesaria"));
                     r.setNombreProducto(rs.getString("nombre_prod"));
                     r.setNombreInsumo(rs.getString("nombre_ins"));
@@ -41,12 +41,12 @@ public class RecetaDAOImpl implements RecetaDAO {
     }
 
     @Override
-    public void asociarInsumo(Connection conn, int idProducto, int idInsumo, BigDecimal cantidad) throws SQLException {
+    public void asociarInsumo(Connection conn, int idProducto, long idInsumo, BigDecimal cantidad) throws SQLException {
         String sql = "INSERT INTO receta (id_producto, id_insumo, cantidad_necesaria) VALUES (?, ?, ?) " +
                      "ON DUPLICATE KEY UPDATE cantidad_necesaria = VALUES(cantidad_necesaria)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idProducto);
-            ps.setInt(2, idInsumo);
+            ps.setLong(2, idInsumo);
             ps.setBigDecimal(3, cantidad);
             ps.executeUpdate();
         }

@@ -11,6 +11,10 @@ import java.util.Optional;
 
 public interface UsuarioDAO {
     Optional<Usuario> autenticar(Connection conn, String username, String password) throws SQLException;
+    Optional<Usuario> buscarPorUsername(Connection conn, String username) throws SQLException;
+    void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException;
+    void resetearIntentosLogin(Connection conn, int idUsuario) throws SQLException;
+    void actualizarPasswordObligatorio(Connection conn, int idUsuario, String nuevoPasswordHash) throws SQLException;
     Optional<Empleado> buscarEmpleadoPorDni(Connection conn, String dni) throws SQLException;
     Optional<Asistencia> obtenerAsistenciaHoy(Connection conn, int idEmpleado) throws SQLException;
     void registrarIngresoAsistencia(Connection conn, Asistencia asistencia) throws SQLException;

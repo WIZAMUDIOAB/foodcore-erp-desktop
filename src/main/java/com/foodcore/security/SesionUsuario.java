@@ -10,8 +10,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Contexto de sesión de usuario inmutable por login (SPEC-FOODCORE-v1.0 §10.2).
- * Se pasa explícitamente a los servicios de negocio sin depender de estado global mutable.
+ * Contexto de sesión de usuario inmutable por login (SPEC-FOODCORE-v1.0 §10.2; REMEDIATION R-18).
+ * Incluye {@code expiraEn = iniciadaEn + 30 min}.
  */
 public final class SesionUsuario {
 
@@ -23,6 +23,7 @@ public final class SesionUsuario {
     private final Set<Permiso> permisos;
     private final String idTerminal;
     private final LocalDateTime iniciadaEn;
+    private final LocalDateTime expiraEn;
 
     public SesionUsuario(long idUsuario,
                          String nombreCompleto,
@@ -38,6 +39,7 @@ public final class SesionUsuario {
             : Collections.unmodifiableSet(EnumSet.copyOf(permisos));
         this.idTerminal = idTerminal != null ? idTerminal : "TERM-LOCAL";
         this.iniciadaEn = iniciadaEn != null ? iniciadaEn : LocalDateTime.now();
+        this.expiraEn = this.iniciadaEn.plusMinutes(MINUTOS_INACTIVIDAD_DEFAULT);
     }
 
     public boolean tienePermiso(Permiso permiso) {
@@ -49,6 +51,13 @@ public final class SesionUsuario {
             return true;
         }
         return Duration.between(iniciadaEn, ahora).toMinutes() >= minutosMaximos;
+    }
+
+    public boolean haExpirado(LocalDateTime ahora) {
+        if (ahora == null) {
+            return true;
+        }
+        return !ahora.isBefore(expiraEn);
     }
 
     public long getIdUsuario() {
@@ -73,5 +82,9 @@ public final class SesionUsuario {
 
     public LocalDateTime getIniciadaEn() {
         return iniciadaEn;
+    }
+
+    public LocalDateTime getExpiraEn() {
+        return expiraEn;
     }
 }

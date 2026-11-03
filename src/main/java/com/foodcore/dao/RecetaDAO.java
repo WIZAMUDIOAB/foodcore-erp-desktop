@@ -9,6 +9,6 @@ import java.util.List;
 
 public interface RecetaDAO {
     List<Receta> listarPorProducto(Connection conn, int idProducto) throws SQLException;
-    void asociarInsumo(Connection conn, int idProducto, int idInsumo, BigDecimal cantidad) throws SQLException;
+    void asociarInsumo(Connection conn, int idProducto, long idInsumo, BigDecimal cantidad) throws SQLException;
     void eliminarComponente(Connection conn, int idReceta) throws SQLException;
 }

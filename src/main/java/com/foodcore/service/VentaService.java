@@ -2,23 +2,25 @@ package com.foodcore.service;
 
 import com.foodcore.dao.*;
 import com.foodcore.exception.CajaCerradaException;
+import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.exception.StockInsuficienteException;
 import com.foodcore.model.*;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
  * Servicio transaccional de Ventas con control estricto ACID mediante {@link TransactionManager},
- * idempotencia por {@code idempotency_key} (§8.1, §9.2), invariantes fiscales vía
- * {@link DesgloseFiscal} y descuento atómico de inventario por recetas.
+ * bloqueo pesimista {@code SELECT ... FOR UPDATE} en orden ascendente de {@code id_insumo} (R-09),
+ * propagación directa de {@link StockInsuficienteException} sin envolver en {@link SQLException} (R-11),
+ * trazabilidad en {@code kardex_movimiento} y control de idempotencia (§8.1, §9.1, §9.2).
  */
 public class VentaService {
 
@@ -48,10 +50,19 @@ public class VentaService {
     }
 
     /**
-     * Ejecuta el registro transaccional e idempotente de una venta, emitiendo comprobante,
-     * descontando insumos de Kárdex y liquidando el pedido de salón si aplica.
+     * Ejecuta el registro transaccional e idempotente de una venta, bloqueando insumos en orden ascendente,
+     * descontando stock, registrando movimientos en {@code kardex_movimiento} y {@code movimiento_caja},
+     * y liquidando el pedido de salón si aplica.
+     *
+     * @throws StockInsuficienteException directamente (sin envolver en {@link SQLException}) si algún insumo carece de stock (R-11).
      */
-    public Venta registrarVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante) throws NegocioException, SQLException {
+    public Venta procesarCobroVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante)
+            throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
+        return registrarVenta(venta, detalles, comprobante);
+    }
+
+    public Venta registrarVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante)
+            throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         if (venta == null) {
             throw new NegocioException("Los datos de la venta no pueden ser nulos.");
         }
@@ -84,47 +95,95 @@ public class VentaService {
         venta.setIgv(desglose.getIgv());
         venta.setTotal(desglose.getTotal());
 
-        // 3. Ejecutar unidad de trabajo atómica ACID vía TransactionManager (§7.1)
+        // 3. Ejecutar unidad de trabajo atómica ACID vía TransactionManager (§7.1, §9.1, R-09, R-10, R-11)
         return tx.executeChecked(conn -> {
             Optional<Caja> cajaAbierta = cajaDAO.obtenerCajaAbierta(conn);
             if (cajaAbierta.isEmpty()) {
                 throw new CajaCerradaException();
             }
-            venta.setIdCaja(cajaAbierta.get().getIdCaja());
+            int idCaja = cajaAbierta.get().getIdCaja();
+            venta.setIdCaja(idCaja);
 
+            // 3.1 Consolidar requerimientos de insumos de todas las líneas ordenados ascendentemente por id_insumo (R-09)
+            TreeMap<Long, BigDecimal> requerimientosPorInsumo = new TreeMap<>();
+            for (DetalleVenta detalle : detalles) {
+                List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
+                for (Receta rec : componentes) {
+                    BigDecimal cantRequerida = DesgloseFiscal.normalizarStock(
+                        rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(detalle.getCantidad()))
+                    );
+                    requerimientosPorInsumo.merge(rec.getIdInsumo(), cantRequerida, BigDecimal::add);
+                }
+            }
+
+            // 3.2 Adquirir bloqueo pesimista SELECT ... FOR UPDATE en orden ascendente de id_insumo (R-09)
+            List<Long> idsOrdenados = new ArrayList<>(requerimientosPorInsumo.keySet());
+            Map<Long, BigDecimal> saldosAnteriores = insumoDAO.lockearPorIds(conn, idsOrdenados);
+
+            // 3.3 Insertar cabecera y detalle de venta
             int idVenta = ventaDAO.insertarVenta(conn, venta);
             venta.setIdVenta(idVenta);
 
             for (DetalleVenta detalle : detalles) {
                 detalle.setIdVenta(idVenta);
                 ventaDAO.insertarDetalleVenta(conn, detalle);
-
-                List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
-                for (Receta rec : componentes) {
-                    BigDecimal cantidadTotalADescontar = DesgloseFiscal.normalizarStock(
-                        rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(detalle.getCantidad()))
-                    );
-
-                    try {
-                        insumoDAO.descontarStock(conn, rec.getIdInsumo(), cantidadTotalADescontar);
-                    } catch (SQLException se) {
-                        if (se.getCause() instanceof NegocioException ne) {
-                            throw ne;
-                        }
-                        throw se;
-                    }
-
-                    String motivo = "Venta #" + idVenta + " - Prod #" + detalle.getIdProducto() + " (" + detalle.getCantidad() + " und)";
-                    insumoDAO.registrarMovimientoInventario(conn, rec.getIdInsumo(), "SALIDA", cantidadTotalADescontar, motivo, idVenta);
-                }
             }
 
+            // 3.4 Descontar stock en orden ascendente y registrar kardex_movimiento con saldo_anterior/posterior (R-02.3, R-09, R-11)
+            for (Long idInsumo : idsOrdenados) {
+                if (!saldosAnteriores.containsKey(idInsumo)) {
+                    throw new InsumoNoEncontradoException(idInsumo);
+                }
+                BigDecimal cantidadADescontar = requerimientosPorInsumo.get(idInsumo)
+                    .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+                BigDecimal saldoAnterior = saldosAnteriores.get(idInsumo);
+
+                // Lanza directamente StockInsuficienteException si stock_actual_disponible < cantidadADescontar
+                insumoDAO.descontarStock(conn, idInsumo, cantidadADescontar);
+
+                BigDecimal saldoPosterior = saldoAnterior.subtract(cantidadADescontar)
+                    .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+                Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
+                BigDecimal costoUnit = (ins != null && ins.getCostoUnitario() != null)
+                    ? ins.getCostoUnitario() : BigDecimal.ZERO;
+
+                String glosa = "Venta #" + idVenta;
+                insumoDAO.registrarMovimientoInventario(conn, idInsumo, "SALIDA", cantidadADescontar, glosa, idVenta);
+
+                KardexMovimiento km = new KardexMovimiento(
+                    0L,
+                    idInsumo,
+                    "SALIDA",
+                    cantidadADescontar.negate(), // Cantidad firmada negativa para SALIDA (§8.2)
+                    saldoAnterior,
+                    saldoPosterior,
+                    costoUnit,
+                    "VENTA",
+                    (long) idVenta,
+                    venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1L,
+                    glosa,
+                    LocalDateTime.now()
+                );
+                insumoDAO.insertarKardex(conn, km);
+            }
+
+            // 3.5 Registrar movimiento en libro de caja (tipo VENTA)
+            String medioPago = venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO";
+            MovimientoCaja movVenta = new MovimientoCaja(
+                0, idCaja, venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1,
+                "VENTA", medioPago, desglose.getTotal(),
+                "Cobro Venta #" + idVenta + " [" + medioPago + "]"
+            );
+            cajaDAO.registrarMovimiento(conn, movVenta);
+
+            // 3.6 Emitir Comprobante de Pago
             if (comprobante != null) {
                 comprobante.setIdVenta(idVenta);
                 comprobante.setTotal(desglose.getTotal());
                 ventaDAO.insertarComprobante(conn, comprobante);
             }
 
+            // 3.7 Si la venta proviene de un pedido de salón, marcar pedido como COBRADO en la misma transacción
             if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
                 pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
             }

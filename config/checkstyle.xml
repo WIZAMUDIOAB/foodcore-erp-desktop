@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- Prohibir System.out.println y System.err.println (SPEC-FOODCORE-v1.0 §4.2, §18.1) -->
+    <module name="RegexpSingleline">
+        <property name="format" value="System\.(out|err)\.print"/>
+        <property name="message" value="Prohibido usar System.out/System.err; utilice Logger."/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- Prohibir marcadores TODO o FIXME pendientes en comentarios (REMEDIATION §4) -->
+        <module name="TodoComment">
+            <property name="format" value="(TODO:|FIXME:)"/>
+        </module>
+        <module name="PackageName">
+            <property name="format" value="^com\.foodcore(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="OuterTypeFilename"/>
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignore|ignored"/>
+        </module>
+    </module>
+</module>

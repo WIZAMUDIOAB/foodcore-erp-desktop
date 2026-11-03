@@ -3,24 +3,47 @@ package com.foodcore.dao;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.Empleado;
 import com.foodcore.model.Usuario;
+import com.foodcore.security.EncriptadorPassword;
 
-import java.sql.*;
-import java.time.LocalDate;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.time.LocalTime;
 import java.util.Optional;
 
 public class UsuarioDAOImpl implements UsuarioDAO {
 
+    private final EncriptadorPassword encriptador = new EncriptadorPassword();
+
     @Override
     public Optional<Usuario> autenticar(Connection conn, String username, String password) throws SQLException {
-        String sql = "SELECT u.*, r.nombre AS rol_nombre, CONCAT(e.nombres, ' ', e.apellidos) AS empleado_nombre " +
-                     "FROM usuario u " +
-                     "JOIN rol r ON u.id_rol = r.id_rol " +
-                     "JOIN empleado e ON u.id_empleado = e.id_empleado " +
-                     "WHERE u.username = ? AND u.password_hash = ? AND u.activo = TRUE";
+        Optional<Usuario> userOpt = buscarPorUsername(conn, username);
+        if (userOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        Usuario u = userOpt.get();
+        if (!u.isActivo()) {
+            return Optional.empty();
+        }
+        String hash = u.getPasswordHash();
+        boolean coincide = (hash != null && hash.startsWith("$2"))
+            ? encriptador.verificar(password, hash)
+            : password.equals(hash);
+        return coincide ? Optional.of(u) : Optional.empty();
+    }
+
+    @Override
+    public Optional<Usuario> buscarPorUsername(Connection conn, String username) throws SQLException {
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, CONCAT(e.nombres, ' ', e.apellidos) AS empleado_nombre "
+            + "FROM usuario u "
+            + "JOIN rol r ON u.id_rol = r.id_rol "
+            + "JOIN empleado e ON u.id_empleado = e.id_empleado "
+            + "WHERE u.username = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, username);
-            ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     Usuario u = new Usuario();
@@ -28,14 +51,60 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                     u.setIdEmpleado(rs.getInt("id_empleado"));
                     u.setIdRol(rs.getInt("id_rol"));
                     u.setUsername(rs.getString("username"));
+                    u.setPasswordHash(rs.getString("password_hash"));
                     u.setActivo(rs.getBoolean("activo"));
                     u.setNombreRol(rs.getString("rol_nombre"));
                     u.setNombreEmpleado(rs.getString("empleado_nombre"));
+                    try {
+                        u.setIntentosFallidos(rs.getInt("intentos_fallidos"));
+                        Timestamp tsBloqueo = rs.getTimestamp("bloqueado_hasta");
+                        if (tsBloqueo != null) {
+                            u.setBloqueadoHasta(tsBloqueo.toLocalDateTime());
+                        }
+                        u.setCambioPasswordRequerido(rs.getBoolean("cambio_password_requerido"));
+                        Timestamp tsUltimo = rs.getTimestamp("ultimo_login");
+                        if (tsUltimo != null) {
+                            u.setUltimoLogin(tsUltimo.toLocalDateTime());
+                        }
+                    } catch (SQLException ignoredCol) {
+                        u.setIntentosFallidos(0);
+                    }
                     return Optional.of(u);
                 }
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException {
+        String sql = bloquear15Minutos
+            ? "UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id_usuario = ?"
+            : "UPDATE usuario SET intentos_fallidos = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, nuevosIntentos);
+            ps.setInt(2, idUsuario);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void resetearIntentosLogin(Connection conn, int idUsuario) throws SQLException {
+        String sql = "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_login = NOW() WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void actualizarPasswordObligatorio(Connection conn, int idUsuario, String nuevoPasswordHash) throws SQLException {
+        String sql = "UPDATE usuario SET password_hash = ?, cambio_password_requerido = FALSE WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, nuevoPasswordHash);
+            ps.setInt(2, idUsuario);
+            ps.executeUpdate();
+        }
     }
 
     @Override

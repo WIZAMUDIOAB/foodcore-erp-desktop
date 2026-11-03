@@ -10,7 +10,15 @@ public final class EncriptadorPassword {
 
     public static final int BCRYPT_COST = 12;
 
-    private EncriptadorPassword() {
+    public EncriptadorPassword() {
+    }
+
+    public String hashear(String passwordPlano) {
+        return generarHash(passwordPlano);
+    }
+
+    public boolean verificar(String passwordPlano, String hashAlmacenado) {
+        return verificarPassword(passwordPlano, hashAlmacenado);
     }
 
     /**
@@ -62,9 +70,13 @@ public final class EncriptadorPassword {
         boolean tieneDigito = false;
         for (int i = 0; i < password.length(); i++) {
             char c = password.charAt(i);
-            if (Character.isUpperCase(c)) tieneMayus = true;
-            else if (Character.isLowerCase(c)) tieneMinus = true;
-            else if (Character.isDigit(c)) tieneDigito = true;
+            if (Character.isUpperCase(c)) {
+                tieneMayus = true;
+            } else if (Character.isLowerCase(c)) {
+                tieneMinus = true;
+            } else if (Character.isDigit(c)) {
+                tieneDigito = true;
+            }
         }
         return tieneMayus && tieneMinus && tieneDigito;
     }

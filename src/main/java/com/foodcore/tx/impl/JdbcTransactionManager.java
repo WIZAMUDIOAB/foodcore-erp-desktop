@@ -15,12 +15,20 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementación JDBC del gestor transaccional explícito (SPEC-FOODCORE-v1.0 §7.1, §16).
- * Asigna un {@code idOperacion} UUID correlacionado para trazabilidad de auditoría.
+ * Implementación JDBC del gestor transaccional explícito (SPEC-FOODCORE-v1.0 §7.1, §16; REMEDIATION R-10, R-11).
+ * <ul>
+ *   <li>Asigna {@code idOperacion} UUID correlacionado para trazabilidad de auditoría.</li>
+ *   <li>Reintenta con backoff exponencial ({@code 100ms, 200ms, 400ms}, máx 3 intentos) ante deadlocks
+ *       InnoDB (error MySQL {@code 1213}) o timeout de bloqueo ({@code 1205}).</li>
+ *   <li>Propaga directamente excepciones de dominio sin envolverlas en {@link SQLException}.</li>
+ * </ul>
  */
 public class JdbcTransactionManager implements TransactionManager {
 
     private static final Logger LOGGER = Logger.getLogger(JdbcTransactionManager.class.getName());
+
+    public static final int MAX_RETRIES = 3;
+    public static final long BASE_BACKOFF_MS = 100L;
 
     @FunctionalInterface
     public interface ConnectionSupplier {
@@ -61,40 +69,90 @@ public class JdbcTransactionManager implements TransactionManager {
         Objects.requireNonNull(work, "La unidad de trabajo transaccional no puede ser nula.");
         String idOperacion = UUID.randomUUID().toString();
 
+        for (int intento = 1; intento <= MAX_RETRIES; intento++) {
+            try {
+                return executeOnce(work, idOperacion, intento);
+            } catch (SQLException se) {
+                if (!esDeadlockOTimeout(se) || intento == MAX_RETRIES) {
+                    throw se;
+                }
+                long esperaMs = BASE_BACKOFF_MS * (1L << (intento - 1));
+                LOGGER.warning(String.format(
+                    "[idOperacion=%s] Deadlock/LockTimeout detectado (errorCode=%d, intento=%d/%d). Reintentando en %d ms...",
+                    idOperacion, se.getErrorCode(), intento, MAX_RETRIES, esperaMs
+                ));
+                dormirBackoff(esperaMs);
+            } catch (RuntimeException re) {
+                if (re.getCause() instanceof SQLException seCause && esDeadlockOTimeout(seCause) && intento < MAX_RETRIES) {
+                    long esperaMs = BASE_BACKOFF_MS * (1L << (intento - 1));
+                    LOGGER.warning(String.format(
+                        "[idOperacion=%s] Deadlock/LockTimeout envuelto (errorCode=%d, intento=%d/%d). Reintentando en %d ms...",
+                        idOperacion, seCause.getErrorCode(), intento, MAX_RETRIES, esperaMs
+                    ));
+                    dormirBackoff(esperaMs);
+                    continue;
+                }
+                throw re;
+            }
+        }
+        throw new IllegalStateException("Inalcanzable: fin de reintentos transaccionales [idOperacion=" + idOperacion + "]");
+    }
+
+    private <T> T executeOnce(CheckedWork<T> work, String idOperacion, int intento) throws NegocioException, SQLException {
         try (Connection conn = connectionSupplier.getConnection()) {
             boolean prevAutoCommit = conn.getAutoCommit();
             conn.setAutoCommit(false);
             try {
                 T resultado = work.apply(conn);
                 conn.commit();
-                LOGGER.fine(() -> String.format("[idOperacion=%s] Transacción ACID confirmada (COMMIT).", idOperacion));
+                LOGGER.info(String.format(
+                    "[idOperacion=%s] [intento=%d] Transacción ACID confirmada (COMMIT).",
+                    idOperacion, intento
+                ));
                 return resultado;
             } catch (NegocioException ne) {
-                rollbackSilencioso(conn, idOperacion, ne);
+                rollbackSilencioso(conn, idOperacion, intento, ne);
                 throw ne;
             } catch (SQLException se) {
-                rollbackSilencioso(conn, idOperacion, se);
+                rollbackSilencioso(conn, idOperacion, intento, se);
                 throw se;
             } catch (RuntimeException re) {
-                rollbackSilencioso(conn, idOperacion, re);
-                if (re.getCause() instanceof NegocioException neCause) {
-                    throw neCause;
-                }
-                if (re.getCause() instanceof SQLException seCause) {
-                    throw seCause;
-                }
+                rollbackSilencioso(conn, idOperacion, intento, re);
                 throw re;
             } catch (Exception ex) {
-                rollbackSilencioso(conn, idOperacion, ex);
+                rollbackSilencioso(conn, idOperacion, intento, ex);
                 throw new NegocioException(CodigoError.ERROR_TRANSACCIONAL,
                     "Fallo inesperado en transacción [idOperacion=" + idOperacion + "]: " + ex.getMessage(), ex);
             } finally {
                 try {
                     conn.setAutoCommit(prevAutoCommit);
                 } catch (SQLException ignored) {
-                    // La conexión se devolverá al pool HikariCP en el cierre del try-with-resources
+                    // La conexión se cierra en el bloque try-with-resources
                 }
             }
+        }
+    }
+
+    /**
+     * Identifica errores transitorios de concurrencia en InnoDB:
+     * MySQL {@code 1213} (Deadlock found when trying to get lock) y {@code 1205} (Lock wait timeout exceeded),
+     * o SQLState {@code 40001} (Serialization failure).
+     */
+    public static boolean esDeadlockOTimeout(SQLException e) {
+        if (e == null) {
+            return false;
+        }
+        int code = e.getErrorCode();
+        String state = e.getSQLState();
+        return code == 1213 || code == 1205 || "40001".equals(state);
+    }
+
+    private void dormirBackoff(long esperaMs) {
+        try {
+            Thread.sleep(esperaMs);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Hilo interrumpido durante backoff de deadlock", ie);
         }
     }
 
@@ -107,15 +165,19 @@ public class JdbcTransactionManager implements TransactionManager {
         });
     }
 
-    private void rollbackSilencioso(Connection conn, String idOperacion, Throwable causa) {
+    private void rollbackSilencioso(Connection conn, String idOperacion, int intento, Throwable causa) {
         try {
             conn.rollback();
-            LOGGER.log(Level.WARNING,
-                String.format("[idOperacion=%s] Transacción abortada (ROLLBACK) por: %s", idOperacion, causa.getMessage()));
+            LOGGER.log(Level.WARNING, String.format(
+                "[idOperacion=%s] [intento=%d] Transacción abortada (ROLLBACK) por: %s",
+                idOperacion, intento, causa.getMessage()
+            ));
         } catch (SQLException rbEx) {
             causa.addSuppressed(rbEx);
-            LOGGER.log(Level.SEVERE,
-                String.format("[idOperacion=%s] Error crítico ejecutando ROLLBACK.", idOperacion), rbEx);
+            LOGGER.log(Level.SEVERE, String.format(
+                "[idOperacion=%s] [intento=%d] Error crítico ejecutando ROLLBACK.",
+                idOperacion, intento
+            ), rbEx);
         }
     }
 }

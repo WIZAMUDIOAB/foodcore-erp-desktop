@@ -30,10 +30,10 @@ public class VentaDAOImpl implements VentaDAO {
             ps.setBigDecimal(5, venta.getSubtotal());
             ps.setBigDecimal(6, venta.getIgv());
             ps.setBigDecimal(7, venta.getTotal());
-            ps.setString(8, venta.getMetodoPago());
-            ps.setBigDecimal(9, venta.getMontoRecibido());
-            ps.setBigDecimal(10, venta.getVuelto());
-            ps.setString(11, venta.getEstado());
+            ps.setString(8, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
+            ps.setBigDecimal(9, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
+            ps.setBigDecimal(10, venta.getVuelto() != null ? venta.getVuelto() : java.math.BigDecimal.ZERO);
+            ps.setString(11, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {

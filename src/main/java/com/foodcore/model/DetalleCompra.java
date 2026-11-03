@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public class DetalleCompra {
     private int idDetalleCompra;
     private int idCompra;
-    private int idInsumo;
+    private long idInsumo;
     private BigDecimal cantidad;
     private BigDecimal costoUnitario;
     private BigDecimal subtotal;
@@ -14,7 +14,7 @@ public class DetalleCompra {
 
     public DetalleCompra() {}
 
-    public DetalleCompra(int idDetalleCompra, int idCompra, int idInsumo, BigDecimal cantidad, BigDecimal costoUnitario, BigDecimal subtotal) {
+    public DetalleCompra(int idDetalleCompra, int idCompra, long idInsumo, BigDecimal cantidad, BigDecimal costoUnitario, BigDecimal subtotal) {
         this.idDetalleCompra = idDetalleCompra;
         this.idCompra = idCompra;
         this.idInsumo = idInsumo;
@@ -29,8 +29,8 @@ public class DetalleCompra {
     public int getIdCompra() { return idCompra; }
     public void setIdCompra(int idCompra) { this.idCompra = idCompra; }
 
-    public int getIdInsumo() { return idInsumo; }
-    public void setIdInsumo(int idInsumo) { this.idInsumo = idInsumo; }
+    public long getIdInsumo() { return idInsumo; }
+    public void setIdInsumo(long idInsumo) { this.idInsumo = idInsumo; }
 
     public BigDecimal getCantidad() { return cantidad; }
     public void setCantidad(BigDecimal cantidad) { this.cantidad = cantidad; }

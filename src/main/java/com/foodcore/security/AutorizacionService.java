@@ -58,15 +58,19 @@ public class AutorizacionService {
         );
     }
 
+    public static Set<Permiso> permisosPorDefectoParaRol(String codigoRol) {
+        if (codigoRol == null || codigoRol.isBlank()) {
+            return Collections.emptySet();
+        }
+        return MATRIZ_RBAC.getOrDefault(codigoRol.trim().toUpperCase(), Collections.emptySet());
+    }
+
     /**
      * Obtiene el conjunto inmutable de permisos asignados a un rol oficial.
      * Si el rol es nulo o desconocido, devuelve un conjunto vacío (Principio de Mínimo Privilegio).
      */
     public Set<Permiso> obtenerPermisosPorRol(String codigoRol) {
-        if (codigoRol == null || codigoRol.isBlank()) {
-            return Collections.emptySet();
-        }
-        return MATRIZ_RBAC.getOrDefault(codigoRol.trim().toUpperCase(), Collections.emptySet());
+        return permisosPorDefectoParaRol(codigoRol);
     }
 
     /**
@@ -75,6 +79,10 @@ public class AutorizacionService {
     public SesionUsuario crearSesion(long idUsuario, String nombreCompleto, String codigoRol, String idTerminal) {
         Set<Permiso> permisos = obtenerPermisosPorRol(codigoRol);
         return new SesionUsuario(idUsuario, nombreCompleto, codigoRol, permisos, idTerminal, LocalDateTime.now());
+    }
+
+    public void exigirPermiso(SesionUsuario sesion, Permiso permisoRequerido) throws NegocioException {
+        exigir(sesion, permisoRequerido);
     }
 
     /**

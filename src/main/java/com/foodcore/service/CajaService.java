@@ -14,12 +14,13 @@ import com.foodcore.util.ConexionBD;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
  * Servicio de control de turnos de caja, arqueo físico y cierre Z con transacciones explícitas
- * mediante {@link TransactionManager} (SPEC-FOODCORE-v1.0 §6.4, §7.1, §8.3).
+ * mediante {@link TransactionManager} (SPEC-FOODCORE-v1.0 §6.4, §7.1, §8.3, R-02.4).
  */
 public class CajaService {
 
@@ -57,7 +58,7 @@ public class CajaService {
             Caja caja = new Caja(0, idUsuario, nombreCaja, montoNorm, "ABIERTA");
             int id = cajaDAO.abrirCaja(conn, caja);
 
-            MovimientoCaja mov = new MovimientoCaja(0, id, idUsuario, "INGRESO", montoNorm, "Fondo de apertura de turno");
+            MovimientoCaja mov = new MovimientoCaja(0, id, idUsuario, "INGRESO", "EFECTIVO", montoNorm, "Fondo de apertura de turno");
             cajaDAO.registrarMovimiento(conn, mov);
 
             LOGGER.info("Caja #" + id + " abierta con fondo inicial S/ " + montoNorm);
@@ -68,6 +69,12 @@ public class CajaService {
     public BigDecimal calcularVentasTurno(int idCaja) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return cajaDAO.calcularTotalVentasTurno(conn, idCaja);
+        }
+    }
+
+    public Map<String, BigDecimal> obtenerTotalesCierreZ(int idCaja) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return cajaDAO.obtenerTotalesPorMedioPago(conn, idCaja);
         }
     }
 
@@ -88,11 +95,11 @@ public class CajaService {
             BigDecimal montoEsperado = DesgloseFiscal.normalizarMoneda(caja.getMontoApertura().add(totalVentasEfectivo));
             BigDecimal diferencia = DesgloseFiscal.normalizarMoneda(fisicoNorm.subtract(montoEsperado));
 
-            cajaDAO.cerrarCaja(conn, idCaja, idUsuarioCierre, fisicoNorm, diferencia);
+            cajaDAO.cerrarCaja(conn, idCaja, idUsuarioCierre, montoEsperado, fisicoNorm, diferencia);
 
             String glosa = String.format("Cierre Z de turno (Esperado: S/ %s | Contado: S/ %s | Dif: S/ %s)",
                 montoEsperado, fisicoNorm, diferencia);
-            MovimientoCaja movCierre = new MovimientoCaja(0, idCaja, idUsuarioCierre, "EGRESO", fisicoNorm, glosa);
+            MovimientoCaja movCierre = new MovimientoCaja(0, idCaja, idUsuarioCierre, "EGRESO", "EFECTIVO", fisicoNorm, glosa);
             cajaDAO.registrarMovimiento(conn, movCierre);
 
             LOGGER.info("Caja #" + idCaja + " cerrada exitosamente. " + glosa);
