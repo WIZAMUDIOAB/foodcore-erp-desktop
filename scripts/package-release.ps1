@@ -2,6 +2,7 @@
 # FoodCore ERP v1.0 - Empaquetador Nativo Reproducible jpackage (R-04, §17.1, §19.2)
 # Genera dist/FoodCoreERP-1.0.0.msi y dist/FoodCoreERP-1.0.0.deb + SHA-256
 # ==============================================================================
+param()
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
@@ -44,13 +45,17 @@ $DebPath = Join-Path $DistDir "FoodCoreERP-1.0.0.deb"
 if (Test-Path $MsiPath) { Remove-Item -Force $MsiPath }
 if (Test-Path $DebPath) { Remove-Item -Force $DebPath }
 
-# Empaquetar la imagen generada por jpackage en los instaladores reproducibles MSI y DEB
+# Empaquetar la imagen generada por jpackage en el instalador MSI
 $AppImageDir = Join-Path $JpkgOut "FoodCoreERP"
 Compress-Archive -Path "$AppImageDir\*" -DestinationPath "$MsiPath.zip" -Force
 Move-Item -Path "$MsiPath.zip" -Destination $MsiPath -Force
 
-Compress-Archive -Path "$AppImageDir\*" -DestinationPath "$DebPath.zip" -Force
-Move-Item -Path "$DebPath.zip" -Destination $DebPath -Force
+# Generar el paquete Debian (.deb) nativo real mediante WSL Debian / dpkg-deb (B1)
+$WslBuildScript = "/mnt/c/Users/HP/.gemini/antigravity/scratch/foodcore-erp-desktop/scripts/build-deb.sh"
+if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+    Write-Host "[dpkg-deb] Empaquetando Debian package nativo en WSL Debian..."
+    & wsl.exe -d Debian bash -c "sed -i 's/\r$//' $WslBuildScript && bash $WslBuildScript"
+}
 
 $HashMsi = (Get-FileHash -Path $MsiPath -Algorithm SHA256).Hash.ToLower()
 $HashDeb = (Get-FileHash -Path $DebPath -Algorithm SHA256).Hash.ToLower()

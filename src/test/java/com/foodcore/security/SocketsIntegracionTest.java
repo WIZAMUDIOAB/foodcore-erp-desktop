@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Suite de integración del protocolo de sockets KDS LAN: Handshake {@code HELLO/WELCOME/RENEW},
  * rechazo de terminal inactiva, validación HMAC-SHA256, confirmación ACK sobre {@code outbox_evento}
- * y rechazo de tramas > 1 MB según SPEC-FOODCORE-v1.0 (§10.4, §11, §15.2; REMEDIATION R-02.7, R-14).
+ * y rechazo de tramas > 1 MB según SPEC-FOODCORE-v1.0 (§10.4, §11, §15.2; REMEDIATION R-02.7, R-14, N2).
  */
 class SocketsIntegracionTest {
 
@@ -39,7 +39,7 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 & R-14 (1/5): Handshake válido HELLO con KDS-01 -> WELCOME {sessionToken, sessionSecret, ttl} y RENEW extiende sesión")
+    @DisplayName("R-02.7 & R-14 (1/6): Handshake válido HELLO con KDS-01 -> WELCOME {sessionToken, sessionSecret, ttl} y RENEW extiende sesión")
     void debeCompletarHandshakeValidoYRenovarSesionConTerminalActiva() {
         JsonObject hello = new JsonObject();
         hello.addProperty("type", "HELLO");
@@ -66,7 +66,7 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 & R-14 (2/5): Handshake con terminal inactiva (KDS-INACTIVA, activo=0) -> ERROR TerminalNoAutorizada")
+    @DisplayName("R-02.7 & R-14 (2/6): Handshake con terminal inactiva (KDS-INACTIVA, activo=0) -> ERROR TerminalNoAutorizada")
     void debeRechazarHandshakeDeTerminalInactivaConErrorTerminalNoAutorizada() {
         JsonObject hello = new JsonObject();
         hello.addProperty("type", "HELLO");
@@ -80,7 +80,7 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 (3/5): Trama EVENT con firma HMAC-SHA256 adulterada -> rechazada con ERROR HMAC_INVALIDO")
+    @DisplayName("R-02.7 (3/6): Trama EVENT con firma HMAC-SHA256 adulterada -> rechazada con ERROR HMAC_INVALIDO")
     void debeRechazarTramaConHmacAdulterado() {
         JsonObject hello = new JsonObject();
         hello.addProperty("type", "HELLO");
@@ -116,7 +116,7 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 (4/5): Recepción de trama ACK actualiza outbox_evento de PENDIENTE a ENVIADO")
+    @DisplayName("R-02.7 (4/6): Recepción de trama ACK actualiza outbox_evento de PENDIENTE a ENVIADO")
     void recepcionDeAckDebeCambiarEstadoOutboxDePendienteAEnviado() throws Exception {
         long idEvento;
         try (Connection conn = ConexionBD.getConnection()) {
@@ -137,7 +137,20 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 (5/5): Framing -> mensaje mayor a 1 MB (1048576 bytes) es rechazado inmediatamente")
+    @DisplayName("N2 (5/6): RENEW con token inexistente o expirado es rechazado con TerminalNoAutorizada")
+    void debeRechazarRenewConTokenInexistenteOExpirado() {
+        JsonObject renew = new JsonObject();
+        renew.addProperty("type", "RENEW");
+        renew.addProperty("sessionToken", "TOKEN_INVENTADO_O_EXPIRADO");
+
+        JsonObject resp = servidor.procesarTramaProtocolo(renew.toString(), null);
+        assertNotNull(resp);
+        assertEquals("ERROR", resp.get("type").getAsString());
+        assertEquals("TerminalNoAutorizada", resp.get("code").getAsString());
+    }
+
+    @Test
+    @DisplayName("R-02.7 (6/6): Framing -> mensaje mayor a 1 MB (1048576 bytes) es rechazado inmediatamente")
     void debeRechazarMensajeMayorA1Megabyte() {
         String payloadGigante = "A".repeat(TerminalAuthService.MAX_FRAME_BYTES + 512);
         JsonObject resp = servidor.procesarTramaProtocolo(payloadGigante, null);

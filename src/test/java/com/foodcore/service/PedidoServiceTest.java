@@ -29,15 +29,15 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Suite de integración de concurrencia optimista en mesas, idempotencia de pedidos,
- * adición post-entrega y cronómetro KDS por ítem según SPEC-FOODCORE-v1.0
- * (§6.2, §8.5, §9.1, §9.2, §15.2; REMEDIATION R-02.5, R-08).
+ * adición post-entrega con RBAC y cronómetro KDS por ítem según SPEC-FOODCORE-v1.0
+ * (§6.2, §8.5, §9.1, §9.2, §15.2; REMEDIATION R-02.5, R-08, B5).
  */
 class PedidoServiceTest {
 
@@ -77,22 +77,106 @@ class PedidoServiceTest {
     }
 
     @Test
-    @DisplayName("R-02.5 (1/4): Concurrencia optimista en mesa (version) -> 1 éxito y 1 ConflictoEstadoException")
-    void debeDetectarConflictoOptimistaEnActualizacionSimultaneaDeMesa() throws Exception {
-        long idMesa = 1L; // M01 creada en V1__init.sql con version = 0
+    @DisplayName("B5.1: testActualizarEstadoMesa_ConcurrenciaReal - 2 hilos compitiendo con misma version -> 1 éxito, 1 ConflictoEstadoException")
+    void testActualizarEstadoMesa_ConcurrenciaReal() throws Exception {
+        long idMesa = 1L; // M01 con version = 0 creada en V1__init.sql
 
-        // Primera actualización con versionEsperada = 0 tiene éxito e incrementa version a 1
-        pedidoService.actualizarEstadoMesaOptimista(idMesa, "OCUPADA", 0);
+        CountDownLatch startSignal = new CountDownLatch(1);
+        CountDownLatch doneSignal = new CountDownLatch(2);
 
-        // Segunda actualización concurrente que leyó version = 0 debe lanzar ConflictoEstadoException
-        assertThrows(
-            ConflictoEstadoException.class,
-            () -> pedidoService.actualizarEstadoMesaOptimista(idMesa, "OCUPADA", 0)
-        );
+        AtomicInteger exitos = new AtomicInteger(0);
+        AtomicInteger conflictos = new AtomicInteger(0);
+
+        Runnable task = () -> {
+            try {
+                startSignal.await();
+                pedidoService.actualizarEstadoMesaOptimista(idMesa, "OCUPADA", 0);
+                exitos.incrementAndGet();
+            } catch (ConflictoEstadoException ex) {
+                conflictos.incrementAndGet();
+            } catch (Exception e) {
+                // error inesperado
+            } finally {
+                doneSignal.countDown();
+            }
+        };
+
+        Thread t1 = new Thread(task, "hilo-mesa-1");
+        Thread t2 = new Thread(task, "hilo-mesa-2");
+        t1.start();
+        t2.start();
+
+        startSignal.countDown();
+        doneSignal.await();
+
+        assertEquals(1, exitos.get(), "Exactamente 1 hilo debe tener éxito en la actualización optimista");
+        assertEquals(1, conflictos.get(), "El hilo perdedor debe recibir ConflictoEstadoException");
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT version, estado FROM mesa WHERE id_mesa = " + idMesa)) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("version"), "La versión de la mesa debe haber avanzado exactamente a 1");
+            assertEquals("OCUPADA", rs.getString("estado"));
+        }
     }
 
     @Test
-    @DisplayName("R-02.5 (2/4): Idempotencia de comanda -> dos crearPedido con mismo idempotency_key producen exactamente 1 pedido")
+    @DisplayName("B5.2: testAdicionarItemsAPedidoEntregado_SinPermiso_LanzaExcepcion - RBAC bloquea adición post-entrega")
+    void testAdicionarItemsAPedidoEntregado_SinPermiso_LanzaExcepcion() throws Exception {
+        Pedido p = new Pedido(0, 1, null, "M02", "REGISTRADO", new BigDecimal("28.00"));
+        DetallePedido detInicial = new DetallePedido(0, 0, idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "");
+        Pedido creado = pedidoService.crearPedido(p, List.of(detInicial));
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            pedidoDAO.actualizarEstadoPedido(conn, creado.getIdPedido(), "ENTREGADO");
+        }
+
+        SesionUsuario sesionSinPermiso = new SesionUsuario(
+            2L, "Mozo Básico", "MOZO",
+            EnumSet.of(Permiso.PEDIDO_CREAR),
+            "POS-01", LocalDateTime.now(ZONA_LIMA)
+        );
+        DetallePedido itemExtra = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Adicional");
+
+        NegocioException exDenegado = assertThrows(
+            NegocioException.class,
+            () -> pedidoService.adicionarItemsPostEntrega(creado.getIdPedido(), List.of(itemExtra), sesionSinPermiso)
+        );
+        assertEquals(CodigoError.ACCESO_DENEGADO, exDenegado.getCodigoError());
+    }
+
+    @Test
+    @DisplayName("B5.3: testAdicionarItemsAPedidoEntregado_ConPermiso_Permitido - Supervisor con PEDIDO_ADICIONAR_POST_ENTREGA adiciona con éxito")
+    void testAdicionarItemsAPedidoEntregado_ConPermiso_Permitido() throws Exception {
+        Pedido p = new Pedido(0, 1, null, "M02", "REGISTRADO", new BigDecimal("28.00"));
+        DetallePedido detInicial = new DetallePedido(0, 0, idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "");
+        Pedido creado = pedidoService.crearPedido(p, List.of(detInicial));
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            pedidoDAO.actualizarEstadoPedido(conn, creado.getIdPedido(), "ENTREGADO");
+        }
+
+        SesionUsuario sesionAutorizada = new SesionUsuario(
+            1L, "Supervisor Salón", "ADMIN",
+            Set.of(Permiso.PEDIDO_ADICIONAR_POST_ENTREGA),
+            "POS-01", LocalDateTime.now(ZONA_LIMA)
+        );
+        DetallePedido itemExtra = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Adicional Aprobado");
+
+        Pedido actualizado = pedidoService.adicionarItemsPostEntrega(
+            creado.getIdPedido(), List.of(itemExtra), sesionAutorizada
+        );
+        assertEquals("ITEMS_ADICIONALES", actualizado.getEstado());
+        assertEquals(2, actualizado.getDetalles().size());
+    }
+
+    @Test
+    @DisplayName("B5.4: dosCrearPedidoConMismoIdempotencyKeyDebenProducirUnSoloPedido - Idempotencia de comanda")
     void dosCrearPedidoConMismoIdempotencyKeyDebenProducirUnSoloPedido() throws Exception {
         String idemKey = UUID.randomUUID().toString();
 
@@ -120,45 +204,7 @@ class PedidoServiceTest {
     }
 
     @Test
-    @DisplayName("R-02.5 (3/4): Transición ENTREGADO -> ITEMS_ADICIONALES bloqueada sin permiso y permitida con PEDIDO_ADICIONAR_POST_ENTREGA")
-    void debeBloquearAdicionPostEntregaSinPermisoYPermitirlaConPermiso() throws Exception {
-        Pedido p = new Pedido(0, 1, null, "M02", "REGISTRADO", new BigDecimal("28.00"));
-        DetallePedido detInicial = new DetallePedido(0, 0, idProductoPrueba, "Alitas BBQ x6", 1,
-            new BigDecimal("28.00"), new BigDecimal("28.00"), "");
-        Pedido creado = pedidoService.crearPedido(p, List.of(detInicial));
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            pedidoDAO.actualizarEstadoPedido(conn, creado.getIdPedido(), "ENTREGADO");
-        }
-
-        SesionUsuario sesionSinPermiso = new SesionUsuario(
-            2L, "Mozo Básico", "MOZO",
-            EnumSet.of(Permiso.PEDIDO_CREAR),
-            "POS-01", LocalDateTime.now(ZONA_LIMA)
-        );
-        DetallePedido itemExtra = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Alitas BBQ x6", 1,
-            new BigDecimal("28.00"), new BigDecimal("28.00"), "Adicional");
-
-        NegocioException exDenegado = assertThrows(
-            NegocioException.class,
-            () -> pedidoService.adicionarItemsPostEntrega(creado.getIdPedido(), List.of(itemExtra), sesionSinPermiso)
-        );
-        assertEquals(CodigoError.ACCESO_DENEGADO, exDenegado.getCodigoError());
-
-        SesionUsuario sesionAutorizada = new SesionUsuario(
-            1L, "Supervisor Salón", "ADMIN",
-            Set.of(Permiso.PEDIDO_ADICIONAR_POST_ENTREGA),
-            "POS-01", LocalDateTime.now(ZONA_LIMA)
-        );
-        Pedido actualizado = pedidoService.adicionarItemsPostEntrega(
-            creado.getIdPedido(), List.of(itemExtra), sesionAutorizada
-        );
-        assertEquals("ITEMS_ADICIONALES", actualizado.getEstado());
-        assertEquals(2, actualizado.getDetalles().size());
-    }
-
-    @Test
-    @DisplayName("R-08 & R-02.5 (4/4): Comanda con 2 ítems (uno de 3 min y otro de 12 min) -> primera tarjeta GREEN, segunda tarjeta RED")
+    @DisplayName("B5.5: comandaConDosItemsDeDistintoTiempoDebeAsignarColoresIndependientesPorItem - KDS Timer por ítem")
     void comandaConDosItemsDeDistintoTiempoDebeAsignarColoresIndependientesPorItem() throws Exception {
         LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
         Pedido pedido = new Pedido(0, 1, null, "M03", "REGISTRADO", new BigDecimal("56.00"));

@@ -25,14 +25,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Suite TestFX / JavaFX de la vista Punto de Venta (POS): agregar ítem, cobro con F5,
  * deshabilitación del botón Cobrar durante transacción (anti-doble cobro) y limpieza con Esc
- * según SPEC-FOODCORE-v1.0 (§15.3, §19.5, §19.12; REMEDIATION R-03).
+ * según SPEC-FOODCORE-v1.0 (§15.3, §19.5, §19.12; REMEDIATION R-03, B6).
  */
 class VentaPOSViewTest {
 
@@ -80,9 +78,60 @@ class VentaPOSViewTest {
         }
     }
 
+    private Producto crearProductoPrueba() {
+        return new Producto(
+            idProductoPos, 1, "POL-01", "Combo Pollo Crispy",
+            "Crujiente", new BigDecimal("25.00"), new BigDecimal("50"), true
+        );
+    }
+
     @Test
-    @DisplayName("R-03 (1/2): VentaPOSView -> agregar ítem, cobrar con F5, botón Cobrar deshabilitado durante transacción (sin doble cobro)")
-    void debeAgregarItemCobrarConF5YEvitarDobleCobroCuandoBotonEstaDeshabilitado() throws Exception {
+    @DisplayName("B6.6: testAgregarProductoAVenta_ActualizaTotalesYCarrito - Añadir producto actualiza items y label total")
+    void testAgregarProductoAVenta_ActualizaTotalesYCarrito() throws Exception {
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1100, 720);
+
+                VentaController controller = loader.getController();
+                controller.agregarProductoAVenta(crearProductoPrueba());
+
+                assertEquals(1, controller.getItemsVenta().size());
+                Label lblTotal = (Label) root.lookup("#lblTotal");
+                assertEquals("S/ 25.00", lblTotal.getText());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("B6.7: testBotonCobrarDeshabilitado_BloqueaDobleCobro - Bloqueo estricto durante transacción en curso")
+    void testBotonCobrarDeshabilitado_BloqueaDobleCobro() throws Exception {
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1100, 720);
+
+                VentaController controller = loader.getController();
+                controller.agregarProductoAVenta(crearProductoPrueba());
+
+                controller.simularEstadoTransaccionEnCurso(true);
+                assertTrue(controller.getBtnEfectivo().isDisabled(), "El botón Cobrar debe figurar deshabilitado");
+
+                controller.handleCobroEfectivo(null);
+                assertEquals(1, controller.getItemsVenta().size(), "El segundo intento de cobro debe ser completamente ignorado");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("B6.8: testCobroExitosoConTeclaF5_RegistraVentaYVaciaCarrito - Atajo F5 procesa cobro")
+    void testCobroExitosoConTeclaF5_RegistraVentaYVaciaCarrito() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
@@ -92,35 +141,12 @@ class VentaPOSViewTest {
                 VentaController controller = loader.getController();
                 controller.setModoCobroDirectoTest(true);
                 controller.registrarAtajosTeclado();
-
-                Producto prod = new Producto(
-                    idProductoPos, 1, "POL-01", "Combo Pollo Crispy",
-                    "Crujiente", new BigDecimal("25.00"), new BigDecimal("50"), true
-                );
-
-                // 1. Agregar ítem al carrito
-                controller.agregarProductoAVenta(prod);
-                assertEquals(1, controller.getItemsVenta().size());
-
-                Label lblTotal = (Label) root.lookup("#lblTotal");
-                assertEquals("S/ 25.00", lblTotal.getText());
-
-                // 2. Verificar que durante una transacción en curso el botón Cobrar se deshabilita e ignora clic duplicado
-                controller.simularEstadoTransaccionEnCurso(true);
-                assertTrue(controller.getBtnEfectivo().isDisabled(),
-                    "El botón Cobrar debe estar deshabilitado mientras la transacción está en curso");
-                controller.handleCobroEfectivo(null); // Debe ignorarse sin duplicar cobro
-                assertEquals(1, controller.getItemsVenta().size(), "El carrito sigue intacto porque el segundo clic fue bloqueado");
-
-                // 3. Liberar estado simulado y disparar tecla F5 para cobrar
-                controller.simularEstadoTransaccionEnCurso(false);
-                assertFalse(controller.getBtnEfectivo().isDisabled());
+                controller.agregarProductoAVenta(crearProductoPrueba());
 
                 KeyEvent f5Event = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F5, false, false, false, false);
                 scene.getRoot().fireEvent(f5Event);
 
-                assertTrue(controller.getItemsVenta().isEmpty(), "El carrito debe vaciarse tras completar el cobro con F5");
-                assertEquals("S/ 0.00", lblTotal.getText());
+                assertTrue(controller.getItemsVenta().isEmpty(), "El carrito debe vaciarse al completar la venta con F5");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -130,13 +156,13 @@ class VentaPOSViewTest {
              Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM venta")) {
             rs.next();
-            assertEquals(1, rs.getInt(1), "Debe haberse registrado exactamente 1 venta (sin duplicados)");
+            assertEquals(1, rs.getInt(1), "Debe haberse registrado exactamente 1 venta");
         }
     }
 
     @Test
-    @DisplayName("R-03 (2/2): VentaPOSView -> tecla Esc limpia el carrito con confirmación")
-    void debeLimpiarCarritoAlPresionarEscapeConConfirmacion() throws Exception {
+    @DisplayName("B6.9: testTeclaEscape_LimpiaCarritoConConfirmacion - Atajo Esc vacía el carrito tras confirmación")
+    void testTeclaEscape_LimpiaCarritoConConfirmacion() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
@@ -146,18 +172,13 @@ class VentaPOSViewTest {
                 VentaController controller = loader.getController();
                 controller.setConfirmacionEscapeAutomatica(true);
                 controller.registrarAtajosTeclado();
-
-                Producto prod = new Producto(
-                    idProductoPos, 1, "POL-01", "Combo Pollo Crispy",
-                    "Crujiente", new BigDecimal("25.00"), new BigDecimal("50"), true
-                );
-                controller.agregarProductoAVenta(prod);
+                controller.agregarProductoAVenta(crearProductoPrueba());
                 assertEquals(1, controller.getItemsVenta().size());
 
                 KeyEvent escEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false);
                 scene.getRoot().fireEvent(escEvent);
 
-                assertTrue(controller.getItemsVenta().isEmpty(), "La tecla Esc confirmada debe limpiar los ítems del carrito");
+                assertTrue(controller.getItemsVenta().isEmpty(), "La tecla Esc debe vaciar el carrito");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

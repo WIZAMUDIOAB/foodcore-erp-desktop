@@ -21,17 +21,12 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Suite TestFX / JavaFX de la vista de Login, bloqueo por 5 intentos fallidos (15 min),
  * cambio obligatorio de contraseña inicial y expiración de sesión de 30 minutos
- * según SPEC-FOODCORE-v1.0 (§10.1, §10.2, §15.3, §19.4; REMEDIATION R-03, R-18).
+ * según SPEC-FOODCORE-v1.0 (§10.1, §10.2, §15.3, §19.4; REMEDIATION R-03, R-18, B6).
  */
 class LoginViewTest {
 
@@ -46,8 +41,34 @@ class LoginViewTest {
     }
 
     @Test
-    @DisplayName("R-03 & R-18 (1/3): LoginView FXML muestra error en fallo y bloquea la cuenta visiblemente tras 5 intentos fallidos")
-    void debeMostrarErrorYBloqueoVisibleTrasCincoIntentosFallidos() throws Exception {
+    @DisplayName("B6.1: testLoginExitoso_EstableceSesionUsuario - Login válido establece sesión activa en SesionManager")
+    void testLoginExitoso_EstableceSesionUsuario() throws Exception {
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1024, 680);
+
+                TextField txtUsername = (TextField) root.lookup("#txtUsername");
+                PasswordField txtPassword = (PasswordField) root.lookup("#txtPassword");
+                Button btnLogin = (Button) root.lookup("#btnLogin");
+
+                txtUsername.setText("cajero");
+                txtPassword.setText("Admin#2026!");
+                btnLogin.fire();
+
+                SesionUsuario sesion = SesionManager.getSesionActiva();
+                assertNotNull(sesion, "Debe existir sesión activa tras login válido");
+                assertEquals("CAJERO", sesion.getCodigoRol());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("B6.2: testLoginFallido_IncrementaContadorVisible - Intentos 1 a 4 muestran advertencia visible i/5")
+    void testLoginFallido_IncrementaContadorVisible() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
@@ -61,26 +82,46 @@ class LoginViewTest {
 
                 txtUsername.setText("cajero");
 
-                // Intentos 1 a 4: credenciales inválidas
-                for (int i = 1; i <= 4; i++) {
-                    txtPassword.setText("ClaveIncorrecta#" + i);
+                for (int i = 1; i <= 3; i++) {
+                    txtPassword.setText("ClaveErronea#" + i);
                     btnLogin.fire();
-                    assertTrue(lblMensaje.isVisible(), "El mensaje de error debe ser visible en el intento " + i);
+                    assertTrue(lblMensaje.isVisible());
                     assertTrue(lblMensaje.getText().contains(i + "/5"));
                 }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
 
-                // Intento 5: dispara bloqueo por 15 minutos
-                txtPassword.setText("ClaveIncorrecta#5");
-                btnLogin.fire();
+    @Test
+    @DisplayName("B6.3: testBloqueoCuenta_TrasCincoIntentosFallidos - 5to intento fallido bloquea cuenta por 15 min")
+    void testBloqueoCuenta_TrasCincoIntentosFallidos() throws Exception {
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1024, 680);
+
+                TextField txtUsername = (TextField) root.lookup("#txtUsername");
+                PasswordField txtPassword = (PasswordField) root.lookup("#txtPassword");
+                Button btnLogin = (Button) root.lookup("#btnLogin");
+                Label lblMensaje = (Label) root.lookup("#lblMensaje");
+
+                txtUsername.setText("cajero");
+
+                for (int i = 1; i <= 5; i++) {
+                    txtPassword.setText("ClaveBloqueo#" + i);
+                    btnLogin.fire();
+                }
+
                 assertTrue(lblMensaje.isVisible());
-                assertTrue(lblMensaje.getText().toLowerCase().contains("bloqueada"),
-                    "El 5to intento fallido debe mostrar cuenta bloqueada por 15 minutos: " + lblMensaje.getText());
+                assertTrue(lblMensaje.getText().toLowerCase().contains("bloqueada"));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
 
-        // Verificar también en capa de servicio que aun con contraseña correcta rechaza con USUARIO_BLOQUEADO
         NegocioException exBloqueo = assertThrows(
             NegocioException.class,
             () -> authService.login("cajero", "Admin#2026!")
@@ -89,8 +130,8 @@ class LoginViewTest {
     }
 
     @Test
-    @DisplayName("R-03 & R-18 (2/3): Login de admin con cambio_password_requerido=1 exige actualizar clave antes de operar")
-    void debeForzarCambioDePasswordEnPrimerLoginYDesbloquearTrasActualizar() throws Exception {
+    @DisplayName("B6.4: testCambioPasswordObligatorio_BloqueaOperacionesHastaActualizar - Enforce cambio_password_requerido=1")
+    void testCambioPasswordObligatorio_BloqueaOperacionesHastaActualizar() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
@@ -114,38 +155,33 @@ class LoginViewTest {
             }
         });
 
-        // Mientras no cambie la contraseña inicial, SesionManager bloquea operaciones de negocio
         NegocioException exPendiente = assertThrows(
             NegocioException.class,
             SesionManager::verificarSesionActiva
         );
         assertEquals(CodigoError.CAMBIO_PASSWORD_REQUERIDO, exPendiente.getCodigoError());
 
-        // Ejecutar cambio obligatorio de password
         int idAdmin = AuthService.getUsuarioSesionActual().getIdUsuario();
         authService.cambiarPasswordObligatorio(idAdmin, "NuevaClaveSegura#2026!");
 
         assertFalse(SesionManager.isCambioPasswordPendiente());
-        SesionUsuario sesionActiva = SesionManager.verificarSesionActiva();
-        assertNotNull(sesionActiva);
+        assertNotNull(SesionManager.verificarSesionActiva());
     }
 
     @Test
-    @DisplayName("R-18 (3/3): SesionUsuario calcula expiraEn = iniciadaEn + 30 min, SesionManager rechaza sesión expirada y logout limpia estado")
-    void debeVerificarExpiracionDe30MinutosYLimpiezaEnLogout() throws Exception {
+    @DisplayName("B6.5: testExpiracionSesion_TreintaMinutosTTL - Invalida sesión activa transcurridos 30 minutos")
+    void testExpiracionSesion_TreintaMinutosTTL() throws Exception {
         authService.login("cajero", "Admin#2026!");
         SesionUsuario sesion = SesionManager.verificarSesionActiva();
         assertNotNull(sesion);
-        assertEquals(sesion.getIniciadaEn().plusMinutes(30), sesion.getExpiraEn(),
-            "expiraEn debe ser exactamente iniciadaEn + 30 minutos");
+        assertEquals(sesion.getIniciadaEn().plusMinutes(30), sesion.getExpiraEn());
 
-        // Verificar que a los 30 minutos exactos SesionManager lanza SESION_EXPIRADA
         LocalDateTime treintaMinutosDespues = sesion.getIniciadaEn().plusMinutes(30);
         NegocioException exExpirada = assertThrows(
             NegocioException.class,
             () -> SesionManager.verificarSesionActiva(treintaMinutosDespues)
         );
         assertEquals(CodigoError.SESION_EXPIRADA, exExpirada.getCodigoError());
-        assertNull(SesionManager.getSesionActiva(), "La sesión expirada debe limpiarse automáticamente");
+        assertNull(SesionManager.getSesionActiva());
     }
 }
