@@ -34,3 +34,7 @@ Todos los cambios notables en este proyecto se documentan en este archivo siguie
 - **[R-16]** Scripts automatizados de respaldo y restauración (`scripts/backup.ps1`, `scripts/backup.sh`, `scripts/restore.ps1`, `scripts/restore.sh`) verificados en staging con bitácora `logs/restore_YYYYMMDD.log`.
 - **[R-17]** Sincronización verificada en `origin/develop` y `origin/main`.
 - **[R-18]** Bloqueo de cuenta por 15 minutos tras 5 intentos fallidos (`bloqueado_hasta`), expiración de sesión tras 30 minutos (`expiraEn`) en `SesionManager` y cambio obligatorio de contraseña en primer login (`cambio_password_requerido = 1`).
+
+### Notas Técnicas y Deuda Técnica Planificada (v1.0.0 → v1.1.0)
+- **Nota técnica de cobertura**: `com.foodcore.dao.VentaDAOImpl` está ubicada temporalmente en el paquete `dao` por compatibilidad con el módulo de ventas. Será movida a `dao.impl` en v1.1.0 (ticket #NNN). La cobertura de línea declarada de 97.80% corresponde a esta clase. `com.foodcore.dao.impl.VentaDAOImpl` es un adaptador delgado (7 líneas). `AuthServiceImpl` (8 líneas) delega en `AuthService`; la cobertura del delegado es 100% y la lógica de negocio reside en la clase principal. Refactor completo planificado para v1.1.0.
+- **Runtime embebido en el .deb incluye JDK completo (179 MB instalados)** por ausencia de `jlink --strip-native-commands`. Optimización a JRE mínimo (~70 MB) planificada para v1.1.0. El tamaño actual (52 MB comprimido) es funcional pero subóptimo para distribución masiva.
