@@ -6,6 +6,7 @@ import com.foodcore.model.Venta;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 
 /**
  * Implementación canónica de {@code VentaDAO} en paquete {@code com.foodcore.dao.impl}
@@ -26,5 +27,10 @@ public class VentaDAOImpl extends com.foodcore.dao.VentaDAOImpl {
     @Override
     public void insertarComprobante(Connection conn, ComprobantePago comp) throws SQLException {
         super.insertarComprobante(conn, comp);
+    }
+
+    @Override
+    public List<Venta> listarVentasDelDia(Connection conn) throws SQLException {
+        return super.listarVentasDelDia(conn);
     }
 }

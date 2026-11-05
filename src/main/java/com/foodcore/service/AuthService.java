@@ -1,7 +1,6 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.UsuarioDAO;
-import com.foodcore.dao.UsuarioDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Asistencia;
@@ -67,11 +66,17 @@ public class AuthService {
         }
 
         LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
-        if (usuario.getBloqueadoHasta() != null && usuario.getBloqueadoHasta().isAfter(ahora)) {
-            throw new NegocioException(
-                CodigoError.USUARIO_BLOQUEADO,
-                "Cuenta bloqueada temporalmente por exceso de intentos fallidos hasta " + usuario.getBloqueadoHasta()
-            );
+        if (usuario.getBloqueadoHasta() != null) {
+            if (usuario.getBloqueadoHasta().isAfter(ahora)) {
+                throw new NegocioException(
+                    CodigoError.USUARIO_BLOQUEADO,
+                    "Cuenta bloqueada temporalmente por exceso de intentos fallidos hasta " + usuario.getBloqueadoHasta()
+                );
+            } else {
+                usuarioDAO.resetearIntentosLogin(conn, usuario.getIdUsuario());
+                usuario.setIntentosFallidos(0);
+                usuario.setBloqueadoHasta(null);
+            }
         }
 
         String hash = usuario.getPasswordHash();
