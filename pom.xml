@@ -211,23 +211,48 @@
                 </executions>
             </plugin>
 
-            <!-- Surefire (Unit + Integration + TestFX) -->
+            <!-- Surefire (Unit + TestFX Suites) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
                     <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                    <excludes>
+                        <exclude>**/FlywayMigrationTest.java</exclude>
+                        <exclude>**/KardexIntegridadTest.java</exclude>
+                        <exclude>**/OutboxDispatcherTest.java</exclude>
+                        <exclude>**/SocketsIntegracionTest.java</exclude>
+                        <exclude>**/CajaServiceTest.java</exclude>
+                        <exclude>**/PedidoServiceTest.java</exclude>
+                        <exclude>**/VentaServiceConcurrencyTest.java</exclude>
+                        <exclude>**/VentaServiceRollbackTest.java</exclude>
+                        <exclude>**/VentaDAOImplTest.java</exclude>
+                        <exclude>**/AuthServiceImplTest.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 
-            <!-- Failsafe (Integration + Verify Phase, R-01) -->
+            <!-- Failsafe (Integration MySQL / Testcontainers + Verify Phase, R-01, B2-bis) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
                     <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                    <includes>
+                        <include>**/*IT.java</include>
+                        <include>**/FlywayMigrationTest.java</include>
+                        <include>**/KardexIntegridadTest.java</include>
+                        <include>**/OutboxDispatcherTest.java</include>
+                        <include>**/SocketsIntegracionTest.java</include>
+                        <include>**/CajaServiceTest.java</include>
+                        <include>**/PedidoServiceTest.java</include>
+                        <include>**/VentaServiceConcurrencyTest.java</include>
+                        <include>**/VentaServiceRollbackTest.java</include>
+                        <include>**/VentaDAOImplTest.java</include>
+                        <include>**/AuthServiceImplTest.java</include>
+                    </includes>
                 </configuration>
                 <executions>
                     <execution>

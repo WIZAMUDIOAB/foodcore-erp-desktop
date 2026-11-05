@@ -4,7 +4,13 @@ import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
 
-import java.sql.*;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,8 +18,28 @@ public class VentaDAOImpl implements VentaDAO {
 
     @Override
     public int insertarVenta(Connection conn, Venta venta) throws SQLException {
-        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, total, metodo_pago, monto_recibido, vuelto, estado) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        if (venta == null || venta.getTotal() == null || venta.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new SQLException("El total de la venta debe ser estrictamente mayor a cero.");
+        }
+
+        String idemKey = venta.getIdempotencyKey();
+        if (idemKey != null && !idemKey.isBlank()) {
+            String checkSql = "SELECT id_venta FROM venta WHERE idempotency_key = ?";
+            try (PreparedStatement checkPs = conn.prepareStatement(checkSql)) {
+                checkPs.setString(1, idemKey.trim());
+                try (ResultSet rs = checkPs.executeQuery()) {
+                    if (rs.next()) {
+                        int idExistente = rs.getInt("id_venta");
+                        venta.setIdVenta(idExistente);
+                        return idExistente;
+                    }
+                }
+            }
+        }
+
+        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, total, "
+                + "metodo_pago, monto_recibido, vuelto, estado, idempotency_key) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             if (venta.getIdPedido() != null) {
                 ps.setInt(1, venta.getIdPedido());
@@ -27,13 +53,14 @@ public class VentaDAOImpl implements VentaDAO {
             } else {
                 ps.setNull(4, Types.INTEGER);
             }
-            ps.setBigDecimal(5, venta.getSubtotal());
-            ps.setBigDecimal(6, venta.getIgv());
+            ps.setBigDecimal(5, venta.getSubtotal() != null ? venta.getSubtotal() : venta.getTotal());
+            ps.setBigDecimal(6, venta.getIgv() != null ? venta.getIgv() : BigDecimal.ZERO);
             ps.setBigDecimal(7, venta.getTotal());
             ps.setString(8, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
             ps.setBigDecimal(9, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
-            ps.setBigDecimal(10, venta.getVuelto() != null ? venta.getVuelto() : java.math.BigDecimal.ZERO);
+            ps.setBigDecimal(10, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
             ps.setString(11, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
+            ps.setString(12, idemKey != null ? idemKey.trim() : null);
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -49,6 +76,10 @@ public class VentaDAOImpl implements VentaDAO {
 
     @Override
     public void insertarDetalleVenta(Connection conn, DetalleVenta detalle) throws SQLException {
+        if (detalle == null || detalle.getCantidad() <= 0 || detalle.getIdProducto() <= 0
+                || detalle.getPrecioUnitario() == null || detalle.getSubtotal() == null) {
+            throw new SQLException("Detalle de venta inválido: cantidad, producto y montos deben ser válidos.");
+        }
         String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, detalle.getIdVenta());
@@ -101,6 +132,7 @@ public class VentaDAOImpl implements VentaDAO {
                 v.setMontoRecibido(rs.getBigDecimal("monto_recibido"));
                 v.setVuelto(rs.getBigDecimal("vuelto"));
                 v.setEstado(rs.getString("estado"));
+                v.setIdempotencyKey(rs.getString("idempotency_key"));
                 lista.add(v);
             }
         }
