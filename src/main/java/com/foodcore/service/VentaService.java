@@ -1,6 +1,7 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.dao.impl.VentaDAOImpl;
 import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;

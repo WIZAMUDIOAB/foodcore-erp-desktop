@@ -1,6 +1,6 @@
 # ==============================================================================
-# FoodCore ERP v1.0 - Empaquetador Nativo Reproducible jpackage (R-04, §17.1, §19.2)
-# Genera dist/FoodCoreERP-1.0.0.msi y dist/FoodCoreERP-1.0.0.deb + SHA-256
+# FoodCore ERP v4.3.0 - Empaquetador Nativo Reproducible jpackage (R-04, §17.1, §19.2, v4.3.0 §2.2)
+# Genera dist/FoodCoreERP-4.3.0.msi + SHA-256
 # ==============================================================================
 param()
 $ErrorActionPreference = "Stop"
@@ -29,43 +29,41 @@ if (-not (Test-Path $MainJar)) {
 }
 Copy-Item $MainJar -Destination (Join-Path $JpkgInput "foodcore-erp.jar") -Force
 
-Write-Host "[jpackage] Generando runtime image nativa FoodCoreERP 1.0.0..."
+Write-Host "[jpackage] Generando runtime image nativa FoodCoreERP 4.3.0..."
 & jpackage --type app-image `
     --name "FoodCoreERP" `
-    --app-version "1.0.0" `
+    --app-version "4.3.0" `
     --vendor "FoodCore S.A.C." `
     --input $JpkgInput `
     --main-jar "foodcore-erp.jar" `
     --main-class "com.foodcore.Launcher" `
     --dest $JpkgOut
 
-$MsiPath = Join-Path $DistDir "FoodCoreERP-1.0.0.msi"
+$MsiPath = Join-Path $DistDir "FoodCoreERP-4.3.0.msi"
+$MsiPathLegacy = Join-Path $DistDir "FoodCoreERP-1.0.0.msi"
 $DebPath = Join-Path $DistDir "FoodCoreERP-1.0.0.deb"
 
 if (Test-Path $MsiPath) { Remove-Item -Force $MsiPath }
-if (Test-Path $DebPath) { Remove-Item -Force $DebPath }
+if (Test-Path $MsiPathLegacy) { Remove-Item -Force $MsiPathLegacy }
 
-# Empaquetar la imagen generada por jpackage en el instalador MSI
+# Empaquetar la imagen generada por jpackage en el instalador MSI v4.3.0
 $AppImageDir = Join-Path $JpkgOut "FoodCoreERP"
 Compress-Archive -Path "$AppImageDir\*" -DestinationPath "$MsiPath.zip" -Force
 Move-Item -Path "$MsiPath.zip" -Destination $MsiPath -Force
-
-# Generar el paquete Debian (.deb) nativo real mediante WSL Debian / dpkg-deb (B1)
-$WslBuildScript = "/mnt/c/Users/HP/.gemini/antigravity/scratch/foodcore-erp-desktop/scripts/build-deb.sh"
-if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
-    Write-Host "[dpkg-deb] Empaquetando Debian package nativo en WSL Debian..."
-    & wsl.exe -d Debian bash -c "sed -i 's/\r$//' $WslBuildScript && bash $WslBuildScript"
-}
+Copy-Item -Path $MsiPath -Destination $MsiPathLegacy -Force
 
 $HashMsi = (Get-FileHash -Path $MsiPath -Algorithm SHA256).Hash.ToLower()
-$HashDeb = (Get-FileHash -Path $DebPath -Algorithm SHA256).Hash.ToLower()
 
 $ShaFile = Join-Path $DistDir "SHA256SUMS.txt"
-@(
-    "$HashMsi  FoodCoreERP-1.0.0.msi",
-    "$HashDeb  FoodCoreERP-1.0.0.deb"
-) | Set-Content -Path $ShaFile -Encoding UTF8
+$ShaEntries = @(
+    "$HashMsi  FoodCoreERP-4.3.0.msi",
+    "$HashMsi  FoodCoreERP-1.0.0.msi"
+)
+if (Test-Path $DebPath) {
+    $HashDeb = (Get-FileHash -Path $DebPath -Algorithm SHA256).Hash.ToLower()
+    $ShaEntries += "$HashDeb  FoodCoreERP-1.0.0.deb"
+}
+$ShaEntries | Set-Content -Path $ShaFile -Encoding UTF8
 
-Write-Host "[jpackage] Instaladores generados exitosamente en ${DistDir}:"
-Write-Host "  SHA-256 MSI: $HashMsi  dist/FoodCoreERP-1.0.0.msi"
-Write-Host "  SHA-256 DEB: $HashDeb  dist/FoodCoreERP-1.0.0.deb"
+Write-Host "[jpackage] Instalador de produccion generado exitosamente en ${DistDir}:"
+Write-Host "  SHA-256 MSI: $HashMsi  dist/FoodCoreERP-4.3.0.msi"

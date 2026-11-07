@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.exception.NegocioException;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.impl.AuthServiceImpl;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -16,7 +17,7 @@ public class MarcacionAsistenciaController {
     @FXML private TextField txtDni;
     @FXML private Label lblEstado;
 
-    private final AuthService authService = new AuthService();
+    private final AuthService authService = new AuthServiceImpl();
 
     @FXML
     public void handleNumClick(ActionEvent event) {

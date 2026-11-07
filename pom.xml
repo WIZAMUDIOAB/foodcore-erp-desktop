@@ -189,7 +189,28 @@
 
     <build>
         <finalName>foodcore-erp</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/pwa</directory>
+                <targetPath>pwa</targetPath>
+            </resource>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <includes>
+                    <include>keystore.jks</include>
+                    <include>foodcore.cer</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -453,7 +474,7 @@
                         <version>1.6.0</version>
                         <configuration>
                             <name>FoodCoreERP</name>
-                            <appVersion>1.0.0</appVersion>
+                            <appVersion>4.3.0</appVersion>
                             <vendor>FoodCore S.A.C.</vendor>
                             <destination>${project.basedir}/dist</destination>
                             <input>${project.build.directory}</input>
