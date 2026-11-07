@@ -21,7 +21,7 @@ jobs:
           cache: maven
 
       - name: Install Playwright Browsers
-        run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install --with-deps chromium"
+        run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
 
       - name: Build and Start FoodCore Server (Javalin)
         run: |
