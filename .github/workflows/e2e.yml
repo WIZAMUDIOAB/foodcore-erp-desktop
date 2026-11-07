@@ -32,7 +32,7 @@ jobs:
           npx --yes wait-on http://localhost:8080/api/health --timeout 30000
 
       - name: Run E2E Tests (Playwright + TestFX)
-        run: xvfb-run --auto-servernum mvn test -Dtest="*E2ETest"
+        run: mvn test -Dtest="*E2ETest"
 
       - name: Upload Playwright Report & Screenshots
         if: always()
