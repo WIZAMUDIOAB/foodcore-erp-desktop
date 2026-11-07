@@ -244,4 +244,25 @@ public class ReportesController {
 
         ctx.status(200).contentType("application/json; charset=UTF-8").result(root.toString());
     }
+
+    /**
+     * Endpoint GET /api/menu-digital/view: sirve el HTML del Menú Digital para smartphones (v4.3.2).
+     */
+    public void handleMenuDigitalView(Context ctx) {
+        try {
+            java.io.File archivoHtml = new java.io.File("uploads/qr/menu_digital.html");
+            if (!archivoHtml.exists()) {
+                new com.foodcore.service.MenuQrService().generarMenuDigitalHtml(archivoHtml);
+            }
+            if (archivoHtml.exists()) {
+                ctx.contentType("text/html; charset=utf-8");
+                ctx.result(new String(java.nio.file.Files.readAllBytes(archivoHtml.toPath()), java.nio.charset.StandardCharsets.UTF_8));
+                return;
+            }
+            ctx.status(404).result("Menú digital no encontrado");
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error al servir menú digital: " + e.getMessage(), e);
+            ctx.status(500).result("Error interno al cargar menú digital");
+        }
+    }
 }

@@ -37,7 +37,12 @@
                             </children>
                         </VBox>
                         <Region HBox.hgrow="ALWAYS" />
-                        <Button fx:id="btnLimpiarForm" mnemonicParsing="false" onAction="#handleNuevoPlatillo" styleClass="btn-secondary" text="+ Nuevo Platillo" />
+                        <HBox spacing="8.0" alignment="CENTER_RIGHT">
+                            <children>
+                                <Button fx:id="btnMenuDigitalQr" mnemonicParsing="false" onAction="#handleAbrirMenuQr" styleClass="btn-secondary" text="📱 Menú QR Digital" />
+                                <Button fx:id="btnLimpiarForm" mnemonicParsing="false" onAction="#handleNuevoPlatillo" styleClass="btn-secondary" text="+ Nuevo Platillo" />
+                            </children>
+                        </HBox>
                     </children>
                 </HBox>
             </top>

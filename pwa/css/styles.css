@@ -1276,3 +1276,285 @@ html, body {
 .modal-actions-row .btn-touch {
   flex: 1;
 }
+
+
+/* ==========================================================================
+   HOTFIX v4.3.1 — RESPONSIVE PARA CELULARES PEQUEÑOS (360px – 480px)
+   Solo agrega reglas dentro de @media (max-width: 480px).
+   Escritorio y tablets (>= 481px, ej. 1024px) conservan el diseño original.
+   ========================================================================== */
+@media (max-width: 480px) {
+  /* --- Barra superior compartida (index, pin-login, mesas, catálogo) --- */
+  .tablet-topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    position: static;
+  }
+
+  .brand-cluster {
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .brand-title {
+    font-size: 15px;
+  }
+
+  .mesa-active-pill {
+    margin-left: auto;
+    font-size: 13px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .topbar-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .topbar-actions .btn-touch {
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+
+  .connection-pill {
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* --- Vista Login / PIN / Mesas --- */
+  .login-shell {
+    min-height: auto;
+    padding: 16px 12px;
+  }
+
+  .login-card {
+    padding: 24px 18px;
+  }
+
+  .quick-users {
+    flex-direction: column;
+  }
+
+  .pin-login-shell {
+    padding: 16px 12px;
+  }
+
+  .pin-login-container {
+    padding: 18px 14px;
+    gap: 20px;
+  }
+
+  .mesas-container {
+    padding: 16px 12px;
+  }
+
+  .filter-pills {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .filter-pills .btn-touch {
+    flex: 1 1 auto;
+  }
+
+  .mesas-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* --- Vista Catálogo: el carrito pasa de la derecha a la parte inferior --- */
+  .pos-split-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto;
+    overflow: visible;
+  }
+
+  .catalog-pane {
+    padding: 12px 12px calc(40vh + 16px) 12px;
+    overflow: visible;
+    gap: 12px;
+  }
+
+  /* nowrap evita que la línea flex multi-línea crezca al ancho máximo de los chips */
+  .catalog-toolbar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .catalog-pane,
+  .catalog-toolbar,
+  .category-tabs {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Chips de categoría en una sola fila desplazable (sin desbordar la página) */
+  .category-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .category-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cat-tab {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .search-box {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Las tarjetas de platos se ven en 1 sola columna */
+  .dishes-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .dish-thumb,
+  .dish-thumb-fallback {
+    height: 140px;
+  }
+
+  .dish-body {
+    padding: 12px 14px;
+  }
+
+  .dish-card h3,
+  .dish-title {
+    font-size: 14px;
+  }
+
+  .dish-price {
+    font-size: 16px;
+  }
+
+  /* Carrito fijo en la parte inferior (máx. 40% de la altura) */
+  .cart-sidebar {
+    width: 100% !important;
+    max-height: 40vh !important;
+    height: auto;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    border-left: none;
+    border-top: 1px solid var(--fc-border-subtle);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .cart-header {
+    padding: 10px 14px;
+    position: sticky;
+    top: 0;
+    background: var(--fc-bg-surface);
+    z-index: 2;
+  }
+
+  .cart-header h2 {
+    font-size: 15px;
+  }
+
+  .cart-items-list {
+    flex: none;
+    overflow: visible;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .cart-empty {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .quick-notes-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 12px;
+    scrollbar-width: none;
+  }
+
+  .quick-notes-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .note-chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .cart-footer {
+    position: sticky;
+    bottom: 0;
+    padding: 10px 14px;
+    gap: 6px;
+    z-index: 2;
+    box-shadow: 0 -2px 8px rgba(17, 24, 39, 0.06);
+  }
+
+  .cart-summary-row {
+    font-size: 12px;
+  }
+
+  .cart-total-label {
+    font-size: 14px;
+  }
+
+  .cart-total-amount {
+    font-size: 20px;
+  }
+
+  .btn-send-kds {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  /* Toast por encima del carrito inferior */
+  .toast-banner {
+    bottom: calc(40vh + 12px);
+    max-width: calc(100vw - 24px);
+    font-size: 13px;
+    padding: 12px 16px;
+  }
+
+  /* Modal de cambio de mozo */
+  .modal-card-pin {
+    padding: 18px 14px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+}

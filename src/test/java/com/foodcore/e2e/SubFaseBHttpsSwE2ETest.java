@@ -126,4 +126,21 @@ public class SubFaseBHttpsSwE2ETest {
                     "subfase_b_https_sw.png");
         }
     }
+
+    @Test
+    @DisplayName("Sub-Fase B & v4.3.2: 3. Menú Digital URL de Red — GET /api/menu-digital/view sirve HTML")
+    void testMenuDigitalViewEndpoint() throws Exception {
+        HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/menu-digital/view"))
+                .timeout(Duration.ofSeconds(4))
+                .GET()
+                .build();
+        HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, res.statusCode(), "/api/menu-digital/view debe retornar 200 OK");
+        assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("text/html"),
+                "El Content-Type debe ser text/html");
+        assertTrue(res.body().contains("FOODCORE RESTOBAR & GRILL"), "Debe contener el título del menú digital");
+        assertTrue(res.body().contains("Carta Gastronómica Oficial"), "Debe contener el subtítulo del menú digital");
+    }
 }

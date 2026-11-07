@@ -413,3 +413,64 @@ body {
     min-height: 300px;
   }
 }
+
+
+/* ==========================================================================
+   HOTFIX v4.3.1 — KDS EN CELULAR (<= 768px)
+   Las tablets horizontales (1024px) conservan el tablero Kanban de 3 columnas.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .kds-topbar {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .kds-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .kds-topbar-center {
+    order: 3;
+    flex: 1 1 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .kds-topbar-center::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kds-filter-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .kds-topbar-right {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .kds-clock {
+    font-size: 15px;
+    padding: 4px 8px;
+  }
+
+  .kanban-board,
+  .kds-board {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .kanban-column,
+  .kds-column {
+    width: 100% !important;
+    min-height: auto;
+    flex-shrink: 0;
+  }
+}

@@ -403,4 +403,23 @@ public class MenuController {
     public ObservableList<Producto> getListaProductos() {
         return listaProductos;
     }
+
+    @FXML
+    public void handleAbrirMenuQr(ActionEvent event) {
+        try {
+            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/MenuQrModalView.fxml"));
+            javafx.scene.Parent root = loader.load();
+            javafx.stage.Stage stage = new javafx.stage.Stage();
+            stage.setTitle("FoodCore — Menú Digital QR");
+            stage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+            if (rootMenuStack != null && rootMenuStack.getScene() != null) {
+                stage.initOwner(rootMenuStack.getScene().getWindow());
+            }
+            stage.setScene(new javafx.scene.Scene(root));
+            stage.showAndWait();
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error al abrir modal Menu QR: " + e.getMessage(), e);
+            AnimationUtils.mostrarToast(rootMenuStack, "No se pudo abrir el modal del Menu QR: " + e.getMessage(), true);
+        }
+    }
 }

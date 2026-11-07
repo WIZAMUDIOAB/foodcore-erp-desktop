@@ -202,6 +202,7 @@ public class ApiServer {
         app.get("/api/dashboard/ventas-por-hora", reportesController::handleDashboardVentasPorHora);
         app.get("/api/dashboard/top-platos", reportesController::handleDashboardTopPlatos);
         app.get("/api/dashboard/ventas-recientes", reportesController::handleDashboardVentasRecientes);
+        app.get("/api/menu-digital/view", reportesController::handleMenuDigitalView);
 
         // 5. Rutas directas para PWAs y Certificado SSL (con soporte classpath getResourceAsStream y filesystem)
         app.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));

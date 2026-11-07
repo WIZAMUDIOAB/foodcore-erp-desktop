@@ -506,3 +506,70 @@ body {
   font-size: 12px;
   color: var(--dash-text-muted);
 }
+
+
+/* ==========================================================================
+   HOTFIX v4.3.1 — RESPONSIVE PARA CELULARES PEQUEÑOS (360px – 480px)
+   Solo agrega reglas dentro de @media (max-width: 480px).
+   ========================================================================== */
+@media (max-width: 480px) {
+  .dash-topbar {
+    padding: 0 12px;
+  }
+
+  .dash-content {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .dash-hero h2 {
+    font-size: 18px;
+  }
+
+  /* Los KPIs pasan de 2x2 a 1 columna */
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  .kpi-card {
+    padding: 14px;
+  }
+
+  /* El gráfico ocupa todo el ancho */
+  .chart-card {
+    padding: 12px 8px;
+  }
+
+  .chart-header {
+    padding: 0 6px;
+  }
+
+  .chart-wrapper {
+    height: 220px;
+  }
+
+  .info-card {
+    padding: 14px;
+  }
+
+  .top-dish-info {
+    min-width: 0;
+  }
+
+  .top-dish-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* El drawer ocupa el 80% del ancho (oculto fuera de pantalla al cerrarse) */
+  .dash-drawer {
+    width: 80vw !important;
+    right: calc(-80vw - 24px);
+  }
+
+  .dash-drawer.open {
+    right: 0;
+  }
+}

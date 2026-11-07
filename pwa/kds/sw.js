@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foodcore-kds-v4.2.0';
+const CACHE_NAME = 'foodcore-kds-v4.3.1';
 const URLS_TO_CACHE = [
   './',
   './index.html',

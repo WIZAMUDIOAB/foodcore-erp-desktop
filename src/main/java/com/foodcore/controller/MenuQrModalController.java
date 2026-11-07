@@ -52,11 +52,12 @@ public class MenuQrModalController {
             archivoHtmlGenerado = new File("uploads/qr/menu_digital.html");
             menuQrService.generarMenuDigitalHtml(archivoHtmlGenerado);
 
-            String uriDestino = archivoHtmlGenerado.toURI().toString();
-            txtUrlMenu.setText(uriDestino);
+            // v4.3.2: URL de red local accesible para clientes desde cualquier smartphone
+            String urlRed = MenuQrService.construirUrlMenuDigital(8443);
+            txtUrlMenu.setText(urlRed);
 
-            // Generar código QR PNG y cargar en el ImageView
-            BufferedImage bi = menuQrService.generarCodigoQr(uriDestino, 300, 300);
+            // Generar código QR PNG y cargar en el ImageView con la URL de red
+            BufferedImage bi = menuQrService.generarCodigoQr(urlRed, 300, 300);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(bi, "png", baos);
@@ -64,11 +65,11 @@ public class MenuQrModalController {
             Image fxImage = new Image(bais);
 
             imgCodigoQr.setImage(fxImage);
-            lblEstadoQr.setText("✓ QR generado para " + archivoHtmlGenerado.getName());
+            lblEstadoQr.setText("✓ QR activo en red local: " + urlRed);
 
             // También exportar en disco para acceso persistente
             File archivoQrPng = new File("uploads/qr/menu_qr.png");
-            menuQrService.exportarQrPng(uriDestino, 300, 300, archivoQrPng);
+            menuQrService.exportarQrPng(urlRed, 300, 300, archivoQrPng);
 
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error al generar menu y QR: " + e.getMessage(), e);
@@ -78,16 +79,17 @@ public class MenuQrModalController {
 
     @FXML
     public void handleAbrirEnNavegador() {
-        if (archivoHtmlGenerado != null && archivoHtmlGenerado.exists()) {
-            try {
-                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                    Desktop.getDesktop().browse(archivoHtmlGenerado.toURI());
-                } else {
-                    mostrarAlerta(Alert.AlertType.INFORMATION, "Menú Digital", "Ruta del archivo HTML:\n" + archivoHtmlGenerado.getAbsolutePath());
-                }
-            } catch (IOException e) {
-                mostrarAlerta(Alert.AlertType.WARNING, "Aviso", "No se pudo abrir el navegador automáticamente: " + e.getMessage());
+        String url = txtUrlMenu != null && txtUrlMenu.getText() != null && !txtUrlMenu.getText().isBlank()
+                ? txtUrlMenu.getText()
+                : MenuQrService.construirUrlMenuDigital(8443);
+        try {
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new java.net.URI(url));
+            } else if (archivoHtmlGenerado != null && archivoHtmlGenerado.exists()) {
+                mostrarAlerta(Alert.AlertType.INFORMATION, "Menú Digital", "URL del Menú:\n" + url);
             }
+        } catch (Exception e) {
+            mostrarAlerta(Alert.AlertType.WARNING, "Aviso", "No se pudo abrir el navegador automáticamente: " + e.getMessage());
         }
     }
 

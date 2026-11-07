@@ -36,6 +36,42 @@ public class MenuQrService {
     }
 
     /**
+     * Retorna dinámicamente la IP de red local del servidor para acceso desde smartphones (v4.3.2).
+     */
+    public static String obtenerIpServidor() {
+        try {
+            java.net.InetAddress localHost = java.net.InetAddress.getLocalHost();
+            String host = localHost.getHostAddress();
+            if (host != null && !host.equals("127.0.0.1") && !host.startsWith("127.")) {
+                return host;
+            }
+            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface iface = interfaces.nextElement();
+                if (iface.isLoopback() || !iface.isUp()) continue;
+                java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress addr = addresses.nextElement();
+                    if (addr instanceof java.net.Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+            return host != null ? host : "127.0.0.1";
+        } catch (Exception e) {
+            return "127.0.0.1";
+        }
+    }
+
+    /**
+     * Construye la URL de red oficial para acceder al Menú Digital desde smartphones (v4.3.2).
+     */
+    public static String construirUrlMenuDigital(int puertoHttps) {
+        String ip = obtenerIpServidor();
+        return "https://" + ip + ":" + puertoHttps + "/api/menu-digital/view";
+    }
+
+    /**
      * Genera un BufferedImage con el código QR para el texto/URL provisto.
      */
     public BufferedImage generarCodigoQr(String contenido, int ancho, int alto) {
