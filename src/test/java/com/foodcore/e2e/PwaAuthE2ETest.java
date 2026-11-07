@@ -32,7 +32,7 @@ public class PwaAuthE2ETest {
     void testAutenticacionPwaCompleta() {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1366, 850));
+             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser);
              Page page = context.newPage()) {
 
             // 1. Navegar a http://localhost:8080/

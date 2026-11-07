@@ -44,7 +44,7 @@ public class PwaOrderFlowE2ETest {
     void testFlujoCompletoDePedidoPwa() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1366, 850));
+             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser);
              Page page = context.newPage()) {
 
             // 1. Login exitoso en la PWA
@@ -100,7 +100,7 @@ public class PwaOrderFlowE2ETest {
             PlaywrightE2ESupport.guardarEvidencia(page, "PwaOrderFlowE2ETest - Enviado a KDS", "02_e2e_order_sent.png");
 
             // 7. Verificar vía API (GET /api/pedidos) y en Base de Datos que se guardó con estado PENDIENTE y notificó al KDS
-            HttpClient client = HttpClient.newHttpClient();
+            HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
             HttpRequest reqPedidos = HttpRequest.newBuilder()
                     .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/pedidos"))
                     .GET()

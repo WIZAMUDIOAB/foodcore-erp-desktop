@@ -23,15 +23,24 @@ import com.google.gson.JsonObject;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
+import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.KeyStore;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -58,6 +67,8 @@ public class ApiServer {
 
     private static final Logger LOGGER = Logger.getLogger(ApiServer.class.getName());
     public static final int DEFAULT_PORT = 8080;
+    public static final int DEFAULT_HTTPS_PORT = 8443;
+    public static final String KEYSTORE_PASS = "foodcore123";
     private static final String JWT_SECRET = "FoodCoreERP_v4_JwtSecretKey_2026_HighSecurity!";
 
     private static ApiServer instance;
@@ -76,6 +87,7 @@ public class ApiServer {
 
     private Javalin app;
     private int puertoActual = DEFAULT_PORT;
+    private int puertoHttpsActual = DEFAULT_HTTPS_PORT;
 
     private ApiServer() {
         this(new AuthService(), new ProductoDAOImpl(), new MesaDAOImpl(), new PedidoDAOImpl(), new PedidoService());
@@ -115,14 +127,19 @@ public class ApiServer {
     }
 
     public synchronized void iniciar() {
-        iniciar(leerPuertoConfigurado());
+        iniciar(leerPuertoConfigurado(), DEFAULT_HTTPS_PORT);
     }
 
     public synchronized void iniciar(int port) {
+        iniciar(port, DEFAULT_HTTPS_PORT);
+    }
+
+    public synchronized void iniciar(int httpPort, int httpsPort) {
         if (app != null) {
             return;
         }
-        this.puertoActual = port;
+        this.puertoActual = httpPort;
+        this.puertoHttpsActual = httpsPort;
         File pwaDir = new File("pwa");
 
         app = Javalin.create(config -> {
@@ -133,6 +150,30 @@ public class ApiServer {
                     staticFiles.hostedPath = "/";
                     staticFiles.directory = pwaDir.getAbsolutePath();
                     staticFiles.location = Location.EXTERNAL;
+                });
+            }
+
+            // Conector HTTP (8080)
+            config.jetty.addConnector((server, httpConfig) -> {
+                ServerConnector httpConnector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+                httpConnector.setPort(httpPort);
+                return httpConnector;
+            });
+
+            // Conector HTTPS SSL (8443) con keystore.jks
+            SslContextFactory.Server sslContextFactory = obtenerSslContextFactory();
+            if (sslContextFactory != null) {
+                config.jetty.addConnector((server, httpConfig) -> {
+                    HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
+                    SecureRequestCustomizer customizer = new SecureRequestCustomizer();
+                    customizer.setSniHostCheck(false);
+                    httpsConfig.addCustomizer(customizer);
+
+                    ServerConnector sslConnector = new ServerConnector(server,
+                            new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
+                            new HttpConnectionFactory(httpsConfig));
+                    sslConnector.setPort(httpsPort);
+                    return sslConnector;
                 });
             }
         });
@@ -170,8 +211,41 @@ public class ApiServer {
             }
         });
 
-        app.start(port);
-        LOGGER.info("FoodCore API REST (Javalin) iniciada en http://localhost:" + port);
+        app.start();
+        LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + httpPort + ") y HTTPS SSL (puerto " + httpsPort + ")");
+    }
+
+    public int getPuertoHttpsActual() {
+        return puertoHttpsActual;
+    }
+
+    private SslContextFactory.Server obtenerSslContextFactory() {
+        try {
+            KeyStore ks = KeyStore.getInstance("JKS");
+            File keystoreFile = new File("keystore.jks");
+            InputStream is = null;
+            if (keystoreFile.exists()) {
+                is = new FileInputStream(keystoreFile);
+            } else {
+                is = ApiServer.class.getResourceAsStream("/keystore.jks");
+            }
+
+            if (is != null) {
+                try (InputStream inStream = is) {
+                    ks.load(inStream, KEYSTORE_PASS.toCharArray());
+                    SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
+                    sslContextFactory.setKeyStore(ks);
+                    sslContextFactory.setKeyStorePassword(KEYSTORE_PASS);
+                    sslContextFactory.setKeyManagerPassword(KEYSTORE_PASS);
+                    return sslContextFactory;
+                }
+            } else {
+                LOGGER.warning("No se encontró keystore.jks para SSL HTTPS. El servidor funcionará solo en HTTP.");
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error al inicializar SslContextFactory para HTTPS en puerto " + DEFAULT_HTTPS_PORT, e);
+        }
+        return null;
     }
 
     public synchronized void detener() {

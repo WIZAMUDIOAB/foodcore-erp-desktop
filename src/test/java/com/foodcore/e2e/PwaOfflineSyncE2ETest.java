@@ -41,7 +41,7 @@ public class PwaOfflineSyncE2ETest {
     void testResilienciaOfflineIndexedDbYSincronizacionAutomatica() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1366, 850));
+             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser);
              Page page = context.newPage()) {
 
             // 1. Login en la PWA y navegación al catálogo de Mesa 03
@@ -91,7 +91,7 @@ public class PwaOfflineSyncE2ETest {
             assertEquals(0, cantidadPendientePostSync.intValue(),
                     "La cola outbox_pedidos en IndexedDB debe quedar vacía tras la sincronización automática");
 
-            HttpClient client = HttpClient.newHttpClient();
+            HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
             HttpRequest reqVerif = HttpRequest.newBuilder()
                     .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/pedidos/" + uuidOffline))
                     .GET()

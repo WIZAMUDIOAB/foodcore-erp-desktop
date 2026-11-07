@@ -4,11 +4,17 @@ import com.foodcore.api.ApiServer;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
+import com.microsoft.playwright.APIRequest;
+import com.microsoft.playwright.APIRequestContext;
 import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -18,23 +24,26 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.cert.X509Certificate;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Infraestructura compartida para la suite E2E con Microsoft Playwright (SPEC-FOODCORE-v4.1.0 §2).
- * Gestiona el ciclo de vida del servidor Javalin en {@code http://localhost:8080} (tanto en proceso local
- * como contra el servidor en segundo plano de GitHub Actions) y genera reportes en {@code target/playwright-report/}.
+ * Infraestructura compartida para la suite E2E con Microsoft Playwright (SPEC-FOODCORE-v4.1.0 §2, v4.2.0 Sub-Fase B).
+ * Gestiona el ciclo de vida del servidor Javalin en {@code https://localhost:8443} (HTTPS con SSL autofirmado)
+ * y {@code http://localhost:8080} (HTTP), generando reportes en {@code target/playwright-report/}.
  */
 public final class PlaywrightE2ESupport {
 
     private static final Logger LOGGER = Logger.getLogger(PlaywrightE2ESupport.class.getName());
-    public static final String BASE_URL = "http://localhost:8080";
+    public static final String BASE_URL = "https://localhost:8443";
+    public static final String HTTP_BASE_URL = "http://localhost:8080";
     public static final Path REPORT_DIR = Path.of("target", "playwright-report");
 
     private static boolean servidorIniciadoEnProceso = false;
@@ -87,16 +96,70 @@ public final class PlaywrightE2ESupport {
     }
 
     public static Browser lanzarNavegador(Playwright playwright) {
+        List<String> browserArgs = List.of(
+                "--ignore-certificate-errors",
+                "--allow-insecure-localhost",
+                "--disable-web-security"
+        );
         try {
-            return playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+            return playwright.chromium().launch(new BrowserType.LaunchOptions()
+                    .setHeadless(true)
+                    .setArgs(browserArgs));
         } catch (Exception exChromium) {
             File edgeX86 = new File("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
             if (edgeX86.exists()) {
                 return playwright.chromium().launch(
-                        new BrowserType.LaunchOptions().setExecutablePath(edgeX86.toPath()).setHeadless(true));
+                        new BrowserType.LaunchOptions()
+                                .setExecutablePath(edgeX86.toPath())
+                                .setHeadless(true)
+                                .setArgs(browserArgs));
             }
             return playwright.chromium().launch(
-                    new BrowserType.LaunchOptions().setChannel("msedge").setHeadless(true));
+                    new BrowserType.LaunchOptions()
+                            .setChannel("msedge")
+                            .setHeadless(true)
+                            .setArgs(browserArgs));
+        }
+    }
+
+    public static BrowserContext crearContexto(Browser browser) {
+        return crearContexto(browser, 1366, 850);
+    }
+
+    public static BrowserContext crearContexto(Browser browser, int width, int height) {
+        return browser.newContext(new Browser.NewContextOptions()
+                .setViewportSize(width, height)
+                .setIgnoreHTTPSErrors(true));
+    }
+
+    public static APIRequestContext crearApiRequestContext(Playwright playwright) {
+        return playwright.request().newContext(
+                new APIRequest.NewContextOptions()
+                        .setBaseURL(BASE_URL)
+                        .setIgnoreHTTPSErrors(true));
+    }
+
+    public static HttpClient crearInsecureHttpClient() {
+        try {
+            TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return new X509Certificate[0];
+                        }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        }
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        }
+                    }
+            };
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            return HttpClient.newBuilder()
+                    .sslContext(sc)
+                    .connectTimeout(Duration.ofSeconds(4))
+                    .build();
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo inicializar HttpClient con SSL permisivo", e);
         }
     }
 
@@ -146,12 +209,10 @@ public final class PlaywrightE2ESupport {
 
     private static boolean estaServidorRespondiendo() {
         try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .build();
+            HttpClient client = crearInsecureHttpClient();
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(BASE_URL + "/api/health"))
-                    .timeout(Duration.ofSeconds(2))
+                    .timeout(Duration.ofSeconds(3))
                     .GET()
                     .build();
             HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());

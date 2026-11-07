@@ -3,7 +3,7 @@
  * Garantiza carga instantánea de archivos estáticos (HTML, CSS, JS, imágenes)
  * incluso cuando el servidor Javalin está temporalmente fuera de línea.
  */
-const CACHE_NAME = 'foodcore-pwa-cache-v4.0.1';
+const CACHE_NAME = 'foodcore-pwa-cache-v4.2.0-ssl';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

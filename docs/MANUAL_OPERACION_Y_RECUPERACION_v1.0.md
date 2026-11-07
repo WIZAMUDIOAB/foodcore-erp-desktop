@@ -77,3 +77,49 @@
   ```
 - La bitácora de auditoría queda registrada en `logs/restore_YYYYMMDD.log`. Tras la restauración, verifique el conteo completo de todas las tablas operativas del negocio:
   `venta`, `detalle_venta`, `kardex_movimiento`, `outbox_evento`, `pedido`, `detalle_pedido`, `turno_caja`, `movimiento_caja`, `insumo`, `rol`, `usuario`, `terminal` y `flyway_schema_history`.
+
+
+---
+
+## 4. Instalación de Certificado SSL Local (HTTPS) en Tablets Android e iOS (v4.2.0 Sub-Fase B)
+
+Para que las tablets de los mozos operen la PWA con Service Worker activo y sin advertencias de seguridad en el navegador (mostrando el candado seguro de HTTPS), se debe instalar la Autoridad de Certificación autofirmada `foodcore.cer` en cada dispositivo táctil.
+
+### 4.1 Ubicación y Descarga del Certificado
+- **Archivo en el servidor**: `keystore.jks` (almacén privado con validez de 10 años, contraseña `foodcore123`) y `foodcore.cer` (certificado público X.509 RFC/PEM).
+- **Descarga directa en la LAN**:
+  Con la tablet conectada a la misma red Wi-Fi del restaurante, abrir el navegador y acceder a:
+  ```text
+  http://<IP_SERVIDOR>:8080/foodcore.cer
+  o
+  https://<IP_SERVIDOR>:8443/foodcore.cer
+  ```
+
+### 4.2 Instalación en Dispositivos Android (Samsung Galaxy Tab, Xiaomi Pad, Lenovo Tab)
+1. **Descarga**: Abrir Chrome en la tablet y descargar `foodcore.cer`.
+2. **Instalación como CA**:
+   - Abrir **Ajustes** (Configuración) -> **Seguridad y privacidad**.
+   - Ingresar a **Otros ajustes de seguridad** -> **Instalar desde almacenamiento del dispositivo** -> **Certificado de CA**.
+   - Ante la advertencia del sistema operativo, pulsar **Instalar de todas formas** (ingresar el PIN o patrón si lo solicita).
+   - Seleccionar el archivo `foodcore.cer` ubicado en la carpeta *Descargas*.
+3. **Validación**:
+   - Asignar nombre `FoodCore CA`.
+   - Abrir Chrome y navegar a `https://<IP_SERVIDOR>:8443/`.
+   - Verificar que la barra de direcciones muestra el **candado de conexión segura**, sin carteles rojos de advertencia.
+   - En el menú de Chrome (3 puntos), seleccionar **Instalar aplicación** / **Agregar a pantalla principal**.
+
+### 4.3 Instalación en Apple iPad / iOS (iPadOS)
+1. **Descarga de Perfil**:
+   - En **Safari**, ingresar a `http://<IP_SERVIDOR>:8080/foodcore.cer`.
+   - Al mostrar *"Este sitio web está intentando descargar un perfil de configuración"*, presionar **Permitir**.
+2. **Instalación del Perfil**:
+   - Abrir **Ajustes** -> en la parte superior tocar **Perfil descargado** (o **General** -> **VPN y gestión de dispositivos**).
+   - Tocar el perfil `FoodCore Local SSL CA` y presionar **Instalar** (esquina superior derecha).
+   - Introducir el código de desbloqueo del iPad y confirmar **Instalar**.
+3. **Habilitación de Confianza Plena (Obligatorio en iOS)**:
+   - Ir a **Ajustes** -> **General** -> **Información** -> desplazarse al final y entrar a **Ajustes de confianza de los certificados**.
+   - En la sección *"Confiar plenamente en los certificados raíz"*, activar el interruptor para `FoodCore Local SSL CA`.
+   - Presionar **Continuar** en el diálogo de confirmación.
+4. **Validación**:
+   - En Safari, navegar a `https://<IP_SERVIDOR>:8443/`. Aparecerá el candado de conexión cifrada.
+   - Tocar el botón de **Compartir** -> **Agregar a pantalla de inicio** para fijar la PWA táctil de mozos.

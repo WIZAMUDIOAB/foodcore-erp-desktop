@@ -39,8 +39,7 @@ public class ApiRestE2ETest {
     @DisplayName("E2E 4: Endpoints Backend — POST /api/auth/login (JWT), GET /api/productos (>=5 con imagen_url) y GET /api/mesas (12 mesas)")
     void testEndpointsBackendApiRest() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = playwright.request().newContext(
-                    new APIRequest.NewContextOptions().setBaseURL(PlaywrightE2ESupport.BASE_URL));
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
 
             // 1. POST /api/auth/login -> validar 200 OK con token JWT
             APIResponse loginRes = request.post("/api/auth/login",

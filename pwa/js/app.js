@@ -4,9 +4,9 @@
  * y sincronización automática cada 10s desde IndexedDB (`outbox_pedidos`).
  */
 const FoodCorePWA = (() => {
-  const API_BASE = (window.location.port === '8080')
+  const API_BASE = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file://'))
     ? `${window.location.origin}/api`
-    : 'http://localhost:8080/api';
+    : 'https://localhost:8443/api';
 
   let catalogoProductos = [];
   let listaMesas = [];
@@ -166,7 +166,9 @@ const FoodCorePWA = (() => {
       dot.className = 'status-dot ' + (estadoOnline ? 'online' : 'offline');
     }
     if (text) {
-      text.textContent = estadoOnline ? 'API Online (8080)' : 'Modo Offline · IndexedDB';
+      const proto = window.location.protocol === 'https:' ? 'HTTPS' : 'HTTP';
+      const puerto = window.location.port || (proto === 'HTTPS' ? '8443' : '8080');
+      text.textContent = estadoOnline ? `API Online (${proto} ${puerto})` : 'Modo Offline · IndexedDB';
     }
     if (badge && typeof FoodCoreOfflineDB !== 'undefined') {
       try {

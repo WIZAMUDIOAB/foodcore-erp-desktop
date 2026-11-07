@@ -44,8 +44,7 @@ public class SubFaseACatalogoE2ETest {
     @DisplayName("Sub-Fase A: API — GET /api/productos/disponibles y PATCH /api/productos/{id}/disponibilidad")
     void testApiDisponibilidadYProductosDisponibles() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = playwright.request().newContext(
-                    new APIRequest.NewContextOptions().setBaseURL(PlaywrightE2ESupport.BASE_URL));
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
 
             // 1. GET /api/productos/disponibles
             APIResponse respDisponibles = request.get("/api/productos/disponibles");
@@ -97,7 +96,7 @@ public class SubFaseACatalogoE2ETest {
     void testPwaCatalogoDinamicoYMenuDelDia() {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1366, 850));
+             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser);
              Page page = context.newPage()) {
 
             // 1. Navegar a catalogo.html
