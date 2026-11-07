@@ -166,6 +166,10 @@ public class SubFaseC1PinLoginE2ETest {
             // 2. Verificar que el carrito tiene ítems precargados
             Locator cartPill = page.locator("#cartCountPill");
             cartPill.waitFor();
+            page.waitForCondition(() -> {
+                String txt = cartPill.innerText();
+                return txt != null && !txt.contains("0");
+            });
             String itemsIniciales = cartPill.innerText();
 
             // 3. Abrir modal táctil de cambio de mozo

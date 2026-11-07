@@ -19,22 +19,41 @@ public final class FlywayMigrator {
     private static final Logger LOGGER = Logger.getLogger(FlywayMigrator.class.getName());
     public static final String MIGRATIONS_LOCATION = "classpath:db/migration";
 
-    private FlywayMigrator() {
+    public FlywayMigrator() {
+    }
+
+    public static void main(String[] args) {
+        MigrateResult res = migrateOnBootstrap();
+        if (res != null) {
+            LOGGER.info(() -> "Flyway migración completada vía CLI/CI: " + res.migrationsExecuted + " scripts aplicados.");
+        } else {
+            LOGGER.warning("Flyway migrateOnBootstrap finalizó sin ejecutar migraciones.");
+        }
     }
 
     public static MigrateResult migrateOnBootstrap() {
         try {
             Properties props = new Properties();
-            try (InputStream in = FlywayMigrator.class.getResourceAsStream("/application.properties")) {
-                if (in != null) {
-                    props.load(in);
+            try (InputStream inTest = FlywayMigrator.class.getResourceAsStream("/application-test.properties")) {
+                if (inTest != null) {
+                    props.load(inTest);
+                } else {
+                    try (InputStream in = FlywayMigrator.class.getResourceAsStream("/application.properties")) {
+                        if (in != null) {
+                            props.load(in);
+                        }
+                    }
                 }
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "Aviso leyendo propiedades de configuración para Flyway", e);
             }
             String host = ConexionBD.resolverValor(props.getProperty("db.host", "127.0.0.1"), "FOODCORE_DB_HOST", "127.0.0.1");
             String port = ConexionBD.resolverValor(props.getProperty("db.port", "3306"), "FOODCORE_DB_PORT", "3306");
             String db = ConexionBD.resolverValor(props.getProperty("db.name", "foodcore"), "FOODCORE_DB_NAME", "foodcore");
-            String migratorUser = ConexionBD.resolverValor(props.getProperty("db.migrator.user", "foodcore_migrator"), "FOODCORE_MIGRATOR_USER", "foodcore_migrator");
-            String migratorPass = ConexionBD.resolverValor(props.getProperty("db.migrator.password", "${FOODCORE_MIGRATOR_PASS}"), "FOODCORE_MIGRATOR_PASS", "FoodCoreMigrator#2026!");
+            String defaultUser = props.getProperty("db.migrator.user", props.getProperty("db.user", "root"));
+            String defaultPass = props.getProperty("db.migrator.password", props.getProperty("db.password", "root"));
+            String migratorUser = ConexionBD.resolverValor(defaultUser, "FOODCORE_MIGRATOR_USER", defaultUser);
+            String migratorPass = ConexionBD.resolverValor(defaultPass, "FOODCORE_MIGRATOR_PASS", defaultPass);
 
             String url = "jdbc:mysql://" + host + ":" + port + "/" + db
                 + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8";

@@ -389,6 +389,25 @@
             </plugin>
 
             <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>10.15.0</version>
+                <configuration>
+                    <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
+                    <user>root</user>
+                    <password>root</password>
+                    <cleanDisabled>false</cleanDisabled>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.mysql</groupId>
+                        <artifactId>mysql-connector-j</artifactId>
+                        <version>8.3.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.2</version>

@@ -83,6 +83,14 @@ public final class ConexionBD {
 
     private static Properties cargarPropiedades() {
         Properties props = new Properties();
+        try (InputStream inTest = ConexionBD.class.getResourceAsStream("/application-test.properties")) {
+            if (inTest != null) {
+                props.load(inTest);
+                return props;
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "No se pudo leer /application-test.properties", e);
+        }
         try (InputStream inApp = ConexionBD.class.getResourceAsStream("/application.properties")) {
             if (inApp != null) {
                 props.load(inApp);
