@@ -114,7 +114,7 @@ public class SubFaseC1AuditoriaE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
 
-            String uuidPedido = "audit-creador-" + UUID.randomUUID();
+            String uuidPedido = UUID.randomUUID().toString();
             Map<String, Object> payload = Map.of(
                     "uuid_local", uuidPedido,
                     "numero_mesa", "09",
