@@ -220,7 +220,11 @@ public class ApiServer {
                 try {
                     usuarioAutenticado = authService.login(username, password);
                 } catch (Exception exAuth) {
-                    responderError(ctx, 401, exAuth.getMessage() != null ? exAuth.getMessage() : "Credenciales inválidas.");
+                    String msgAuth = (exAuth instanceof com.foodcore.exception.NegocioException
+                            && exAuth.getMessage() != null)
+                                    ? exAuth.getMessage()
+                                    : "Credenciales inválidas. Verifique su usuario y contraseña.";
+                    responderError(ctx, 401, msgAuth);
                     return;
                 }
             }
