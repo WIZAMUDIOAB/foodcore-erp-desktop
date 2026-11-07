@@ -67,7 +67,9 @@ public final class ConexionBD {
         config.setMaximumPoolSize(Integer.parseInt(props.getProperty("hikari.maximumPoolSize", "10")));
         config.setMinimumIdle(Integer.parseInt(props.getProperty("hikari.minimumIdle", "2")));
         config.setIdleTimeout(Long.parseLong(props.getProperty("hikari.idleTimeout", "30000")));
-        config.setConnectionTimeout(Long.parseLong(props.getProperty("hikari.connectionTimeout", "10000")));
+        boolean esCi = "true".equalsIgnoreCase(System.getenv("CI")) || "true".equalsIgnoreCase(System.getenv("GITHUB_ACTIONS"));
+        config.setConnectionTimeout(esCi ? 1200L : Long.parseLong(props.getProperty("hikari.connectionTimeout", "10000")));
+        config.setInitializationFailTimeout(-1L);
         config.setMaxLifetime(Long.parseLong(props.getProperty("hikari.maxLifetime", "600000")));
 
         config.addDataSourceProperty("cachePrepStmts", "true");

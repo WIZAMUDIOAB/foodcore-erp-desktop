@@ -195,18 +195,25 @@ const FoodCorePWA = (() => {
         return;
       }
 
+      let huboFallo = false;
       for (const pedido of pendientes) {
-        const res = await fetch(`${API_BASE}/pedidos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pedido)
-        });
-        if (res.ok) {
-          await FoodCoreOfflineDB.eliminarPedidoOutbox(pedido.uuid_local);
-          mostrarToast(`✓ Pedido sincronizado con Cocina (Mesa ${pedido.numero_mesa})`);
+        try {
+          const res = await fetch(`${API_BASE}/pedidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pedido)
+          });
+          if (res.ok) {
+            await FoodCoreOfflineDB.eliminarPedidoOutbox(pedido.uuid_local);
+            mostrarToast(`✓ Pedido sincronizado con Cocina (Mesa ${pedido.numero_mesa})`);
+          } else {
+            huboFallo = true;
+          }
+        } catch (_) {
+          huboFallo = true;
         }
       }
-      await actualizarIndicadorConexion(true);
+      await actualizarIndicadorConexion(!huboFallo);
     } catch (_) {
       await actualizarIndicadorConexion(false);
     }
@@ -218,7 +225,7 @@ const FoodCorePWA = (() => {
   async function iniciarLoginView() {
     registrarServiceWorker();
     await verificarSaludApi();
-    setInterval(sincronizarOutbox, 10000);
+    setInterval(sincronizarOutbox, 4000);
 
     const form = document.getElementById('loginForm');
     if (!form) return;
@@ -227,6 +234,10 @@ const FoodCorePWA = (() => {
       e.preventDefault();
       const username = document.getElementById('txtUsername').value.trim();
       const password = document.getElementById('txtPassword').value.trim();
+      const errBanner = document.getElementById('loginErrorMsg');
+      if (errBanner) {
+        errBanner.style.display = 'none';
+      }
 
       try {
         const res = await fetch(`${API_BASE}/auth/login`, {
@@ -236,7 +247,12 @@ const FoodCorePWA = (() => {
         });
         const data = await res.json();
         if (!res.ok) {
-          mostrarToast('⚠ ' + (data.message || 'Credenciales incorrectas'));
+          const msg = '⚠ ' + (data.message || 'Credenciales inválidas.');
+          if (errBanner) {
+            errBanner.textContent = msg;
+            errBanner.style.display = 'block';
+          }
+          mostrarToast(msg);
           return;
         }
         localStorage.setItem('fc_pwa_token', data.token);
@@ -277,7 +293,7 @@ const FoodCorePWA = (() => {
     }
 
     await cargarMesas('TODAS');
-    setInterval(sincronizarOutbox, 10000);
+    setInterval(sincronizarOutbox, 4000);
   }
 
   async function cargarMesas(filtroEstado = 'TODAS') {
@@ -388,7 +404,7 @@ const FoodCorePWA = (() => {
     }
 
     renderizarCarrito();
-    setInterval(sincronizarOutbox, 10000);
+    setInterval(sincronizarOutbox, 4000);
   }
 
   async function cargarCatalogoProductos() {

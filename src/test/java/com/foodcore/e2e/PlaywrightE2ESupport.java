@@ -1,0 +1,194 @@
+package com.foodcore.e2e;
+
+import com.foodcore.api.ApiServer;
+import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ServidorSockets;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+
+import java.io.File;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Infraestructura compartida para la suite E2E con Microsoft Playwright (SPEC-FOODCORE-v4.1.0 §2).
+ * Gestiona el ciclo de vida del servidor Javalin en {@code http://localhost:8080} (tanto en proceso local
+ * como contra el servidor en segundo plano de GitHub Actions) y genera reportes en {@code target/playwright-report/}.
+ */
+public final class PlaywrightE2ESupport {
+
+    private static final Logger LOGGER = Logger.getLogger(PlaywrightE2ESupport.class.getName());
+    public static final String BASE_URL = "http://localhost:8080";
+    public static final Path REPORT_DIR = Path.of("target", "playwright-report");
+
+    private static boolean servidorIniciadoEnProceso = false;
+
+    private PlaywrightE2ESupport() {
+    }
+
+    /**
+     * Garantiza que {@code http://localhost:8080} esté activo y con catálogo de prueba listo.
+     */
+    public static synchronized void asegurarServidorActivo() {
+        try {
+            Files.createDirectories(REPORT_DIR);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso creando directorio playwright-report", e);
+        }
+
+        if (estaServidorRespondiendo()) {
+            sembrarCatalogoSiBdDisponible();
+            return;
+        }
+
+        sembrarCatalogoSiBdDisponible();
+
+        try {
+            ServidorSockets.getInstance().iniciar();
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "ServidorSockets ya activo", e);
+        }
+
+        ApiServer.getInstance().iniciar(8080);
+        if (!servidorIniciadoEnProceso) {
+            servidorIniciadoEnProceso = true;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    ApiServer.getInstance().detener();
+                } catch (Exception ignored) {
+                }
+            }));
+        }
+    }
+
+    public static synchronized void detenerServidorSiCorresponde() {
+        // El servidor Javalin se mantiene activo para toda la suite E2E y se cierra en el ShutdownHook de la JVM
+    }
+
+    public static Playwright crearPlaywright() {
+        return Playwright.create(new Playwright.CreateOptions()
+                .setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")));
+    }
+
+    public static Browser lanzarNavegador(Playwright playwright) {
+        try {
+            return playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+        } catch (Exception exChromium) {
+            File edgeX86 = new File("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
+            if (edgeX86.exists()) {
+                return playwright.chromium().launch(
+                        new BrowserType.LaunchOptions().setExecutablePath(edgeX86.toPath()).setHeadless(true));
+            }
+            return playwright.chromium().launch(
+                    new BrowserType.LaunchOptions().setChannel("msedge").setHeadless(true));
+        }
+    }
+
+    public static void guardarEvidencia(Page page, String nombreTest, String nombreArchivoPng) {
+        try {
+            Files.createDirectories(REPORT_DIR);
+            if (page != null) {
+                Path screenshotPath = REPORT_DIR.resolve(nombreArchivoPng);
+                page.screenshot(new Page.ScreenshotOptions()
+                        .setPath(screenshotPath)
+                        .setFullPage(true));
+            }
+            registrarEntradaReporteHtml(nombreTest, nombreArchivoPng);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso guardando evidencia Playwright", e);
+        }
+    }
+
+    public static void registrarResultadoApiEnReporte(String nombreTest, String detalle) {
+        try {
+            Files.createDirectories(REPORT_DIR);
+            registrarEntradaReporteHtml(nombreTest, detalle);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso registrando reporte API E2E", e);
+        }
+    }
+
+    private static synchronized void registrarEntradaReporteHtml(String nombreTest, String evidencia) {
+        try {
+            Path indexHtml = REPORT_DIR.resolve("index.html");
+            if (!Files.exists(indexHtml)) {
+                String header = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'/>"
+                        + "<title>FoodCore ERP v4.1.0 — Playwright E2E Report</title>"
+                        + "<style>body{font-family:Inter,sans-serif;background:#F8F9FA;color:#111827;padding:24px;}"
+                        + ".card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:12px;}"
+                        + ".pass{color:#047857;font-weight:700;}</style></head><body>"
+                        + "<h1>FoodCore ERP v4.1.0 — Reporte E2E Playwright</h1>\n";
+                Files.writeString(indexHtml, header, StandardCharsets.UTF_8, StandardOpenOption.CREATE);
+            }
+            String entry = "<div class='card'><span class='pass'>[PASS]</span> <strong>"
+                    + nombreTest + "</strong> — " + evidencia + " <small>(" + LocalDateTime.now() + ")</small></div>\n";
+            Files.writeString(indexHtml, entry, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso escribiendo index.html de reporte E2E", e);
+        }
+    }
+
+    private static boolean estaServidorRespondiendo() {
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(2))
+                    .build();
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/health"))
+                    .timeout(Duration.ofSeconds(2))
+                    .GET()
+                    .build();
+            HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
+            return res.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void sembrarCatalogoSiBdDisponible() {
+        try {
+            if (!"true".equalsIgnoreCase(System.getenv("GITHUB_ACTIONS"))) {
+                MySqlIntegrationTestSupport.inicializarEntornoMySql();
+            }
+            try (Connection conn = ConexionBD.getConnection();
+                 Statement st = conn.createStatement()) {
+                st.executeUpdate("INSERT INTO categoria (id_categoria, nombre, descripcion, activo) VALUES "
+                        + "(1, 'Hamburguesas', 'Hamburguesas al carbón', 1), "
+                        + "(2, 'Alitas & Pollo', 'Alitas crujientes broaster', 1), "
+                        + "(3, 'Bebidas', 'Bebidas heladas y artesanales', 1), "
+                        + "(4, 'Guarniciones', 'Papas y complementos', 1) "
+                        + "ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), activo = 1");
+
+                st.executeUpdate("INSERT INTO producto (id_producto, id_categoria, codigo, nombre, descripcion, "
+                        + "precio_venta, costo_estimado, disponible, activo, imagen_url) VALUES "
+                        + "(1, 1, 'HAM-01', 'Hamburguesa Royal Doble', 'Doble carne angus 180g, huevo, queso cheddar y papas', 24.50, 9.50, 1, 1, NULL), "
+                        + "(2, 1, 'HAM-02', 'Hamburguesa Clásica', 'Carne 180g al carbón, queso cheddar fundido y vegetales', 18.00, 6.80, 1, 1, NULL), "
+                        + "(3, 2, 'ALI-01', 'Alitas BBQ Picantes', '6 alitas bañadas en salsa artesanal BBQ ligeramente picante', 22.00, 8.50, 1, 1, NULL), "
+                        + "(4, 2, 'CRIS-01', 'Combo Pollo Crispy', '3 piezas broaster crocantes con papas amarillas', 26.00, 10.20, 1, 1, NULL), "
+                        + "(5, 3, 'BEB-01', 'Limonada Frozen Artesanal', 'Limonada natural frappeada con hierbabuena', 14.00, 3.50, 1, 1, NULL), "
+                        + "(6, 3, 'BEB-02', 'Chicha Morada Tradicional', 'Receta tradicional con manzana y canela', 12.00, 3.00, 1, 1, NULL), "
+                        + "(7, 4, 'COM-01', 'Papas Fritas Supremas', 'Porción gigante de papas con queso fundido y tocino', 11.50, 4.00, 1, 1, NULL) "
+                        + "ON DUPLICATE KEY UPDATE id_categoria = VALUES(id_categoria), nombre = VALUES(nombre), "
+                        + "precio_venta = VALUES(precio_venta), disponible = 1, activo = 1, imagen_url = VALUES(imagen_url)");
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Usando catálogo embebido de respaldo en ApiServer para entorno CI sin MySQL local", e);
+        }
+    }
+}

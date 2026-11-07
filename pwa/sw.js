@@ -36,9 +36,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Las llamadas a /api/* siempre van a red primero en tiempo real
+  // Las llamadas a /api/* no son interceptadas por el Service Worker (el soporte offline de pedidos lo maneja IndexedDB en db.js)
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
     return;
   }
 
