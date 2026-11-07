@@ -36,14 +36,15 @@
     <!-- Panel Izquierdo: Catálogo de Platos en Tarjetas -->
     <section class="catalog-pane">
       <div class="catalog-toolbar">
-        <div class="category-tabs">
+        <div class="category-tabs" id="categoryTabs">
           <button type="button" class="cat-tab active" onclick="FoodCorePWA.filtrarCategoria('TODOS', this)">Todos los Platos</button>
+          <button type="button" class="cat-tab tab-menu-dia" onclick="FoodCorePWA.filtrarCategoria('MENU_DEL_DIA', this)">⭐ Menú del Día</button>
           <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Hamburguesas', this)">Hamburguesas</button>
           <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Alitas', this)">Alitas &amp; Pollo</button>
           <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Bebidas', this)">Bebidas</button>
           <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Guarniciones', this)">Guarniciones</button>
         </div>
-        <input type="search" id="txtBuscarPlato" class="search-box" placeholder="Buscar plato rápido..." />
+        <input type="search" id="txtBuscarPlato" class="search-box" placeholder="Buscar plato rápido (tiempo real)..." autocomplete="off" />
       </div>
 
       <div id="dishesGrid" class="dishes-grid"></div>

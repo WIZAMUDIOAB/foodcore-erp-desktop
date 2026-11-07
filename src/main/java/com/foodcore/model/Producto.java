@@ -1,6 +1,7 @@
 package com.foodcore.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public class Producto {
     private int idProducto;
@@ -12,6 +13,8 @@ public class Producto {
     private BigDecimal costoEstimado;
     private boolean disponible;
     private String imagenUrl;
+    private boolean esMenuDelDia;
+    private LocalDate fechaDisponibilidad;
 
     // Relación descriptiva
     private String nombreCategoria;
@@ -19,10 +22,14 @@ public class Producto {
     public Producto() {}
 
     public Producto(int idProducto, int idCategoria, String codigo, String nombre, String descripcion, BigDecimal precioVenta, BigDecimal costoEstimado, boolean disponible) {
-        this(idProducto, idCategoria, codigo, nombre, descripcion, precioVenta, costoEstimado, disponible, null);
+        this(idProducto, idCategoria, codigo, nombre, descripcion, precioVenta, costoEstimado, disponible, null, false, null);
     }
 
     public Producto(int idProducto, int idCategoria, String codigo, String nombre, String descripcion, BigDecimal precioVenta, BigDecimal costoEstimado, boolean disponible, String imagenUrl) {
+        this(idProducto, idCategoria, codigo, nombre, descripcion, precioVenta, costoEstimado, disponible, imagenUrl, false, null);
+    }
+
+    public Producto(int idProducto, int idCategoria, String codigo, String nombre, String descripcion, BigDecimal precioVenta, BigDecimal costoEstimado, boolean disponible, String imagenUrl, boolean esMenuDelDia, LocalDate fechaDisponibilidad) {
         this.idProducto = idProducto;
         this.idCategoria = idCategoria;
         this.codigo = codigo;
@@ -32,6 +39,8 @@ public class Producto {
         this.costoEstimado = costoEstimado;
         this.disponible = disponible;
         this.imagenUrl = imagenUrl;
+        this.esMenuDelDia = esMenuDelDia;
+        this.fechaDisponibilidad = fechaDisponibilidad;
     }
 
     public int getIdProducto() { return idProducto; }
@@ -63,6 +72,12 @@ public class Producto {
 
     public String getNombreCategoria() { return nombreCategoria; }
     public void setNombreCategoria(String nombreCategoria) { this.nombreCategoria = nombreCategoria; }
+
+    public boolean isEsMenuDelDia() { return esMenuDelDia; }
+    public void setEsMenuDelDia(boolean esMenuDelDia) { this.esMenuDelDia = esMenuDelDia; }
+
+    public LocalDate getFechaDisponibilidad() { return fechaDisponibilidad; }
+    public void setFechaDisponibilidad(LocalDate fechaDisponibilidad) { this.fechaDisponibilidad = fechaDisponibilidad; }
 
     @Override
     public String toString() { return nombre + " (S/ " + precioVenta + ")"; }

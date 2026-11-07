@@ -176,16 +176,16 @@ public final class PlaywrightE2ESupport {
                         + "ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), activo = 1");
 
                 st.executeUpdate("INSERT INTO producto (id_producto, id_categoria, codigo, nombre, descripcion, "
-                        + "precio_venta, costo_estimado, disponible, activo, imagen_url) VALUES "
-                        + "(1, 1, 'HAM-01', 'Hamburguesa Royal Doble', 'Doble carne angus 180g, huevo, queso cheddar y papas', 24.50, 9.50, 1, 1, NULL), "
-                        + "(2, 1, 'HAM-02', 'Hamburguesa Clásica', 'Carne 180g al carbón, queso cheddar fundido y vegetales', 18.00, 6.80, 1, 1, NULL), "
-                        + "(3, 2, 'ALI-01', 'Alitas BBQ Picantes', '6 alitas bañadas en salsa artesanal BBQ ligeramente picante', 22.00, 8.50, 1, 1, NULL), "
-                        + "(4, 2, 'CRIS-01', 'Combo Pollo Crispy', '3 piezas broaster crocantes con papas amarillas', 26.00, 10.20, 1, 1, NULL), "
-                        + "(5, 3, 'BEB-01', 'Limonada Frozen Artesanal', 'Limonada natural frappeada con hierbabuena', 14.00, 3.50, 1, 1, NULL), "
-                        + "(6, 3, 'BEB-02', 'Chicha Morada Tradicional', 'Receta tradicional con manzana y canela', 12.00, 3.00, 1, 1, NULL), "
-                        + "(7, 4, 'COM-01', 'Papas Fritas Supremas', 'Porción gigante de papas con queso fundido y tocino', 11.50, 4.00, 1, 1, NULL) "
+                        + "precio_venta, costo_estimado, disponible, activo, imagen_url, es_menu_del_dia) VALUES "
+                        + "(1, 1, 'HAM-01', 'Hamburguesa Royal Doble', 'Doble carne angus 180g, huevo, queso cheddar y papas', 24.50, 9.50, 1, 1, NULL, 1), "
+                        + "(2, 1, 'HAM-02', 'Hamburguesa Clásica', 'Carne 180g al carbón, queso cheddar fundido y vegetales', 18.00, 6.80, 1, 1, NULL, 0), "
+                        + "(3, 2, 'ALI-01', 'Alitas BBQ Picantes', '6 alitas bañadas en salsa artesanal BBQ ligeramente picante', 22.00, 8.50, 1, 1, NULL, 0), "
+                        + "(4, 2, 'CRIS-01', 'Combo Pollo Crispy', '3 piezas broaster crocantes con papas amarillas', 26.00, 10.20, 1, 1, NULL, 1), "
+                        + "(5, 3, 'BEB-01', 'Limonada Frozen Artesanal', 'Limonada natural frappeada con hierbabuena', 14.00, 3.50, 1, 1, NULL, 1), "
+                        + "(6, 3, 'BEB-02', 'Chicha Morada Tradicional', 'Receta tradicional con manzana y canela', 12.00, 3.00, 1, 1, NULL, 0), "
+                        + "(7, 4, 'COM-01', 'Papas Fritas Supremas', 'Porción gigante de papas con queso fundido y tocino', 11.50, 4.00, 1, 1, NULL, 0) "
                         + "ON DUPLICATE KEY UPDATE id_categoria = VALUES(id_categoria), nombre = VALUES(nombre), "
-                        + "precio_venta = VALUES(precio_venta), disponible = 1, activo = 1, imagen_url = VALUES(imagen_url)");
+                        + "precio_venta = VALUES(precio_venta), disponible = 1, activo = 1, imagen_url = VALUES(imagen_url), es_menu_del_dia = VALUES(es_menu_del_dia)");
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Usando catálogo embebido de respaldo en ApiServer para entorno CI sin MySQL local", e);

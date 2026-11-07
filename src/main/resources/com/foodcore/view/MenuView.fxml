@@ -59,11 +59,12 @@
                             <children>
                                 <TableView fx:id="tblMenu" VBox.vgrow="ALWAYS">
                                     <columns>
-                                        <TableColumn fx:id="colImagen" prefWidth="90.0" text="Imagen" />
-                                        <TableColumn fx:id="colNombre" prefWidth="230.0" text="Platillo / Bebida" />
-                                        <TableColumn fx:id="colCategoria" prefWidth="150.0" text="Categoría" />
-                                        <TableColumn fx:id="colPrecio" prefWidth="110.0" text="Precio" />
-                                        <TableColumn fx:id="colEstado" prefWidth="115.0" text="Estado" />
+                                        <TableColumn fx:id="colImagen" prefWidth="85.0" text="Imagen" />
+                                        <TableColumn fx:id="colNombre" prefWidth="210.0" text="Platillo / Bebida" />
+                                        <TableColumn fx:id="colCategoria" prefWidth="135.0" text="Categoría" />
+                                        <TableColumn fx:id="colPrecio" prefWidth="95.0" text="Precio" />
+                                        <TableColumn fx:id="colEstado" prefWidth="105.0" text="Disponibilidad" />
+                                        <TableColumn fx:id="colMenuDia" prefWidth="90.0" text="Menú Día" />
                                     </columns>
                                 </TableView>
                             </children>
@@ -120,6 +121,8 @@
                                 </VBox>
 
                                 <CheckBox fx:id="chkActivo" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Platillo Activo en Carta POS" />
+                                <CheckBox fx:id="chkDisponible" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Disponible (En Stock para Comandas)" />
+                                <CheckBox fx:id="chkMenuDelDia" mnemonicParsing="false" selected="false" styleClass="text-body-strong" text="⭐ Incluir en Menú del Día" />
 
                                 <Region VBox.vgrow="ALWAYS" />
 

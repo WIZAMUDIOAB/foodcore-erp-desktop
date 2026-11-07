@@ -3,7 +3,12 @@ package com.foodcore.dao;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +53,25 @@ public class ProductoDAOImpl implements ProductoDAO {
     }
 
     @Override
+    public List<Producto> listarMenuDelDia(Connection conn) throws SQLException {
+        List<Producto> lista = new ArrayList<>();
+        String sql = "SELECT p.*, COALESCE(c.nombre, 'General') AS nombre_cat " +
+                     "FROM producto p " +
+                     "LEFT JOIN categoria c ON p.id_categoria = c.id_categoria " +
+                     "WHERE (p.activo = 1 OR p.activo IS NULL) " +
+                     "AND (p.disponible = TRUE OR p.disponible IS NULL OR p.disponible = 1) " +
+                     "AND p.es_menu_del_dia = 1 " +
+                     "ORDER BY p.id_producto ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(mapearProducto(rs));
+            }
+        }
+        return lista;
+    }
+
+    @Override
     public List<Producto> listarTodos(Connection conn) throws SQLException {
         List<Producto> lista = new ArrayList<>();
         String sql = "SELECT p.*, c.nombre AS nombre_cat " +
@@ -82,8 +106,9 @@ public class ProductoDAOImpl implements ProductoDAO {
 
     @Override
     public int crear(Connection conn, Producto p) throws SQLException {
-        String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, costo_estimado, disponible, imagen_url) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, " +
+                     "costo_estimado, disponible, imagen_url, es_menu_del_dia, fecha_disponibilidad) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, p.getIdCategoria());
             ps.setString(2, p.getCodigo());
@@ -93,6 +118,12 @@ public class ProductoDAOImpl implements ProductoDAO {
             ps.setBigDecimal(6, p.getCostoEstimado());
             ps.setBoolean(7, p.isDisponible());
             ps.setString(8, p.getImagenUrl());
+            ps.setBoolean(9, p.isEsMenuDelDia());
+            if (p.getFechaDisponibilidad() != null) {
+                ps.setDate(10, Date.valueOf(p.getFechaDisponibilidad()));
+            } else {
+                ps.setNull(10, java.sql.Types.DATE);
+            }
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -107,7 +138,9 @@ public class ProductoDAOImpl implements ProductoDAO {
 
     @Override
     public void actualizar(Connection conn, Producto p) throws SQLException {
-        String sql = "UPDATE producto SET id_categoria = ?, codigo = ?, nombre = ?, descripcion = ?, precio_venta = ?, costo_estimado = ?, disponible = ?, imagen_url = ? " +
+        String sql = "UPDATE producto SET id_categoria = ?, codigo = ?, nombre = ?, descripcion = ?, " +
+                     "precio_venta = ?, costo_estimado = ?, disponible = ?, imagen_url = ?, " +
+                     "es_menu_del_dia = ?, fecha_disponibilidad = ? " +
                      "WHERE id_producto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, p.getIdCategoria());
@@ -118,7 +151,13 @@ public class ProductoDAOImpl implements ProductoDAO {
             ps.setBigDecimal(6, p.getCostoEstimado());
             ps.setBoolean(7, p.isDisponible());
             ps.setString(8, p.getImagenUrl());
-            ps.setInt(9, p.getIdProducto());
+            ps.setBoolean(9, p.isEsMenuDelDia());
+            if (p.getFechaDisponibilidad() != null) {
+                ps.setDate(10, Date.valueOf(p.getFechaDisponibilidad()));
+            } else {
+                ps.setNull(10, java.sql.Types.DATE);
+            }
+            ps.setInt(11, p.getIdProducto());
             ps.executeUpdate();
         }
     }
@@ -128,6 +167,16 @@ public class ProductoDAOImpl implements ProductoDAO {
         String sql = "UPDATE producto SET disponible = ? WHERE id_producto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setBoolean(1, disponible);
+            ps.setInt(2, idProducto);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void cambiarMenuDelDia(Connection conn, int idProducto, boolean esMenuDelDia) throws SQLException {
+        String sql = "UPDATE producto SET es_menu_del_dia = ? WHERE id_producto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBoolean(1, esMenuDelDia);
             ps.setInt(2, idProducto);
             ps.executeUpdate();
         }
@@ -157,6 +206,19 @@ public class ProductoDAOImpl implements ProductoDAO {
             p.setImagenUrl(rs.getString("imagen_url"));
         } catch (SQLException ignored) {
             p.setImagenUrl(null);
+        }
+        try {
+            p.setEsMenuDelDia(rs.getBoolean("es_menu_del_dia"));
+        } catch (SQLException ignored) {
+            p.setEsMenuDelDia(false);
+        }
+        try {
+            Date fDisp = rs.getDate("fecha_disponibilidad");
+            if (fDisp != null) {
+                p.setFechaDisponibilidad(fDisp.toLocalDate());
+            }
+        } catch (SQLException ignored) {
+            p.setFechaDisponibilidad(null);
         }
         p.setNombreCategoria(rs.getString("nombre_cat"));
         return p;

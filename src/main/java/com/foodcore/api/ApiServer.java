@@ -36,6 +36,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -70,6 +71,7 @@ public class ApiServer {
     private final Map<String, ObjectNode> cacheIdempotenciaPedidos = new ConcurrentHashMap<>();
     private final Map<String, String> estadosMesasMemoria = new ConcurrentHashMap<>();
     private final Map<String, Double> totalesMesasMemoria = new ConcurrentHashMap<>();
+    private final List<Producto> catalogoRespaldoCache = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final AtomicInteger secuenciaPedidosFallback = new AtomicInteger(1000);
 
     private Javalin app;
@@ -138,16 +140,18 @@ public class ApiServer {
         // Cabeceras CORS globales para cualquier origen (Tablets / PWA)
         app.before(ctx -> {
             ctx.header("Access-Control-Allow-Origin", "*");
-            ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Idempotency-Key");
+            ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+            ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Idempotency-Key, X-Requested-With");
         });
 
         app.options("/*", ctx -> ctx.status(204));
 
-        // Endpoints API REST v4.0 / v4.1.0
+        // Endpoints API REST v4.0 / v4.1.0 / v4.2.0
         app.get("/api/health", this::handleHealth);
         app.post("/api/auth/login", this::handleLogin);
         app.get("/api/productos", this::handleListarProductos);
+        app.get("/api/productos/disponibles", this::handleListarProductosDisponibles);
+        app.patch("/api/productos/{id}/disponibilidad", this::handleActualizarDisponibilidad);
         app.get("/api/productos/{id}/imagen", this::handleImagenProducto);
         app.get("/uploads/platillos/{archivo}", this::handleServirUploadPlatillo);
         app.get("/api/mesas", this::handleListarMesas);
@@ -253,11 +257,42 @@ public class ApiServer {
 
     /**
      * GET /api/productos
-     * Retorna el catálogo de platos en tiempo real desde MySQL con {@code imagen_url} dinámica (v4.0.1).
-     * Si el producto no tiene fotografía, {@code imagen_url} se envía vacío ({@code ""}) para que la PWA
-     * renderice el fallback profesional SaaS con las iniciales del producto.
+     * Retorna el catálogo de platos en tiempo real desde MySQL con {@code imagen_url} dinámica (v4.0.1 / v4.2.0).
      */
     private void handleListarProductos(Context ctx) {
+        ctx.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        ctx.header("Pragma", "no-cache");
+
+        ArrayNode array = mapper.createArrayNode();
+        List<Producto> productos = new ArrayList<>();
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            if (conn != null) {
+                productos = productoDAO.listarTodos(conn);
+                if (productos.isEmpty()) {
+                    productos = productoDAO.listarProductosDisponibles(conn);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Usando catálogo de respaldo en GET /api/productos", e);
+        }
+
+        if (productos.isEmpty()) {
+            productos = obtenerCatalogoRespaldo();
+        }
+
+        for (Producto p : productos) {
+            array.add(construirJsonProducto(p));
+        }
+
+        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+    }
+
+    /**
+     * GET /api/productos/disponibles
+     * Retorna únicamente los productos con {@code disponible = 1} (v4.2.0 Sub-Fase A).
+     */
+    private void handleListarProductosDisponibles(Context ctx) {
         ctx.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         ctx.header("Pragma", "no-cache");
 
@@ -269,36 +304,93 @@ public class ApiServer {
                 productos = productoDAO.listarProductosDisponibles(conn);
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Usando catálogo de respaldo en GET /api/productos", e);
+            LOGGER.log(Level.FINE, "Usando catálogo de respaldo en GET /api/productos/disponibles", e);
         }
 
         if (productos.isEmpty()) {
-            productos = obtenerCatalogoRespaldo();
+            productos = obtenerCatalogoRespaldo().stream().filter(Producto::isDisponible).toList();
+        } else {
+            productos = productos.stream().filter(Producto::isDisponible).toList();
         }
 
         for (Producto p : productos) {
-            ObjectNode item = mapper.createObjectNode();
-            double precio = p.getPrecioVenta() != null
-                    ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP).doubleValue()
-                    : 0.0;
-            String img = normalizarImagenUrl(p);
-            String cat = (p.getNombreCategoria() != null && !p.getNombreCategoria().isBlank())
-                    ? p.getNombreCategoria()
-                    : resolverNombreCategoria(p.getIdCategoria());
-
-            item.put("id", p.getIdProducto());
-            item.put("idProducto", p.getIdProducto());
-            item.put("codigo", p.getCodigo() != null ? p.getCodigo() : "PROD-" + p.getIdProducto());
-            item.put("nombre", p.getNombre());
-            item.put("descripcion", p.getDescripcion() != null ? p.getDescripcion() : "Especialidad de la casa");
-            item.put("precio", precio);
-            item.put("imagen_url", img);
-            item.put("categoria", cat);
-            item.put("disponible", p.isDisponible());
-            array.add(item);
+            array.add(construirJsonProducto(p));
         }
 
         ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+    }
+
+    /**
+     * PATCH /api/productos/{id}/disponibilidad
+     * Permite marcar un producto como disponible o agotado (v4.2.0 Sub-Fase A).
+     */
+    private void handleActualizarDisponibilidad(Context ctx) {
+        try {
+            int idProducto = Integer.parseInt(ctx.pathParam("id"));
+            boolean nuevoEstado = false;
+
+            if (ctx.body() != null && !ctx.body().isBlank()) {
+                JsonNode body = mapper.readTree(ctx.body());
+                if (body.has("disponible")) {
+                    nuevoEstado = body.get("disponible").asBoolean();
+                } else if (body.has("agotado")) {
+                    nuevoEstado = !body.get("agotado").asBoolean();
+                }
+            } else if (ctx.queryParam("disponible") != null) {
+                nuevoEstado = Boolean.parseBoolean(ctx.queryParam("disponible"));
+            }
+
+            try (Connection conn = ConexionBD.getConnection()) {
+                if (conn != null) {
+                    productoDAO.cambiarDisponibilidad(conn, idProducto, nuevoEstado);
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "No se pudo actualizar disponibilidad en MySQL, aplicando a memoria", e);
+            }
+
+            // Actualizar también en el catálogo de respaldo en memoria si existe
+            for (Producto p : catalogoRespaldoCache) {
+                if (p.getIdProducto() == idProducto) {
+                    p.setDisponible(nuevoEstado);
+                    break;
+                }
+            }
+
+            ObjectNode resp = mapper.createObjectNode();
+            resp.put("success", true);
+            resp.put("id_producto", idProducto);
+            resp.put("disponible", nuevoEstado);
+            resp.put("mensaje", nuevoEstado ? "Producto disponible en catálogo" : "Producto marcado como AGOTADO");
+            ctx.status(200).json(resp);
+        } catch (NumberFormatException e) {
+            responderError(ctx, 400, "ID de producto inválido.");
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error al actualizar disponibilidad de producto", e);
+            responderError(ctx, 500, "Error interno al actualizar disponibilidad.");
+        }
+    }
+
+    private ObjectNode construirJsonProducto(Producto p) {
+        ObjectNode item = mapper.createObjectNode();
+        double precio = p.getPrecioVenta() != null
+                ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        String img = normalizarImagenUrl(p);
+        String cat = (p.getNombreCategoria() != null && !p.getNombreCategoria().isBlank())
+                ? p.getNombreCategoria()
+                : resolverNombreCategoria(p.getIdCategoria());
+
+        item.put("id", p.getIdProducto());
+        item.put("idProducto", p.getIdProducto());
+        item.put("codigo", p.getCodigo() != null ? p.getCodigo() : "PROD-" + p.getIdProducto());
+        item.put("nombre", p.getNombre());
+        item.put("descripcion", p.getDescripcion() != null ? p.getDescripcion() : "Especialidad de la casa");
+        item.put("precio", precio);
+        item.put("imagen_url", img);
+        item.put("categoria", cat);
+        item.put("disponible", p.isDisponible());
+        item.put("es_menu_del_dia", p.isEsMenuDelDia());
+        return item;
     }
 
     /**
@@ -719,22 +811,24 @@ public class ApiServer {
     }
 
     private List<Producto> obtenerCatalogoRespaldo() {
-        List<Producto> lista = new ArrayList<>();
-        lista.add(new Producto(1, 1, "HAM-01", "Hamburguesa Royal Doble",
-                "Doble carne angus 180g, huevo, queso cheddar y papas", new BigDecimal("24.50"), new BigDecimal("9.50"), true));
-        lista.add(new Producto(2, 1, "HAM-02", "Cheese Burger Clásica",
-                "Carne 180g, queso cheddar fundido, lechuga y tomate", new BigDecimal("18.00"), new BigDecimal("6.80"), true));
-        lista.add(new Producto(3, 2, "ALI-01", "Alitas BBQ Picantes x6",
-                "6 alitas bañadas en salsa artesanal BBQ ligeramente picante", new BigDecimal("22.00"), new BigDecimal("8.50"), true));
-        lista.add(new Producto(4, 2, "CRIS-01", "Combo Pollo Crispy 3 Pzs",
-                "3 piezas broaster crocantes con papas amarillas", new BigDecimal("26.00"), new BigDecimal("10.20"), true));
-        lista.add(new Producto(5, 3, "BEB-01", "Limonada Frozen 1L",
-                "Limonada natural frappeada con hierbabuena", new BigDecimal("14.00"), new BigDecimal("3.50"), true));
-        lista.add(new Producto(6, 3, "BEB-02", "Chicha Morada 1L",
-                "Receta tradicional con manzana y canela", new BigDecimal("12.00"), new BigDecimal("3.00"), true));
-        lista.add(new Producto(7, 4, "COM-01", "Papas Fritas Supremas",
-                "Porción gigante de papas con queso fundido y tocino", new BigDecimal("11.50"), new BigDecimal("4.00"), true));
-        return lista;
+        if (catalogoRespaldoCache.isEmpty()) {
+            LocalDate hoy = LocalDate.now();
+            catalogoRespaldoCache.add(new Producto(1, 1, "HAM-01", "Hamburguesa Royal Doble",
+                    "Doble carne angus 180g, huevo, queso cheddar y papas", new BigDecimal("24.50"), new BigDecimal("9.50"), true, null, true, hoy));
+            catalogoRespaldoCache.add(new Producto(2, 1, "HAM-02", "Cheese Burger Clásica",
+                    "Carne 180g, queso cheddar fundido, lechuga y tomate", new BigDecimal("18.00"), new BigDecimal("6.80"), true, null, false, null));
+            catalogoRespaldoCache.add(new Producto(3, 2, "ALI-01", "Alitas BBQ Picantes x6",
+                    "6 alitas bañadas en salsa artesanal BBQ ligeramente picante", new BigDecimal("22.00"), new BigDecimal("8.50"), true, null, false, null));
+            catalogoRespaldoCache.add(new Producto(4, 2, "CRIS-01", "Combo Pollo Crispy 3 Pzs",
+                    "3 piezas broaster crocantes con papas amarillas", new BigDecimal("26.00"), new BigDecimal("10.20"), true, null, true, hoy));
+            catalogoRespaldoCache.add(new Producto(5, 3, "BEB-01", "Limonada Frozen 1L",
+                    "Limonada natural frappeada con hierbabuena", new BigDecimal("14.00"), new BigDecimal("3.50"), true, null, true, hoy));
+            catalogoRespaldoCache.add(new Producto(6, 3, "BEB-02", "Chicha Morada 1L",
+                    "Receta tradicional con manzana y canela", new BigDecimal("12.00"), new BigDecimal("3.00"), true, null, false, null));
+            catalogoRespaldoCache.add(new Producto(7, 4, "COM-01", "Papas Fritas Supremas",
+                    "Porción gigante de papas con queso fundido y tocino", new BigDecimal("11.50"), new BigDecimal("4.00"), true, null, false, null));
+        }
+        return new ArrayList<>(catalogoRespaldoCache);
     }
 
     private String resolverNombreCategoria(int idCategoria) {

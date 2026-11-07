@@ -25,7 +25,9 @@ const FoodCorePWA = (() => {
       descripcion: 'Doble carne angus 180g, huevo, queso cheddar y papas',
       precio: 24.50,
       categoria: 'Hamburguesas',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: true
     },
     {
       id: 2,
@@ -34,7 +36,9 @@ const FoodCorePWA = (() => {
       descripcion: 'Carne 180g al carbón, queso cheddar fundido y vegetales',
       precio: 18.00,
       categoria: 'Hamburguesas',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: false
     },
     {
       id: 3,
@@ -43,7 +47,9 @@ const FoodCorePWA = (() => {
       descripcion: '6 alitas bañadas en salsa artesanal BBQ ligeramente picante',
       precio: 22.00,
       categoria: 'Alitas & Pollo',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: false
     },
     {
       id: 4,
@@ -52,7 +58,9 @@ const FoodCorePWA = (() => {
       descripcion: '3 piezas broaster crocantes con papas amarillas nativas',
       precio: 26.00,
       categoria: 'Alitas & Pollo',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: true
     },
     {
       id: 5,
@@ -61,7 +69,9 @@ const FoodCorePWA = (() => {
       descripcion: 'Jarra de limonada natural frappeada con hierbabuena',
       precio: 14.00,
       categoria: 'Bebidas',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: true
     },
     {
       id: 6,
@@ -70,7 +80,9 @@ const FoodCorePWA = (() => {
       descripcion: 'Receta tradicional de maíz morado con manzana y canela',
       precio: 12.00,
       categoria: 'Bebidas',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: false
     },
     {
       id: 7,
@@ -79,7 +91,9 @@ const FoodCorePWA = (() => {
       descripcion: 'Porción familiar con salsa de queso cheddar y tocino',
       precio: 11.50,
       categoria: 'Guarniciones',
-      imagen_url: ''
+      imagen_url: '',
+      disponible: true,
+      es_menu_del_dia: false
     }
   ];
 
@@ -405,9 +419,14 @@ const FoodCorePWA = (() => {
 
     renderizarCarrito();
     setInterval(sincronizarOutbox, 4000);
+
+    // Auto-refresco del catálogo cada 30 segundos (v4.2.0 Sub-Fase A)
+    setInterval(async () => {
+      await cargarCatalogoProductos(true);
+    }, 30000);
   }
 
-  async function cargarCatalogoProductos() {
+  async function cargarCatalogoProductos(silencioso = false) {
     try {
       const res = await fetch(`${API_BASE}/productos`, { method: 'GET', cache: 'no-store' });
       if (res.ok) {
@@ -422,7 +441,51 @@ const FoodCorePWA = (() => {
       const cache = await FoodCoreOfflineDB.obtenerCatalogoCache();
       catalogoProductos = (cache && cache.length > 0) ? cache : CATALOGO_FALLBACK;
     }
+    renderizarCategoriasTabs();
     renderizarCatalogo();
+  }
+
+  function renderizarCategoriasTabs() {
+    const container = document.getElementById('categoryTabs');
+    if (!container) return;
+
+    // Recolectar categorías presentes en el catálogo
+    const categoriasSet = new Set();
+    catalogoProductos.forEach((p) => {
+      if (p.categoria && p.categoria.trim()) {
+        categoriasSet.add(p.categoria.trim());
+      }
+    });
+    const categoriasUnicas = Array.from(categoriasSet);
+
+    container.innerHTML = '';
+
+    // 1. Tab Todos los Platos
+    const btnTodos = document.createElement('button');
+    btnTodos.type = 'button';
+    btnTodos.className = `cat-tab ${categoriaActiva === 'TODOS' ? 'active' : ''}`;
+    btnTodos.textContent = 'Todos los Platos';
+    btnTodos.onclick = () => filtrarCategoria('TODOS', btnTodos);
+    container.appendChild(btnTodos);
+
+    // 2. Tab Menú del Día
+    const btnMenuDia = document.createElement('button');
+    btnMenuDia.type = 'button';
+    btnMenuDia.className = `cat-tab tab-menu-dia ${categoriaActiva === 'MENU_DEL_DIA' ? 'active' : ''}`;
+    btnMenuDia.innerHTML = '⭐ Menú del Día';
+    btnMenuDia.onclick = () => filtrarCategoria('MENU_DEL_DIA', btnMenuDia);
+    container.appendChild(btnMenuDia);
+
+    // 3. Categorías dinámicas
+    categoriasUnicas.forEach((cat) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const esActiva = categoriaActiva.toLowerCase() === cat.toLowerCase();
+      btn.className = `cat-tab ${esActiva ? 'active' : ''}`;
+      btn.textContent = cat;
+      btn.onclick = () => filtrarCategoria(cat, btn);
+      container.appendChild(btn);
+    });
   }
 
   function filtrarCategoria(cat, btnElement) {
@@ -440,17 +503,29 @@ const FoodCorePWA = (() => {
     grid.innerHTML = '';
 
     const filtrados = catalogoProductos.filter((p) => {
-      const coincideCat = categoriaActiva === 'TODOS'
-        || (p.categoria && p.categoria.toLowerCase().includes(categoriaActiva.toLowerCase()));
+      let coincideCat = false;
+      if (categoriaActiva === 'TODOS') {
+        coincideCat = true;
+      } else if (categoriaActiva === 'MENU_DEL_DIA') {
+        coincideCat = (p.es_menu_del_dia === true || p.es_menu_del_dia === 1 || (p.categoria && p.categoria.toLowerCase().includes('menú del día')));
+      } else {
+        coincideCat = p.categoria && (p.categoria.toLowerCase() === categoriaActiva.toLowerCase() || p.categoria.toLowerCase().includes(categoriaActiva.toLowerCase()));
+      }
+
       const coincideTexto = !textoBusqueda
         || p.nombre.toLowerCase().includes(textoBusqueda)
-        || (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda));
+        || (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda))
+        || (p.codigo && p.codigo.toLowerCase().includes(textoBusqueda));
+
       return coincideCat && coincideTexto;
     });
 
     filtrados.forEach((p) => {
       const card = document.createElement('div');
-      card.className = 'dish-card';
+      const disponible = (p.disponible !== false && p.disponible !== 0);
+      const esMenuDia = (p.es_menu_del_dia === true || p.es_menu_del_dia === 1);
+
+      card.className = `dish-card ${disponible ? '' : 'dish-card-agotado'}`.trim();
       const iniciales = obtenerInicialesProducto(p.nombre);
       const imgUrl = (typeof p.imagen_url === 'string') ? p.imagen_url.trim() : '';
       const tieneImagenValida = imgUrl !== '';
@@ -459,15 +534,24 @@ const FoodCorePWA = (() => {
         ? `<img class="dish-thumb" src="${imgUrl}" alt="${p.nombre}" style="object-fit: cover;" />`
         : `<div class="dish-thumb-fallback" aria-label="${p.nombre}">${iniciales}</div>`;
 
+      const badgeMenuDia = esMenuDia ? `<span class="dish-badge-menu-dia">⭐ Menú del Día</span>` : '';
+      const badgeAgotado = !disponible ? `<span class="dish-badge-agotado">AGOTADO</span>` : '';
+
       card.innerHTML = `
         <div class="dish-thumb-wrapper">${mediaHtml}</div>
         <div class="dish-body">
-          <span class="dish-category-tag">${p.categoria || 'Especialidad'}</span>
+          <div style="display:flex; align-items:center; flex-wrap:wrap;">
+            <span class="dish-category-tag">${p.categoria || 'Especialidad'}</span>
+            ${badgeMenuDia}
+            ${badgeAgotado}
+          </div>
           <div class="dish-title">${p.nombre}</div>
           <div class="dish-desc">${p.descripcion || 'Preparación al instante en cocina'}</div>
           <div class="dish-footer">
             <span class="dish-price">S/ ${Number(p.precio).toFixed(2)}</span>
-            <button type="button" class="btn-add-dish" aria-label="Agregar ${p.nombre}">+</button>
+            <button type="button" class="btn-add-dish ${disponible ? '' : 'disabled'}" ${disponible ? '' : 'disabled'} aria-label="${disponible ? 'Agregar ' + p.nombre : p.nombre + ' agotado'}">
+              ${disponible ? '+' : '✕'}
+            </button>
           </div>
         </div>
       `;
@@ -483,9 +567,11 @@ const FoodCorePWA = (() => {
         });
       }
 
-      card.querySelector('.btn-add-dish').addEventListener('click', () => {
-        agregarAlCarritoPorObjeto(p, 1, '');
-      });
+      if (disponible) {
+        card.querySelector('.btn-add-dish').addEventListener('click', () => {
+          agregarAlCarritoPorObjeto(p, 1, '');
+        });
+      }
       grid.appendChild(card);
     });
   }
@@ -685,6 +771,7 @@ const FoodCorePWA = (() => {
     cargarMesas,
     iniciarCatalogoView,
     cargarCatalogoProductos,
+    renderizarCategoriasTabs,
     filtrarCategoria,
     obtenerInicialesProducto,
     aplicarChipNota,

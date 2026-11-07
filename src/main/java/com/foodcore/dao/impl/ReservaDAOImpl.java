@@ -83,14 +83,15 @@ public class ReservaDAOImpl implements ReservaDAO {
 
     @Override
     public Optional<ReservaMesa> buscarReservaProximaParaMesa(Connection conn, String numeroMesa, LocalDate fecha, LocalTime horaActual, int minutosMargen) throws SQLException {
+        LocalTime inicio = horaActual.minusMinutes(15);
+        LocalTime fin = horaActual.plusMinutes(minutosMargen);
+
+        String condHora = inicio.isAfter(fin) ? "(r.hora >= ? OR r.hora <= ?)" : "(r.hora BETWEEN ? AND ?)";
         String sql = "SELECT r.*, m.numero AS numero_mesa FROM reserva_mesa r "
                 + "JOIN mesa m ON r.id_mesa = m.id_mesa "
                 + "WHERE m.numero = ? AND r.fecha = ? AND r.estado IN ('CONFIRMADA', 'PENDIENTE') "
-                + "AND r.hora BETWEEN ? AND ? "
+                + "AND " + condHora + " "
                 + "ORDER BY r.hora ASC LIMIT 1";
-
-        LocalTime inicio = horaActual.minusMinutes(15);
-        LocalTime fin = horaActual.plusMinutes(minutosMargen);
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, numeroMesa);

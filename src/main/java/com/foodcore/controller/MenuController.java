@@ -57,6 +57,7 @@ public class MenuController {
     @FXML private TableColumn<Producto, String> colCategoria;
     @FXML private TableColumn<Producto, String> colPrecio;
     @FXML private TableColumn<Producto, String> colEstado;
+    @FXML private TableColumn<Producto, String> colMenuDia;
 
     @FXML private Label lblTituloFormulario;
     @FXML private TextField txtCodigo;
@@ -66,6 +67,8 @@ public class MenuController {
     @FXML private ImageView imgPreview;
     @FXML private Label lblRutaImagen;
     @FXML private CheckBox chkActivo;
+    @FXML private CheckBox chkDisponible;
+    @FXML private CheckBox chkMenuDelDia;
     @FXML private Button btnSeleccionarFoto;
     @FXML private Button btnGuardarPlatillo;
     @FXML private Button btnLimpiarForm;
@@ -105,8 +108,13 @@ public class MenuController {
             return new SimpleStringProperty("S/ " + pr);
         });
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(
-            c.getValue().isDisponible() ? "ACTIVO" : "INACTIVO"
+            c.getValue().isDisponible() ? "DISPONIBLE" : "AGOTADO"
         ));
+        if (colMenuDia != null) {
+            colMenuDia.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().isEsMenuDelDia() ? "MENÚ DÍA" : "-"
+            ));
+        }
 
         colImagen.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -175,12 +183,33 @@ public class MenuController {
                     setText(null);
                 } else {
                     Label pill = new Label(item);
-                    pill.getStyleClass().add("ACTIVO".equalsIgnoreCase(item) ? "badge-pill-success" : "badge-pill-neutral");
+                    pill.getStyleClass().add("DISPONIBLE".equalsIgnoreCase(item) ? "badge-pill-success" : "badge-pill-danger");
                     setGraphic(pill);
                     setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                 }
             }
         });
+
+        if (colMenuDia != null) {
+            colMenuDia.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null || "-".equals(item)) {
+                        setGraphic(null);
+                        setText(empty ? null : "-");
+                        if (!empty) {
+                            getStyleClass().setAll("table-cell", "text-caption-muted");
+                        }
+                    } else {
+                        Label pill = new Label("⭐ DÍA");
+                        pill.getStyleClass().add("badge-pill-accent");
+                        setGraphic(pill);
+                        setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                    }
+                }
+            });
+        }
 
         tblMenu.setItems(listaProductos);
         cmbCategoria.setItems(listaCategorias);
@@ -227,6 +256,12 @@ public class MenuController {
         txtNombre.setText(p.getNombre() != null ? p.getNombre() : "");
         txtPrecio.setText(p.getPrecioVenta() != null ? p.getPrecioVenta().toPlainString() : "0.00");
         chkActivo.setSelected(p.isDisponible());
+        if (chkDisponible != null) {
+            chkDisponible.setSelected(p.isDisponible());
+        }
+        if (chkMenuDelDia != null) {
+            chkMenuDelDia.setSelected(p.isEsMenuDelDia());
+        }
         for (Categoria c : listaCategorias) {
             if (c.getIdCategoria() == p.getIdCategoria()) {
                 cmbCategoria.getSelectionModel().select(c);
@@ -269,13 +304,14 @@ public class MenuController {
     }
 
     /**
-     * Crea o actualiza un platillo en BD incluyendo su {@code imagen_url} (§2.2).
+     * Crea o actualiza un platillo en BD incluyendo su {@code imagen_url}, disponibilidad y menú del día (v4.2.0).
      */
     public Producto guardarPlatilloEnBD(int idCategoria,
                                         String codigo,
                                         String nombre,
                                         BigDecimal precioVenta,
                                         boolean disponible,
+                                        boolean esMenuDelDia,
                                         String imagenUrl) throws Exception {
         try (Connection conn = ConexionBD.getConnection()) {
             if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
@@ -284,15 +320,25 @@ public class MenuController {
                 productoEnEdicion.setNombre(nombre);
                 productoEnEdicion.setPrecioVenta(precioVenta);
                 productoEnEdicion.setDisponible(disponible);
+                productoEnEdicion.setEsMenuDelDia(esMenuDelDia);
                 productoEnEdicion.setImagenUrl(imagenUrl);
                 productoDAO.actualizar(conn, productoEnEdicion);
                 return productoEnEdicion;
             } else {
-                Producto nuevo = new Producto(0, idCategoria, codigo, nombre, "", precioVenta, BigDecimal.ZERO, disponible, imagenUrl);
+                Producto nuevo = new Producto(0, idCategoria, codigo, nombre, "", precioVenta, BigDecimal.ZERO, disponible, imagenUrl, esMenuDelDia, esMenuDelDia ? java.time.LocalDate.now() : null);
                 productoDAO.crear(conn, nuevo);
                 return nuevo;
             }
         }
+    }
+
+    public Producto guardarPlatilloEnBD(int idCategoria,
+                                        String codigo,
+                                        String nombre,
+                                        BigDecimal precioVenta,
+                                        boolean disponible,
+                                        String imagenUrl) throws Exception {
+        return guardarPlatilloEnBD(idCategoria, codigo, nombre, precioVenta, disponible, false, imagenUrl);
     }
 
     @FXML
@@ -322,6 +368,12 @@ public class MenuController {
         txtNombre.clear();
         txtPrecio.clear();
         chkActivo.setSelected(true);
+        if (chkDisponible != null) {
+            chkDisponible.setSelected(true);
+        }
+        if (chkMenuDelDia != null) {
+            chkMenuDelDia.setSelected(false);
+        }
         actualizarVistaPreviaImagen(null);
     }
 
@@ -337,7 +389,9 @@ public class MenuController {
                 return;
             }
             BigDecimal precio = new BigDecimal(txtPrecio.getText().trim()).setScale(2, RoundingMode.HALF_UP);
-            guardarPlatilloEnBD(idCat, cod, nom, precio, chkActivo.isSelected(), rutaImagenRelativaActual);
+            boolean disp = (chkDisponible != null) ? chkDisponible.isSelected() : chkActivo.isSelected();
+            boolean menuDia = (chkMenuDelDia != null) && chkMenuDelDia.isSelected();
+            guardarPlatilloEnBD(idCat, cod, nom, precio, disp, menuDia, rutaImagenRelativaActual);
             AnimationUtils.mostrarToast(rootMenuStack, "Platillo guardado exitosamente.", false);
             handleNuevoPlatillo(null);
             cargarDatosMenu();
