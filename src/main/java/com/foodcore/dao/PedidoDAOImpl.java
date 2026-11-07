@@ -20,7 +20,7 @@ public class PedidoDAOImpl implements PedidoDAO {
 
     @Override
     public int crearPedido(Connection conn, Pedido pedido) throws SQLException {
-        String sql = "INSERT INTO pedido (id_usuario, id_cliente, numero_mesa, total, estado, idempotency_key, tipo_pedido, cliente_nombre, cliente_telefono, cliente_direccion, cliente_referencia, costo_envio, repartidor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO pedido (id_usuario, id_cliente, numero_mesa, total, estado, idempotency_key, tipo_pedido, cliente_nombre, cliente_telefono, cliente_direccion, cliente_referencia, costo_envio, repartidor, id_usuario_creador) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, pedido.getIdUsuario());
             if (pedido.getIdCliente() != null) {
@@ -39,6 +39,11 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setString(11, pedido.getClienteReferencia());
             ps.setBigDecimal(12, pedido.getCostoEnvio() != null ? pedido.getCostoEnvio() : BigDecimal.ZERO);
             ps.setString(13, pedido.getRepartidor());
+            if (pedido.getIdUsuarioCreador() != null) {
+                ps.setInt(14, pedido.getIdUsuarioCreador());
+            } else {
+                ps.setInt(14, pedido.getIdUsuario());
+            }
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -109,6 +114,8 @@ public class PedidoDAOImpl implements PedidoDAO {
             p.setClienteReferencia(rs.getString("cliente_referencia"));
             p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
             p.setRepartidor(rs.getString("repartidor"));
+            int idCreador = rs.getInt("id_usuario_creador");
+            p.setIdUsuarioCreador(rs.wasNull() ? p.getIdUsuario() : idCreador);
         } catch (SQLException ignored) {}
         return p;
     }

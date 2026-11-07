@@ -17,7 +17,11 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.StackPane;
+import java.util.Optional;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -35,7 +39,7 @@ public class UsuariosController {
 
     private static final Logger LOGGER = Logger.getLogger(UsuariosController.class.getName());
 
-    public record FilaUsuario(int idUsuario, String username, String nombreCompleto, String rol, boolean cambioRequerido, boolean activo) {
+    public record FilaUsuario(int idUsuario, String username, String nombreCompleto, String rol, boolean cambioRequerido, boolean activo, boolean pinConfigurado) {
     }
 
     @FXML private StackPane rootUsuariosStack;
@@ -44,6 +48,7 @@ public class UsuariosController {
     @FXML private TableColumn<FilaUsuario, String> colNombre;
     @FXML private TableColumn<FilaUsuario, String> colRol;
     @FXML private TableColumn<FilaUsuario, String> colCambioClave;
+    @FXML private TableColumn<FilaUsuario, String> colPinConfigurado;
     @FXML private TableColumn<FilaUsuario, String> colEstado;
 
     @FXML private TextField txtUsername;
@@ -56,6 +61,7 @@ public class UsuariosController {
     @FXML private CheckBox chkUsuarioActivo;
     @FXML private Button btnCrearUsuario;
     @FXML private Button btnResetearPassword;
+    @FXML private Button btnConfigurarPin;
 
     private final EncriptadorPassword encriptador = new EncriptadorPassword();
     private final ObservableList<FilaUsuario> listaUsuarios = FXCollections.observableArrayList();
@@ -64,6 +70,7 @@ public class UsuariosController {
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnCrearUsuario);
         AnimationUtils.attachTactileFeedback(btnResetearPassword);
+        AnimationUtils.attachTactileFeedback(btnConfigurarPin);
 
         cmbRol.setItems(FXCollections.observableArrayList("ADMIN", "CAJERO", "MOZO", "COCINA", "ALMACEN"));
         cmbRol.getSelectionModel().select("CAJERO");
@@ -71,6 +78,28 @@ public class UsuariosController {
         colUsername.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().username()));
         colNombre.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().nombreCompleto()));
         colRol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().rol()));
+        colPinConfigurado.setCellValueFactory(c -> new SimpleStringProperty(
+            c.getValue().pinConfigurado() ? "CONFIGURADO" : "SIN PIN"
+        ));
+        colPinConfigurado.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                    return;
+                }
+                Label badge = new Label(item);
+                if ("CONFIGURADO".equals(item)) {
+                    badge.getStyleClass().add("badge-pill-accent");
+                } else {
+                    badge.getStyleClass().add("badge-pill-danger");
+                }
+                setGraphic(badge);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+            }
+        });
         colCambioClave.setCellValueFactory(c -> new SimpleStringProperty(
             c.getValue().cambioRequerido() ? "REQUERIDO (1)" : "ACTUALIZADA"
         ));
@@ -86,7 +115,7 @@ public class UsuariosController {
         new Thread(() -> {
             List<FilaUsuario> filas = new ArrayList<>();
             String sql = "SELECT id_usuario, username, COALESCE(nombre_completo, username) AS nom, codigo_rol, "
-                + "cambio_password_requerido, activo FROM usuario ORDER BY id_usuario ASC";
+                + "cambio_password_requerido, activo, pin, pin_hash FROM usuario ORDER BY id_usuario ASC";
             try (Connection conn = ConexionBD.getConnection();
                  PreparedStatement ps = conn.prepareStatement(sql);
                  ResultSet rs = ps.executeQuery()) {
@@ -97,7 +126,8 @@ public class UsuariosController {
                         rs.getString("nom"),
                         rs.getString("codigo_rol"),
                         rs.getBoolean("cambio_password_requerido"),
-                        rs.getBoolean("activo")
+                        rs.getBoolean("activo"),
+                        (rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank()) || (rs.getString("pin") != null && !rs.getString("pin").isBlank())
                     ));
                 }
             } catch (Exception e) {
@@ -198,6 +228,49 @@ public class UsuariosController {
             cargarUsuarios();
         } catch (Exception e) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Error al resetear clave: " + e.getMessage(), true);
+        }
+    }
+
+    @FXML
+    public void handleConfigurarPin(ActionEvent event) {
+        FilaUsuario sel = tblUsuarios.getSelectionModel().getSelectedItem();
+        if (sel == null) {
+            AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario para configurar su PIN.", true);
+            return;
+        }
+
+        TextInputDialog dialog = new TextInputDialog("1234");
+        dialog.setTitle("Configurar PIN Tablet");
+        dialog.setHeaderText("Configurar PIN de 4 a 6 dígitos para: " + sel.username());
+        dialog.setContentText("Nuevo PIN numérico:");
+
+        Optional<String> res = dialog.showAndWait();
+        if (res.isPresent()) {
+            String pin = res.get().trim();
+            if (!pin.matches("^\\d{4,6}$")) {
+                AnimationUtils.mostrarToast(rootUsuariosStack, "El PIN debe tener entre 4 y 6 dígitos numéricos.", true);
+                return;
+            }
+            try {
+                actualizarPinUsuario(sel.idUsuario(), pin);
+                AnimationUtils.mostrarToast(rootUsuariosStack, "PIN actualizado exitosamente para " + sel.username() + ".", false);
+                cargarUsuarios();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Error al configurar PIN", e);
+                AnimationUtils.mostrarToast(rootUsuariosStack, "Error actualizando PIN: " + e.getMessage(), true);
+            }
+        }
+    }
+
+    public void actualizarPinUsuario(int idUsuario, String pin) throws Exception {
+        String hash = EncriptadorPassword.generarHash(pin);
+        String sql = "UPDATE usuario SET pin = ?, pin_hash = ? WHERE id_usuario = ?";
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, pin);
+            ps.setString(2, hash);
+            ps.setInt(3, idUsuario);
+            ps.executeUpdate();
         }
     }
 }

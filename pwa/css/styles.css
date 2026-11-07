@@ -860,3 +860,419 @@ html, body {
 .toast-banner.show {
   display: inline-flex;
 }
+
+/* ==========================================================================
+   SUB-FASE C.1: MODO MOZO, PIN LOGIN Y CAMBIO RÁPIDO (v4.2.0)
+   ========================================================================== */
+
+/* Tabs en Login */
+.auth-tabs-toggle {
+  display: flex;
+  background: #F3F4F6;
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  gap: 4px;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  text-align: center;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fc-text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.auth-tab-btn.active {
+  background: #FFFFFF;
+  color: var(--fc-brand-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Layout Pantalla PIN Login */
+.pin-login-shell {
+  padding: 32px 24px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.pin-login-container {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 32px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+  border: 1px solid var(--fc-border-subtle);
+}
+
+@media (max-width: 860px) {
+  .pin-login-container {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+}
+
+.pin-section-header h2, .pin-pad-header h2 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+  margin-bottom: 6px;
+}
+
+.pin-section-header p {
+  font-size: 13.5px;
+  color: var(--fc-text-muted);
+  margin-bottom: 20px;
+}
+
+/* Selector de Mozos Táctil */
+.mozo-selection-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mozo-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 2px solid var(--fc-border-subtle);
+  background: #FAFAFA;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.mozo-card:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.mozo-card.active {
+  background: #FFF7ED;
+  border-color: var(--fc-brand-primary);
+  box-shadow: 0 0 0 3px rgba(240, 90, 34, 0.15);
+}
+
+.mozo-avatar-circle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F05A22, #D94E1B);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.mozo-avatar-circle.admin {
+  background: linear-gradient(135deg, #111827, #374151);
+}
+
+.mozo-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mozo-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+}
+
+.mozo-role-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #E0E7FF;
+  color: #3730A3;
+  letter-spacing: 0.5px;
+}
+
+.mozo-role-badge.badge-admin {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.pin-ready-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 3px #ECFDF5;
+}
+
+/* Chip Mozo Seleccionado */
+.target-mozo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #F3F4F6;
+  font-size: 13px;
+  color: var(--fc-text-secondary);
+  margin-bottom: 16px;
+}
+
+.target-mozo-chip strong {
+  color: var(--fc-text-primary);
+  font-weight: 700;
+}
+
+/* Indicadores de PIN (Dots) */
+.pin-dots-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0 20px;
+  padding: 14px;
+  background: #F9FAFB;
+  border-radius: 14px;
+  border: 1px solid var(--fc-border-subtle);
+}
+
+.pin-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #D1D5DB;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pin-dot.filled {
+  background: var(--fc-brand-primary);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgba(240, 90, 34, 0.25);
+}
+
+/* Teclado Numérico Táctil */
+.pin-keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pin-keypad-grid.compact {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pin-btn {
+  height: 64px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--fc-border-subtle);
+  font-family: var(--font-sans);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(17, 24, 39, 0.04);
+  transition: all 0.12s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.pin-keypad-grid.compact .pin-btn {
+  height: 52px;
+  font-size: 22px;
+}
+
+.pin-btn:active {
+  transform: scale(0.94);
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.pin-btn.pin-btn-action {
+  background: #F9FAFB;
+  color: var(--fc-text-secondary);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.pin-btn.pin-btn-action:active {
+  background: #E5E7EB;
+}
+
+.btn-submit-pin {
+  width: 100%;
+  min-height: 54px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pin-error-banner {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+/* Topbar Mozo Activo y Botón Switch */
+.mozo-topbar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.mozo-avatar-mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--fc-brand-primary);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-switch-mozo {
+  background: #1F2937;
+  color: #F9FAFB;
+  border: 1px solid #374151;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-switch-mozo:hover {
+  background: #374151;
+  color: #FFFFFF;
+}
+
+/* Modal Cambio de Mozo */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-card-pin {
+  background: #FFFFFF;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+}
+
+.modal-subtitle {
+  font-size: 12.5px;
+  color: var(--fc-text-muted);
+  margin-top: 2px;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fc-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.btn-close-modal:hover {
+  background: #F3F4F6;
+  color: var(--fc-text-primary);
+}
+
+.mozo-switch-selector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.mozo-chip-modal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-border-subtle);
+  background: #F9FAFB;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mozo-chip-modal.active {
+  border-color: var(--fc-brand-primary);
+  background: #FFF7ED;
+  color: var(--fc-brand-primary);
+}
+
+.modal-actions-row {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-actions-row .btn-touch {
+  flex: 1;
+}

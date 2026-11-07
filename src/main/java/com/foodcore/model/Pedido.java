@@ -33,6 +33,7 @@ public class Pedido {
     private String clienteReferencia;
     private BigDecimal costoEnvio = BigDecimal.ZERO;
     private String repartidor;
+    private Integer idUsuarioCreador;
 
     private List<DetallePedido> detalles = new ArrayList<>();
 
@@ -108,6 +109,9 @@ public class Pedido {
 
     public String getRepartidor() { return repartidor; }
     public void setRepartidor(String repartidor) { this.repartidor = repartidor; }
+
+    public Integer getIdUsuarioCreador() { return idUsuarioCreador; }
+    public void setIdUsuarioCreador(Integer idUsuarioCreador) { this.idUsuarioCreador = idUsuarioCreador; }
 
     @Override
     public String toString() { return "Pedido #" + idPedido + " - Mesa " + numeroMesa + " (" + estado + ")"; }

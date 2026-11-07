@@ -12,6 +12,7 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
@@ -36,6 +37,8 @@ public class AuditoriaController {
 
     @FXML private StackPane rootAuditoriaStack;
     @FXML private Button btnActualizarAuditoria;
+    @FXML private ComboBox<String> cmbFiltroMozo;
+    private final List<RegistroAuditoria> todosEventos = new ArrayList<>();
 
     @FXML private TableView<RegistroAuditoria> tblAuditoria;
     @FXML private TableColumn<RegistroAuditoria, String> colIdAuditoria;
@@ -91,6 +94,9 @@ public class AuditoriaController {
         });
 
         tblAuditoria.setItems(listaAuditoria);
+        if (cmbFiltroMozo != null) {
+            cmbFiltroMozo.valueProperty().addListener((obs, oldVal, newVal) -> aplicarFiltroMozo(newVal));
+        }
         cargarEventosAuditoria();
     }
 
@@ -105,8 +111,47 @@ public class AuditoriaController {
             }
 
             final List<RegistroAuditoria> resultadoFinal = items;
-            Platform.runLater(() -> listaAuditoria.setAll(resultadoFinal));
+            Platform.runLater(() -> {
+                todosEventos.clear();
+                todosEventos.addAll(resultadoFinal);
+                actualizarComboMozos();
+                aplicarFiltroMozo(cmbFiltroMozo != null ? cmbFiltroMozo.getValue() : null);
+            });
         }).start();
+    }
+
+    private void actualizarComboMozos() {
+        if (cmbFiltroMozo == null) return;
+        String seleccionado = cmbFiltroMozo.getValue();
+        java.util.Set<String> usuarios = new java.util.TreeSet<>();
+        for (RegistroAuditoria reg : todosEventos) {
+            if (reg.getNombreUsuario() != null && !reg.getNombreUsuario().isBlank()) {
+                usuarios.add(reg.getNombreUsuario());
+            }
+        }
+        ObservableList<String> items = FXCollections.observableArrayList();
+        items.add("Todos los Mozos / Operadores");
+        items.addAll(usuarios);
+        cmbFiltroMozo.setItems(items);
+        if (seleccionado != null && items.contains(seleccionado)) {
+            cmbFiltroMozo.setValue(seleccionado);
+        } else {
+            cmbFiltroMozo.getSelectionModel().selectFirst();
+        }
+    }
+
+    public void aplicarFiltroMozo(String mozoSeleccionado) {
+        if (todosEventos.isEmpty() && !listaAuditoria.isEmpty()) {
+            todosEventos.addAll(listaAuditoria);
+        }
+        if (mozoSeleccionado == null || mozoSeleccionado.isBlank() || mozoSeleccionado.startsWith("Todos")) {
+            listaAuditoria.setAll(todosEventos);
+        } else {
+            List<RegistroAuditoria> filtrados = todosEventos.stream()
+                .filter(r -> mozoSeleccionado.equalsIgnoreCase(r.getNombreUsuario()))
+                .toList();
+            listaAuditoria.setAll(filtrados);
+        }
     }
 
     public ObservableList<RegistroAuditoria> getListaAuditoria() {

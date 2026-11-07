@@ -14,12 +14,18 @@
       <div class="brand-mark">FC</div>
       <div>
         <div class="brand-title">FoodCore · Comanda Móvil</div>
-        <span class="brand-subtitle" id="lblNombreMozo">Mateo Quispe (Mozo)</span>
+        <div class="mozo-topbar-info" id="badgeMozoActivo">
+          <span class="mozo-avatar-mini" id="avatarMozoActivo">MQ</span>
+          <span class="brand-subtitle" id="lblNombreMozo">Mateo Quispe (Mozo)</span>
+        </div>
       </div>
       <span class="mesa-active-pill" id="lblMesaActiva">Mesa 04</span>
     </div>
 
     <div class="topbar-actions">
+      <button type="button" id="btnCambiarMozo" class="btn-touch btn-switch-mozo" onclick="FoodCorePWA.abrirModalCambiarMozo()">
+        🔄 Cambiar Mozo
+      </button>
       <div class="connection-pill" id="connectionPill">
         <span class="status-dot online" id="statusDot"></span>
         <span id="statusText">API Online (8080)</span>
@@ -87,6 +93,59 @@
       </div>
     </aside>
   </main>
+
+  <!-- Modal Táctil de Cambio Rápido de Mozo (v4.2.0 Sub-Fase C.1) -->
+  <div id="modalCambiarMozo" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalMozoTitulo">
+    <div class="modal-card-pin">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalMozoTitulo">Cambio Rápido de Mozo</h3>
+          <p class="modal-subtitle">Ingrese el PIN del mozo que asume esta atención (el carrito se mantiene intacto).</p>
+        </div>
+        <button type="button" class="btn-close-modal" id="btnCerrarModalMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="mozo-switch-selector" id="modalMozosList">
+        <!-- Renderizado dinámicamente -->
+      </div>
+
+      <div class="pin-dots-display" id="modalPinDots">
+        <span class="pin-dot" id="mdot-0"></span>
+        <span class="pin-dot" id="mdot-1"></span>
+        <span class="pin-dot" id="mdot-2"></span>
+        <span class="pin-dot" id="mdot-3"></span>
+      </div>
+
+      <div id="modalPinErrorMsg" class="pin-error-banner" role="alert" style="display:none;"></div>
+
+      <div class="pin-keypad-grid compact">
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('1')">1</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('2')">2</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('3')">3</button>
+
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('4')">4</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('5')">5</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('6')">6</button>
+
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('7')">7</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('8')">8</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('9')">9</button>
+
+        <button type="button" class="pin-btn pin-btn-action" onclick="FoodCorePWA.limpiarPinModal()">C</button>
+        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('0')">0</button>
+        <button type="button" class="pin-btn pin-btn-action" onclick="FoodCorePWA.borrarDigitoPinModal()">⌫</button>
+      </div>
+
+      <div class="modal-actions-row">
+        <button type="button" class="btn-touch btn-dark-outline" id="btnCancelarCambioMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()">
+          Cancelar
+        </button>
+        <button type="button" class="btn-touch btn-primary" id="btnConfirmarCambioMozo" onclick="FoodCorePWA.confirmarCambioMozoPin()">
+          Confirmar Cambio
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="toastBanner" class="toast-banner"></div>
 

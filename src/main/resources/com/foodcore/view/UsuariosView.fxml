@@ -58,7 +58,8 @@
                                     <columns>
                                         <TableColumn fx:id="colUsername" prefWidth="135.0" text="Usuario" />
                                         <TableColumn fx:id="colNombre" prefWidth="215.0" text="Nombre Completo" />
-                                        <TableColumn fx:id="colRol" prefWidth="120.0" text="Rol RBAC" />
+                                        <TableColumn fx:id="colRol" prefWidth="110.0" text="Rol RBAC" />
+                                        <TableColumn fx:id="colPinConfigurado" prefWidth="125.0" text="PIN Tablet" />
                                         <TableColumn fx:id="colCambioClave" prefWidth="135.0" text="Cambio Clave" />
                                         <TableColumn fx:id="colEstado" prefWidth="105.0" text="Estado" />
                                     </columns>
@@ -130,6 +131,7 @@
 
                                 <Label styleClass="text-body-strong" text="Acción de Seguridad sobre Usuario Seleccionado" />
                                 <Button fx:id="btnResetearPassword" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleResetearPassword" styleClass="btn-secondary" text="Resetear Contraseña (cambio_password=1)" />
+                                <Button fx:id="btnConfigurarPin" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleConfigurarPin" styleClass="btn-primary" text="Configurar PIN Tablet (4-6 dígitos)" />
                             </children>
                         </VBox>
 

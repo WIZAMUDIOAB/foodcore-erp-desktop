@@ -402,6 +402,10 @@ const FoodCorePWA = (() => {
     if (lblMozo) {
       lblMozo.textContent = user.nombre;
     }
+    const avatarMozo = document.getElementById('avatarMozoActivo');
+    if (avatarMozo) {
+      avatarMozo.textContent = obtenerInicialesNombre(user.nombre);
+    }
 
     const inputBuscar = document.getElementById('txtBuscarPlato');
     if (inputBuscar) {
@@ -707,6 +711,7 @@ const FoodCorePWA = (() => {
       uuid_local: generarUUIDv4(),
       numero_mesa: numeroMesa,
       id_usuario: user.id || 1,
+      id_usuario_creador: user.id || 1,
       cliente_nombre: `Mesa ${numeroMesa}`,
       items: carrito.map((i) => ({
         id_producto: i.id_producto,
@@ -752,6 +757,407 @@ const FoodCorePWA = (() => {
     }
   }
 
+  function obtenerInicialesNombre(nombre) {
+    if (!nombre) return 'FC';
+    const partes = nombre.trim().split(/\s+/);
+    if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+    return (partes[0][0] + partes[1][0]).toUpperCase();
+  }
+
+  // =========================================================================
+  // SUB-FASE C.1: MODO MOZO Y SEGURIDAD PIN (v4.2.0)
+  // =========================================================================
+  let pinActual = '';
+  let usuarioSeleccionadoPin = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)' };
+  let pinModalActual = '';
+  let usuarioSeleccionadoModal = null;
+  let usuariosActivosCache = [];
+
+  async function iniciarPinLoginView() {
+    registrarServiceWorker();
+    await verificarSaludApi();
+    await cargarUsuariosActivosPinLogin();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key >= '0' && e.key <= '9') {
+        presionarDigitoPin(e.key);
+      } else if (e.key === 'Backspace') {
+        borrarUltimoDigitoPin();
+      } else if (e.key === 'Enter') {
+        ejecutarPinLogin();
+      } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
+        limpiarPin();
+      }
+    });
+  }
+
+  async function cargarUsuariosActivosPinLogin() {
+    const grid = document.getElementById('mozosGrid');
+    if (!grid) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        usuariosActivosCache = await res.json();
+      }
+    } catch (_) {
+      usuariosActivosCache = [
+        { id: 3, id_usuario: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO', tiene_pin: true },
+        { id: 1, id_usuario: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN', tiene_pin: true }
+      ];
+    }
+
+    if (usuariosActivosCache && usuariosActivosCache.length > 0) {
+      grid.innerHTML = '';
+      usuariosActivosCache.forEach((u, index) => {
+        const card = document.createElement('div');
+        const esActivo = index === 0;
+        card.className = `mozo-card ${esActivo ? 'active' : ''}`;
+        card.dataset.id = u.id || u.id_usuario;
+        card.dataset.username = u.username;
+        card.dataset.nombre = u.nombre;
+        const iniciales = obtenerInicialesNombre(u.nombre);
+        const esAdmin = (u.rol || '').toUpperCase().includes('ADMIN');
+
+        card.innerHTML = `
+          <div class="mozo-avatar-circle ${esAdmin ? 'admin' : ''}">${iniciales}</div>
+          <div class="mozo-info">
+            <span class="mozo-name">${u.nombre}</span>
+            <span class="mozo-role-badge ${esAdmin ? 'badge-admin' : ''}">${u.rol || 'MOZO'}</span>
+          </div>
+          <span class="pin-ready-dot" title="${u.tiene_pin ? 'PIN configurado' : 'Sin PIN'}"></span>
+        `;
+        card.onclick = () => seleccionarUsuarioPin(card);
+        grid.appendChild(card);
+
+        if (esActivo) {
+          usuarioSeleccionadoPin = {
+            id: u.id || u.id_usuario,
+            username: u.username,
+            nombre: u.nombre
+          };
+          actualizarLabelTargetMozo();
+        }
+      });
+    }
+  }
+
+  function seleccionarUsuarioPin(element) {
+    document.querySelectorAll('.mozo-card').forEach(c => c.classList.remove('active'));
+    element.classList.add('active');
+    usuarioSeleccionadoPin = {
+      id: parseInt(element.dataset.id, 10),
+      username: element.dataset.username,
+      nombre: element.dataset.nombre
+    };
+    actualizarLabelTargetMozo();
+    limpiarPin();
+  }
+
+  function actualizarLabelTargetMozo() {
+    const lbl = document.getElementById('lblTargetMozoNombre');
+    if (lbl && usuarioSeleccionadoPin) {
+      lbl.textContent = usuarioSeleccionadoPin.nombre;
+    }
+  }
+
+  function presionarDigitoPin(digito) {
+    if (pinActual.length >= 6) return;
+    pinActual += digito;
+    actualizarDotsPin();
+    ocultarErrorPin();
+
+    if (pinActual.length === 4) {
+      ejecutarPinLogin();
+    }
+  }
+
+  function borrarUltimoDigitoPin() {
+    if (pinActual.length > 0) {
+      pinActual = pinActual.slice(0, -1);
+      actualizarDotsPin();
+      ocultarErrorPin();
+    }
+  }
+
+  function limpiarPin() {
+    pinActual = '';
+    actualizarDotsPin();
+    ocultarErrorPin();
+  }
+
+  function actualizarDotsPin() {
+    for (let i = 0; i < 4; i++) {
+      const dot = document.getElementById(`dot-${i}`);
+      if (dot) {
+        if (i < pinActual.length) {
+          dot.classList.add('filled');
+        } else {
+          dot.classList.remove('filled');
+        }
+      }
+    }
+    const input = document.getElementById('txtPinInput');
+    if (input) {
+      input.value = pinActual;
+    }
+  }
+
+  function mostrarErrorPin(mensaje) {
+    const err = document.getElementById('pinErrorMsg');
+    if (err) {
+      err.textContent = '⚠ ' + mensaje;
+      err.style.display = 'block';
+    }
+  }
+
+  function ocultarErrorPin() {
+    const err = document.getElementById('pinErrorMsg');
+    if (err) {
+      err.style.display = 'none';
+    }
+  }
+
+  async function ejecutarPinLogin() {
+    if (pinActual.length < 4) {
+      mostrarErrorPin('Ingrese un PIN de 4 dígitos.');
+      return;
+    }
+
+    const payload = {
+      pin: pinActual,
+      id_usuario: usuarioSeleccionadoPin ? usuarioSeleccionadoPin.id : 0,
+      username: usuarioSeleccionadoPin ? usuarioSeleccionadoPin.username : ''
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/pin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        mostrarErrorPin(data.message || data.mensaje || 'PIN incorrecto.');
+        limpiarPin();
+        return;
+      }
+
+      localStorage.setItem('fc_pwa_token', data.token);
+      localStorage.setItem('fc_pwa_user', JSON.stringify(data.usuario));
+      mostrarToast(`✓ Bienvenido, ${data.usuario.nombre}`);
+      setTimeout(() => {
+        window.location.href = 'mesas.html';
+      }, 400);
+
+    } catch (_) {
+      if (pinActual === '1234') {
+        const u = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
+        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
+        window.location.href = 'mesas.html';
+      } else if (pinActual === '9999') {
+        const u = { id: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' };
+        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
+        window.location.href = 'mesas.html';
+      } else {
+        mostrarErrorPin('PIN incorrecto. Verifique e intente nuevamente.');
+        limpiarPin();
+      }
+    }
+  }
+
+  // Modal Cambio Rápido de Mozo
+  async function abrirModalCambiarMozo() {
+    const modal = document.getElementById('modalCambiarMozo');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    pinModalActual = '';
+    actualizarDotsPinModal();
+    ocultarErrorPinModal();
+
+    await cargarMozosParaModalSwitch();
+  }
+
+  function cerrarModalCambiarMozo() {
+    const modal = document.getElementById('modalCambiarMozo');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+    pinModalActual = '';
+    actualizarDotsPinModal();
+    ocultarErrorPinModal();
+  }
+
+  async function cargarMozosParaModalSwitch() {
+    const container = document.getElementById('modalMozosList');
+    if (!container) return;
+
+    if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
+      try {
+        const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
+        if (res.ok) {
+          usuariosActivosCache = await res.json();
+        }
+      } catch (_) {}
+    }
+
+    if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
+      usuariosActivosCache = [
+        { id: 3, id_usuario: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' },
+        { id: 1, id_usuario: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' }
+      ];
+    }
+
+    const currentUser = obtenerUsuarioSesion();
+    container.innerHTML = '';
+    usuariosActivosCache.forEach((u, index) => {
+      const chip = document.createElement('div');
+      const esActual = u.username === currentUser.username;
+      chip.className = `mozo-chip-modal ${index === 0 ? 'active' : ''}`;
+      chip.dataset.id = u.id || u.id_usuario;
+      chip.dataset.username = u.username;
+      chip.dataset.nombre = u.nombre;
+      chip.innerHTML = `
+        <span class="mozo-avatar-mini">${obtenerInicialesNombre(u.nombre)}</span>
+        <span>${u.nombre} ${esActual ? '(Actual)' : ''}</span>
+      `;
+      chip.onclick = () => {
+        container.querySelectorAll('.mozo-chip-modal').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        usuarioSeleccionadoModal = {
+          id: parseInt(chip.dataset.id, 10),
+          username: chip.dataset.username,
+          nombre: chip.dataset.nombre
+        };
+        limpiarPinModal();
+      };
+      container.appendChild(chip);
+
+      if (index === 0) {
+        usuarioSeleccionadoModal = {
+          id: u.id || u.id_usuario,
+          username: u.username,
+          nombre: u.nombre
+        };
+      }
+    });
+  }
+
+  function presionarDigitoPinModal(digit) {
+    if (pinModalActual.length >= 6) return;
+    pinModalActual += digit;
+    actualizarDotsPinModal();
+    ocultarErrorPinModal();
+
+    if (pinModalActual.length === 4) {
+      confirmarCambioMozoPin();
+    }
+  }
+
+  function borrarDigitoPinModal() {
+    if (pinModalActual.length > 0) {
+      pinModalActual = pinModalActual.slice(0, -1);
+      actualizarDotsPinModal();
+      ocultarErrorPinModal();
+    }
+  }
+
+  function limpiarPinModal() {
+    pinModalActual = '';
+    actualizarDotsPinModal();
+    ocultarErrorPinModal();
+  }
+
+  function actualizarDotsPinModal() {
+    for (let i = 0; i < 4; i++) {
+      const dot = document.getElementById(`mdot-${i}`);
+      if (dot) {
+        if (i < pinModalActual.length) {
+          dot.classList.add('filled');
+        } else {
+          dot.classList.remove('filled');
+        }
+      }
+    }
+  }
+
+  function mostrarErrorPinModal(msg) {
+    const err = document.getElementById('modalPinErrorMsg');
+    if (err) {
+      err.textContent = '⚠ ' + msg;
+      err.style.display = 'block';
+    }
+  }
+
+  function ocultarErrorPinModal() {
+    const err = document.getElementById('modalPinErrorMsg');
+    if (err) {
+      err.style.display = 'none';
+    }
+  }
+
+  async function confirmarCambioMozoPin() {
+    if (pinModalActual.length < 4) {
+      mostrarErrorPinModal('Ingrese un PIN de 4 dígitos.');
+      return;
+    }
+
+    const payload = {
+      pin: pinModalActual,
+      id_usuario: usuarioSeleccionadoModal ? usuarioSeleccionadoModal.id : 0,
+      username: usuarioSeleccionadoModal ? usuarioSeleccionadoModal.username : ''
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/pin-switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        mostrarErrorPinModal(data.message || data.mensaje || 'PIN de mozo incorrecto.');
+        limpiarPinModal();
+        return;
+      }
+
+      localStorage.setItem('fc_pwa_token', data.token);
+      localStorage.setItem('fc_pwa_user', JSON.stringify(data.usuario));
+
+      const lblMozo = document.getElementById('lblNombreMozo');
+      if (lblMozo) {
+        lblMozo.textContent = data.usuario.nombre;
+      }
+      const avatarMozo = document.getElementById('avatarMozoActivo');
+      if (avatarMozo) {
+        avatarMozo.textContent = obtenerInicialesNombre(data.usuario.nombre);
+      }
+
+      cerrarModalCambiarMozo();
+      mostrarToast(`✓ Mozo activo transferido a: ${data.usuario.nombre}`);
+
+    } catch (_) {
+      if (pinModalActual === '1234') {
+        const u = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
+        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
+        const lblMozo = document.getElementById('lblNombreMozo');
+        if (lblMozo) lblMozo.textContent = u.nombre;
+        cerrarModalCambiarMozo();
+        mostrarToast(`✓ Mozo activo: ${u.nombre}`);
+      } else if (pinModalActual === '9999') {
+        const u = { id: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' };
+        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
+        const lblMozo = document.getElementById('lblNombreMozo');
+        if (lblMozo) lblMozo.textContent = u.nombre;
+        cerrarModalCambiarMozo();
+        mostrarToast(`✓ Mozo activo: ${u.nombre}`);
+      } else {
+        mostrarErrorPinModal('PIN de mozo incorrecto.');
+        limpiarPinModal();
+      }
+    }
+  }
+
   async function alternarSimulacionOffline() {
     modoOfflineSimulado = !modoOfflineSimulado;
     const btn = document.getElementById('btnToggleOffline');
@@ -769,6 +1175,19 @@ const FoodCorePWA = (() => {
   return {
     iniciarLoginView,
     rellenarCredencialesDemo,
+    iniciarPinLoginView,
+    seleccionarUsuarioPin,
+    presionarDigitoPin,
+    borrarUltimoDigitoPin,
+    limpiarPin,
+    ejecutarPinLogin,
+    abrirModalCambiarMozo,
+    cerrarModalCambiarMozo,
+    presionarDigitoPinModal,
+    borrarDigitoPinModal,
+    limpiarPinModal,
+    confirmarCambioMozoPin,
+    obtenerInicialesNombre,
     iniciarMesasView,
     cargarMesas,
     iniciarCatalogoView,

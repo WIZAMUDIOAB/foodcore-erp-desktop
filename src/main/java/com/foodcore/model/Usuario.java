@@ -23,6 +23,7 @@ public class Usuario {
     // Campos RRHH (SPEC Sub-Fase 4B)
     private String dni;
     private String pin;
+    private String pinHash;
     private double sueldoBase = 1200.00;
     private String horarioLaboral = "08:00-16:00";
     private LocalTime horaEntradaProgramada = LocalTime.of(8, 0);
@@ -151,6 +152,14 @@ public class Usuario {
     public String getPin() { return pin; }
 
     public void setPin(String pin) { this.pin = pin; }
+
+    public String getPinHash() { return pinHash; }
+
+    public void setPinHash(String pinHash) { this.pinHash = pinHash; }
+
+    public boolean isPinConfigurado() {
+        return (pinHash != null && !pinHash.isBlank()) || (pin != null && !pin.isBlank());
+    }
 
     public double getSueldoBase() { return sueldoBase; }
 

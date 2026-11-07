@@ -68,6 +68,11 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                         if (tsUltimo != null) {
                             u.setUltimoLogin(tsUltimo.toLocalDateTime());
                         }
+                        try {
+                            u.setDni(rs.getString("dni"));
+                            u.setPin(rs.getString("pin"));
+                            u.setPinHash(rs.getString("pin_hash"));
+                        } catch (SQLException ignored) {}
                     } catch (SQLException ignoredCol) {
                         u.setIntentosFallidos(0);
                     }
@@ -241,6 +246,63 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         }
     }
 
+    @Override
+    public boolean actualizarPin(Connection conn, int idUsuario, String pinPlano, String pinHash) throws SQLException {
+        String sql = "UPDATE usuario SET pin = ?, pin_hash = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, pinPlano);
+            ps.setString(2, pinHash);
+            ps.setInt(3, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String pinPlano) throws SQLException {
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, CONCAT(COALESCE(e.nombres, u.username), ' ', COALESCE(e.apellidos, '')) AS empleado_nombre "
+                + "FROM usuario u "
+                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.id_usuario = ? AND u.activo = 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Usuario u = mapearUsuarioCompleto(rs);
+                    if (verificarPin(pinPlano, u)) {
+                        return Optional.of(u);
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Usuario> autenticarPorPinGeneral(Connection conn, String pinPlano) throws SQLException {
+        List<Usuario> activos = listarTodosActivos(conn);
+        for (Usuario u : activos) {
+            if (verificarPin(pinPlano, u)) {
+                return Optional.of(u);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean verificarPin(String pinPlano, Usuario u) {
+        if (pinPlano == null || pinPlano.isBlank()) {
+            return false;
+        }
+        String hash = u.getPinHash();
+        if (hash != null && hash.startsWith("$2")) {
+            if (encriptador.verificar(pinPlano, hash)) {
+                return true;
+            }
+        }
+        // Fallback a pin en texto plano si existe
+        return pinPlano.equals(u.getPin());
+    }
+
     private Usuario mapearUsuarioCompleto(ResultSet rs) throws SQLException {
         Usuario u = new Usuario();
         u.setIdUsuario(rs.getInt("id_usuario"));
@@ -255,6 +317,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         try {
             u.setDni(rs.getString("dni"));
             u.setPin(rs.getString("pin"));
+            u.setPinHash(rs.getString("pin_hash"));
             u.setSueldoBase(rs.getDouble("sueldo_base"));
             u.setHorarioLaboral(rs.getString("horario_laboral"));
             Time te = rs.getTime("hora_entrada_programada");

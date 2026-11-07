@@ -26,4 +26,7 @@ public interface UsuarioDAO {
     boolean actualizarDatosLaborales(Connection conn, int idUsuario, String dni, String pin,
                                      double sueldoBase, String horarioLaboral,
                                      LocalTime horaEntrada, LocalTime horaSalida) throws SQLException;
+    boolean actualizarPin(Connection conn, int idUsuario, String pinPlano, String pinHash) throws SQLException;
+    Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String pinPlano) throws SQLException;
+    Optional<Usuario> autenticarPorPinGeneral(Connection conn, String pinPlano) throws SQLException;
 }
