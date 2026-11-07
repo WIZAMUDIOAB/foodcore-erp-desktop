@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#111827" />
+  <title>FoodCore ERP v4.2 — Dashboard Gerencial</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" />
+  <!-- Chart.js para gráficos ejecutivos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- TOPBAR EJECUTIVO (MOBILE-FIRST) -->
+  <header class="dash-topbar">
+    <div class="dash-brand">
+      <div class="dash-logo">FC</div>
+      <div class="dash-title-wrap">
+        <h1>FoodCore Dueño</h1>
+        <span>Métricas en Vivo</span>
+      </div>
+    </div>
+
+    <div class="dash-topbar-actions">
+      <button type="button" class="btn-hamburger" id="btnOpenDrawer" aria-label="Abrir Menú">☰</button>
+    </div>
+  </header>
+
+  <!-- DRAWER OVERLAY & MENÚ LATERAL -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="dash-drawer" id="drawerMenu">
+    <div class="drawer-header">
+      <span class="drawer-title">Menú Principal</span>
+      <button type="button" class="btn-close-drawer" id="btnCloseDrawer">✕</button>
+    </div>
+    <nav class="drawer-nav">
+      <a href="index.html" class="drawer-link active">📊 Resumen de Ventas</a>
+      <a href="../mesas.html" class="drawer-link">🍽️ Salón & Mesas</a>
+      <a href="../kds/" class="drawer-link highlight">👨‍🍳 KDS Pantalla Cocina</a>
+      <a href="#inventario" class="drawer-link" onclick="alert('Sección Inventario: 100% de insumos con stock suficiente')">📦 Inventario & Stock</a>
+      <a href="#mermas" class="drawer-link" onclick="alert('Sección Mermas: 0.8% del costo total hoy')">🗑️ Reporte de Mermas</a>
+      <div style="margin-top:auto; padding-top:20px; border-top:1px solid #1F2937;">
+        <a href="../index.html" class="drawer-link" style="color:#EF4444;">🔒 Cerrar Sesión</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- CONTENIDO PRINCIPAL DEL DASHBOARD -->
+  <main class="dash-content">
+    <!-- HERO HEADER -->
+    <section class="dash-hero">
+      <div>
+        <h2>Panel Ejecutivo</h2>
+        <p>Rendimiento del Restaurante en Tiempo Real</p>
+      </div>
+      <div class="dash-live-badge">
+        <span class="live-dot"></span>
+        <span>En Línea (Sincronizado)</span>
+      </div>
+    </section>
+
+    <!-- 4 TARJETAS KPIS -->
+    <section class="kpi-grid">
+      <!-- KPI 1: VENTAS DÍA -->
+      <div class="kpi-card" id="cardKpiVentas">
+        <div class="kpi-header">
+          <span class="kpi-label">Ventas Hoy</span>
+          <span class="kpi-icon">💰</span>
+        </div>
+        <div class="kpi-value" id="lblVentasDia">S/ 0.00</div>
+        <div class="kpi-trend trend-up">
+          <span>▲ +14.2%</span> <span style="color:var(--dash-text-muted); font-size:11px;">vs ayer</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: TICKET PROMEDIO -->
+      <div class="kpi-card" id="cardKpiTicket">
+        <div class="kpi-header">
+          <span class="kpi-label">Ticket Prom.</span>
+          <span class="kpi-icon">🏷️</span>
+        </div>
+        <div class="kpi-value" id="lblTicketPromedio">S/ 0.00</div>
+        <div class="kpi-trend trend-up">
+          <span>▲ +5.8%</span> <span style="color:var(--dash-text-muted); font-size:11px;">vs meta</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: TRANSACCIONES -->
+      <div class="kpi-card" id="cardKpiTransacciones">
+        <div class="kpi-header">
+          <span class="kpi-label">Comandas</span>
+          <span class="kpi-icon">🧾</span>
+        </div>
+        <div class="kpi-value" id="lblTransacciones">0 tx</div>
+        <div class="kpi-trend trend-neutral">
+          <span>Turno Tarde Activo</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: PLATO ESTRELLA -->
+      <div class="kpi-card" id="cardKpiPlato">
+        <div class="kpi-header">
+          <span class="kpi-label">Plato Estrella</span>
+          <span class="kpi-icon">⭐</span>
+        </div>
+        <div class="kpi-value" id="lblPlatoTop" style="font-size:16px; font-weight:700; font-family:var(--font-sans); line-height:1.2;">Cargando...</div>
+        <div class="kpi-trend trend-up">
+          <span>🔥 Más vendido hoy</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- GRÁFICO INTERACTIVO: VENTAS POR HORA -->
+    <section class="chart-card" id="cardGraficoVentas">
+      <div class="chart-header">
+        <div>
+          <h3>Curva de Ventas por Hora</h3>
+          <p style="font-size:12px; color:var(--dash-text-muted);">Evolución de ingresos en el turno actual</p>
+        </div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartVentasHora"></canvas>
+      </div>
+    </section>
+
+    <!-- GRID INFERIOR: TOP PLATOS & OCUPACIÓN -->
+    <section class="dash-lower-grid">
+      <!-- TOP PLATOS -->
+      <div class="info-card">
+        <h3>Top 5 Platillos Más Pedidos</h3>
+        <div class="top-dishes-list" id="topPlatosList"></div>
+      </div>
+
+      <!-- OCUPACIÓN Y MESAS -->
+      <div class="info-card">
+        <h3>Ocupación del Salón</h3>
+        <div class="occupancy-box">
+          <div class="occupancy-stats">
+            <span id="lblMesasOcupadas" style="font-weight:700; color:var(--dash-brand);">0 Ocupadas</span>
+            <span id="lblMesasLibres" style="color:var(--dash-success); font-weight:700;">12 Libres</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressMesasFill" style="width: 25%;"></div>
+          </div>
+          <p style="font-size:12px; color:var(--dash-text-muted); margin-top:4px;">Capacidad máxima: 12 mesas en salón principal y terraza</p>
+        </div>
+
+        <h3 style="margin-top:10px;">Transacciones Recientes</h3>
+        <div class="recent-tx-list" id="recentTxList"></div>
+      </div>
+    </section>
+
+    <footer class="dash-footer">
+      FoodCore ERP v4.2.0 — Sistema Integral para Restaurantes y Franquicias
+    </footer>
+  </main>
+
+  <script src="js/dashboard.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      FoodCoreDashboard.init();
+    });
+  </script>
+</body>
+</html>

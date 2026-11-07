@@ -235,7 +235,9 @@ public class ApiServer {
         // Sub-Fase C.2: KDS (Cocina / Bar)
         app.get("/api/kds/comandas", this::handleKdsComandas);
         app.get("/api/kds/items", this::handleKdsItems);
+        app.get("/api/kds/pendientes", this::handleKdsItems);
         app.patch("/api/kds/items/{id}/estado", this::handleActualizarEstadoItemKds);
+        app.patch("/api/kds/{id}/estado", this::handleActualizarEstadoItemKds);
         app.patch("/api/pedidos/{id}/estado", this::handleActualizarEstadoPedido);
 
         // Sub-Fase C.2: Caja (Turnos, Arqueo Z y Cobro)
@@ -246,9 +248,16 @@ public class ApiServer {
 
         // Sub-Fase C.2: Dashboard (KPIs, Ventas por hora, Top Platos, Recientes)
         app.get("/api/dashboard/kpis", this::handleDashboardKpis);
+        app.get("/api/reportes/dashboard", this::handleDashboardKpis);
         app.get("/api/dashboard/ventas-por-hora", this::handleDashboardVentasPorHora);
         app.get("/api/dashboard/top-platos", this::handleDashboardTopPlatos);
         app.get("/api/dashboard/ventas-recientes", this::handleDashboardVentasRecientes);
+
+        // Rutas directas para PWAs KDS y Dashboard
+        app.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
+        app.get("/kds/", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
+        app.get("/dashboard", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
+        app.get("/dashboard/", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
 
         // Fallback para servir index.html en la raíz si se accede a /
         app.get("/", ctx -> {
@@ -263,6 +272,21 @@ public class ApiServer {
 
         app.start();
         LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + httpPort + ") y HTTPS SSL (puerto " + httpsPort + ")");
+    }
+
+    private void servirPwaHtml(Context ctx, String ruta) {
+        try {
+            File f = new File(ruta);
+            if (f.exists()) {
+                ctx.contentType("text/html; charset=UTF-8");
+                ctx.result(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+            } else {
+                ctx.status(404).result("PWA no encontrada: " + ruta);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Error sirviendo " + ruta, e);
+            ctx.status(500).result("Error interno sirviendo PWA");
+        }
     }
 
     public int getPuertoHttpsActual() {
@@ -1383,6 +1407,18 @@ public class ApiServer {
             it2.put("notas", "Con hierbabuena");
             it2.put("estado_cocina", "EN_PREPARACION");
             it2.put("numero_mesa", "04");
+            it2.put("enviado_en", Instant.now().minusSeconds(120).toString());
+
+            ObjectNode it3 = root.addObject();
+            it3.put("id_detalle_pedido", 503);
+            it3.put("id_pedido", 102);
+            it3.put("id_producto", 2);
+            it3.put("nombre", "Lomo Saltado Criollo");
+            it3.put("cantidad", 1);
+            it3.put("notas", "Término 3/4");
+            it3.put("estado_cocina", "PENDIENTE");
+            it3.put("numero_mesa", "02");
+            it3.put("enviado_en", Instant.now().minusSeconds(420).toString());
             it2.put("enviado_en", Instant.now().minusSeconds(120).toString());
         }
 

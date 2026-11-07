@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0D0E11" />
+  <title>FoodCore ERP v4.2 — KDS Cocina & Bar</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/kds.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" />
+</head>
+<body>
+  <!-- HEADER KDS (MODO OSCURO SAAS) -->
+  <header class="kds-topbar">
+    <div class="kds-brand">
+      <div class="kds-logo">FC</div>
+      <div class="kds-title-wrap">
+        <h1>KDS Cocina & Bar</h1>
+        <span>Estación Central — Turno Activo</span>
+      </div>
+    </div>
+
+    <div class="kds-topbar-center">
+      <button type="button" class="kds-filter-btn active" data-estacion="TODOS">Todos los Platos</button>
+      <button type="button" class="kds-filter-btn" data-estacion="COCINA">🍳 Cocina Caliente</button>
+      <button type="button" class="kds-filter-btn" data-estacion="BAR">🍹 Bar & Bebidas</button>
+    </div>
+
+    <div class="kds-topbar-right">
+      <div class="kds-clock" id="lblReloj">12:00:00</div>
+      <div class="kds-status-pill">
+        <span class="kds-dot"></span>
+        <span id="lblEstadoConexion">En Línea</span>
+      </div>
+      <a href="../mesas.html" class="btn-nav-touch">🍽 Ir a Salón</a>
+    </div>
+  </header>
+
+  <!-- TABLERO KANBAN KDS -->
+  <main class="kds-board">
+    <!-- COLUMNA 1: PENDIENTES -->
+    <section class="kds-column" id="colWrapperPendiente">
+      <div class="kds-col-header">
+        <div class="col-header-title">
+          <span class="col-indicator ind-pendiente"></span>
+          <h2>Pendiente</h2>
+        </div>
+        <span class="kds-badge-count" id="countPendiente">0</span>
+      </div>
+      <div class="kds-cards-container" id="colPendiente"></div>
+    </section>
+
+    <!-- COLUMNA 2: EN PREPARACIÓN -->
+    <section class="kds-column" id="colWrapperPreparacion">
+      <div class="kds-col-header">
+        <div class="col-header-title">
+          <span class="col-indicator ind-preparando"></span>
+          <h2>En Preparación</h2>
+        </div>
+        <span class="kds-badge-count" id="countPreparacion">0</span>
+      </div>
+      <div class="kds-cards-container" id="colPreparacion"></div>
+    </section>
+
+    <!-- COLUMNA 3: LISTO PARA SERVIR -->
+    <section class="kds-column" id="colWrapperListo">
+      <div class="kds-col-header">
+        <div class="col-header-title">
+          <span class="col-indicator ind-listo"></span>
+          <h2>Listo para Servir</h2>
+        </div>
+        <span class="kds-badge-count" id="countListo">0</span>
+      </div>
+      <div class="kds-cards-container" id="colListo"></div>
+    </section>
+  </main>
+
+  <script src="js/kds.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      FoodCoreKDS.init();
+    });
+  </script>
+</body>
+</html>

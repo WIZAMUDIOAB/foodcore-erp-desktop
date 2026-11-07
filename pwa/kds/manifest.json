@@ -1,0 +1,16 @@
+{
+  "name": "FoodCore KDS — Cocina y Bar",
+  "short_name": "FoodCore KDS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#121417",
+  "theme_color": "#0D0E11",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "../img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
