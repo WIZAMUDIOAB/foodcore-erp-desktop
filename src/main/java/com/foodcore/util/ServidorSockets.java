@@ -36,7 +36,11 @@ public class ServidorSockets {
 
     private static ServidorSockets instance;
     private ServerSocket serverSocket;
-    private ExecutorService threadPool = Executors.newCachedThreadPool();
+    private ExecutorService threadPool = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "ServidorSockets-Worker");
+        t.setDaemon(true);
+        return t;
+    });
     private final Set<PrintWriter> clientesConectados = Collections.synchronizedSet(new HashSet<>());
     private final TerminalAuthService terminalAuthService = new TerminalAuthService();
     private final OutboxRepository outboxRepository = new OutboxRepository();
@@ -63,7 +67,11 @@ public class ServidorSockets {
             return;
         }
         if (threadPool.isShutdown()) {
-            threadPool = Executors.newCachedThreadPool();
+            threadPool = Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "ServidorSockets-Worker");
+                t.setDaemon(true);
+                return t;
+            });
         }
         this.puertoActual = puerto;
         corriendo = true;

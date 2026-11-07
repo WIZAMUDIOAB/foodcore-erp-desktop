@@ -2,6 +2,7 @@ package com.foodcore.model;
 
 public class Rol {
     private int idRol;
+    private String codigo;
     private String nombre;
     private String descripcion;
     private boolean estado;
@@ -13,10 +14,14 @@ public class Rol {
         this.nombre = nombre;
         this.descripcion = descripcion;
         this.estado = estado;
+        this.codigo = nombre;
     }
 
     public int getIdRol() { return idRol; }
     public void setIdRol(int idRol) { this.idRol = idRol; }
+
+    public String getCodigo() { return codigo != null ? codigo : nombre; }
+    public void setCodigo(String codigo) { this.codigo = codigo; }
 
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }

@@ -1,0 +1,82 @@
+{
+  "info": {
+    "name": "FoodCore ERP v4.0 — API REST & Tablet PWA",
+    "_postman_id": "4f8c9b12-2026-4a91-9e10-foodcorev400",
+    "description": "Colección oficial de endpoints Javalin (:8080) para Tablets PWA de Mozos con soporte Offline-First e idempotencia por uuid_local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. POST /api/auth/login — Autenticación JWT",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"mozo\",\n  \"password\": \"Mozo2026!\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/auth/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. GET /api/productos — Catálogo de Platos",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/productos",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "productos"]
+        }
+      }
+    },
+    {
+      "name": "3. GET /api/mesas — Estado de Mesas del Salón",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/mesas",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "mesas"]
+        }
+      }
+    },
+    {
+      "name": "4. POST /api/pedidos — Crear Pedido Idempotente y Enviar a KDS",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"uuid_local\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"numero_mesa\": \"04\",\n  \"id_usuario\": 1,\n  \"items\": [\n    {\n      \"id_producto\": 1,\n      \"nombre\": \"Hamburguesa Royal Doble\",\n      \"cantidad\": 2,\n      \"precio_unitario\": 24.50,\n      \"notas\": \"Término 3/4, sin mayonesa\"\n    },\n    {\n      \"id_producto\": 3,\n      \"nombre\": \"Alitas BBQ Picantes x6\",\n      \"cantidad\": 1,\n      \"precio_unitario\": 22.00,\n      \"notas\": \"Salsa BBQ aparte\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/pedidos",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "pedidos"]
+        }
+      }
+    }
+  ]
+}

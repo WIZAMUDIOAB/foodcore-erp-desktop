@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootDeliveryStack" prefHeight="768.0" prefWidth="1020.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.DeliveryController">
+    <children>
+        <BorderPane>
+            <!-- Cabecera -->
+            <top>
+                <VBox spacing="16.0" styleClass="view-topbar" BorderPane.alignment="CENTER">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Tablero de Entregas y Delivery" />
+                                                <Label fx:id="lblContadorBadge" styleClass="badge-pill-accent" text="0 ACTIVOS" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Despacho de pedidos a domicilio, control de repartidores y estados de ruta" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="btnNuevoDeliveryDirecto" mnemonicParsing="false" onAction="#handleCrearDelivery" styleClass="btn-primary" text="+ Registrar Pedido Delivery" />
+                                <Button fx:id="btnActualizarTablero" mnemonicParsing="false" onAction="#cargarPedidosDelivery" styleClass="btn-secondary" text="Actualizar" />
+                            </children>
+                        </HBox>
+
+                        <Region styleClass="divider-horizontal" />
+
+                        <!-- Asignación Rápida de Repartidor -->
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <Label styleClass="text-body-strong" text="Asignar Repartidor al Seleccionado:" />
+                                <TextField fx:id="txtRepartidor" promptText="Nombre del Motorizado / Courier..." styleClass="input-field" prefWidth="260.0" />
+                                <Button fx:id="btnAsignarRepartidor" mnemonicParsing="false" onAction="#handleAsignarRepartidor" styleClass="btn-secondary" text="Asignar" />
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnPasarEnCamino" mnemonicParsing="false" onAction="#handlePasarEnCamino" styleClass="btn-warning" text="Marcar EN CAMINO" />
+                                <Button fx:id="btnMarcarEntregado" mnemonicParsing="false" onAction="#handleMarcarEntregado" styleClass="btn-success" text="Marcar ENTREGADO" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Tabla de Pedidos Delivery -->
+            <center>
+                <VBox styleClass="kardex-table-wrapper" BorderPane.alignment="CENTER">
+                    <children>
+                        <TableView fx:id="tblDelivery" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="colIdPedido" prefWidth="90.0" text="Pedido #" />
+                                <TableColumn fx:id="colEstado" prefWidth="130.0" text="Estado Ruta" />
+                                <TableColumn fx:id="colCliente" prefWidth="180.0" text="Cliente" />
+                                <TableColumn fx:id="colTelefono" prefWidth="120.0" text="Teléfono" />
+                                <TableColumn fx:id="colDireccion" prefWidth="240.0" text="Dirección y Referencia" />
+                                <TableColumn fx:id="colEnvio" prefWidth="100.0" text="Envío" />
+                                <TableColumn fx:id="colTotal" prefWidth="110.0" text="Total Pedido" />
+                                <TableColumn fx:id="colRepartidor" prefWidth="150.0" text="Repartidor Asignado" />
+                            </columns>
+                        </TableView>
+                    </children>
+                </VBox>
+            </center>
+        </BorderPane>
+    </children>
+</StackPane>

@@ -58,7 +58,23 @@ public class AutorizacionService {
         );
     }
 
+    private static final com.foodcore.dao.RolDAO ROL_DAO = new com.foodcore.dao.impl.RolDAOImpl();
+
     public static Set<Permiso> permisosPorDefectoParaRol(String codigoRol) {
+        if (codigoRol == null || codigoRol.isBlank()) {
+            return Collections.emptySet();
+        }
+        String codNorm = codigoRol.trim().toUpperCase();
+        try (java.sql.Connection conn = com.foodcore.util.ConexionBD.getConnection()) {
+            Set<Permiso> dinamicos = ROL_DAO.obtenerPermisosPorRol(conn, codNorm);
+            if (!dinamicos.isEmpty()) {
+                return dinamicos;
+            }
+        } catch (Exception ignored) {}
+        return MATRIZ_RBAC.getOrDefault(codNorm, Collections.emptySet());
+    }
+
+    public static Set<Permiso> permisosPorDefectoParaRolLegacy(String codigoRol) {
         if (codigoRol == null || codigoRol.isBlank()) {
             return Collections.emptySet();
         }

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootCajaStack" prefHeight="720.0" prefWidth="1040.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ArqueoCajaController">
+    <children>
+        <ScrollPane fitToWidth="true">
+            <content>
+                <StackPane styleClass="pos-catalog-panel">
+                    <children>
+                        <!-- Una columna centrada, ancho máximo 720px (§9) -->
+                        <VBox alignment="TOP_CENTER" maxWidth="720.0" prefWidth="720.0" spacing="20.0" styleClass="caja-centered-column">
+                            <children>
+
+                                <!-- Encabezado de Vista -->
+                                <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="surface-card">
+                                    <children>
+                                        <VBox spacing="2.0">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                                    <children>
+                                                        <Label styleClass="view-heading" text="Control de Caja, Arqueo y Cierre Z" />
+                                                        <Label fx:id="lblEstadoCajaBadge" styleClass="badge-pill-success" text="TURNO ABIERTO" />
+                                                    </children>
+                                                </HBox>
+                                                <Label styleClass="view-subheading" text="Cuadre de efectivo en gaveta, gastos de caja chica y cierre de turno" />
+                                            </children>
+                                        </VBox>
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblNombreCaja" styleClass="text-body-strong" text="Caja Principal 01" />
+                                    </children>
+                                </HBox>
+
+                                <!-- PANEL DE APERTURA (Si no hay caja abierta) -->
+                                <VBox fx:id="panelApertura" managed="false" spacing="14.0" styleClass="surface-card" visible="false">
+                                    <children>
+                                        <Label styleClass="text-h2" text="Apertura de Turno de Caja" />
+                                        <Label styleClass="text-body-secondary" text="Registre el fondo inicial en efectivo para habilitar cobros en el terminal POS." />
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Identificador de Terminal / Caja" />
+                                                <TextField fx:id="txtAperturaNombre" styleClass="input-field" text="Caja Principal 01" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Saldo Inicial en Efectivo (S/)" />
+                                                <TextField fx:id="txtAperturaMonto" promptText="100.00" styleClass="input-field" text="100.00" />
+                                            </children>
+                                        </VBox>
+                                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirTurnoCaja" styleClass="btn-primary" text="Abrir Turno de Caja" />
+                                    </children>
+                                </VBox>
+
+                                <!-- PANEL DE ARQUEO Y CIERRE Z (Si hay caja abierta) (§9 & §3.4) -->
+                                <VBox fx:id="panelArqueo" spacing="20.0">
+                                    <children>
+
+                                        <!-- 4 Cifras en Mono Grande: Saldo inicial, Teórico, Contado, Diferencia (§9) -->
+                                        <GridPane hgap="14.0" vgap="14.0">
+                                            <columnConstraints>
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                            </columnConstraints>
+                                            <rowConstraints>
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                            </rowConstraints>
+                                            <children>
+                                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="SALDO INICIAL (APERTURA)" />
+                                                        <Label fx:id="lblFondoApertura" styleClass="text-mono-lg" text="S/ 100.00" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="SALDO TEÓRICO EN SISTEMA" />
+                                                        <Label fx:id="lblTotalEsperado" styleClass="text-mono-lg" text="S/ 245.00" />
+                                                        <Label fx:id="lblTotalVentas" styleClass="text-caption" text="Ventas del turno: S/ 145.00" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="EFECTIVO CONTADO EN GAVETA" />
+                                                        <Label fx:id="lblMontoContado" styleClass="text-mono-lg" text="S/ 245.00" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="DIFERENCIA (CUADRE)" />
+                                                        <Label fx:id="lblDiferencia" styleClass="text-mono-lg-success" text="S/ 0.00" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </GridPane>
+
+                                        <!-- Input de 48px con foco naranja para Conteo Físico + Botón Registrar Gasto + Cerrar Turno (§9 & §3.4) -->
+                                        <VBox spacing="14.0" styleClass="surface-card">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Declaración de Efectivo Físico" />
+                                                <VBox spacing="6.0">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Monto físico contado en gaveta (S/)" />
+                                                        <TextField fx:id="txtEfectivoFisico" onKeyReleased="#calcularDiferencia" promptText="Ingrese el monto contado en efectivo" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <HBox alignment="CENTER_RIGHT" spacing="12.0">
+                                                    <children>
+                                                        <Button fx:id="btnRegistrarGasto" mnemonicParsing="false" onAction="#handleAbrirModalGasto" styleClass="btn-secondary" text="Registrar Gasto" />
+                                                        <Button fx:id="btnCerrarTurno" mnemonicParsing="false" onAction="#handleCerrarCaja" styleClass="btn-primary" text="Cerrar turno" />
+                                                    </children>
+                                                </HBox>
+                                            </children>
+                                        </VBox>
+
+                                        <!-- Tarjeta de Resumen Cierre Z con Tabla Mono y Totales por Medio de Pago (§9) -->
+                                        <VBox spacing="12.0" styleClass="surface-card">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                                    <children>
+                                                        <Label styleClass="text-h2" text="Resumen Cierre Z · Medios de Pago" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="badge-pill-neutral" text="AUDITORÍA FISCAL" />
+                                                    </children>
+                                                </HBox>
+                                                <TableView fx:id="tblCierreZ" prefHeight="196.0">
+                                                    <columns>
+                                                        <TableColumn fx:id="colMedioPago" prefWidth="260.0" text="Medio de Pago" />
+                                                        <TableColumn fx:id="colOperaciones" prefWidth="160.0" text="Operaciones" />
+                                                        <TableColumn fx:id="colTotalMedio" prefWidth="240.0" text="Total Recaudado (S/)" />
+                                                    </columns>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+
+                                    </children>
+                                </VBox>
+
+                            </children>
+                        </VBox>
+                    </children>
+                </StackPane>
+            </content>
+        </ScrollPane>
+    </children>
+</StackPane>

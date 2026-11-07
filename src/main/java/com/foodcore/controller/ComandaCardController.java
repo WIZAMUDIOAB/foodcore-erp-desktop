@@ -19,13 +19,15 @@ import javafx.util.Duration;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador de tarjeta individual de ítem KDS con semáforo de umbral (<5m verde, 5-10m ámbar, >10m rojo)
- * según SPEC-FOODCORE-v1.0 (§8.5; REMEDIATION R-08).
+ * Controlador de tarjeta individual de ítem KDS con barra superior de 4px según SLA
+ * (<5m verde, 5-10m ámbar, >10m rojo con pulso suave de 1.5s) y botones de 44px
+ * según UI-REDESIGN-SPEC-FOODCORE-v1.1 (§7) y SPEC-FOODCORE-v1.0 (§8.5).
  */
 public class ComandaCardController {
 
@@ -40,13 +42,16 @@ public class ComandaCardController {
     @FXML private Label lblEstado;
     @FXML private Button btnIniciar;
     @FXML private Button btnDespachar;
+    @FXML private Button btnEntregado;
 
     private int idPedido = 0;
     private int idDetallePedido = 0;
     private int segundosTranscurridos = 0;
+    private String estadoActual = "PENDIENTE";
     private String colorUmbral = "GREEN";
     private Timeline timer;
     private Consumer<ComandaCardController> onDespachadoListener;
+    private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
 
     public static String determinarColorPorSegundos(long segundos) {
@@ -64,6 +69,7 @@ public class ComandaCardController {
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnIniciar);
         AnimationUtils.attachTactileFeedback(btnDespachar);
+        AnimationUtils.attachTactileFeedback(btnEntregado);
         if (btnDespachar != null && (btnDespachar.getId() == null || btnDespachar.getId().isBlank())) {
             btnDespachar.setId("btnListo");
         }
@@ -87,7 +93,7 @@ public class ComandaCardController {
         if (btnIniciar != null && onIniciar != null) {
             btnIniciar.setOnAction(ev -> {
                 onIniciar.accept(item);
-                lblEstado.setText("Estado: EN_PREPARACION");
+                aplicarEstadoVisual("EN_PREPARACION");
             });
         }
         if (btnDespachar != null && onListo != null) {
@@ -95,23 +101,49 @@ public class ComandaCardController {
             btnDespachar.setOnAction(ev -> {
                 stopTimer();
                 onListo.accept(item);
-                lblEstado.setText("Estado: LISTO");
+                aplicarEstadoVisual("LISTO");
             });
         }
     }
 
     public void initData(String mesa, String comanda, String estado) {
-        lblNumeroMesa.setText("MESA " + mesa);
+        if (mesa != null && (mesa.toUpperCase().contains("DELIVERY") || mesa.toUpperCase().contains("DL-"))) {
+            lblNumeroMesa.setText("DELIVERY " + mesa);
+            lblNumeroMesa.getStyleClass().add("badge-pill-accent");
+        } else if (mesa != null && (mesa.toUpperCase().contains("LLEVAR") || mesa.toUpperCase().contains("TK-"))) {
+            lblNumeroMesa.setText("PARA LLEVAR " + mesa);
+            lblNumeroMesa.getStyleClass().add("badge-pill-accent");
+        } else {
+            lblNumeroMesa.setText("MESA " + mesa);
+        }
         lblNumeroComanda.setText("Comanda #" + comanda);
+        aplicarEstadoVisual(estado != null ? estado : "PENDIENTE");
+    }
+
+    private void aplicarEstadoVisual(String estado) {
+        this.estadoActual = estado;
         lblEstado.setText("Estado: " + estado);
         if ("EN_PREPARACION".equalsIgnoreCase(estado)) {
-            btnIniciar.setDisable(true);
-            btnIniciar.setText("En Cocina");
-            lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #f59e0b;");
-        } else if ("LISTO".equalsIgnoreCase(estado) || "ENTREGADO".equalsIgnoreCase(estado)) {
-            btnIniciar.setDisable(true);
-            btnIniciar.setText("Listo");
-            lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #10b981;");
+            if (btnIniciar != null) {
+                btnIniciar.setDisable(true);
+            }
+        } else if ("LISTO".equalsIgnoreCase(estado)) {
+            if (btnIniciar != null) {
+                btnIniciar.setDisable(true);
+            }
+            if (btnDespachar != null) {
+                btnDespachar.setDisable(true);
+            }
+        } else if ("ENTREGADO".equalsIgnoreCase(estado)) {
+            if (btnIniciar != null) {
+                btnIniciar.setDisable(true);
+            }
+            if (btnDespachar != null) {
+                btnDespachar.setDisable(true);
+            }
+            if (btnEntregado != null) {
+                btnEntregado.setDisable(true);
+            }
         }
     }
 
@@ -131,6 +163,10 @@ public class ComandaCardController {
         return idDetallePedido;
     }
 
+    public String getEstadoActual() {
+        return estadoActual;
+    }
+
     public void setSegundosTranscurridos(int segundos) {
         this.segundosTranscurridos = Math.max(0, segundos);
         actualizarEstiloTiempo();
@@ -148,21 +184,22 @@ public class ComandaCardController {
         if (timer != null) {
             timer.stop();
         }
+        AnimationUtils.setSoftPulse(cardContainer, false);
     }
 
     public void agregarPlato(String producto, int cantidad, String notas) {
-        VBox itemBox = new VBox(3);
+        VBox itemBox = new VBox(4);
         Label lblPlato = new Label(cantidad + "x  " + producto);
         lblPlato.setWrapText(true);
-        lblPlato.setMaxWidth(265);
-        lblPlato.setStyle("-fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #f9fafb;");
+        lblPlato.setMaxWidth(275);
+        lblPlato.getStyleClass().add("text-body-strong-inverse");
         itemBox.getChildren().add(lblPlato);
 
         if (notas != null && !notas.trim().isEmpty()) {
-            Label lblNota = new Label("↳ Nota: " + notas);
+            Label lblNota = new Label("Nota: " + notas);
             lblNota.setWrapText(true);
-            lblNota.setMaxWidth(265);
-            lblNota.setStyle("-fx-background-color: rgba(245, 158, 11, 0.14); -fx-text-fill: #fcd34d; -fx-padding: 2px 6px; -fx-background-radius: 4px; -fx-font-size: 11px; -fx-font-weight: 600;");
+            lblNota.setMaxWidth(275);
+            lblNota.getStyleClass().add("badge-pill-warning");
             itemBox.getChildren().add(lblNota);
         }
         vboxItems.getChildren().add(itemBox);
@@ -183,36 +220,33 @@ public class ComandaCardController {
         int sec = segundosTranscurridos % 60;
         lblTiempo.setText(String.format("%02d:%02d min", min, sec));
 
-        String baseCard = "-fx-background-color: #161920; -fx-background-radius: 10px; -fx-padding: 14px; -fx-border-width: 2px; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 3);";
         cardContainer.getStyleClass().removeAll(
             "kds-header-green", "kds-header-amber", "kds-header-red",
             "kds-card-green", "kds-card-amber", "kds-card-red"
         );
+        lblTiempo.getStyleClass().removeAll("kds-timer-green", "kds-timer-amber", "kds-timer-red");
 
         if (min >= 10) {
             colorUmbral = "RED";
             cardContainer.getStyleClass().addAll("kds-header-red", "kds-card-red");
-            cardContainer.setStyle(baseCard + " -fx-border-color: #ef4444;");
-            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #ef4444; -fx-font-size: 14px; -fx-background-color: rgba(239, 68, 68, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+            lblTiempo.getStyleClass().add("kds-timer-red");
+            AnimationUtils.setSoftPulse(cardContainer, true);
         } else if (min >= 5) {
             colorUmbral = "AMBER";
             cardContainer.getStyleClass().addAll("kds-header-amber", "kds-card-amber");
-            cardContainer.setStyle(baseCard + " -fx-border-color: #f59e0b;");
-            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #f59e0b; -fx-font-size: 14px; -fx-background-color: rgba(245, 158, 11, 0.18); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+            lblTiempo.getStyleClass().add("kds-timer-amber");
+            AnimationUtils.setSoftPulse(cardContainer, false);
         } else {
             colorUmbral = "GREEN";
             cardContainer.getStyleClass().addAll("kds-header-green", "kds-card-green");
-            cardContainer.setStyle(baseCard + " -fx-border-color: #10b981;");
-            lblTiempo.setStyle("-fx-font-weight: 800; -fx-text-fill: #10b981; -fx-font-size: 14px; -fx-background-color: rgba(16, 185, 129, 0.14); -fx-padding: 4px 8px; -fx-background-radius: 6px;");
+            lblTiempo.getStyleClass().add("kds-timer-green");
+            AnimationUtils.setSoftPulse(cardContainer, false);
         }
     }
 
     @FXML
     public void handleIniciar(ActionEvent event) {
-        lblEstado.setText("Estado: EN PREPARACIÓN");
-        lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #f59e0b;");
-        btnIniciar.setDisable(true);
-        btnIniciar.setText("En Cocina");
+        aplicarEstadoVisual("EN_PREPARACION");
 
         if (idDetallePedido > 0 || idPedido > 0) {
             new Thread(() -> {
@@ -228,13 +262,15 @@ public class ComandaCardController {
                 }
             }).start();
         }
+
+        if (onEstadoCambiadoListener != null) {
+            onEstadoCambiadoListener.accept(this, "EN_PREPARACION");
+        }
     }
 
     @FXML
     public void handleDespachar(ActionEvent event) {
-        stopTimer();
-        lblEstado.setText("Estado: LISTO / DESPACHADO");
-        lblEstado.setStyle("-fx-font-weight: 700; -fx-font-size: 11px; -fx-text-fill: #10b981;");
+        aplicarEstadoVisual("LISTO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
             new Thread(() -> {
@@ -257,6 +293,34 @@ public class ComandaCardController {
             }).start();
         }
 
+        if (onEstadoCambiadoListener != null) {
+            onEstadoCambiadoListener.accept(this, "LISTO");
+        } else if (onDespachadoListener != null) {
+            stopTimer();
+            onDespachadoListener.accept(this);
+        }
+    }
+
+    @FXML
+    public void handleEntregado(ActionEvent event) {
+        stopTimer();
+        aplicarEstadoVisual("ENTREGADO");
+
+        if (idDetallePedido > 0 || idPedido > 0) {
+            new Thread(() -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if (idDetallePedido > 0) {
+                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+                    }
+                    if (idPedido > 0) {
+                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                    }
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex);
+                }
+            }).start();
+        }
+
         if (onDespachadoListener != null) {
             onDespachadoListener.accept(this);
         }
@@ -264,6 +328,10 @@ public class ComandaCardController {
 
     public void setOnDespachadoListener(Consumer<ComandaCardController> listener) {
         this.onDespachadoListener = listener;
+    }
+
+    public void setOnEstadoCambiadoListener(BiConsumer<ComandaCardController, String> listener) {
+        this.onEstadoCambiadoListener = listener;
     }
 
     public VBox getCardContainer() {
@@ -280,5 +348,9 @@ public class ComandaCardController {
 
     public Button getBtnDespachar() {
         return btnDespachar;
+    }
+
+    public Button getBtnEntregado() {
+        return btnEntregado;
     }
 }

@@ -3,7 +3,9 @@ package com.foodcore.util;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DesgloseFiscal;
+import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
+import com.foodcore.model.Pedido;
 import com.foodcore.model.Venta;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
@@ -37,6 +39,7 @@ public class ImpresoraTermicaService {
     public static final int ANCHO_COLUMNAS = 48;
     public static final byte[] ESC_POS_INIT = new byte[]{0x1B, 0x40};
     public static final byte[] ESC_POS_CUT = new byte[]{0x1D, 0x56, 0x41, 0x10};
+    public static final byte[] ESC_POS_ABRIR_CAJON = new byte[]{0x1B, 0x70, 0x00, 0x19, (byte) 0xFA};
 
     private static final String SEPARADOR_DOBLE = "=".repeat(ANCHO_COLUMNAS);
     private static final String SEPARADOR_SIMPLE = "-".repeat(ANCHO_COLUMNAS);
@@ -210,8 +213,8 @@ public class ImpresoraTermicaService {
             return "";
         }
         String reemplazado = texto
-            .replace('ñ', 'n')
-            .replace('Ñ', 'N');
+            .replace('\u00f1', 'n')
+            .replace('\u00d1', 'N');
         String normalizado = Normalizer.normalize(reemplazado, Normalizer.Form.NFD);
         return normalizado.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     }
@@ -270,5 +273,112 @@ public class ImpresoraTermicaService {
             ? etq.substring(0, espacioDisponibleEtq)
             : String.format("%" + espacioDisponibleEtq + "s", etq);
         return etqFija + " " + mnt;
+    }
+
+    /**
+     * Envía pulso eléctrico ESC/POS al cajón monedero al cobrar en EFECTIVO (§4.1 SPEC-FOODCORE-v1.3).
+     */
+    public static boolean emitirPulsoAperturaCajon(String nombreImpresora) {
+        try {
+            javax.print.PrintService servicio = null;
+            if (nombreImpresora != null && !nombreImpresora.isBlank()) {
+                for (javax.print.PrintService ps : javax.print.PrintServiceLookup.lookupPrintServices(null, null)) {
+                    if (ps.getName().equalsIgnoreCase(nombreImpresora.trim())) {
+                        servicio = ps;
+                        break;
+                    }
+                }
+            }
+            if (servicio == null) {
+                servicio = javax.print.PrintServiceLookup.lookupDefaultPrintService();
+            }
+            if (servicio != null) {
+                javax.print.DocPrintJob job = servicio.createPrintJob();
+                javax.print.Doc doc = new javax.print.SimpleDoc(ESC_POS_ABRIR_CAJON, javax.print.DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+                job.print(doc, null);
+                LOGGER.info("Pulso de apertura de cajón monedero enviado a impresora: " + servicio.getName());
+                return true;
+            }
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "No se pudo enviar pulso físico de cajón (entorno sin hardware conectado).", ex);
+        }
+        return false;
+    }
+
+    /**
+     * Formatea las líneas del ticket de pre-cuenta de consumo (§8 SPEC Sub-Fase 4C).
+     */
+    public List<String> formatearLineasPreCuenta(Pedido pedido, List<DetallePedido> detalles) throws NegocioException {
+        if (pedido == null) {
+            throw new NegocioException("Los datos del pedido son obligatorios para emitir la pre-cuenta.");
+        }
+        if (detalles == null || detalles.isEmpty()) {
+            throw new NegocioException("La pre-cuenta debe contener al menos un ítem.");
+        }
+
+        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(pedido.getTotal());
+        List<String> lineas = new ArrayList<>();
+
+        lineas.add(SEPARADOR_DOBLE);
+        lineas.add(centrar("FOODCORE RESTOBAR"));
+        lineas.add(centrar("PRE-CUENTA DE CONSUMO"));
+        lineas.add(centrar("*** NO ES COMPROBANTE DE PAGO ***"));
+        lineas.add(SEPARADOR_SIMPLE);
+
+        String mesaStr = pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "01";
+        lineas.add(ajustarLinea("MESA   : " + mesaStr));
+        lineas.add(ajustarLinea("PEDIDO : #" + pedido.getIdPedido()));
+        lineas.add(ajustarLinea("FECHA  : " + LocalDateTime.now().format(FMT_FECHA)));
+        if (pedido.getClienteNombre() != null && !pedido.getClienteNombre().isBlank()) {
+            lineas.add(ajustarLinea("CLIENTE: " + pedido.getClienteNombre()));
+        }
+        lineas.add(SEPARADOR_SIMPLE);
+
+        lineas.add(alinearColumnas("CANT", "DESCRIPCION", "TOTAL"));
+        lineas.add(SEPARADOR_SIMPLE);
+
+        for (DetallePedido item : detalles) {
+            String nom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String totalFmt = String.format("S/ %.2f", item.getSubtotal());
+            lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nom, totalFmt));
+            if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
+                lineas.add(ajustarLinea(" * Nota: " + item.getNotasPreparacion()));
+            }
+        }
+
+        lineas.add(SEPARADOR_SIMPLE);
+        lineas.add(alinearEtiquetaMonto("OP. GRAVADA :", "S/ " + desglose.getSubtotalGravado().setScale(2, java.math.RoundingMode.HALF_UP)));
+        lineas.add(alinearEtiquetaMonto("I.G.V. (18%):", "S/ " + desglose.getIgv().setScale(2, java.math.RoundingMode.HALF_UP)));
+        lineas.add(SEPARADOR_DOBLE);
+        lineas.add(alinearEtiquetaMonto("TOTAL ESTIMADO:", "S/ " + pedido.getTotal().setScale(2, java.math.RoundingMode.HALF_UP)));
+        lineas.add(SEPARADOR_DOBLE);
+        lineas.add(centrar("Solicite su Boleta o Factura"));
+        lineas.add(centrar("al momento de pagar en caja"));
+        lineas.add(centrar("¡Muchas gracias por su visita!"));
+        return lineas;
+    }
+
+    public boolean imprimirPreCuenta(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
+        try {
+            List<String> lineas = formatearLineasPreCuenta(pedido, detalles);
+            escribirFallbackEnLog(lineas);
+            if (nombreImpresora != null && !nombreImpresora.isBlank()) {
+                try {
+                    byte[] bytesEscPos = generarBytesEscPos(lineas, true);
+                    PrintService printService = PrintServiceLookup.lookupDefaultPrintService();
+                    if (printService != null) {
+                        DocPrintJob job = printService.createPrintJob();
+                        Doc doc = new SimpleDoc(bytesEscPos, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+                        job.print(doc, null);
+                    }
+                } catch (Exception pe) {
+                    LOGGER.log(Level.WARNING, "No se pudo enviar pre-cuenta al spooler físico", pe);
+                }
+            }
+            return true;
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Error al emitir pre-cuenta", ex);
+            return false;
+        }
     }
 }

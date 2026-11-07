@@ -1,0 +1,80 @@
+### ============================================================================
+### FOODCORE ERP v4.0 — COLECCIÓN DE LLAMADAS A LA API REST (Javalin :8080)
+### Especificación: SPEC-FOODCORE-v4.0-API-PWA-UX (§2, §6)
+### ============================================================================
+
+@baseUrl = http://localhost:8080
+
+### 0. Health Check del Servidor Javalin
+GET {{baseUrl}}/api/health
+Accept: application/json
+
+### 1. Autenticación de Operador / Mozo (Retorna Token JWT HS256 y Datos del Usuario)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "mozo",
+  "password": "Mozo2026!"
+}
+
+### 2. Obtener Catálogo de Platos Disponibles (id, nombre, precio, imagen_url, categoria)
+GET {{baseUrl}}/api/productos
+Accept: application/json
+
+### 3. Obtener Estado Actual de las Mesas del Salón (01 a 12)
+GET {{baseUrl}}/api/mesas
+Accept: application/json
+
+### 4. Registrar Pedido y Enviar a Cocina KDS con Idempotencia (uuid_local)
+POST {{baseUrl}}/api/pedidos
+Content-Type: application/json
+
+{
+  "uuid_local": "550e8400-e29b-41d4-a716-446655440000",
+  "numero_mesa": "04",
+  "id_usuario": 1,
+  "cliente_nombre": "Mesa 04 - Salón Principal",
+  "items": [
+    {
+      "id_producto": 1,
+      "nombre": "Hamburguesa Royal Doble",
+      "cantidad": 2,
+      "precio_unitario": 24.50,
+      "notas": "Término 3/4, sin mayonesa"
+    },
+    {
+      "id_producto": 3,
+      "nombre": "Alitas BBQ Picantes x6",
+      "cantidad": 1,
+      "precio_unitario": 22.00,
+      "notas": "Salsa BBQ aparte"
+    },
+    {
+      "id_producto": 6,
+      "nombre": "Chicha Morada 1L",
+      "cantidad": 2,
+      "precio_unitario": 12.00,
+      "notas": "Helada"
+    }
+  ]
+}
+
+### 5. Reintento Idempotente desde IndexedDB Outbox (mismo uuid_local -> HTTP 200 sin duplicar)
+POST {{baseUrl}}/api/pedidos
+Content-Type: application/json
+
+{
+  "uuid_local": "550e8400-e29b-41d4-a716-446655440000",
+  "numero_mesa": "04",
+  "id_usuario": 1,
+  "items": [
+    {
+      "id_producto": 1,
+      "nombre": "Hamburguesa Royal Doble",
+      "cantidad": 2,
+      "precio_unitario": 24.50,
+      "notas": "Término 3/4, sin mayonesa"
+    }
+  ]
+}

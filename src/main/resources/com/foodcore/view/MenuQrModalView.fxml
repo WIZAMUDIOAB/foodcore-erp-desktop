@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox alignment="CENTER" prefHeight="580.0" prefWidth="480.0" spacing="16.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MenuQrModalController">
+
+    <!-- Header Modal -->
+    <VBox alignment="CENTER" spacing="4.0" styleClass="surface-card">
+        <HBox alignment="CENTER" spacing="8.0">
+            <Label styleClass="text-h2" text="📱 Menú Digital QR Dinámico" />
+            <Label styleClass="badge-pill-success" text="ZXING 3.5" />
+        </HBox>
+        <Label styleClass="text-caption-muted" text="Escanee con cualquier smartphone para ver la carta actualizada" />
+    </VBox>
+
+    <!-- Contenedor del Código QR -->
+    <VBox alignment="CENTER" prefHeight="260.0" prefWidth="260.0" spacing="10.0" style="-fx-background-color: white; -fx-padding: 16; -fx-background-radius: 16; -fx-border-color: #E2E8F0; -fx-border-radius: 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 12, 0, 0, 4);">
+        <ImageView fx:id="imgCodigoQr" fitHeight="220.0" fitWidth="220.0" pickOnBounds="true" preserveRatio="true" />
+        <Label fx:id="lblEstadoQr" styleClass="text-caption-muted" text="Código QR activo y sincronizado" />
+    </VBox>
+
+    <!-- URL Local o Externa -->
+    <VBox spacing="6.0" styleClass="surface-card">
+        <Label styleClass="text-caption-muted" text="ENLACE DIRECTO AL MENÚ DIGITAL HTML:" />
+        <HBox alignment="CENTER_LEFT" spacing="8.0">
+            <TextField fx:id="txtUrlMenu" editable="false" HBox.hgrow="ALWAYS" styleClass="search-box" />
+            <Button mnemonicParsing="false" onAction="#handleAbrirEnNavegador" styleClass="btn-secondary" text="🌐 Abrir" />
+        </HBox>
+    </VBox>
+
+    <!-- Acciones Inferiores -->
+    <HBox alignment="CENTER" spacing="12.0">
+        <Button fx:id="btnImprimirQr" mnemonicParsing="false" onAction="#handleImprimirQr" prefHeight="42.0" styleClass="btn-primary" text="🖨 Imprimir QR en Ticketera" />
+        <Button mnemonicParsing="false" onAction="#handleCerrar" prefHeight="42.0" styleClass="btn-secondary" text="Cerrar" />
+    </HBox>
+
+</VBox>

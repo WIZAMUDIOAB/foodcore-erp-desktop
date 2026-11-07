@@ -11,6 +11,7 @@ public class Producto {
     private BigDecimal precioVenta;
     private BigDecimal costoEstimado;
     private boolean disponible;
+    private String imagenUrl;
 
     // Relación descriptiva
     private String nombreCategoria;
@@ -18,6 +19,10 @@ public class Producto {
     public Producto() {}
 
     public Producto(int idProducto, int idCategoria, String codigo, String nombre, String descripcion, BigDecimal precioVenta, BigDecimal costoEstimado, boolean disponible) {
+        this(idProducto, idCategoria, codigo, nombre, descripcion, precioVenta, costoEstimado, disponible, null);
+    }
+
+    public Producto(int idProducto, int idCategoria, String codigo, String nombre, String descripcion, BigDecimal precioVenta, BigDecimal costoEstimado, boolean disponible, String imagenUrl) {
         this.idProducto = idProducto;
         this.idCategoria = idCategoria;
         this.codigo = codigo;
@@ -26,6 +31,7 @@ public class Producto {
         this.precioVenta = precioVenta;
         this.costoEstimado = costoEstimado;
         this.disponible = disponible;
+        this.imagenUrl = imagenUrl;
     }
 
     public int getIdProducto() { return idProducto; }
@@ -51,6 +57,9 @@ public class Producto {
 
     public boolean isDisponible() { return disponible; }
     public void setDisponible(boolean disponible) { this.disponible = disponible; }
+
+    public String getImagenUrl() { return imagenUrl; }
+    public void setImagenUrl(String imagenUrl) { this.imagenUrl = imagenUrl; }
 
     public String getNombreCategoria() { return nombreCategoria; }
     public void setNombreCategoria(String nombreCategoria) { this.nombreCategoria = nombreCategoria; }

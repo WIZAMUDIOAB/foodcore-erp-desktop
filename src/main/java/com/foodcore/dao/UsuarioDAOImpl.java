@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class UsuarioDAOImpl implements UsuarioDAO {
@@ -174,5 +176,93 @@ public class UsuarioDAOImpl implements UsuarioDAO {
             ps.setInt(2, idAsistencia);
             ps.executeUpdate();
         }
+    }
+
+    @Override
+    public Optional<Usuario> buscarPorDniOPin(Connection conn, String credencial) throws SQLException {
+        if (credencial == null || credencial.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, CONCAT(COALESCE(e.nombres, u.username), ' ', COALESCE(e.apellidos, '')) AS empleado_nombre "
+                + "FROM usuario u "
+                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.activo = 1 AND (u.dni = ? OR u.pin = ? OR e.dni = ?) "
+                + "LIMIT 1";
+
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            String q = credencial.trim();
+            ps.setString(1, q);
+            ps.setString(2, q);
+            ps.setString(3, q);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearUsuarioCompleto(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public List<Usuario> listarTodosActivos(Connection conn) throws SQLException {
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, CONCAT(COALESCE(e.nombres, u.username), ' ', COALESCE(e.apellidos, '')) AS empleado_nombre "
+                + "FROM usuario u "
+                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.activo = 1 "
+                + "ORDER BY u.id_usuario ASC";
+
+        List<Usuario> lista = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(mapearUsuarioCompleto(rs));
+            }
+        }
+        return lista;
+    }
+
+    @Override
+    public boolean actualizarDatosLaborales(Connection conn, int idUsuario, String dni, String pin,
+                                            double sueldoBase, String horarioLaboral,
+                                            LocalTime horaEntrada, LocalTime horaSalida) throws SQLException {
+        String sql = "UPDATE usuario SET dni = ?, pin = ?, sueldo_base = ?, horario_laboral = ?, "
+                + "hora_entrada_programada = ?, hora_salida_programada = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, dni);
+            ps.setString(2, pin);
+            ps.setDouble(3, sueldoBase);
+            ps.setString(4, horarioLaboral);
+            ps.setTime(5, horaEntrada != null ? Time.valueOf(horaEntrada) : Time.valueOf("08:00:00"));
+            ps.setTime(6, horaSalida != null ? Time.valueOf(horaSalida) : Time.valueOf("16:00:00"));
+            ps.setInt(7, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    private Usuario mapearUsuarioCompleto(ResultSet rs) throws SQLException {
+        Usuario u = new Usuario();
+        u.setIdUsuario(rs.getInt("id_usuario"));
+        u.setIdEmpleado(rs.getInt("id_empleado"));
+        u.setIdRol(rs.getInt("id_rol"));
+        u.setUsername(rs.getString("username"));
+        u.setPasswordHash(rs.getString("password_hash"));
+        u.setActivo(rs.getBoolean("activo"));
+        u.setNombreRol(rs.getString("rol_nombre"));
+        u.setNombreEmpleado(rs.getString("empleado_nombre"));
+
+        try {
+            u.setDni(rs.getString("dni"));
+            u.setPin(rs.getString("pin"));
+            u.setSueldoBase(rs.getDouble("sueldo_base"));
+            u.setHorarioLaboral(rs.getString("horario_laboral"));
+            Time te = rs.getTime("hora_entrada_programada");
+            if (te != null) u.setHoraEntradaProgramada(te.toLocalTime());
+            Time ts = rs.getTime("hora_salida_programada");
+            if (ts != null) u.setHoraSalidaProgramada(ts.toLocalTime());
+        } catch (SQLException ignored) {
+        }
+        return u;
     }
 }

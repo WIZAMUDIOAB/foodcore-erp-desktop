@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Entidad de Pedido alineada a SPEC-FOODCORE-v1.0 (§5, §6.2; REMEDIATION R-07).
+ * Entidad de Pedido alineada a SPEC-FOODCORE-v1.0 (Â§5, Â§6.2; REMEDIATION R-07).
  * Sin campos redundantes de marca temporal; incluye {@code idempotencyKey} y {@code version}.
  */
 public class Pedido {
@@ -24,6 +24,15 @@ public class Pedido {
     private BigDecimal total;
     private String idempotencyKey = UUID.randomUUID().toString();
     private int version = 0;
+
+    // Campos Enterprise v1.3 (SEC-3 Canales de Venta: Delivery / Takeaway)
+    private String tipoPedido = "MESA"; // MESA, LLEVAR, DELIVERY
+    private String clienteNombre;
+    private String clienteTelefono;
+    private String clienteDireccion;
+    private String clienteReferencia;
+    private BigDecimal costoEnvio = BigDecimal.ZERO;
+    private String repartidor;
 
     private List<DetallePedido> detalles = new ArrayList<>();
 
@@ -78,6 +87,27 @@ public class Pedido {
 
     public List<DetallePedido> getDetalles() { return detalles; }
     public void setDetalles(List<DetallePedido> detalles) { this.detalles = detalles; }
+
+    public String getTipoPedido() { return tipoPedido; }
+    public void setTipoPedido(String tipoPedido) { this.tipoPedido = tipoPedido != null ? tipoPedido : "MESA"; }
+
+    public String getClienteNombre() { return clienteNombre; }
+    public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
+
+    public String getClienteTelefono() { return clienteTelefono; }
+    public void setClienteTelefono(String clienteTelefono) { this.clienteTelefono = clienteTelefono; }
+
+    public String getClienteDireccion() { return clienteDireccion; }
+    public void setClienteDireccion(String clienteDireccion) { this.clienteDireccion = clienteDireccion; }
+
+    public String getClienteReferencia() { return clienteReferencia; }
+    public void setClienteReferencia(String clienteReferencia) { this.clienteReferencia = clienteReferencia; }
+
+    public BigDecimal getCostoEnvio() { return costoEnvio; }
+    public void setCostoEnvio(BigDecimal costoEnvio) { this.costoEnvio = costoEnvio != null ? costoEnvio : BigDecimal.ZERO; }
+
+    public String getRepartidor() { return repartidor; }
+    public void setRepartidor(String repartidor) { this.repartidor = repartidor; }
 
     @Override
     public String toString() { return "Pedido #" + idPedido + " - Mesa " + numeroMesa + " (" + estado + ")"; }

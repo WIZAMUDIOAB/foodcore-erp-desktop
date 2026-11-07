@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#111827" />
+  <title>FoodCore ERP v4.0 — Selección de Mesa</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="tablet-topbar">
+    <div class="brand-cluster">
+      <div class="brand-mark">FC</div>
+      <div>
+        <div class="brand-title">FoodCore</div>
+        <span class="brand-subtitle" id="lblNombreMozo">Mateo Quispe (Mozo)</span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="connection-pill">
+        <span class="status-dot online" id="statusDot"></span>
+        <span id="statusText">API Online (8080)</span>
+        <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
+      </div>
+      <a href="index.html" class="btn-touch btn-dark-outline">Cambiar Operador</a>
+    </div>
+  </header>
+
+  <main class="mesas-container">
+    <div class="section-header">
+      <div>
+        <h1>Salón y Comedores</h1>
+        <p style="color:var(--fc-text-muted); font-size:14px;">Toque una mesa para abrir o adicionar platos a la comanda</p>
+      </div>
+      <div class="filter-pills">
+        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('TODAS')">Todas (12)</button>
+        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('LIBRE')">🟢 Libres</button>
+        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('OCUPADA')">🟠 Ocupadas</button>
+      </div>
+    </div>
+
+    <div id="mesasGrid" class="mesas-grid"></div>
+  </main>
+
+  <div id="toastBanner" class="toast-banner"></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      FoodCorePWA.iniciarMesasView();
+    });
+  </script>
+</body>
+</html>

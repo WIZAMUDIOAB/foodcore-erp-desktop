@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootRelojStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.RelojAsistenciaController">
+    <children>
+        <!-- Contenedor Central Centrado Vertical y Horizontalmente -->
+        <VBox alignment="CENTER" spacing="20.0">
+            <padding>
+                <Insets bottom="32.0" left="48.0" right="48.0" top="32.0" />
+            </padding>
+            <children>
+                <!-- Cabecera del Reloj Digital Kiosco -->
+                <VBox alignment="CENTER" maxWidth="520.0" spacing="6.0" style="-fx-background-color: #1A1D21; -fx-padding: 20 32; -fx-background-radius: 14 14 0 0;">
+                    <children>
+                        <Label styleClass="badge-pill-accent" text="KIOSCO DE CONTROL LABORAL — FOODCORE" />
+                        <Label fx:id="lblRelojDigital" style="-fx-font-family: 'JetBrains Mono', 'Consolas', monospace; -fx-font-size: 44px; -fx-font-weight: bold; -fx-text-fill: -fc-accent;" text="14:35:00" />
+                        <Label fx:id="lblFechaActual" style="-fx-text-fill: #94A3B8;" styleClass="view-subheading" text="Viernes, 06 de Noviembre de 2026" />
+                    </children>
+                </VBox>
+
+                <!-- Tarjeta Principal de Marcaje -->
+                <VBox maxWidth="520.0" spacing="20.0" styleClass="stat-card" style="-fx-background-radius: 0 0 14 14;">
+                    <padding>
+                        <Insets bottom="28.0" left="32.0" right="32.0" top="24.0" />
+                    </padding>
+                    <children>
+                        <VBox alignment="CENTER" spacing="4.0">
+                            <children>
+                                <Label styleClass="text-h3" text="Registro de Entrada y Salida" />
+                                <Label styleClass="text-body-secondary" text="Ingrese su DNI (8 dígitos) o PIN de 4 dígitos" />
+                            </children>
+                        </VBox>
+
+                        <VBox spacing="8.0">
+                            <children>
+                                <Label styleClass="form-field-label" text="DNI o PIN del Colaborador:" />
+                                <TextField fx:id="txtCredencial" alignment="CENTER" onAction="#handleMarcar" promptText="Ingrese DNI o PIN..." style="-fx-font-size: 22px; -fx-font-family: 'JetBrains Mono', monospace; -fx-font-weight: bold; -fx-letter-spacing: 2px;" styleClass="form-text-field" />
+                            </children>
+                        </VBox>
+
+                        <!-- Teclado Numérico Virtual para Kiosco Táctil -->
+                        <GridPane alignment="CENTER" hgap="10.0" vgap="10.0">
+                            <columnConstraints>
+                                <ColumnConstraints percentWidth="33.3" />
+                                <ColumnConstraints percentWidth="33.3" />
+                                <ColumnConstraints percentWidth="33.3" />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints minHeight="48.0" />
+                                <RowConstraints minHeight="48.0" />
+                                <RowConstraints minHeight="48.0" />
+                                <RowConstraints minHeight="48.0" />
+                            </rowConstraints>
+                            <children>
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="1" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="2" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="3" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="4" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="5" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="6" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="7" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="8" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="9" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClearKey" styleClass="btn-kds-outline" text="C" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleBackspaceKey" styleClass="btn-kds-outline" text="⌫" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                            </children>
+                        </GridPane>
+
+                        <Button fx:id="btnMarcar" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleMarcar" prefHeight="48.0" style="-fx-font-size: 16px; -fx-font-weight: bold;" styleClass="btn-primary" text="REGISTRAR ASISTENCIA" />
+                    </children>
+                </VBox>
+
+                <!-- Tarjeta de Confirmación Dinámica -->
+                <VBox fx:id="cardConfirmacion" alignment="CENTER" maxWidth="520.0" spacing="10.0" styleClass="stat-card-accent" visible="false">
+                    <padding>
+                        <Insets bottom="16.0" left="20.0" right="20.0" top="16.0" />
+                    </padding>
+                    <children>
+                        <Label fx:id="lblConfirmacionBadge" styleClass="badge-pill-success" text="✓ ENTRADA REGISTRADA" />
+                        <Label fx:id="lblConfirmacionNombre" styleClass="text-h3" text="Carlos Meneses" />
+                        <Label fx:id="lblConfirmacionDetalle" styleClass="stat-card-subtitle" text="14:35:20 | Jornada puntual" wrapText="true" />
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+
+        <!-- Controles Superiores Derechos: Expandir Ventana [⤢] y Salir del Kiosco [✕] -->
+        <HBox alignment="TOP_RIGHT" maxHeight="-Infinity" maxWidth="-Infinity" spacing="10.0" StackPane.alignment="TOP_RIGHT">
+            <StackPane.margin>
+                <Insets right="28.0" top="24.0" />
+            </StackPane.margin>
+            <children>
+                <Button fx:id="btnExpandirVentana" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-secondary" text="⤢" />
+                <Button fx:id="btnSalirKiosco" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="✕ Salir del Kiosco" />
+            </children>
+        </HBox>
+    </children>
+</StackPane>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="768.0" prefWidth="1180.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.KioscoController">
+
+    <!-- Topbar Kiosco Táctil (§13, §14) -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16.0" style="-fx-background-color: #1E293B; -fx-padding: 16 24 16 24; -fx-border-color: #FF5A1F; -fx-border-width: 0 0 3 0;">
+            <VBox spacing="2.0">
+                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                    <Label style="-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: 800; -fx-letter-spacing: -0.5px;" text="FOODCORE RESTOBAR · KIOSCO AUTOSERVICIO" />
+                    <Label style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-padding: 3 8 3 8; -fx-background-radius: 6; -fx-font-weight: 700; -fx-font-size: 11px;" text="MODO CLIENTE TÁCTIL" />
+                </HBox>
+                <Label style="-fx-text-fill: #94A3B8; -fx-font-size: 13px;" text="Seleccione sus platillos favoritos y confirme su orden directa a cocina" />
+            </VBox>
+            <Region HBox.hgrow="ALWAYS" />
+            <HBox alignment="CENTER_RIGHT" spacing="16.0">
+                <children>
+                    <VBox alignment="CENTER_RIGHT" spacing="2.0">
+                        <children>
+                            <Label fx:id="lblTurnoActual" style="-fx-text-fill: #FF5A1F; -fx-font-size: 18px; -fx-font-weight: 800; -fx-font-family: monospace;" text="TURNO #T-101" />
+                            <Label style="-fx-text-fill: #94A3B8; -fx-font-size: 11px;" text="Emisión automática de ticketera" />
+                        </children>
+                    </VBox>
+                    <Button fx:id="btnExpandirVentana" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-kds-outline" text="⤢" />
+                    <Button fx:id="btnSalirKiosco" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="✕ Salir del Kiosco" />
+                </children>
+            </HBox>
+        </HBox>
+    </top>
+
+    <!-- Centro: Catálogo Táctil y Panel de Orden -->
+    <center>
+        <GridPane hgap="16.0" style="-fx-padding: 16;">
+            <columnConstraints>
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="64.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="36.0" />
+            </columnConstraints>
+            <rowConstraints>
+                <RowConstraints vgrow="ALWAYS" />
+            </rowConstraints>
+
+            <children>
+                <!-- PANEL IZQUIERDO: Categorías y Mosaico de Platillos -->
+                <VBox spacing="14.0" GridPane.columnIndex="0">
+                    <!-- Barra de Chips de Categorías -->
+                    <HBox fx:id="boxCategoriasKiosco" alignment="CENTER_LEFT" spacing="10.0" styleClass="surface-card" />
+
+                    <!-- Mosaico Scrollable de Productos -->
+                    <ScrollPane fitToWidth="true" styleClass="pos-scroll-pane" VBox.vgrow="ALWAYS">
+                        <content>
+                            <FlowPane fx:id="flowProductosKiosco" hgap="14.0" style="-fx-padding: 8;" vgap="14.0" />
+                        </content>
+                    </ScrollPane>
+                </VBox>
+
+                <!-- PANEL DERECHO: Carrito de Compras / Bandeja del Cliente -->
+                <VBox spacing="12.0" styleClass="surface-card" GridPane.columnIndex="1">
+                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <Label styleClass="text-h2" text="🛒 Mi Pedido" />
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button mnemonicParsing="false" onAction="#handleLimpiarCarrito" styleClass="btn-secondary" text="Limpiar" />
+                    </HBox>
+
+                    <!-- Lista de Ítems en Carrito -->
+                    <TableView fx:id="tblCarrito" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="colProducto" prefWidth="170.0" text="PRODUCTO" />
+                            <TableColumn fx:id="colCantidad" prefWidth="70.0" text="CANT." />
+                            <TableColumn fx:id="colSubtotal" prefWidth="80.0" text="TOTAL" />
+                            <TableColumn fx:id="colAccion" prefWidth="80.0" text="AJUSTE" />
+                        </columns>
+                    </TableView>
+
+                    <Separator />
+
+                    <!-- Resumen de Pago -->
+                    <VBox spacing="6.0" style="-fx-background-color: #F8FAFC; -fx-padding: 12; -fx-background-radius: 8;">
+                        <HBox alignment="CENTER_LEFT">
+                            <Label styleClass="text-caption-muted" text="Subtotal Neto" />
+                            <Region HBox.hgrow="ALWAYS" />
+                            <Label fx:id="lblSubtotal" styleClass="text-mono" text="S/ 0.00" />
+                        </HBox>
+                        <HBox alignment="CENTER_LEFT">
+                            <Label styleClass="text-caption-muted" text="IGV (18% Incluido)" />
+                            <Region HBox.hgrow="ALWAYS" />
+                            <Label fx:id="lblIgv" styleClass="text-mono" text="S/ 0.00" />
+                        </HBox>
+                        <Separator />
+                        <HBox alignment="CENTER_LEFT">
+                            <Label styleClass="text-body-strong" text="TOTAL A PAGAR:" />
+                            <Region HBox.hgrow="ALWAYS" />
+                            <Label fx:id="lblTotalKiosco" style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: #FF5A1F; -fx-font-family: monospace;" text="S/ 0.00" />
+                        </HBox>
+                    </VBox>
+
+                    <!-- Botón Gigante de Confirmación Táctil -->
+                    <Button fx:id="btnConfirmarKiosco" maxWidth="Infinity" mnemonicParsing="false" onAction="#handleConfirmarPedido" prefHeight="54.0" style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: 800; -fx-background-radius: 10;" text="✓ CONFIRMAR Y ENVIAR A COCINA" />
+                </VBox>
+            </children>
+        </GridPane>
+    </center>
+
+</BorderPane>

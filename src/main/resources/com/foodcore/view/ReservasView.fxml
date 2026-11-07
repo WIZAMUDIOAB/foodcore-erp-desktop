@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootReservasStack" prefHeight="768.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ReservasController">
+    <children>
+        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <BorderPane minWidth="960.0">
+            <!-- Encabezado y KPIs -->
+            <top>
+                <VBox spacing="14.0">
+                    <padding>
+                        <Insets bottom="16.0" left="24.0" right="24.0" top="20.0" />
+                    </padding>
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="16.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="view-heading" text="Libro de Reservas y Bloqueo Preventivo" />
+                                        <Label styleClass="view-subheading" text="Gestión de comensales anticipados, confirmaciones vía WhatsApp y bloqueo automático en Salón" />
+                                    </children>
+                                </VBox>
+                                <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                    <children>
+                                        <Button fx:id="btnNuevaReserva" mnemonicParsing="false" onAction="#handleAbrirModal" styleClass="btn-primary" text="+ Nueva Reserva" />
+                                        <Button fx:id="btnWhatsApp" mnemonicParsing="false" onAction="#handleEnviarWhatsApp" styleClass="btn-secondary" text="📲 Enviar WhatsApp" />
+                                        <Button fx:id="btnSentar" mnemonicParsing="false" onAction="#handleSentarReserva" styleClass="btn-kds-outline" text="✓ Sentar Comensales" />
+                                    </children>
+                                </HBox>
+                            </children>
+                        </HBox>
+
+                        <!-- 4 KPI Cards de Reservas (§9.1) -->
+                        <HBox spacing="14.0">
+                            <children>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="RESERVAS DEL DÍA" />
+                                        <Label fx:id="lblKpiTotalReservas" styleClass="stat-card-value" text="0" />
+                                        <Label styleClass="stat-card-subtitle" text="Mesas programadas" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="COMENSALES ESPERADOS" />
+                                        <Label fx:id="lblKpiPersonas" styleClass="stat-card-value" text="0" />
+                                        <Label styleClass="stat-card-subtitle" text="Personas en salón" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="MESAS COMPROMETIDAS" />
+                                        <Label fx:id="lblKpiMesasComprometidas" styleClass="stat-card-value" text="0" />
+                                        <Label styleClass="stat-card-subtitle" text="Con bloqueo en POS" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card-accent" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="ESTADO DE CONFIRMACIÓN" />
+                                        <Label fx:id="lblKpiConfirmadas" styleClass="stat-card-value" text="0 / 0" />
+                                        <Label styleClass="stat-card-subtitle" text="Confirmadas vs Pendientes" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Contenido Principal: Filtros y Tabla -->
+            <center>
+                <VBox spacing="12.0">
+                    <padding>
+                        <Insets bottom="20.0" left="24.0" right="24.0" top="4.0" />
+                    </padding>
+                    <children>
+                        <!-- Barra de Filtros -->
+                        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="surface-card">
+                            <children>
+                                <Label styleClass="form-field-label" text="Fecha:" />
+                                <DatePicker fx:id="dpFecha" onAction="#handleFiltrar" prefWidth="150.0" />
+
+                                <Label styleClass="form-field-label" text="Estado:" />
+                                <ComboBox fx:id="cmbFiltroEstado" onAction="#handleFiltrar" prefWidth="150.0" />
+
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Label fx:id="lblTotalRegistros" styleClass="text-caption" text="0 reservas encontradas" />
+                                <Button mnemonicParsing="false" onAction="#cargarDatos" styleClass="btn-secondary" text="↻ Actualizar" />
+                            </children>
+                        </HBox>
+
+                        <!-- Tabla de Reservas -->
+                        <TableView fx:id="tblReservas" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="colHora" prefWidth="85.0" text="Hora" />
+                                <TableColumn fx:id="colMesa" prefWidth="85.0" text="Mesa" />
+                                <TableColumn fx:id="colCliente" prefWidth="210.0" text="Cliente" />
+                                <TableColumn fx:id="colTelefono" prefWidth="130.0" text="Teléfono / WhatsApp" />
+                                <TableColumn fx:id="colPersonas" prefWidth="85.0" text="Personas" />
+                                <TableColumn fx:id="colEstado" prefWidth="125.0" text="Estado" />
+                                <TableColumn fx:id="colNotas" prefWidth="280.0" text="Notas / Requerimientos Especiales" />
+                            </columns>
+                            <columnResizePolicy>
+                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                            </columnResizePolicy>
+                        </TableView>
+                    </children>
+                </VBox>
+            </center>
+        </BorderPane>
+            </content>
+        </ScrollPane>
+
+        <!-- Modal Nueva Reserva -->
+        <VBox fx:id="modalReserva" alignment="CENTER" styleClass="modal-backdrop" visible="false">
+            <children>
+                <VBox maxWidth="480.0" spacing="16.0" styleClass="modal-card">
+                    <children>
+                        <Label styleClass="modal-title" text="Registrar Nueva Reserva de Mesa" />
+
+                        <VBox spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="form-field-label" text="Nombre del Cliente:" />
+                                        <TextField fx:id="txtCliente" promptText="Ej. Mariana Valdivia" styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
+
+                                <HBox spacing="10.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Teléfono / Celular (WhatsApp):" />
+                                                <TextField fx:id="txtTelefono" promptText="987654321" styleClass="form-text-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" prefWidth="130.0">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="N° Personas:" />
+                                                <TextField fx:id="txtPersonas" alignment="CENTER" promptText="4" styleClass="form-text-field" text="2" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+
+                                <HBox spacing="10.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Fecha de Reserva:" />
+                                                <DatePicker fx:id="dpModalFecha" maxWidth="1.7976931348623157E308" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" prefWidth="130.0">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Hora (HH:mm):" />
+                                                <TextField fx:id="txtModalHora" alignment="CENTER" promptText="20:00" styleClass="form-text-field" text="20:00" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+
+                                <HBox spacing="10.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Mesa Asignada:" />
+                                                <ComboBox fx:id="cmbModalMesa" maxWidth="1.7976931348623157E308" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Estado:" />
+                                                <ComboBox fx:id="cmbModalEstado" maxWidth="1.7976931348623157E308" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="form-field-label" text="Notas / Peticiones Especiales:" />
+                                        <TextField fx:id="txtNotas" promptText="Ej. Aniversario, decoración especial, silla para bebé..." styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </VBox>
+
+                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                            <children>
+                                <Button mnemonicParsing="false" onAction="#handleCerrarModal" styleClass="btn-secondary" text="Cancelar" />
+                                <Button mnemonicParsing="false" onAction="#handleGuardarReserva" styleClass="btn-primary" text="Guardar Reserva" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>

@@ -22,6 +22,7 @@ public interface InsumoDAO {
     void registrarMovimientoInventario(Connection conn, long idInsumo, String tipo, BigDecimal cantidad, String motivo, Integer referenciaId) throws SQLException;
     long insertarKardex(Connection conn, KardexMovimiento mov) throws SQLException;
     KardexMovimiento registrarMovimientoKardexAtomico(Connection conn, long idInsumo, String tipoMovimiento, BigDecimal magnitudPositiva, long idUsuario, String observacion) throws SQLException;
+    KardexMovimiento registrarCompraInsumo(Connection conn, long idInsumo, BigDecimal cantidad, BigDecimal costoUnitarioCompra, long idUsuario, String observacion) throws SQLException;
     List<KardexMovimiento> listarKardexPorInsumo(Connection conn, long idInsumo) throws SQLException;
     void eliminar(Connection conn, long idInsumo) throws SQLException;
 }

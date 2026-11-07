@@ -16,14 +16,14 @@ import java.util.stream.Collectors;
 
 /**
  * DAO JDBC para gestión de insumos, bloqueo pesimista {@code FOR UPDATE} (R-09),
- * descuento atómico sin envolver excepciones de dominio (R-11) y registro inmutable de Kárdex (R-06).
+ * descuento atómico sin envolver excepciones de dominio (R-11) y registro inmutable de Kárdex (R-06, §2.1, §3.3).
  */
 public class InsumoDAOImpl implements InsumoDAO {
 
     @Override
     public List<Insumo> listarTodos(Connection conn) throws SQLException {
         List<Insumo> lista = new ArrayList<>();
-        String sql = "SELECT * FROM insumo ORDER BY nombre ASC";
+        String sql = "SELECT * FROM insumo WHERE activo = 1 ORDER BY nombre ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -121,15 +121,16 @@ public class InsumoDAOImpl implements InsumoDAO {
 
     @Override
     public long crear(Connection conn, Insumo i) throws SQLException {
-        String sql = "INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual_disponible, stock_minimo, costo_unitario) " +
-                     "VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO insumo (codigo, nombre, unidad_medida, stock_actual_disponible, stock_minimo, costo_unitario, costo_unitario_actual) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, i.getCodigo() != null ? i.getCodigo() : ("INS-" + System.nanoTime()));
             ps.setString(2, i.getNombre());
-            ps.setString(3, i.getUnidadMedida());
+            ps.setString(3, i.getUnidadMedida() != null ? i.getUnidadMedida() : "UNIDAD");
             ps.setBigDecimal(4, i.getStockActualDisponible().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(5, i.getStockMinimo().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(6, i.getCostoUnitario());
+            ps.setBigDecimal(7, i.getCostoUnitario());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -144,7 +145,7 @@ public class InsumoDAOImpl implements InsumoDAO {
 
     @Override
     public void actualizar(Connection conn, Insumo i) throws SQLException {
-        String sql = "UPDATE insumo SET codigo = ?, nombre = ?, unidad_medida = ?, stock_actual_disponible = ?, stock_minimo = ?, costo_unitario = ? " +
+        String sql = "UPDATE insumo SET codigo = ?, nombre = ?, unidad_medida = ?, stock_actual_disponible = ?, stock_minimo = ?, costo_unitario = ?, costo_unitario_actual = ? " +
                      "WHERE id_insumo = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, i.getCodigo());
@@ -153,7 +154,8 @@ public class InsumoDAOImpl implements InsumoDAO {
             ps.setBigDecimal(4, i.getStockActualDisponible().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(5, i.getStockMinimo().setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO));
             ps.setBigDecimal(6, i.getCostoUnitario());
-            ps.setLong(7, i.getIdInsumo());
+            ps.setBigDecimal(7, i.getCostoUnitario());
+            ps.setLong(8, i.getIdInsumo());
             ps.executeUpdate();
         }
     }
@@ -235,8 +237,9 @@ public class InsumoDAOImpl implements InsumoDAO {
             throw new InsumoNoEncontradoException(idInsumo);
         }
         BigDecimal saldoAnterior = locked.get(idInsumo);
-        boolean esIncremento = "ENTRADA".equalsIgnoreCase(tipoMovimiento)
-            || "AJUSTE_POS".equalsIgnoreCase(tipoMovimiento);
+        String tipoUpper = tipoMovimiento != null ? tipoMovimiento.trim().toUpperCase() : "AJUSTE_POS";
+        boolean esIncremento = tipoUpper.startsWith("ENTRADA")
+            || "AJUSTE_POS".equalsIgnoreCase(tipoUpper);
         BigDecimal cantidadFirmada = esIncremento ? mag : mag.negate();
         BigDecimal saldoPosterior = saldoAnterior.add(cantidadFirmada)
             .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
@@ -255,12 +258,12 @@ public class InsumoDAOImpl implements InsumoDAO {
         KardexMovimiento km = new KardexMovimiento(
             0L,
             idInsumo,
-            tipoMovimiento.toUpperCase(),
+            tipoUpper,
             cantidadFirmada,
             saldoAnterior,
             saldoPosterior,
             costoUnitario,
-            tipoMovimiento.toUpperCase(),
+            tipoUpper,
             null,
             idUsuario,
             observacion,
@@ -268,6 +271,27 @@ public class InsumoDAOImpl implements InsumoDAO {
         );
         insertarKardex(conn, km);
         return km;
+    }
+
+    @Override
+    public KardexMovimiento registrarCompraInsumo(Connection conn,
+                                                  long idInsumo,
+                                                  BigDecimal cantidad,
+                                                  BigDecimal costoUnitarioCompra,
+                                                  long idUsuario,
+                                                  String observacion) throws SQLException {
+        if (costoUnitarioCompra != null && costoUnitarioCompra.compareTo(BigDecimal.ZERO) > 0) {
+            String sqlCosto = "UPDATE insumo SET costo_unitario = ?, costo_unitario_actual = ? WHERE id_insumo = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sqlCosto)) {
+                ps.setBigDecimal(1, costoUnitarioCompra);
+                ps.setBigDecimal(2, costoUnitarioCompra);
+                ps.setLong(3, idInsumo);
+                ps.executeUpdate();
+            }
+        }
+        String obs = (observacion != null && !observacion.isBlank()) ? observacion : "Compra de abastecimiento";
+        registrarMovimientoInventario(conn, idInsumo, "ENTRADA_COMPRA", cantidad, obs, null);
+        return registrarMovimientoKardexAtomico(conn, idInsumo, "ENTRADA_COMPRA", cantidad, idUsuario, obs);
     }
 
     @Override
@@ -336,7 +360,7 @@ public class InsumoDAOImpl implements InsumoDAO {
 
     @Override
     public void eliminar(Connection conn, long idInsumo) throws SQLException {
-        String sql = "DELETE FROM insumo WHERE id_insumo = ?";
+        String sql = "UPDATE insumo SET activo = 0 WHERE id_insumo = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, idInsumo);
             ps.executeUpdate();

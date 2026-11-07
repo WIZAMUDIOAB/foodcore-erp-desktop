@@ -19,8 +19,9 @@ import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
- * Servicio de control de turnos de caja, arqueo físico y cierre Z con transacciones explícitas
- * mediante {@link TransactionManager} (SPEC-FOODCORE-v1.0 §6.4, §7.1, §8.3, R-02.4).
+ * Servicio de control de turnos de caja, gastos operativos de caja chica (§3.4),
+ * arqueo físico y cierre Z con transacciones explícitas mediante {@link TransactionManager}
+ * (SPEC-FOODCORE-v1.0 §6.4, §7.1, §8.3, R-02.4; SPEC-FOODCORE-v1.2 §3.4).
  */
 public class CajaService {
 
@@ -66,9 +67,42 @@ public class CajaService {
         });
     }
 
+    /**
+     * Registra una salida de efectivo de caja chica / gasto operativo no relacionado con ventas (§3.4).
+     * Genera un {@code movimiento_caja} de tipo {@code EGRESO} que afecta el saldo teórico del turno
+     * pero no altera el IGV ni las ventas fiscales.
+     */
+    public void registrarGastoOperativo(int idCaja, int idUsuario, BigDecimal monto, String concepto)
+            throws NegocioException, SQLException {
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new NegocioException("El monto del gasto operativo debe ser mayor a cero.");
+        }
+        if (concepto == null || concepto.trim().isEmpty()) {
+            throw new NegocioException("Debe especificar el concepto o motivo del gasto de caja.");
+        }
+        BigDecimal montoNorm = DesgloseFiscal.normalizarMoneda(monto);
+        String glosa = "Gasto Operativo: " + concepto.trim();
+
+        tx.executeVoidChecked(conn -> {
+            Optional<Caja> opt = cajaDAO.obtenerCajaAbierta(conn);
+            if (opt.isEmpty() || opt.get().getIdCaja() != idCaja) {
+                throw new CajaCerradaException("No hay un turno de caja abierto para registrar el gasto.");
+            }
+            MovimientoCaja movGasto = new MovimientoCaja(0, idCaja, idUsuario, "EGRESO", "EFECTIVO", montoNorm, glosa);
+            cajaDAO.registrarMovimiento(conn, movGasto);
+            LOGGER.info("Gasto operativo registrado en Caja #" + idCaja + ": S/ " + montoNorm + " (" + glosa + ")");
+        });
+    }
+
     public BigDecimal calcularVentasTurno(int idCaja) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return cajaDAO.calcularTotalVentasTurno(conn, idCaja);
+        }
+    }
+
+    public BigDecimal calcularGastosTurno(int idCaja) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return cajaDAO.calcularTotalGastosTurno(conn, idCaja);
         }
     }
 
@@ -92,7 +126,10 @@ public class CajaService {
 
             Caja caja = opt.get();
             BigDecimal totalVentasEfectivo = cajaDAO.calcularTotalVentasTurno(conn, idCaja);
-            BigDecimal montoEsperado = DesgloseFiscal.normalizarMoneda(caja.getMontoApertura().add(totalVentasEfectivo));
+            BigDecimal totalGastosEfectivo = cajaDAO.calcularTotalGastosTurno(conn, idCaja);
+            BigDecimal montoEsperado = DesgloseFiscal.normalizarMoneda(
+                caja.getMontoApertura().add(totalVentasEfectivo).subtract(totalGastosEfectivo)
+            );
             BigDecimal diferencia = DesgloseFiscal.normalizarMoneda(fisicoNorm.subtract(montoEsperado));
 
             cajaDAO.cerrarCaja(conn, idCaja, idUsuarioCierre, montoEsperado, fisicoNorm, diferencia);

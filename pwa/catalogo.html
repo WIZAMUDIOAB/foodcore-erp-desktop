@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#111827" />
+  <title>FoodCore ERP v4.0 — Toma de Comanda Tablet</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="tablet-topbar">
+    <div class="brand-cluster">
+      <div class="brand-mark">FC</div>
+      <div>
+        <div class="brand-title">FoodCore · Comanda Móvil</div>
+        <span class="brand-subtitle" id="lblNombreMozo">Mateo Quispe (Mozo)</span>
+      </div>
+      <span class="mesa-active-pill" id="lblMesaActiva">Mesa 04</span>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="connection-pill" id="connectionPill">
+        <span class="status-dot online" id="statusDot"></span>
+        <span id="statusText">API Online (8080)</span>
+        <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
+      </div>
+      <button type="button" id="btnToggleOffline" class="btn-touch btn-dark-outline" onclick="FoodCorePWA.alternarSimulacionOffline()">
+        🔌 Simular Caída API
+      </button>
+      <a href="mesas.html" class="btn-touch btn-dark-outline">← Mesas</a>
+    </div>
+  </header>
+
+  <main class="pos-split-layout">
+    <!-- Panel Izquierdo: Catálogo de Platos en Tarjetas -->
+    <section class="catalog-pane">
+      <div class="catalog-toolbar">
+        <div class="category-tabs">
+          <button type="button" class="cat-tab active" onclick="FoodCorePWA.filtrarCategoria('TODOS', this)">Todos los Platos</button>
+          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Hamburguesas', this)">Hamburguesas</button>
+          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Alitas', this)">Alitas &amp; Pollo</button>
+          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Bebidas', this)">Bebidas</button>
+          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Guarniciones', this)">Guarniciones</button>
+        </div>
+        <input type="search" id="txtBuscarPlato" class="search-box" placeholder="Buscar plato rápido..." />
+      </div>
+
+      <div id="dishesGrid" class="dishes-grid"></div>
+    </section>
+
+    <!-- Panel Derecho: Carrito Lateral con Resumen y Botón Enviar a Cocina -->
+    <aside class="cart-sidebar">
+      <div class="cart-header">
+        <h2>Comanda Actual</h2>
+        <span class="cart-count-pill" id="cartCountPill">0 ítems</span>
+      </div>
+
+      <div id="cartItemsList" class="cart-items-list"></div>
+
+      <div class="quick-notes-bar">
+        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Sin mayonesa')">+ Sin mayonesa</button>
+        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Sin cremas')">+ Sin cremas</button>
+        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Extra papas')">+ Extra papas</button>
+        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Término 3/4')">+ Término 3/4</button>
+      </div>
+
+      <div class="cart-footer">
+        <div class="cart-summary-row">
+          <span>Op. Gravada (Subtotal)</span>
+          <span id="lblSubtotal" style="font-family:var(--font-mono);">S/ 0.00</span>
+        </div>
+        <div class="cart-summary-row">
+          <span>IGV (18%)</span>
+          <span id="lblIgv" style="font-family:var(--font-mono);">S/ 0.00</span>
+        </div>
+        <div class="cart-total-row">
+          <span class="cart-total-label">Total Comanda</span>
+          <span class="cart-total-amount" id="lblTotal">S/ 0.00</span>
+        </div>
+
+        <button type="button" id="btnEnviarCocina" class="btn-touch btn-primary btn-send-kds" onclick="FoodCorePWA.enviarPedidoACocina()">
+          Enviar a Cocina (KDS) →
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toastBanner" class="toast-banner"></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      FoodCorePWA.iniciarCatalogoView();
+    });
+  </script>
+</body>
+</html>

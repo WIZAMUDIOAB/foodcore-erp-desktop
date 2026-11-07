@@ -1,16 +1,18 @@
 package com.foodcore.model;
 
+import com.foodcore.util.UnidadMedidaFormatter;
+
 import java.math.BigDecimal;
 
 /**
- * Modelo de dominio de Insumo alineado al DDL de SPEC-FOODCORE-v1.0 (§5, R-06):
- * {@code id_insumo BIGINT} y {@code stock_actual_disponible DECIMAL(14,4)}.
+ * Modelo de dominio de Insumo alineado al DDL de SPEC-FOODCORE-v1.0 (§5, R-06) y SPEC-FOODCORE-v1.2 (§1.1, §2.1):
+ * {@code id_insumo BIGINT}, {@code unidad_medida ENUM('UNIDAD','KG','GR','ML','LT')} y {@code stock_actual_disponible DECIMAL(14,4)}.
  */
 public class Insumo {
     private long idInsumo;
     private String codigo;
     private String nombre;
-    private String unidadMedida; // GR, UND, ML, KG, LT
+    private String unidadMedida; // UNIDAD, KG, GR, ML, LT
     private BigDecimal stockActualDisponible;
     private BigDecimal stockMinimo;
     private BigDecimal costoUnitario;
@@ -65,6 +67,18 @@ public class Insumo {
     public int getVersion() { return version; }
     public void setVersion(int version) { this.version = version; }
 
+    /**
+     * Semáforo de alerta (§2.1): devuelve {@code true} si {@code stock_actual <= stock_minimo}.
+     */
+    public boolean requiereReabastecimiento() {
+        if (stockActualDisponible == null || stockMinimo == null) {
+            return false;
+        }
+        return stockActualDisponible.compareTo(stockMinimo) <= 0;
+    }
+
     @Override
-    public String toString() { return nombre + " [" + stockActualDisponible + " " + unidadMedida + "]"; }
+    public String toString() {
+        return nombre + " [" + UnidadMedidaFormatter.formatear(stockActualDisponible, unidadMedida) + "]";
+    }
 }

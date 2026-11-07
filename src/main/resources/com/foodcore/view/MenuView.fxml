@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootMenuStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MenuController">
+    <children>
+        <BorderPane styleClass="pos-catalog-panel">
+
+            <!-- Encabezado -->
+            <top>
+                <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="surface-card">
+                    <children>
+                        <VBox spacing="2.0">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="view-heading" text="Gestión de Menú, Carta y Fotografías" />
+                                        <Label styleClass="badge-pill-accent" text="CATÁLOGO POS" />
+                                    </children>
+                                </HBox>
+                                <Label styleClass="view-subheading" text="Administración de platillos, precios de venta y carga de fotografías para tarjetas táctiles del POS" />
+                            </children>
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnLimpiarForm" mnemonicParsing="false" onAction="#handleNuevoPlatillo" styleClass="btn-secondary" text="+ Nuevo Platillo" />
+                    </children>
+                </HBox>
+            </top>
+
+            <!-- Centro: Split 65% Tabla con Thumbnails / 35% Editor CRUD con Foto (§2.2) -->
+            <center>
+                <GridPane hgap="16.0" styleClass="kardex-table-wrapper">
+                    <columnConstraints>
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="64.0" />
+                        <ColumnConstraints hgrow="ALWAYS" percentWidth="36.0" />
+                    </columnConstraints>
+                    <rowConstraints>
+                        <RowConstraints vgrow="ALWAYS" />
+                    </rowConstraints>
+                    <children>
+
+                        <!-- Tabla de Platillos (§2.2: Imagen thumbnail, Nombre, Categoría, Precio, Estado) -->
+                        <VBox spacing="10.0" GridPane.columnIndex="0">
+                            <children>
+                                <TableView fx:id="tblMenu" VBox.vgrow="ALWAYS">
+                                    <columns>
+                                        <TableColumn fx:id="colImagen" prefWidth="90.0" text="Imagen" />
+                                        <TableColumn fx:id="colNombre" prefWidth="230.0" text="Platillo / Bebida" />
+                                        <TableColumn fx:id="colCategoria" prefWidth="150.0" text="Categoría" />
+                                        <TableColumn fx:id="colPrecio" prefWidth="110.0" text="Precio" />
+                                        <TableColumn fx:id="colEstado" prefWidth="115.0" text="Estado" />
+                                    </columns>
+                                </TableView>
+                            </children>
+                        </VBox>
+
+                        <!-- Formulario CRUD de Platillo y Fotografía (§2.2) -->
+                        <VBox spacing="12.0" styleClass="surface-card" GridPane.columnIndex="1">
+                            <children>
+                                <Label fx:id="lblTituloFormulario" styleClass="text-h2" text="Ficha de Platillo" />
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Código SKU" />
+                                        <TextField fx:id="txtCodigo" promptText="Ej. HAM-25" styleClass="input-field" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Nombre del Platillo" />
+                                        <TextField fx:id="txtNombre" promptText="Ej. Burger Angus Trufada" styleClass="input-field" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Categoría" />
+                                        <ComboBox fx:id="cmbCategoria" maxWidth="1.7976931348623157E308" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Precio de Venta (S/)" />
+                                        <TextField fx:id="txtPrecio" promptText="24.50" styleClass="input-field" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="6.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Fotografía del Platillo (uploads/platillos/)" />
+                                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                            <children>
+                                                <ImageView fx:id="imgPreview" fitHeight="56.0" fitWidth="72.0" preserveRatio="true" />
+                                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Button fx:id="btnSeleccionarFoto" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleSeleccionarFoto" styleClass="btn-secondary" text="Subir Foto (JPG/PNG)" />
+                                                        <Label fx:id="lblRutaImagen" styleClass="text-caption-muted" text="Sin imagen seleccionada" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+
+                                <CheckBox fx:id="chkActivo" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Platillo Activo en Carta POS" />
+
+                                <Region VBox.vgrow="ALWAYS" />
+
+                                <Button fx:id="btnGuardarPlatillo" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleGuardarPlatillo" styleClass="btn-primary" text="Guardar Platillo" />
+                            </children>
+                        </VBox>
+
+                    </children>
+                </GridPane>
+            </center>
+
+        </BorderPane>
+    </children>
+</StackPane>

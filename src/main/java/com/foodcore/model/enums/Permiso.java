@@ -1,11 +1,12 @@
 package com.foodcore.model.enums;
 
 /**
- * Permisos granulares RBAC definidos en SPEC-FOODCORE-v1.0 (§10.3).
+ * Permisos granulares RBAC definidos en SPEC-FOODCORE-v1.0 (§10.3) y SPEC-FOODCORE-v1.2 (§3.2).
  */
 public enum Permiso {
     VENTA_COBRAR("Autoriza el cobro de comandas y ventas POS"),
     VENTA_ANULAR("Autoriza la anulación auditada de una venta registrada"),
+    VENTA_DESCUENTO("Autoriza aplicar descuentos porcentuales o de monto fijo en ventas POS"),
     PEDIDO_CREAR("Autoriza abrir una mesa y crear nuevos pedidos"),
     PEDIDO_ADICIONAR("Autoriza agregar ítems a pedidos abiertos o en preparación"),
     PEDIDO_ADICIONAR_POST_ENTREGA("Autoriza reabrir un pedido entregado para adición extraordinaria"),

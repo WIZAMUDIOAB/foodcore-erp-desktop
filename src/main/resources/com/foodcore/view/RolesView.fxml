@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootRolesStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.RolesController">
+    <children>
+        <BorderPane>
+            <!-- Cabecera -->
+            <top>
+                <VBox spacing="16.0" styleClass="view-topbar" BorderPane.alignment="CENTER">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Roles Dinámicos y Matriz de Permisos" />
+                                                <Label styleClass="badge-pill-accent" text="RBAC ENTERPRISE" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Creación de roles a medida y configuración granular de privilegios sin recompilación" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="btnNuevoRol" mnemonicParsing="false" onAction="#handleAbrirModalNuevoRol" styleClass="btn-primary" text="+ Nuevo Rol" />
+                                <Button fx:id="btnActualizarRoles" mnemonicParsing="false" onAction="#cargarRolesDesdeBD" styleClass="btn-secondary" text="Actualizar" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Contenido Dividido: Tabla de Roles a la Izquierda, Matriz a la Derecha -->
+            <center>
+                <HBox spacing="16.0" styleClass="kardex-table-wrapper" BorderPane.alignment="CENTER">
+                    <children>
+                        <!-- Panel Izquierdo: Lista de Roles -->
+                        <VBox prefWidth="380.0" spacing="12.0">
+                            <children>
+                                <Label styleClass="text-h2" text="Roles Registrados" />
+                                <TableView fx:id="tblRoles" VBox.vgrow="ALWAYS">
+                                    <columns>
+                                        <TableColumn fx:id="colCodigoRol" prefWidth="110.0" text="Código" />
+                                        <TableColumn fx:id="colNombreRol" prefWidth="160.0" text="Nombre Rol" />
+                                        <TableColumn fx:id="colEstadoRol" prefWidth="90.0" text="Estado" />
+                                    </columns>
+                                </TableView>
+                            </children>
+                        </VBox>
+
+                        <!-- Panel Derecho: Matriz de Permisos del Rol Seleccionado -->
+                        <VBox spacing="12.0" HBox.hgrow="ALWAYS">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                    <children>
+                                        <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label fx:id="lblRolSeleccionadoTitulo" styleClass="text-h2" text="Permisos Asignados al Rol" />
+                                                <Label fx:id="lblRolDescripcion" styleClass="text-caption-muted" text="Seleccione un rol de la tabla para visualizar y modificar sus permisos." />
+                                            </children>
+                                        </VBox>
+                                        <Button fx:id="btnGuardarPermisos" mnemonicParsing="false" onAction="#handleGuardarPermisos" styleClass="btn-success" text="Guardar Cambios Matriz" />
+                                    </children>
+                                </HBox>
+
+                                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+                                    <content>
+                                        <VBox fx:id="boxMatrizPermisos" spacing="16.0" styleClass="surface-card">
+                                            <!-- Categorías de permisos pobladas dinámicamente -->
+                                        </VBox>
+                                    </content>
+                                </ScrollPane>
+                            </children>
+                        </VBox>
+                    </children>
+                </HBox>
+            </center>
+        </BorderPane>
+    </children>
+</StackPane>

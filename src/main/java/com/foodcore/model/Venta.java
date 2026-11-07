@@ -15,8 +15,9 @@ public class Venta {
     private LocalDateTime fechaHora;
     private BigDecimal subtotal;
     private BigDecimal igv;
+    private BigDecimal descuento = BigDecimal.ZERO;
     private BigDecimal total;
-    private String metodoPago; // EFECTIVO, TARJETA, YAPE_PLIN
+    private String metodoPago; // EFECTIVO, TARJETA, YAPE_PLIN, MIXTO
     private BigDecimal montoRecibido;
     private BigDecimal vuelto;
     private String estado; // COMPLETADA, ANULADA
@@ -66,6 +67,11 @@ public class Venta {
 
     public BigDecimal getIgv() { return igv; }
     public void setIgv(BigDecimal igv) { this.igv = igv; }
+
+    public BigDecimal getDescuento() { return descuento; }
+    public void setDescuento(BigDecimal descuento) {
+        this.descuento = descuento != null ? descuento : BigDecimal.ZERO;
+    }
 
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }

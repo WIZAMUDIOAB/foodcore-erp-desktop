@@ -1,0 +1,810 @@
+/* ==========================================================================
+   FOODCORE ERP v4.0 — PWA TABLET PARA MOZOS (Design System SaaS)
+   Tokens oficiales: #F8F9FA (Canvas), #111827 (Dark), #F05A22 (Brand Orange)
+   Tipografía: Inter & JetBrains Mono | Touch Targets >= 48px
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+
+:root {
+  --fc-bg-canvas: #F8F9FA;
+  --fc-bg-surface: #FFFFFF;
+  --fc-bg-dark: #111827;
+  --fc-bg-dark-elevated: #1F2937;
+  --fc-brand-primary: #F05A22;
+  --fc-brand-primary-hover: #D94E1B;
+  --fc-brand-primary-soft: #FFF3EE;
+  --fc-text-primary: #111827;
+  --fc-text-secondary: #4B5563;
+  --fc-text-muted: #6B7280;
+  --fc-border-subtle: #E5E7EB;
+  --fc-success: #10B981;
+  --fc-success-soft: #ECFDF5;
+  --fc-warning: #F59E0B;
+  --fc-warning-soft: #FFFBEB;
+  --fc-danger: #EF4444;
+  --fc-danger-soft: #FEF2F2;
+  --fc-radius-card: 14px;
+  --fc-radius-btn: 10px;
+  --fc-shadow-sm: 0 1px 3px rgba(17, 24, 39, 0.06), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --fc-shadow-md: 0 4px 12px rgba(17, 24, 39, 0.08);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  background-color: var(--fc-bg-canvas);
+  color: var(--fc-text-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   BARRA SUPERIOR TABLET (TOP SHELL + INDICADOR CONEXIÓN)
+   ========================================================================== */
+.tablet-topbar {
+  height: 68px;
+  background-color: var(--fc-bg-dark);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid #1F2937;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fc-brand-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 17px;
+  color: #FFFFFF;
+  letter-spacing: -0.5px;
+}
+
+.brand-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.3px;
+}
+
+.brand-subtitle {
+  font-size: 12px;
+  color: #9CA3AF;
+  display: block;
+}
+
+.mesa-active-pill {
+  background: rgba(240, 90, 34, 0.18);
+  border: 1px solid rgba(240, 90, 34, 0.45);
+  color: #FF8A5B;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Indicador Visual Online/Offline (Criterio 4) */
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--fc-bg-dark-elevated);
+  border: 1px solid #374151;
+  font-size: 13px;
+  font-weight: 600;
+  color: #F3F4F6;
+}
+
+.status-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.25s ease;
+}
+
+.status-dot.online {
+  background-color: var(--fc-success);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+}
+
+.status-dot.offline {
+  background-color: var(--fc-danger);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25);
+}
+
+.outbox-badge {
+  background-color: var(--fc-warning);
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+/* ==========================================================================
+   BOTONES TÁCTILES (MÍNIMO 48PX DE ALTO — SPEC §3)
+   ========================================================================== */
+.btn-touch {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: var(--fc-radius-btn);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  user-select: none;
+}
+
+.btn-touch:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background-color: var(--fc-brand-primary);
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(240, 90, 34, 0.28);
+}
+
+.btn-primary:hover {
+  background-color: var(--fc-brand-primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--fc-bg-surface);
+  color: var(--fc-text-primary);
+  border-color: var(--fc-border-subtle);
+}
+
+.btn-secondary:hover {
+  background-color: #F3F4F6;
+}
+
+.btn-dark-outline {
+  background-color: var(--fc-bg-dark-elevated);
+  color: #E5E7EB;
+  border-color: #374151;
+}
+
+.btn-dark-outline:hover {
+  background-color: #374151;
+}
+
+.btn-add-dish {
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 12px;
+  background-color: var(--fc-brand-primary);
+  color: #FFFFFF;
+  font-size: 22px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(240, 90, 34, 0.25);
+}
+
+.btn-add-dish:hover {
+  background-color: var(--fc-brand-primary-hover);
+}
+
+/* ==========================================================================
+   VISTA 1: LOGIN DE MOZO (index.html)
+   ========================================================================== */
+.login-shell {
+  min-height: calc(100vh - 68px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--fc-bg-surface);
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: 18px;
+  padding: 36px 32px;
+  box-shadow: var(--fc-shadow-md);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.login-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+  margin-bottom: 6px;
+}
+
+.login-header p {
+  font-size: 14px;
+  color: var(--fc-text-muted);
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fc-text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: var(--fc-radius-btn);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--fc-text-primary);
+  background: #FFFFFF;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--fc-brand-primary);
+  box-shadow: 0 0 0 3px rgba(240, 90, 34, 0.14);
+}
+
+.quick-users {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.quick-user-chip {
+  flex: 1;
+  min-height: 48px;
+  background: var(--fc-bg-canvas);
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fc-text-secondary);
+  cursor: pointer;
+}
+
+.quick-user-chip:hover {
+  border-color: var(--fc-brand-primary);
+  color: var(--fc-brand-primary);
+  background: var(--fc-brand-primary-soft);
+}
+
+/* ==========================================================================
+   VISTA 2: SELECCIÓN DE MESAS (mesas.html)
+   ========================================================================== */
+.mesas-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 10px;
+}
+
+.mesas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.mesa-card {
+  background: var(--fc-bg-surface);
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: var(--fc-radius-card);
+  padding: 20px;
+  box-shadow: var(--fc-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mesa-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--fc-brand-primary);
+  box-shadow: var(--fc-shadow-md);
+}
+
+.mesa-card.ocupada {
+  border-left: 5px solid var(--fc-brand-primary);
+}
+
+.mesa-card.libre {
+  border-left: 5px solid var(--fc-success);
+}
+
+.mesa-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mesa-number {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+}
+
+.mesa-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.mesa-badge.libre {
+  background: var(--fc-success-soft);
+  color: #047857;
+}
+
+.mesa-badge.ocupada {
+  background: var(--fc-brand-primary-soft);
+  color: var(--fc-brand-primary);
+}
+
+.mesa-meta {
+  font-size: 13px;
+  color: var(--fc-text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.mesa-total {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--fc-brand-primary);
+}
+
+/* ==========================================================================
+   VISTA 3: CATÁLOGO Y CARRITO DE PEDIDO (catalogo.html)
+   ========================================================================== */
+.pos-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 410px;
+  height: calc(100vh - 68px);
+  overflow: hidden;
+}
+
+.catalog-pane {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.catalog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cat-tab {
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--fc-bg-surface);
+  border: 1px solid var(--fc-border-subtle);
+  color: var(--fc-text-secondary);
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.cat-tab.active {
+  background: var(--fc-bg-dark);
+  color: #FFFFFF;
+  border-color: var(--fc-bg-dark);
+}
+
+.search-box {
+  min-width: 230px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-border-subtle);
+  background: var(--fc-bg-surface);
+  font-size: 14px;
+}
+
+.dishes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+  gap: 16px;
+}
+
+.dish-card {
+  background: var(--fc-bg-surface);
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: var(--fc-radius-card);
+  overflow: hidden;
+  box-shadow: var(--fc-shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dish-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: var(--fc-shadow-md);
+}
+
+.dish-thumb-wrapper {
+  padding: 12px 12px 0 12px;
+}
+
+.dish-thumb {
+  width: 100%;
+  height: 118px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+  background-color: #F3F4F6;
+}
+
+.dish-thumb-fallback {
+  width: 100%;
+  height: 118px;
+  background-color: #F3F4F6;
+  color: #111827;
+  font-family: 'Inter', var(--font-sans);
+  font-weight: 700;
+  font-size: 24px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.dish-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.dish-category-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--fc-text-muted);
+  letter-spacing: 0.4px;
+}
+
+.dish-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fc-text-primary);
+  line-height: 1.3;
+}
+
+.dish-desc {
+  font-size: 12.5px;
+  color: var(--fc-text-muted);
+  flex: 1;
+}
+
+.dish-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.dish-price {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--fc-brand-primary);
+}
+
+/* ==========================================================================
+   CARRITO LATERAL DERECHO (RESUMEN DE COMANDA)
+   ========================================================================== */
+.cart-sidebar {
+  background: var(--fc-bg-surface);
+  border-left: 1px solid var(--fc-border-subtle);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.cart-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--fc-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cart-header h2 {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.cart-count-pill {
+  background: var(--fc-brand-primary-soft);
+  color: var(--fc-brand-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.cart-items-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cart-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--fc-text-muted);
+  font-size: 14px;
+}
+
+.cart-item {
+  background: var(--fc-bg-canvas);
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cart-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cart-item-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fc-text-primary);
+}
+
+.cart-item-subtotal {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fc-text-primary);
+  white-space: nowrap;
+}
+
+.cart-item-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-qty {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--fc-border-subtle);
+  background: #FFFFFF;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-qty:hover {
+  border-color: var(--fc-brand-primary);
+  color: var(--fc-brand-primary);
+}
+
+.qty-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  min-width: 28px;
+  text-align: center;
+}
+
+.cart-item-note-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--fc-border-subtle);
+  border-radius: 8px;
+  font-size: 12.5px;
+  background: #FFFFFF;
+}
+
+.quick-notes-bar {
+  padding: 10px 18px;
+  border-top: 1px solid var(--fc-border-subtle);
+  background: #FAFAFA;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.note-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--fc-border-subtle);
+  background: #FFFFFF;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fc-text-secondary);
+  cursor: pointer;
+}
+
+.note-chip:hover {
+  border-color: var(--fc-brand-primary);
+  color: var(--fc-brand-primary);
+}
+
+.cart-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--fc-border-subtle);
+  background: var(--fc-bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cart-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  color: var(--fc-text-secondary);
+}
+
+.cart-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 8px;
+  border-top: 1px dashed var(--fc-border-subtle);
+}
+
+.cart-total-label {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--fc-text-primary);
+}
+
+.cart-total-amount {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--fc-brand-primary);
+}
+
+.btn-send-kds {
+  width: 100%;
+  min-height: 54px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   TOAST NOTIFICATION
+   ========================================================================== */
+.toast-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fc-bg-dark);
+  color: #FFFFFF;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--fc-shadow-md);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast-banner.show {
+  display: inline-flex;
+}

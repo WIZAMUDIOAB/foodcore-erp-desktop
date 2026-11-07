@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootConfigStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ConfiguracionController">
+    <children>
+        <StackPane styleClass="pos-catalog-panel">
+            <children>
+                <VBox alignment="TOP_CENTER" maxWidth="680.0" prefWidth="680.0" spacing="18.0" styleClass="caja-centered-column">
+                    <children>
+                        <VBox spacing="4.0" styleClass="surface-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="view-heading" text="Configuración del Restaurante y Ticketera" />
+                                        <Label styleClass="badge-pill-neutral" text="TICKET INTERNO NO FISCAL" />
+                                    </children>
+                                </HBox>
+                                <Label styleClass="view-subheading" text="Datos de cabecera del comprobante interno no fiscal y nombre de la impresora térmica LAN/USB" />
+                            </children>
+                        </VBox>
+
+                        <VBox spacing="14.0" styleClass="surface-card">
+                            <children>
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Nombre Comercial del Restaurante" />
+                                        <TextField fx:id="txtNombreRestaurante" styleClass="input-field" text="FoodCore Fast Food S.A.C." />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Dirección del Local" />
+                                        <TextField fx:id="txtDireccion" styleClass="input-field" text="Av. Javier Prado Este 2450, San Borja, Lima" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Teléfono de Contacto" />
+                                        <TextField fx:id="txtTelefono" styleClass="input-field" text="(01) 442-8900" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="RUC Opcional (Referencia en Comprobante Interno)" />
+                                        <TextField fx:id="txtRuc" styleClass="input-field" text="20609874512" />
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Nombre de Impresora Térmica (80mm / 58mm)" />
+                                        <TextField fx:id="txtImpresora" styleClass="input-field" text="EPSON-TM-T20III" />
+                                    </children>
+                                </VBox>
+
+                                <HBox alignment="CENTER_RIGHT">
+                                    <children>
+                                        <Button fx:id="btnGuardarConfig" mnemonicParsing="false" onAction="#handleGuardarConfiguracion" styleClass="btn-primary" text="Guardar Configuración" />
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+                    </children>
+                </VBox>
+            </children>
+        </StackPane>
+    </children>
+</StackPane>

@@ -12,6 +12,7 @@ public class DetalleVenta {
 
     // Campo descriptivo
     private String nombreProducto;
+    private String notasPreparacion;
 
     public DetalleVenta() {}
 
@@ -50,8 +51,11 @@ public class DetalleVenta {
     public String getNombreProducto() { return nombreProducto; }
     public void setNombreProducto(String nombreProducto) { this.nombreProducto = nombreProducto; }
 
+    public String getNotasPreparacion() { return notasPreparacion; }
+    public void setNotasPreparacion(String notasPreparacion) { this.notasPreparacion = notasPreparacion; }
+
     @Override
     public String toString() {
-        return cantidad + "x " + nombreProducto + " - S/ " + subtotal;
+        return cantidad + "x " + nombreProducto + (notasPreparacion != null ? " (" + notasPreparacion + ")" : "") + " - S/ " + subtotal;
     }
 }

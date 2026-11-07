@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootMermasStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MermasController">
+    <children>
+        <BorderPane styleClass="pos-catalog-panel">
+
+            <!-- Encabezado y Formulario Rápido de Registro de Merma (§3.3) -->
+            <top>
+                <VBox spacing="16.0" styleClass="surface-card">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <VBox spacing="2.0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Control de Mermas y Bajas de Almacén" />
+                                                <Label styleClass="badge-pill-danger" text="DESCUENTO DE STOCK" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Registro auditado de insumos deteriorados o platos quemados con impacto directo en Kardex" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+
+                        <Region styleClass="divider-horizontal" />
+
+                        <HBox alignment="BOTTOM_LEFT" spacing="12.0">
+                            <children>
+                                <VBox prefWidth="300.0" spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Insumo Afectado" />
+                                        <ComboBox fx:id="cmbInsumoMerma" maxWidth="1.7976931348623157E308" />
+                                    </children>
+                                </VBox>
+                                <VBox prefWidth="150.0" spacing="4.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Cantidad de Merma" />
+                                        <TextField fx:id="txtCantidadMerma" promptText="Ej. 2" styleClass="input-field" />
+                                    </children>
+                                </VBox>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Motivo de Baja / Observación" />
+                                        <TextField fx:id="txtMotivoMerma" promptText="Ej. Carne echada a perder / Plato quemado" styleClass="input-field" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="btnRegistrarMerma" mnemonicParsing="false" onAction="#handleRegistrarMerma" styleClass="btn-primary" text="Registrar Merma" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Historial de Mermas Registradas -->
+            <center>
+                <VBox styleClass="kardex-table-wrapper" BorderPane.alignment="CENTER">
+                    <children>
+                        <TableView fx:id="tblMermas" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="colFecha" prefWidth="165.0" text="Fecha / Hora" />
+                                <TableColumn fx:id="colInsumo" prefWidth="240.0" text="Insumo" />
+                                <TableColumn fx:id="colCantidad" prefWidth="150.0" text="Cantidad Descontada" />
+                                <TableColumn fx:id="colSaldo" prefWidth="150.0" text="Saldo Posterior" />
+                                <TableColumn fx:id="colMotivo" prefWidth="330.0" text="Motivo Registrado" />
+                            </columns>
+                        </TableView>
+                    </children>
+                </VBox>
+            </center>
+
+        </BorderPane>
+    </children>
+</StackPane>

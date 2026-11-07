@@ -1,6 +1,7 @@
 package com.foodcore.model;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 public class Usuario {
     private int idUsuario;
@@ -18,6 +19,14 @@ public class Usuario {
     // Relaciones descriptivas
     private String nombreRol;
     private String nombreEmpleado;
+
+    // Campos RRHH (SPEC Sub-Fase 4B)
+    private String dni;
+    private String pin;
+    private double sueldoBase = 1200.00;
+    private String horarioLaboral = "08:00-16:00";
+    private LocalTime horaEntradaProgramada = LocalTime.of(8, 0);
+    private LocalTime horaSalidaProgramada = LocalTime.of(16, 0);
 
     public Usuario() {
     }
@@ -134,6 +143,30 @@ public class Usuario {
     public void setNombreEmpleado(String nombreEmpleado) {
         this.nombreEmpleado = nombreEmpleado;
     }
+
+    public String getDni() { return dni; }
+
+    public void setDni(String dni) { this.dni = dni; }
+
+    public String getPin() { return pin; }
+
+    public void setPin(String pin) { this.pin = pin; }
+
+    public double getSueldoBase() { return sueldoBase; }
+
+    public void setSueldoBase(double sueldoBase) { this.sueldoBase = sueldoBase; }
+
+    public String getHorarioLaboral() { return horarioLaboral; }
+
+    public void setHorarioLaboral(String horarioLaboral) { this.horarioLaboral = horarioLaboral; }
+
+    public LocalTime getHoraEntradaProgramada() { return horaEntradaProgramada; }
+
+    public void setHoraEntradaProgramada(LocalTime horaEntradaProgramada) { this.horaEntradaProgramada = horaEntradaProgramada; }
+
+    public LocalTime getHoraSalidaProgramada() { return horaSalidaProgramada; }
+
+    public void setHoraSalidaProgramada(LocalTime horaSalidaProgramada) { this.horaSalidaProgramada = horaSalidaProgramada; }
 
     @Override
     public String toString() {

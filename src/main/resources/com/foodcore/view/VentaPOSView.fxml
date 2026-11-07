@@ -1,110 +1,178 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.TilePane?>
+<?import javafx.scene.layout.VBox?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.foodcore.controller.VentaController"
-            prefHeight="720.0" prefWidth="1100.0" style="-fx-background-color: -color-bg-base;">
+<BorderPane prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.VentaController">
 
     <!-- Topbar Superior -->
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="view-topbar" style="-fx-padding: 12px 24px;">
+        <HBox alignment="CENTER_LEFT" minHeight="64.0" prefHeight="64.0" spacing="12.0" styleClass="view-topbar">
             <VBox spacing="2.0">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <Label text="Terminal de Ventas" styleClass="view-heading"/>
-                    <Label text="Caja Activa" style="-fx-background-color: #ecfdf5; -fx-text-fill: #059669; -fx-font-weight: bold; -fx-font-size: 10px; -fx-padding: 3px 8px; -fx-background-radius: 999px;"/>
+                    <Label styleClass="view-heading" text="Terminal Punto de Venta (POS)" />
+                    <Label styleClass="badge-pill-success" text="CAJA ACTIVA" />
                 </HBox>
-                <Label text="Emisión rápida de comandas, boletas y tickets de venta" styleClass="view-subheading"/>
+                <Label styleClass="view-subheading" text="Facturación rápida, envío a cocina, división de cuentas y cobro multimedio" />
             </VBox>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button text="Arqueo y Cierre de Caja" onAction="#handleAbrirArqueo" styleClass="btn-secondary"/>
+            <Region HBox.hgrow="ALWAYS" />
+            <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                <Button fx:id="btnFidelizacion" mnemonicParsing="false" onAction="#handleFidelizacionCanje" styleClass="btn-secondary" text="🎁 Fidelización" />
+                <Button fx:id="btnDividirCuenta" mnemonicParsing="false" onAction="#handleDividirCuenta" styleClass="btn-secondary" text="Dividir Cuenta" />
+                <Button fx:id="btnDescuento" mnemonicParsing="false" onAction="#handleAplicarDescuento" styleClass="btn-secondary" text="Descuento" />
+                <Button fx:id="btnAnularVenta" mnemonicParsing="false" onAction="#handleAnularVenta" styleClass="btn-secondary" text="Anular Venta" />
+                <Button mnemonicParsing="false" onAction="#handleAbrirArqueo" styleClass="btn-secondary" text="Arqueo y Cierre" />
+            </HBox>
         </HBox>
     </top>
 
-    <!-- Centro: Catalogo Visual de Productos -->
+    <!-- Centro: Split 35% Orden (Izquierda) / 65% Catálogo (Derecha) (§6) -->
     <center>
-        <VBox spacing="12.0" style="-fx-padding: 16px 20px;">
-            <!-- Buscador y Chips de Categorias en dos filas limpias -->
-            <VBox spacing="8.0">
-                <HBox alignment="CENTER_LEFT" spacing="12.0">
-                    <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código..." prefWidth="340.0" prefHeight="38.0"/>
-                </HBox>
-                <ScrollPane fitToHeight="true" vbarPolicy="NEVER" hbarPolicy="AS_NEEDED"
-                            style="-fx-background-color: transparent; -fx-padding: 0;">
-                    <HBox fx:id="boxCategorias" spacing="8.0" alignment="CENTER_LEFT" style="-fx-padding: 2px 0;"/>
-                </ScrollPane>
-            </VBox>
+        <GridPane fx:id="posSplitGrid">
+            <columnConstraints>
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="35.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="65.0" />
+            </columnConstraints>
+            <rowConstraints>
+                <RowConstraints vgrow="ALWAYS" />
+            </rowConstraints>
+            <children>
 
-            <!-- Grilla de Productos -->
-            <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
-                <TilePane fx:id="tileProductos" hgap="12.0" vgap="12.0" prefColumns="4" style="-fx-padding: 4px;"/>
-            </ScrollPane>
-        </VBox>
-    </center>
+                <!-- PANEL IZQUIERDO (35% ORDEN): Header con mesa y mozo, lista de ítems, totales mono, botones 56px, chips de atajo -->
+                <VBox spacing="12.0" styleClass="pos-order-panel" GridPane.columnIndex="0">
+                    <children>
+                        <!-- Header Orden: Mesa y Mozo -->
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <children>
+                                <VBox spacing="2.0">
+                                    <children>
+                                        <Label fx:id="lblOrdenHeader" styleClass="text-h2" text="Mesa 01 · Salón Principal" />
+                                        <Label fx:id="lblMozoHeader" styleClass="text-caption" text="Mozo: Carlos Mendoza · Pedido #ORD-104" />
+                                    </children>
+                                </VBox>
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnNotaItem" mnemonicParsing="false" onAction="#handleNotaItem" styleClass="category-chip" text="+ Nota" />
+                                <Button fx:id="btnQuitarItem" mnemonicParsing="false" onAction="#handleEliminarItem" styleClass="btn-secondary" text="Quitar" />
+                            </children>
+                        </HBox>
 
-    <!-- Panel Lateral Derecho: Resumen de Pedido y Cobro -->
-    <right>
-        <VBox prefWidth="420.0" spacing="12.0"
-              style="-fx-background-color: -color-bg-surface; -fx-padding: 16px; -fx-border-color: -color-border-subtle; -fx-border-width: 0 0 0 1;">
+                        <!-- Lista de ítems de la orden -->
+                        <TableView fx:id="tblDetalle" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="colProducto" prefWidth="148.0" text="Ítem" />
+                                <TableColumn fx:id="colCantidad" prefWidth="64.0" text="Cant." />
+                                <TableColumn fx:id="colPrecio" prefWidth="78.0" text="P. Unit" />
+                                <TableColumn fx:id="colSubtotal" prefWidth="84.0" text="Importe" />
+                            </columns>
+                            <columnResizePolicy>
+                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                            </columnResizePolicy>
+                        </TableView>
 
-            <HBox alignment="CENTER_LEFT">
-                <VBox spacing="2.0">
-                    <Label text="Comanda en Curso" style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
-                    <Label text="Doble clic en un ítem para aumentar cantidad" style="-fx-font-size: 11px; -fx-text-fill: -color-ink-muted;"/>
+                        <!-- Totales fijos al fondo (Subtotal, IGV, Descuento, Total en Monoespaciado §2.2, §6, §3.2) -->
+                        <VBox spacing="8.0" styleClass="pos-totals-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT">
+                                    <children>
+                                        <Label styleClass="text-caption" text="Subtotal Gravado" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblSubtotal" styleClass="text-mono" text="S/ 0.00" />
+                                    </children>
+                                </HBox>
+                                <HBox alignment="CENTER_LEFT">
+                                    <children>
+                                        <Label styleClass="text-caption" text="IGV (18%)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblIgv" styleClass="text-mono" text="S/ 0.00" />
+                                    </children>
+                                </HBox>
+                                <HBox fx:id="rowDescuento" alignment="CENTER_LEFT" managed="false" visible="false">
+                                    <children>
+                                        <Label styleClass="text-caption" text="Descuento Autorizado" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblDescuento" styleClass="text-mono-accent" text="-S/ 0.00" />
+                                    </children>
+                                </HBox>
+                                <Region styleClass="divider-horizontal" />
+                                <HBox alignment="CENTER_LEFT">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Total a Pagar" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblTotal" styleClass="text-mono-lg-accent" text="S/ 0.00" />
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+
+                        <!-- Botones primarios de orden: Enviar y Cobrar de 56px (§2.5 y §6) -->
+                        <HBox spacing="10.0">
+                            <children>
+                                <Button fx:id="btnEnviarCocina" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEnviarComanda" styleClass="btn-pos-action-secondary" text="Enviar" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnEfectivo" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroEfectivo" styleClass="btn-pos-action-primary" text="Cobrar" HBox.hgrow="ALWAYS" />
+                            </children>
+                        </HBox>
+
+                        <!-- Botones adicionales de medio de pago (56px) -->
+                        <HBox spacing="10.0">
+                            <children>
+                                <Button fx:id="btnTarjeta" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroTarjeta" styleClass="btn-pos-action-secondary" text="Cobrar Tarjeta" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnYape" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroYape" styleClass="btn-pos-action-secondary" text="Cobrar Yape/Plin" HBox.hgrow="ALWAYS" />
+                            </children>
+                        </HBox>
+
+                        <Button fx:id="btnPreCuenta" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleImprimirPreCuenta" prefHeight="40.0" styleClass="btn-kds-outline" text="📄 Imprimir Pre-Cuenta" />
+
+                        <!-- Footer del ticket con atajos visibles como chips (§6) -->
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <children>
+                                <Label styleClass="shortcut-chip" text="F5 Efectivo" />
+                                <Label styleClass="shortcut-chip" text="F6 Tarjeta" />
+                                <Label styleClass="shortcut-chip" text="F7 Yape/Plin" />
+                            </children>
+                        </HBox>
+                    </children>
                 </VBox>
-                <Region HBox.hgrow="ALWAYS"/>
-                <Button text="Quitar ítem" onAction="#handleEliminarItem"
-                        style="-fx-background-color: transparent; -fx-text-fill: #dc2626; -fx-font-weight: 600; -fx-font-size: 11px; -fx-cursor: hand;"/>
-            </HBox>
 
-            <!-- Tabla de Detalle con Anchos Calibrados (Cero Texto Truncado) -->
-            <TableView fx:id="tblDetalle" VBox.vgrow="ALWAYS">
-                <columns>
-                    <TableColumn fx:id="colProducto" text="Producto" prefWidth="155.0"/>
-                    <TableColumn fx:id="colCantidad" text="Cant." prefWidth="72.0"/>
-                    <TableColumn fx:id="colPrecio" text="P. Unit" prefWidth="75.0"/>
-                    <TableColumn fx:id="colSubtotal" text="Total" prefWidth="80.0"/>
-                </columns>
-            </TableView>
+                <!-- PANEL DERECHO (65% CATÁLOGO): Categorías tipo pill (36px) + Grid de tiles 4x4 mínimo 96px (§6) -->
+                <VBox spacing="16.0" styleClass="pos-catalog-panel" GridPane.columnIndex="1">
+                    <children>
+                        <VBox spacing="12.0">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                    <children>
+                                        <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código SKU..." styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                    </children>
+                                </HBox>
+                                <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="NEVER">
+                                    <content>
+                                        <HBox fx:id="boxCategorias" alignment="CENTER_LEFT" spacing="8.0" />
+                                    </content>
+                                </ScrollPane>
+                            </children>
+                        </VBox>
 
-            <!-- Resumen Financiero -->
-            <VBox spacing="6.0" style="-fx-background-color: #f8fafc; -fx-padding: 14px; -fx-background-radius: 8px; -fx-border-color: -color-border-subtle; -fx-border-radius: 8px;">
-                <HBox alignment="CENTER_LEFT">
-                    <Label text="Subtotal Neto:" style="-fx-text-fill: -color-ink-secondary; -fx-font-size: 12px;"/>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblSubtotal" text="S/ 0.00" style="-fx-font-weight: 600; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
-                </HBox>
-                <HBox alignment="CENTER_LEFT">
-                    <Label text="IGV (18%):" style="-fx-text-fill: -color-ink-secondary; -fx-font-size: 12px;"/>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblIgv" text="S/ 0.00" style="-fx-font-weight: 600; -fx-font-size: 13px; -fx-text-fill: -color-ink-primary;"/>
-                </HBox>
-                <Separator style="-fx-opacity: 0.5;"/>
-                <HBox alignment="CENTER_LEFT">
-                    <Label text="Total a Cobrar" style="-fx-font-size: 15px; -fx-font-weight: 800; -fx-text-fill: -color-ink-primary;"/>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <Label fx:id="lblTotal" text="S/ 0.00" style="-fx-font-size: 22px; -fx-font-weight: 800; -fx-text-fill: -color-brand-ember;"/>
-                </HBox>
-            </VBox>
+                        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                            <content>
+                                <TilePane fx:id="tileProductos" hgap="12.0" prefColumns="4" vgap="12.0" />
+                            </content>
+                        </ScrollPane>
+                    </children>
+                </VBox>
 
-            <!-- Acciones de Cobro Inmediato -->
-            <VBox spacing="6.0">
-                <Label text="MÉTODOS DE PAGO RÁPIDO" style="-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: -color-ink-muted; -fx-letter-spacing: 0.06em;"/>
-                <HBox spacing="8.0">
-                    <Button fx:id="btnEfectivo" text="Efectivo [F5]" onAction="#handleCobroEfectivo"
-                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0" styleClass="btn-emerald"
-                            style="-fx-font-size: 12px; -fx-padding: 6px 10px;"/>
-                    <Button fx:id="btnTarjeta" text="Tarjeta [F6]" onAction="#handleCobroTarjeta"
-                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0" styleClass="btn-secondary"
-                            style="-fx-font-size: 12px; -fx-padding: 6px 10px;"/>
-                    <Button fx:id="btnYape" text="Yape/Plin [F7]" onAction="#handleCobroYape"
-                            HBox.hgrow="ALWAYS" maxWidth="Infinity" prefHeight="42.0"
-                            style="-fx-background-color: #6d28d9; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px; -fx-padding: 6px 10px; -fx-background-radius: 7px; -fx-cursor: hand;"/>
-                </HBox>
-            </VBox>
-        </VBox>
-    </right>
+            </children>
+        </GridPane>
+    </center>
 
 </BorderPane>

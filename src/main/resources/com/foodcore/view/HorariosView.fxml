@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootHorariosStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.HorariosController">
+    <children>
+        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <BorderPane minWidth="960.0">
+                    <!-- Encabezado -->
+                    <top>
+                        <VBox spacing="12.0">
+                            <padding>
+                                <Insets bottom="12.0" left="24.0" right="24.0" top="24.0" />
+                            </padding>
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Programación de Turnos y Horarios Semanales" />
+                                                <Label styleClass="view-subheading" text="Gestión de roles de salón/cocina, alertas de cobertura mínima y publicación al personal" />
+                                            </children>
+                                        </VBox>
+                                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                            <children>
+                                                <Button fx:id="btnNuevoTurno" mnemonicParsing="false" onAction="#handleNuevoTurnoModal" styleClass="btn-secondary" text="+ Asignar Turno" />
+                                                <Button fx:id="btnPublicarHorarios" mnemonicParsing="false" onAction="#handlePublicarHorarios" styleClass="btn-primary" text="Publicar Horario Semanal" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </HBox>
+
+                                <!-- Banner de Alertas de Cobertura -->
+                                <HBox fx:id="bannerAlertasCobertura" alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: #FEF3C7; -fx-padding: 10 16; -fx-background-radius: 8; -fx-border-color: #FCD34D; -fx-border-radius: 8;">
+                                    <children>
+                                        <Label style="-fx-font-size: 16px;" text="⚠" />
+                                        <Label fx:id="lblTextoAlerta" style="-fx-text-fill: #92400E; -fx-font-weight: bold;" text="Evaluando cobertura de personal para el fin de semana..." wrapText="true" HBox.hgrow="ALWAYS" />
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+                    </top>
+
+                    <!-- Contenido Principal: Grilla Semanal + Panel Colaboradores -->
+                    <center>
+                        <HBox spacing="16.0">
+                            <padding>
+                                <Insets bottom="24.0" left="24.0" right="24.0" top="6.0" />
+                            </padding>
+                            <children>
+                                <!-- Calendario Semanal con Scroll Horizontal/Vertical -->
+                                <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="AS_NEEDED" style="-fx-background-color: transparent; -fx-background: transparent;" vbarPolicy="AS_NEEDED" HBox.hgrow="ALWAYS">
+                                    <content>
+                                        <GridPane fx:id="gridSemana" hgap="12.0" minWidth="1050.0" styleClass="stat-card" vgap="12.0">
+                                            <padding>
+                                                <Insets bottom="16.0" left="16.0" right="16.0" top="16.0" />
+                                            </padding>
+                                            <columnConstraints>
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                                <ColumnConstraints minWidth="140.0" prefWidth="150.0" hgrow="ALWAYS" />
+                                            </columnConstraints>
+                                            <rowConstraints>
+                                                <RowConstraints minHeight="40.0" prefHeight="40.0" />
+                                                <RowConstraints minHeight="450.0" vgrow="ALWAYS" />
+                                            </rowConstraints>
+                                            <!-- Las columnas (LUNES a DOMINGO) se llenan dinámicamente -->
+                                        </GridPane>
+                                    </content>
+                                </ScrollPane>
+
+                                <!-- Panel Lateral: Colaboradores Disponibles -->
+                                <VBox maxWidth="280.0" minWidth="260.0" prefWidth="270.0" spacing="12.0" styleClass="stat-card">
+                                    <padding>
+                                        <Insets bottom="16.0" left="14.0" right="14.0" top="14.0" />
+                                    </padding>
+                                    <children>
+                                        <Label styleClass="text-h3" text="Equipo Disponible" />
+                                        <Label styleClass="text-body-secondary" text="Seleccione para programar turno rápido" />
+                                        <ListView fx:id="listColaboradores" VBox.vgrow="ALWAYS" />
+                                        <Button fx:id="btnAsignarRapido" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAsignarRapido" styleClass="btn-kds-outline" text="Programar Colaborador" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+                    </center>
+                </BorderPane>
+            </content>
+        </ScrollPane>
+
+        <!-- Modal Asignar Turno -->
+        <VBox fx:id="modalTurno" alignment="CENTER" styleClass="modal-backdrop" visible="false">
+            <children>
+                <VBox maxWidth="440.0" spacing="16.0" styleClass="modal-card">
+                    <children>
+                        <Label styleClass="modal-title" text="Asignar Turno a Colaborador" />
+
+                        <VBox spacing="10.0">
+                            <children>
+                                <Label styleClass="form-field-label" text="Colaborador:" />
+                                <ComboBox fx:id="cmbModalColaborador" maxWidth="1.7976931348623157E308" />
+
+                                <Label styleClass="form-field-label" text="Día de la Semana:" />
+                                <ComboBox fx:id="cmbModalDia" maxWidth="1.7976931348623157E308" />
+
+                                <Label styleClass="form-field-label" text="Turno Programado:" />
+                                <ComboBox fx:id="cmbModalTurno" maxWidth="1.7976931348623157E308" />
+
+                                <HBox spacing="12.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Hora Inicio:" />
+                                                <TextField fx:id="txtModalInicio" promptText="08:00" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Hora Fin:" />
+                                                <TextField fx:id="txtModalFin" promptText="16:00" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+
+                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                            <children>
+                                <Button mnemonicParsing="false" onAction="#handleCerrarModalTurno" styleClass="btn-secondary" text="Cancelar" />
+                                <Button fx:id="btnGuardarTurno" mnemonicParsing="false" onAction="#handleGuardarTurnoModal" styleClass="btn-primary" text="Guardar Turno" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>

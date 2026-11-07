@@ -31,11 +31,12 @@ public class ProductoDAOImpl implements ProductoDAO {
     @Override
     public List<Producto> listarProductosDisponibles(Connection conn) throws SQLException {
         List<Producto> lista = new ArrayList<>();
-        String sql = "SELECT p.*, c.nombre AS nombre_cat " +
+        String sql = "SELECT p.*, COALESCE(c.nombre, 'General') AS nombre_cat " +
                      "FROM producto p " +
-                     "JOIN categoria c ON p.id_categoria = c.id_categoria " +
-                     "WHERE p.disponible = TRUE " +
-                     "ORDER BY c.nombre, p.nombre";
+                     "LEFT JOIN categoria c ON p.id_categoria = c.id_categoria " +
+                     "WHERE (p.activo = 1 OR p.activo IS NULL) " +
+                     "AND (p.disponible = TRUE OR p.disponible IS NULL OR p.disponible = 1) " +
+                     "ORDER BY p.id_producto ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -52,7 +53,7 @@ public class ProductoDAOImpl implements ProductoDAO {
         String sql = "SELECT p.*, c.nombre AS nombre_cat " +
                      "FROM producto p " +
                      "JOIN categoria c ON p.id_categoria = c.id_categoria " +
-                     "ORDER BY p.id_producto ASC";
+                     "WHERE p.activo = 1 ORDER BY p.id_producto ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -81,8 +82,8 @@ public class ProductoDAOImpl implements ProductoDAO {
 
     @Override
     public int crear(Connection conn, Producto p) throws SQLException {
-        String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, costo_estimado, disponible) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, costo_estimado, disponible, imagen_url) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, p.getIdCategoria());
             ps.setString(2, p.getCodigo());
@@ -91,6 +92,7 @@ public class ProductoDAOImpl implements ProductoDAO {
             ps.setBigDecimal(5, p.getPrecioVenta());
             ps.setBigDecimal(6, p.getCostoEstimado());
             ps.setBoolean(7, p.isDisponible());
+            ps.setString(8, p.getImagenUrl());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -105,7 +107,7 @@ public class ProductoDAOImpl implements ProductoDAO {
 
     @Override
     public void actualizar(Connection conn, Producto p) throws SQLException {
-        String sql = "UPDATE producto SET id_categoria = ?, codigo = ?, nombre = ?, descripcion = ?, precio_venta = ?, costo_estimado = ?, disponible = ? " +
+        String sql = "UPDATE producto SET id_categoria = ?, codigo = ?, nombre = ?, descripcion = ?, precio_venta = ?, costo_estimado = ?, disponible = ?, imagen_url = ? " +
                      "WHERE id_producto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, p.getIdCategoria());
@@ -115,7 +117,8 @@ public class ProductoDAOImpl implements ProductoDAO {
             ps.setBigDecimal(5, p.getPrecioVenta());
             ps.setBigDecimal(6, p.getCostoEstimado());
             ps.setBoolean(7, p.isDisponible());
-            ps.setInt(8, p.getIdProducto());
+            ps.setString(8, p.getImagenUrl());
+            ps.setInt(9, p.getIdProducto());
             ps.executeUpdate();
         }
     }
@@ -132,7 +135,7 @@ public class ProductoDAOImpl implements ProductoDAO {
 
     @Override
     public void eliminar(Connection conn, int idProducto) throws SQLException {
-        String sql = "DELETE FROM producto WHERE id_producto = ?";
+        String sql = "UPDATE producto SET activo = 0 WHERE id_producto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idProducto);
             ps.executeUpdate();
@@ -150,6 +153,11 @@ public class ProductoDAOImpl implements ProductoDAO {
             rs.getBigDecimal("costo_estimado"),
             rs.getBoolean("disponible")
         );
+        try {
+            p.setImagenUrl(rs.getString("imagen_url"));
+        } catch (SQLException ignored) {
+            p.setImagenUrl(null);
+        }
         p.setNombreCategoria(rs.getString("nombre_cat"));
         return p;
     }

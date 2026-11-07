@@ -1,5 +1,7 @@
 package com.foodcore.dao;
 
+import java.math.BigDecimal;
+
 import com.foodcore.exception.ConflictoEstadoException;
 import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
@@ -18,7 +20,7 @@ public class PedidoDAOImpl implements PedidoDAO {
 
     @Override
     public int crearPedido(Connection conn, Pedido pedido) throws SQLException {
-        String sql = "INSERT INTO pedido (id_usuario, id_cliente, numero_mesa, total, estado, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO pedido (id_usuario, id_cliente, numero_mesa, total, estado, idempotency_key, tipo_pedido, cliente_nombre, cliente_telefono, cliente_direccion, cliente_referencia, costo_envio, repartidor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, pedido.getIdUsuario());
             if (pedido.getIdCliente() != null) {
@@ -30,6 +32,13 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setBigDecimal(4, pedido.getTotal());
             ps.setString(5, pedido.getEstado());
             ps.setString(6, pedido.getIdempotencyKey());
+            ps.setString(7, pedido.getTipoPedido() != null ? pedido.getTipoPedido() : "MESA");
+            ps.setString(8, pedido.getClienteNombre());
+            ps.setString(9, pedido.getClienteTelefono());
+            ps.setString(10, pedido.getClienteDireccion());
+            ps.setString(11, pedido.getClienteReferencia());
+            ps.setBigDecimal(12, pedido.getCostoEnvio() != null ? pedido.getCostoEnvio() : BigDecimal.ZERO);
+            ps.setString(13, pedido.getRepartidor());
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -92,6 +101,15 @@ public class PedidoDAOImpl implements PedidoDAO {
         } catch (SQLException ignored) {
             // Compatibilidad
         }
+        try {
+            p.setTipoPedido(rs.getString("tipo_pedido"));
+            p.setClienteNombre(rs.getString("cliente_nombre"));
+            p.setClienteTelefono(rs.getString("cliente_telefono"));
+            p.setClienteDireccion(rs.getString("cliente_direccion"));
+            p.setClienteReferencia(rs.getString("cliente_referencia"));
+            p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
+            p.setRepartidor(rs.getString("repartidor"));
+        } catch (SQLException ignored) {}
         return p;
     }
 

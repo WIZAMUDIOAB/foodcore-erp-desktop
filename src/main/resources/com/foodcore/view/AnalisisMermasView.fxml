@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.AreaChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootMermasStack" prefHeight="768.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.AnalisisMermasController">
+    <children>
+        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <BorderPane minWidth="960.0">
+            <!-- Encabezado y KPIs -->
+            <top>
+                <VBox spacing="14.0">
+                    <padding>
+                        <Insets bottom="12.0" left="24.0" right="24.0" top="18.0" />
+                    </padding>
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="16.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="view-heading" text="Control de Mermas y Desperdicio con Análisis" />
+                                        <Label styleClass="view-subheading" text="Auditoría de pérdidas económicas en cocina/almacén, Pareto de causas y ranking de impacto" />
+                                    </children>
+                                </VBox>
+                                <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                    <children>
+                                        <Button fx:id="btnNuevaMerma" mnemonicParsing="false" onAction="#handleAbrirModal" styleClass="btn-primary" text="+ Registrar Merma" />
+                                        <Button mnemonicParsing="false" onAction="#cargarDatos" styleClass="btn-secondary" text="↻ Actualizar" />
+                                    </children>
+                                </HBox>
+                            </children>
+                        </HBox>
+
+                        <!-- Banner de Alertas si hay insumos críticos (§10.2) -->
+                        <HBox fx:id="bannerAlertasMermas" alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: #FEF3C7; -fx-padding: 8 16; -fx-background-radius: 8; -fx-border-color: #FCD34D; -fx-border-radius: 8;" visible="false">
+                            <children>
+                                <Label style="-fx-font-size: 16px;" text="⚠" />
+                                <Label fx:id="lblTextoAlertaMermas" style="-fx-text-fill: #92400E; -fx-font-weight: bold;" text="Alerta de Mermas Reincidentes" HBox.hgrow="ALWAYS" />
+                            </children>
+                        </HBox>
+
+                        <!-- 4 KPI Cards de Mermas (§10.1) -->
+                        <HBox spacing="14.0">
+                            <children>
+                                <VBox styleClass="stat-card-accent" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="COSTO TOTAL DE PÉRDIDA" />
+                                        <Label fx:id="lblKpiCostoPerdida" styleClass="stat-card-value" text="S/ 0.00" />
+                                        <Label styleClass="stat-card-subtitle" text="Impacto económico del mes" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="TOTAL EVENTOS MERMA" />
+                                        <Label fx:id="lblKpiTotalEventos" styleClass="stat-card-value" text="0" />
+                                        <Label styleClass="stat-card-subtitle" text="Registros en cocina/barra" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="INSUMO MÁS AFECTADO" />
+                                        <Label fx:id="lblKpiInsumoCritico" styleClass="stat-card-value" text="-" />
+                                        <Label styleClass="stat-card-subtitle" text="Mayor importe acumulado" />
+                                    </children>
+                                </VBox>
+                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="stat-card-title" text="MOTIVO PREDOMINANTE" />
+                                        <Label fx:id="lblKpiMotivoPredominante" styleClass="stat-card-value" text="-" />
+                                        <Label styleClass="stat-card-subtitle" text="Causa con mayor recurrencia" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Contenido Principal: Gráficos y Tablas -->
+            <center>
+                <ScrollPane fitToHeight="true" fitToWidth="true" style="-fx-background-color: transparent; -fx-background: transparent;">
+                    <content>
+                        <VBox spacing="16.0">
+                            <padding>
+                                <Insets bottom="20.0" left="24.0" right="24.0" top="4.0" />
+                            </padding>
+                            <children>
+                                <!-- Sección 1: Gráficos Estadísticos (Barras y Torta) -->
+                                <GridPane hgap="16.0" vgap="16.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints percentWidth="50.0" />
+                                        <ColumnConstraints percentWidth="50.0" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints minHeight="230.0" prefHeight="240.0" vgrow="NEVER" />
+                                    </rowConstraints>
+                                    <children>
+                                        <!-- Gráfico de Área Suavizada: Pérdidas por Mes -->
+                                        <VBox styleClass="stat-card" GridPane.columnIndex="0">
+                                            <padding>
+                                                <Insets bottom="8.0" left="12.0" right="12.0" top="10.0" />
+                                            </padding>
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Evolución de Pérdidas Mensuales (S/)" />
+                                                <AreaChart fx:id="areaChartMermas" animated="false" createSymbols="false" horizontalGridLinesVisible="false" legendVisible="false" verticalGridLinesVisible="false" VBox.vgrow="ALWAYS">
+                                                    <xAxis>
+                                                        <CategoryAxis label="Mes" />
+                                                    </xAxis>
+                                                    <yAxis>
+                                                        <NumberAxis label="Pérdida (S/)" />
+                                                    </yAxis>
+                                                </AreaChart>
+                                            </children>
+                                        </VBox>
+
+                                        <!-- Gráfico de Torta: Causas / Motivos de Merma -->
+                                        <VBox styleClass="stat-card" GridPane.columnIndex="1">
+                                            <padding>
+                                                <Insets bottom="8.0" left="12.0" right="12.0" top="10.0" />
+                                            </padding>
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Distribución de Mermas por Causa / Motivo" />
+                                                <PieChart fx:id="chartMermasMotivo" animated="false" labelsVisible="false" legendSide="RIGHT" VBox.vgrow="ALWAYS" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+
+                                <!-- Sección 2: Tablas (Top 5 Insumos Pérdida + Registro Histórico Completo) -->
+                                <GridPane hgap="16.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints percentWidth="38.0" />
+                                        <ColumnConstraints percentWidth="62.0" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints minHeight="260.0" vgrow="ALWAYS" />
+                                    </rowConstraints>
+                                    <children>
+                                        <!-- Top 5 Insumos con Mayor Pérdida Económica -->
+                                        <VBox spacing="8.0" styleClass="stat-card" GridPane.columnIndex="0">
+                                            <padding>
+                                                <Insets bottom="12.0" left="14.0" right="14.0" top="12.0" />
+                                            </padding>
+                                            <children>
+                                                <Label styleClass="text-h3" text="Top 5 Insumos Críticos" />
+                                                <Label styleClass="text-caption" text="Mayor impacto económico negativo del mes" />
+                                                <TableView fx:id="tblTopInsumos" VBox.vgrow="ALWAYS">
+                                                    <columns>
+                                                        <TableColumn fx:id="colTopInsumo" prefWidth="170.0" text="Insumo" />
+                                                        <TableColumn fx:id="colTopCant" prefWidth="115.0" text="Cant. Perdida" />
+                                                        <TableColumn fx:id="colTopPerdida" prefWidth="115.0" text="Pérdida (S/)" />
+                                                    </columns>
+                                                    <columnResizePolicy>
+                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                    </columnResizePolicy>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+
+                                        <!-- Registro Histórico de Mermas -->
+                                        <VBox spacing="8.0" styleClass="stat-card" GridPane.columnIndex="1">
+                                            <padding>
+                                                <Insets bottom="12.0" left="14.0" right="14.0" top="12.0" />
+                                            </padding>
+                                            <children>
+                                                <Label styleClass="text-h3" text="Registro Detallado de Mermas" />
+                                                <Label styleClass="text-caption" text="Historial cronológico de eventos con motivo y responsable" />
+                                                <TableView fx:id="tblMermasDetalle" VBox.vgrow="ALWAYS">
+                                                    <columns>
+                                                        <TableColumn fx:id="colDetFecha" prefWidth="125.0" text="Fecha / Hora" />
+                                                        <TableColumn fx:id="colDetInsumo" prefWidth="145.0" text="Insumo" />
+                                                        <TableColumn fx:id="colDetCantidad" prefWidth="95.0" text="Cantidad" />
+                                                        <TableColumn fx:id="colDetMotivo" prefWidth="115.0" text="Motivo" />
+                                                        <TableColumn fx:id="colDetCosto" prefWidth="105.0" text="Costo (S/)" />
+                                                        <TableColumn fx:id="colDetObservacion" prefWidth="190.0" text="Observaciones" />
+                                                    </columns>
+                                                    <columnResizePolicy>
+                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                    </columnResizePolicy>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+                            </children>
+                        </VBox>
+                    </content>
+                </ScrollPane>
+            </center>
+        </BorderPane>
+            </content>
+        </ScrollPane>
+
+        <!-- Modal Registrar Nueva Merma -->
+        <VBox fx:id="modalNuevaMerma" alignment="CENTER" styleClass="modal-backdrop" visible="false">
+            <children>
+                <VBox maxWidth="460.0" spacing="16.0" styleClass="modal-card">
+                    <children>
+                        <Label styleClass="modal-title" text="Registrar Evento de Merma" />
+
+                        <VBox spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="form-field-label" text="Insumo Mermado:" />
+                                        <ComboBox fx:id="cmbModalInsumo" maxWidth="1.7976931348623157E308" />
+                                    </children>
+                                </VBox>
+
+                                <HBox spacing="10.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Cantidad Mermada:" />
+                                                <TextField fx:id="txtModalCantidad" promptText="1.50" styleClass="form-text-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="form-field-label" text="Motivo / Causa:" />
+                                                <ComboBox fx:id="cmbModalMotivo" maxWidth="1.7976931348623157E308" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <Label styleClass="form-field-label" text="Observación o Justificación:" />
+                                        <TextField fx:id="txtModalObservacion" promptText="Ej. Sobre-cocción en parrilla por corte de gas" styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </VBox>
+
+                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                            <children>
+                                <Button mnemonicParsing="false" onAction="#handleCerrarModal" styleClass="btn-secondary" text="Cancelar" />
+                                <Button mnemonicParsing="false" onAction="#handleGuardarMerma" styleClass="btn-primary" text="Registrar y Descontar Stock" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>

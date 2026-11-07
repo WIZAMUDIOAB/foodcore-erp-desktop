@@ -171,6 +171,10 @@ public class AuthService {
         }
     }
 
+    public static void setUsuarioSesionActual(Usuario usuario) {
+        usuarioSesionActual = usuario;
+    }
+
     public static Usuario getUsuarioSesionActual() {
         return usuarioSesionActual;
     }

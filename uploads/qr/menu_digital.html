@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodCore Gastronomía · Menú Digital</title>
+  <style>
+    :root { --primary: #FF5A1F; --dark: #1E293B; --card-bg: #FFFFFF; --bg: #F8FAFC; --text: #334155; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 40px; }
+    header { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white; padding: 32px 20px; text-align: center; border-bottom: 4px solid var(--primary); }
+    header h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+    header p { font-size: 14px; color: #94A3B8; margin-top: 6px; }
+    .badge-live { display: inline-block; background: #10B981; color: white; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-top: 10px; text-transform: uppercase; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 20px; }
+    .card { background: var(--card-bg); border-radius: 14px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #E2E8F0; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+    .card-title { font-size: 17px; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
+    .card-desc { font-size: 13px; color: #64748B; line-height: 1.4; margin-bottom: 12px; flex-grow: 1; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F1F5F9; padding-top: 10px; }
+    .price { font-size: 18px; font-weight: 800; color: var(--primary); }
+    .btn-pedir { background: #EEF2F6; color: var(--dark); border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    footer { text-align: center; margin-top: 40px; font-size: 12px; color: #94A3B8; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FOODCORE RESTOBAR & GRILL</h1>
+    <p>Carta Gastronómica Oficial · Actualizada en Tiempo Real</p>
+    <div class="badge-live">● Disponible para Pedidos</div>
+  </header>
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <div>
+          <div class="card-title">Hamburguesa Clasica</div>
+          <div class="card-desc">Carne 150g, queso cheddar y papas</div>
+        </div>
+        <div class="card-footer">
+          <span class="price">S/ 18.50</span>
+          <button class="btn-pedir">Especialidad</button>
+        </div>
+      </div>
+      <div class="card">
+        <div>
+          <div class="card-title">Alitas BBQ x6</div>
+          <div class="card-desc">6 alitas bañadas en salsa BBQ</div>
+        </div>
+        <div class="card-footer">
+          <span class="price">S/ 22.00</span>
+          <button class="btn-pedir">Especialidad</button>
+        </div>
+      </div>
+      <div class="card">
+        <div>
+          <div class="card-title">Gaseosa Personal</div>
+          <div class="card-desc">Botella 500ml helada</div>
+        </div>
+        <div class="card-footer">
+          <span class="price">S/ 5.00</span>
+          <button class="btn-pedir">Especialidad</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer>FoodCore ERP v2.0 Enterprise · Todos los derechos reservados</footer>
+</body>
+</html>

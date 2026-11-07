@@ -1,74 +1,121 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.foodcore.controller.MainDashboardController"
-            prefHeight="750.0" prefWidth="1200.0" style="-fx-background-color: -color-bg-base;">
+<StackPane fx:id="rootDashboardStack" prefHeight="768.0" prefWidth="1280.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MainDashboardController">
+    <children>
+        <BorderPane fx:id="mainBorderPane">
+            <!-- Barra Lateral Izquierda Colapsable con RBAC y Buscador Integrado (SPEC v3.0.3 §1 & §2) -->
+            <left>
+                <VBox fx:id="sidebarBox" prefWidth="252.0" spacing="8.0" styleClass="sidebar-container">
+                    <!-- Brand, Versión y Botón de Colapsar Sidebar [«] -->
+                    <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <VBox fx:id="boxBrandHeader" spacing="2.0" HBox.hgrow="ALWAYS">
+                            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                <Label styleClass="sidebar-brand-title" text="FoodCore" />
+                                <Label styleClass="sidebar-brand-badge" text="v3.0" />
+                            </HBox>
+                            <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                <Region fx:id="dotNetworkStatus" styleClass="status-dot-online" />
+                                <Label fx:id="lblNetworkStatus" styleClass="badge-pill-success" text="ONLINE" />
+                            </HBox>
+                        </VBox>
+                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-kds-outline" text="«" />
+                    </HBox>
 
-    <!-- Barra Lateral Izquierda de Navegacion (Command Rail) -->
-    <left>
-        <VBox prefWidth="255.0" spacing="6.0" styleClass="sidebar-container" style="-fx-padding: 22px 14px;">
-            <!-- Brand & Identity -->
-            <VBox spacing="4.0" style="-fx-padding: 0 8px 14px 8px;">
-                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                    <Label text="FoodCore" styleClass="sidebar-brand-title"/>
-                    <Label text="PRO" styleClass="sidebar-brand-badge"/>
-                </HBox>
-                <Label text="Fast Food S.A.C. · Terminal LAN" style="-fx-text-fill: #6b7280; -fx-font-size: 11px;"/>
-            </VBox>
+                    <!-- Buscador Global Integrado en Sidebar (220px, #1F2937, Texto Blanco) -->
+                    <TextField fx:id="txtBuscarSidebar" maxWidth="220.0" prefWidth="220.0" promptText="Buscar (Ctrl+K)..." style="-fx-background-color: #1F2937; -fx-text-fill: #FFFFFF; -fx-prompt-text-fill: #9CA3AF; -fx-background-radius: 8px; -fx-border-color: #374151; -fx-border-radius: 8px; -fx-padding: 8px 12px;" styleClass="sidebar-search-input" />
 
-            <Separator style="-fx-opacity: 0.12;"/>
+                    <!-- ScrollPane de Navegación -->
+                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" style="-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                        <content>
+                            <VBox spacing="2.0" style="-fx-background-color: transparent;">
+                                <children>
+                                    <!-- Sección OPERACIONES (§5) -->
+                                    <Label fx:id="lblSecOperaciones" styleClass="sidebar-section-header" text="OPERACIONES" />
+                                    <Button fx:id="btnNavDashboard" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDashboard" styleClass="sidebar-nav-button" text="📊 Dashboard Gerencial" />
+                                    <Button fx:id="btnNavSalon" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavSalon" styleClass="sidebar-nav-button" text="🪑 Salón y Mesas" />
+                                    <Button fx:id="btnNavReservas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReservas" styleClass="sidebar-nav-button" text="📅 Libro de Reservas" />
+                                    <Button fx:id="btnNavDelivery" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDelivery" styleClass="sidebar-nav-button" text="🛵 Delivery y Envíos" />
+                                    <Button fx:id="btnNavPOS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPOS" styleClass="sidebar-nav-button" text="💳 Punto de Venta (POS)" />
+                                    <Button fx:id="btnNavKDS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKDS" styleClass="sidebar-nav-button" text="👨‍🍳 Cocina (KDS)" />
+                                    <Button fx:id="btnNavCaja" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavCaja" styleClass="sidebar-nav-button" text="💵 Caja y Turnos" />
 
-            <!-- Seccion de Operaciones -->
-            <Label text="OPERACIONES Y VENTAS" styleClass="sidebar-section-header"/>
+                                    <!-- Sección CRECIMIENTO COMERCIAL (Sub-Fase 4D v2.0) -->
+                                    <Label fx:id="lblSecComercial" styleClass="sidebar-section-header" text="COMERCIAL Y MARKETING" />
+                                    <Button fx:id="btnNavPromociones" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPromociones" styleClass="sidebar-nav-button" text="🏷️ Promociones y Descuentos" />
+                                    <Button fx:id="btnNavKiosco" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKiosco" styleClass="sidebar-nav-button" text="📱 Kiosco Autoservicio" />
+                                    <Button fx:id="btnNavMenuQr" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenuQr" styleClass="sidebar-nav-button" text="📲 Menú Digital QR" />
 
-            <Button fx:id="btnNavPOS" text="Punto de Venta" onAction="#handleNavPOS"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
+                                    <!-- Sección FINANZAS (Sub-Fase 4A v2.0) -->
+                                    <Label fx:id="lblSecFinanzas" styleClass="sidebar-section-header" text="FINANZAS" />
+                                    <Button fx:id="btnNavReportesContables" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesContables" styleClass="sidebar-nav-button" text="📑 Reportes Contables" />
+                                    <Button fx:id="btnNavProveedores" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavProveedores" styleClass="sidebar-nav-button" text="🏢 Proveedores y CxP" />
+                                    <Button fx:id="btnNavClientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavClientes" styleClass="sidebar-nav-button" text="👥 Clientes y CxC" />
+                                    <Button fx:id="btnNavHistorialPrecios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHistorialPrecios" styleClass="sidebar-nav-button" text="📈 Historial de Precios" />
+                                    <Button fx:id="btnNavReportesAvanzados" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesAvanzados" styleClass="sidebar-nav-button" text="📊 Reportes Avanzados" />
 
-            <Button fx:id="btnNavSalon" text="Salón y Mesas" onAction="#handleNavSalon"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
+                                    <!-- Sección RECURSOS HUMANOS -->
+                                    <Label fx:id="lblSecRrhh" styleClass="sidebar-section-header" text="RECURSOS HUMANOS" />
+                                    <Button fx:id="btnNavAsistencia" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAsistencia" styleClass="sidebar-nav-button" text="⏱️ Control de Asistencia" />
+                                    <Button fx:id="btnNavReloj" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReloj" styleClass="sidebar-nav-button" text="🕒 Reloj Marcador" />
+                                    <Button fx:id="btnNavHorarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHorarios" styleClass="sidebar-nav-button" text="🗓️ Turnos y Horarios" />
+                                    <Button fx:id="btnNavMiHorario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMiHorario" styleClass="sidebar-nav-button" text="👤 Mi Portal y Horario" />
 
-            <Button fx:id="btnNavKDS" text="Línea de Cocina (KDS)" onAction="#handleNavKDS"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
+                                    <!-- Sección BACKOFFICE -->
+                                    <Label fx:id="lblSecBackoffice" styleClass="sidebar-section-header" text="BACKOFFICE" />
+                                    <Button fx:id="btnNavInventario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavInventario" styleClass="sidebar-nav-button" text="📦 Inventario de Insumos" />
+                                    <Button fx:id="btnNavMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenu" styleClass="sidebar-nav-button" text="🍽️ Menú y Platillos" />
+                                    <Button fx:id="btnNavRecetas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRecetas" styleClass="sidebar-nav-button" text="📖 Recetas y Escandallo" />
+                                    <Button fx:id="btnNavMermas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMermas" styleClass="sidebar-nav-button" text="📉 Registro de Mermas" />
+                                    <Button fx:id="btnNavAnalisisMermas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAnalisisMermas" styleClass="sidebar-nav-button" text="🔬 Análisis de Mermas" />
+                                    <Button fx:id="btnNavKardex" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKardex" styleClass="sidebar-nav-button" text="📋 Auditoría Kardex" />
+                                    <Button fx:id="btnNavAuditoria" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAuditoria" styleClass="sidebar-nav-button" text="🛡️ Bitácora de Auditoría" />
 
-            <!-- Seccion de Gestion y Auditoria -->
-            <Label text="GESTIÓN Y RECURSOS" styleClass="sidebar-section-header"/>
+                                    <!-- Sección SISTEMA (§5) -->
+                                    <Label fx:id="lblSecSistema" styleClass="sidebar-section-header" text="SISTEMA" />
+                                    <Button fx:id="btnNavUsuarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavUsuarios" styleClass="sidebar-nav-button" text="👥 Gestión de Usuarios" />
+                                    <Button fx:id="btnNavRoles" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRoles" styleClass="sidebar-nav-button" text="🔑 Roles y Permisos" />
+                                    <Button fx:id="btnNavConfiguracion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavConfiguracion" styleClass="sidebar-nav-button" text="⚙️ Configuración del Sistema" />
+                                </children>
+                            </VBox>
+                        </content>
+                    </ScrollPane>
 
-            <Button fx:id="btnNavReportes" text="Analítica y Reportes" onAction="#handleNavReportes"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
-
-            <Button fx:id="btnNavAsistencia" text="Reloj de Asistencia" onAction="#handleNavAsistencia"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
-
-            <Button fx:id="btnNavMantenimiento" text="Base de Datos y Stock" onAction="#handleNavMantenimiento"
-                    maxWidth="Infinity" prefHeight="42.0" styleClass="sidebar-nav-button"/>
-
-            <Region VBox.vgrow="ALWAYS"/>
-
-            <Separator style="-fx-opacity: 0.12;"/>
-
-            <!-- Perfil de Sesion Activa -->
-            <VBox spacing="8.0" style="-fx-padding: 6px 4px 0 4px;">
-                <HBox alignment="CENTER_LEFT" spacing="10.0"
-                      style="-fx-background-color: #161920; -fx-padding: 10px; -fx-background-radius: 8px;">
-                    <VBox spacing="2.0" HBox.hgrow="ALWAYS">
-                        <Label fx:id="lblUsuarioLogueado" text="Administrador"
-                               style="-fx-text-fill: #f9fafb; -fx-font-weight: 700; -fx-font-size: 12px;"/>
-                        <Label text="Sesión autorizada" style="-fx-text-fill: #10b981; -fx-font-size: 10px;"/>
+                    <!-- Perfil de Sesión Activa -->
+                    <VBox spacing="6.0" styleClass="sidebar-user-card">
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <Region styleClass="status-dot-online" />
+                            <VBox spacing="1.0" HBox.hgrow="ALWAYS">
+                                <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong-inverse" text="admin · Administrador" />
+                                <Label styleClass="text-caption-muted" text="Sesión autorizada RBAC" />
+                            </VBox>
+                        </HBox>
+                        <HBox spacing="6.0">
+                            <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-kds-outline" text="Clave" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="btnCerrarSesion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCerrarSesion" styleClass="btn-kds-delivered" text="Salir" HBox.hgrow="ALWAYS" />
+                        </HBox>
                     </VBox>
-                </HBox>
-                <Button text="Cerrar Sesión" onAction="#handleCerrarSesion" maxWidth="Infinity" prefHeight="32.0"
-                        style="-fx-background-color: transparent; -fx-text-fill: #9ca3af; -fx-font-size: 11px; -fx-cursor: hand; -fx-border-color: #272c36; -fx-border-radius: 6px;"/>
-            </VBox>
-        </VBox>
-    </left>
+                </VBox>
+            </left>
 
-    <!-- Contenedor Central Dinamico -->
-    <center>
-        <StackPane fx:id="contentArea" style="-fx-background-color: -color-bg-base;"/>
-    </center>
-
-</BorderPane>
+            <!-- Zona de Trabajo Central Dinámica al 100% de Alto (Sin TopBar redundante) -->
+            <center>
+                <VBox styleClass="app-canvas">
+                    <children>
+                        <StackPane fx:id="contentArea" styleClass="app-canvas" VBox.vgrow="ALWAYS" />
+                    </children>
+                </VBox>
+            </center>
+        </BorderPane>
+    </children>
+</StackPane>

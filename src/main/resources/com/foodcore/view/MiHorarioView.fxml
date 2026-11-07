@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootMiHorarioStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MiHorarioController">
+    <children>
+        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <BorderPane minWidth="960.0">
+                    <!-- Encabezado Personal -->
+                    <top>
+                        <VBox spacing="14.0">
+                            <padding>
+                                <Insets bottom="16.0" left="24.0" right="24.0" top="24.0" />
+                            </padding>
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                    <children>
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                                    <children>
+                                                        <Label styleClass="view-heading" text="Mi Portal y Horario Semanal" />
+                                                        <Label fx:id="lblMiRolBadge" styleClass="badge-pill-accent" text="MOZO" />
+                                                    </children>
+                                                </HBox>
+                                                <Label fx:id="lblBienvenida" styleClass="view-subheading" text="Bienvenido, consulte sus turnos asignados de la semana y su récord de asistencia" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+
+                                <!-- Resumen Mensual Personal -->
+                                <HBox spacing="12.0">
+                                    <children>
+                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="stat-card-title" text="HORAS ACUMULADAS MES" />
+                                                <Label fx:id="lblMisHorasMes" styleClass="stat-card-value" text="0.0 hrs" />
+                                                <Label styleClass="stat-card-subtitle" text="Jornadas efectivas completadas" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="stat-card-title" text="DÍAS ASISTIDOS" />
+                                                <Label fx:id="lblMisDiasTrabajados" styleClass="stat-card-value" text="0" />
+                                                <Label styleClass="stat-card-subtitle" text="Turnos asistidos este mes" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="stat-card-title" text="TARDANZAS ACUMULADAS" />
+                                                <Label fx:id="lblMisTardanzasMin" styleClass="stat-card-value" text="0 min" />
+                                                <Label styleClass="stat-card-subtitle" text="Tolerancia legal: 5 min" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="stat-card-accent" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="stat-card-title" text="SUELDO BASE ASIGNADO" />
+                                                <Label fx:id="lblMiSueldoBase" styleClass="stat-card-value" text="S/ 0.00" />
+                                                <Label styleClass="stat-card-subtitle" text="Planilla mensual regular" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+                    </top>
+
+                    <!-- Cronograma Semanal y Tabla de Asistencias Recientes -->
+                    <center>
+                        <VBox spacing="16.0">
+                            <padding>
+                                <Insets bottom="24.0" left="24.0" right="24.0" top="4.0" />
+                            </padding>
+                            <children>
+                                <!-- Tarjetas de Cronograma Semanal -->
+                                <VBox spacing="8.0" styleClass="stat-card">
+                                    <padding>
+                                        <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+                                    </padding>
+                                    <children>
+                                        <Label styleClass="text-h3" text="Cronograma de la Semana en Curso" />
+                                        <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" style="-fx-background-color: transparent; -fx-background: transparent;" vbarPolicy="NEVER">
+                                            <content>
+                                                <HBox fx:id="boxDiasSemana" spacing="8.0" />
+                                            </content>
+                                        </ScrollPane>
+                                    </children>
+                                </VBox>
+
+                                <!-- Tabla de Asistencias Recientes -->
+                                <VBox spacing="8.0" styleClass="stat-card" VBox.vgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="text-h3" text="Historial de Asistencias y Marcajes Recientes" />
+                                        <TableView fx:id="tblMisAsistencias" minHeight="280.0" VBox.vgrow="ALWAYS">
+                                            <columns>
+                                                <TableColumn fx:id="colFecha" prefWidth="110.0" text="Fecha" />
+                                                <TableColumn fx:id="colDia" prefWidth="95.0" text="Día" />
+                                                <TableColumn fx:id="colEntrada" prefWidth="105.0" text="Hora Entrada" />
+                                                <TableColumn fx:id="colSalida" prefWidth="105.0" text="Hora Salida" />
+                                                <TableColumn fx:id="colHoras" prefWidth="95.0" text="Total Horas" />
+                                                <TableColumn fx:id="colExtra" prefWidth="95.0" text="H. Extra" />
+                                                <TableColumn fx:id="colTardanza" prefWidth="95.0" text="Tardanza" />
+                                                <TableColumn fx:id="colEstado" prefWidth="105.0" text="Estado" />
+                                                <TableColumn fx:id="colNotas" prefWidth="120.0" text="Observaciones" />
+                                            </columns>
+                                            <columnResizePolicy>
+                                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                            </columnResizePolicy>
+                                        </TableView>
+                                    </children>
+                                </VBox>
+                            </children>
+                        </VBox>
+                    </center>
+                </BorderPane>
+            </content>
+        </ScrollPane>
+    </children>
+</StackPane>

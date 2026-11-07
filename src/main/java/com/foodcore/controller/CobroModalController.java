@@ -1,5 +1,8 @@
 package com.foodcore.controller;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DesgloseFiscal;
@@ -21,6 +24,8 @@ import java.util.List;
 
 public class CobroModalController {
 
+    private static final Logger LOGGER = Logger.getLogger(CobroModalController.class.getName());
+
     @FXML private Label lblTotalCobro;
     @FXML private RadioButton rbTicket;
     @FXML private RadioButton rbBoleta;
@@ -39,7 +44,7 @@ public class CobroModalController {
 
     @FXML
     public void initialize() {
-        cmbMetodoPago.setItems(FXCollections.observableArrayList("EFECTIVO", "TARJETA", "YAPE_PLIN"));
+        cmbMetodoPago.setItems(FXCollections.observableArrayList("EFECTIVO", "TARJETA", "YAPE_PLIN", "CREDITO_CORPORATIVO"));
         cmbMetodoPago.getSelectionModel().select("EFECTIVO");
 
         cmbMetodoPago.setOnAction(e -> {
@@ -169,6 +174,31 @@ public class CobroModalController {
 
             // Registro transaccional ACID en BD, descuento de insumos y cierre de comanda si aplica
             ventaService.registrarVenta(venta, itemsVenta, comprobante);
+
+            if ("CREDITO_CORPORATIVO".equalsIgnoreCase(metodo)) {
+                try (java.sql.Connection conn = com.foodcore.util.ConexionBD.getConnection()) {
+                    com.foodcore.dao.ClienteDAO cliDAO = new com.foodcore.dao.impl.ClienteDAOImpl();
+                    com.foodcore.dao.CuentaPorCobrarDAO cxcDAO = new com.foodcore.dao.impl.CuentaPorCobrarDAOImpl();
+                    java.util.Optional<com.foodcore.model.Cliente> cliOpt = cliDAO.buscarPorDocumento(conn, txtDocCliente.getText().trim());
+                    int idCli = 1;
+                    if (cliOpt.isPresent()) {
+                        idCli = cliOpt.get().getIdCliente();
+                    }
+                    com.foodcore.model.CuentaPorCobrar cxc = new com.foodcore.model.CuentaPorCobrar();
+                    cxc.setIdCliente(idCli);
+                    cxc.setIdVenta(venta.getIdVenta());
+                    cxc.setNumeroComprobante(serie + "-" + numero);
+                    cxc.setFechaEmision(java.time.LocalDate.now());
+                    cxc.setFechaVencimiento(java.time.LocalDate.now().plusDays(30));
+                    cxc.setMontoTotal(desglose.getTotal().doubleValue());
+                    cxc.setMontoCobrado(0.0);
+                    cxc.setEstado("PENDIENTE");
+                    cxc.setObservaciones("Venta POS a credito corporativo. Cliente: " + txtNombreCliente.getText());
+                    cxcDAO.insertar(conn, cxc);
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "Aviso al vincular credito corporativo", ex);
+                }
+            }
 
             // Mostrar el comprobante electrónico generado
             mostrarTicketImpresion(comprobante, venta, recibido, vuelto);

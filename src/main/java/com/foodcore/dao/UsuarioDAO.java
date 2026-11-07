@@ -7,6 +7,7 @@ import com.foodcore.model.Usuario;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioDAO {
@@ -19,4 +20,10 @@ public interface UsuarioDAO {
     Optional<Asistencia> obtenerAsistenciaHoy(Connection conn, int idEmpleado) throws SQLException;
     void registrarIngresoAsistencia(Connection conn, Asistencia asistencia) throws SQLException;
     void registrarSalidaAsistencia(Connection conn, int idAsistencia, LocalTime horaSalida) throws SQLException;
+
+    Optional<Usuario> buscarPorDniOPin(Connection conn, String credencial) throws SQLException;
+    List<Usuario> listarTodosActivos(Connection conn) throws SQLException;
+    boolean actualizarDatosLaborales(Connection conn, int idUsuario, String dni, String pin,
+                                     double sueldoBase, String horarioLaboral,
+                                     LocalTime horaEntrada, LocalTime horaSalida) throws SQLException;
 }

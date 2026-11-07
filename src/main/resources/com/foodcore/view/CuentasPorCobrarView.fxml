@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootCxcStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.CuentasPorCobrarController">
+    <children>
+        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <BorderPane minWidth="960.0">
+            <!-- Cabecera -->
+            <top>
+                <VBox spacing="16.0" styleClass="view-topbar" BorderPane.alignment="CENTER">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Cuentas por Cobrar (Clientes Corporativos)" />
+                                                <Label styleClass="badge-pill-accent" text="FINANZAS v2.0" />
+                                                <Label fx:id="lblBadgeAlertaVencidas" styleClass="badge-pill-danger" text="0 COMPROBANTES VENCIDOS" visible="false" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Seguimiento de facturas al crédito corporativo, vencimientos y registro de ingresos de caja" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="btnCobrar" mnemonicParsing="false" onAction="#handleAbrirModalCobro" styleClass="btn-primary" text="Registrar Cobro / Abono" />
+                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarCuentasSincrono" styleClass="btn-secondary" text="Actualizar" />
+                            </children>
+                        </HBox>
+
+                        <!-- Filtros y Métricas Rápidas -->
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <Label styleClass="text-body-strong" text="Filtrar por Estado:" />
+                                <ComboBox fx:id="cbFiltroEstado" prefWidth="160.0" styleClass="form-combo-box" />
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Label styleClass="text-body-strong" text="Saldo Total por Cobrar:" />
+                                <Label fx:id="lblSaldoTotal" styleClass="stat-card-value" text="S/ 0.00" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Centro: Tabla de Facturas por Cobrar -->
+            <center>
+                <VBox spacing="12.0" styleClass="view-content" BorderPane.alignment="CENTER">
+                    <children>
+                        <VBox spacing="8.0" styleClass="stat-card" VBox.vgrow="ALWAYS">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                    <children>
+                                        <Label styleClass="text-h3" text="Comprobantes al Crédito Corporativo" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblContadorCxc" styleClass="badge-pill-success" text="0 Comprobantes" />
+                                    </children>
+                                </HBox>
+
+                                <TableView fx:id="tblCuentasPorCobrar" VBox.vgrow="ALWAYS">
+                                    <columns>
+                                        <TableColumn fx:id="colCliente" prefWidth="250.0" text="Cliente / Razón Social" />
+                                        <TableColumn fx:id="colComprobante" prefWidth="130.0" text="Comprobante #" />
+                                        <TableColumn fx:id="colEmision" prefWidth="105.0" text="Fecha Emisión" />
+                                        <TableColumn fx:id="colVencimiento" prefWidth="110.0" text="Vencimiento" />
+                                        <TableColumn fx:id="colMontoTotal" prefWidth="110.0" text="Monto Total" />
+                                        <TableColumn fx:id="colMontoCobrado" prefWidth="105.0" text="Cobrado" />
+                                        <TableColumn fx:id="colSaldo" prefWidth="115.0" text="Saldo Deudor" />
+                                        <TableColumn fx:id="colEstado" prefWidth="100.0" text="Estado" />
+                                    </columns>
+                                    <columnResizePolicy>
+                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    </columnResizePolicy>
+                                </TableView>
+                            </children>
+                        </VBox>
+                    </children>
+                </VBox>
+            </center>
+        </BorderPane>
+            </content>
+        </ScrollPane>
+
+        <!-- Modal Registrar Cobro -->
+        <VBox fx:id="modalCobro" alignment="CENTER" styleClass="modal-backdrop" visible="false">
+            <children>
+                <VBox maxWidth="440.0" spacing="16.0" styleClass="modal-card">
+                    <children>
+                        <Label styleClass="modal-title" text="Registrar Cobro a Cliente Corporativo" />
+                        <VBox spacing="10.0">
+                            <children>
+                                <Label styleClass="text-body-caption" text="CLIENTE Y COMPROBANTE" />
+                                <Label fx:id="lblModalDocInfo" styleClass="text-body-strong" text="-" wrapText="true" />
+
+                                <Label styleClass="text-body-caption" text="SALDO DEUDOR PENDIENTE" />
+                                <Label fx:id="lblModalSaldoPendiente" styleClass="text-h4" text="S/ 0.00" />
+
+                                <Label styleClass="form-field-label" text="Monto a Cobrar (S/):" />
+                                <TextField fx:id="txtModalMontoCobrar" promptText="0.00" styleClass="form-text-field" />
+
+                                <Label styleClass="form-field-label" text="Medio de Pago:" />
+                                <ComboBox fx:id="cbModalMetodoPago" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+
+                                <Label styleClass="form-field-label" text="Nota / Glosa del Cobro:" />
+                                <TextField fx:id="txtModalNota" promptText="Cobro transferencia corporativa" styleClass="form-text-field" />
+                            </children>
+                        </VBox>
+
+                        <Label fx:id="lblModalCobroError" styleClass="text-danger" text="" wrapText="true" />
+
+                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                            <children>
+                                <Button mnemonicParsing="false" onAction="#handleCerrarModalCobro" styleClass="btn-secondary" text="Cancelar" />
+                                <Button mnemonicParsing="false" onAction="#handleConfirmarCobro" styleClass="btn-primary" text="Confirmar Cobro" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>

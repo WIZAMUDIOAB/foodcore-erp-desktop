@@ -141,6 +141,23 @@ public class CajaDAOImpl implements CajaDAO {
     }
 
     @Override
+    public BigDecimal calcularTotalGastosTurno(Connection conn, int idCaja) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(ABS(monto)), 0.00) FROM movimiento_caja "
+            + "WHERE id_caja = ? AND tipo_movimiento IN ('EGRESO', 'ANULACION') "
+            + "AND COALESCE(medio_pago, 'EFECTIVO') = 'EFECTIVO' "
+            + "AND concepto NOT LIKE 'Cierre Z de turno%'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCaja);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBigDecimal(1);
+                }
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    @Override
     public Map<String, BigDecimal> obtenerTotalesPorMedioPago(Connection conn, int idCaja) throws SQLException {
         Map<String, BigDecimal> totales = new LinkedHashMap<>();
         String sql = "SELECT COALESCE(medio_pago, 'EFECTIVO') AS medio, COALESCE(SUM(monto), 0.00) AS total "

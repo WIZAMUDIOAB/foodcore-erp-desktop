@@ -1,43 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
 
-<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.foodcore.controller.SalonMesasController"
-      spacing="16.0" style="-fx-padding: 24px; -fx-background-color: -color-bg-base;">
+<ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.SalonMesasController">
+    <content>
+        <VBox minWidth="980.0" spacing="20.0" styleClass="pos-catalog-panel">
+            <children>
+                <!-- Topbar del Salón (§8) -->
+                <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="16.0" styleClass="surface-card">
+                    <children>
+                        <VBox spacing="2.0">
+                            <children>
+                                <Label styleClass="view-heading" text="Salón y Comedores" />
+                                <Label styleClass="view-subheading" text="Gestión táctil de mesas, transferencia, unión, reservas y pre-cuenta" />
+                            </children>
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
 
-    <!-- Topbar del Salon -->
-    <HBox alignment="CENTER_LEFT" spacing="16.0">
-        <VBox spacing="2.0">
-            <Label text="Salón y Comedores" styleClass="view-heading"/>
-            <Label text="Distribución de mesas y seguimiento de consumos en tiempo real" styleClass="view-subheading"/>
+                        <!-- Acciones y Leyenda alineadas a la derecha (§8) -->
+                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                            <children>
+                                <!-- Leyenda de Estados con Borde Superior de 4px (§8) -->
+                                <HBox alignment="CENTER" spacing="10.0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                            <children>
+                                                <Region styleClass="status-dot-neutral" />
+                                                <Label styleClass="text-caption" text="Libre" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                            <children>
+                                                <Region styleClass="status-dot-danger" />
+                                                <Label styleClass="text-caption" text="Ocupada" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                            <children>
+                                                <Region styleClass="status-dot-warning" />
+                                                <Label styleClass="text-caption" text="Por cobrar" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                            <children>
+                                                <Region style="-fx-background-color: #8B5CF6; -fx-pref-width: 10px; -fx-pref-height: 10px; -fx-background-radius: 5;" />
+                                                <Label styleClass="text-caption" text="Reservada" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </HBox>
+
+                                <MenuButton mnemonicParsing="false" styleClass="btn-secondary" text="⚙ Operaciones de Mesa">
+                                    <items>
+                                        <MenuItem mnemonicParsing="false" onAction="#handleTransferirMesaDialog" text="⇄ Transferir Mesa" />
+                                        <MenuItem mnemonicParsing="false" onAction="#handleUnirMesasDialog" text="⚯ Unir Mesas" />
+                                        <MenuItem mnemonicParsing="false" onAction="#handleAbrirReservas" text="📅 Libro de Reservas" />
+                                    </items>
+                                </MenuButton>
+                                <Button fx:id="btnParaLlevar" mnemonicParsing="false" onAction="#handleNuevoTakeaway" styleClass="btn-secondary" text="Mostrador / Llevar" />
+                                <Button fx:id="btnNuevoDelivery" mnemonicParsing="false" onAction="#handleNuevoDelivery" styleClass="btn-primary" text="+ Delivery" />
+                                <Button mnemonicParsing="false" onAction="#cargarMesas" styleClass="btn-secondary" text="↻" />
+                            </children>
+                        </HBox>
+                    </children>
+                </HBox>
+
+                <!-- Cuadrícula de Mesas (>= 120x120px, borde superior 4px, H1 centrado, tiempo en caption) (§8) -->
+                <FlowPane fx:id="flowMesas" hgap="16.0" vgap="16.0" VBox.vgrow="ALWAYS" />
+            </children>
         </VBox>
-        <Region HBox.hgrow="ALWAYS"/>
-
-        <!-- Leyenda de Estados de Mesa -->
-        <HBox alignment="CENTER" spacing="12.0"
-              style="-fx-background-color: -color-bg-surface; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-border-color: -color-border-subtle; -fx-border-radius: 20px;">
-            <HBox alignment="CENTER" spacing="6.0">
-                <Label style="-fx-background-color: -color-accent-emerald; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
-                <Label text="Libre" style="-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
-            </HBox>
-            <Separator orientation="VERTICAL"/>
-            <HBox alignment="CENTER" spacing="6.0">
-                <Label style="-fx-background-color: -color-brand-ember; -fx-min-width: 10px; -fx-min-height: 10px; -fx-background-radius: 5px;"/>
-                <Label text="En servicio" style="-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -color-ink-secondary;"/>
-            </HBox>
-        </HBox>
-
-        <Button text="⟳ Actualizar" onAction="#cargarMesas" styleClass="btn-secondary"/>
-    </HBox>
-
-    <Separator style="-fx-opacity: 0.6;"/>
-
-    <!-- Cuadricula de Mesas con Scroll -->
-    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" style="-fx-background-color: transparent;">
-        <FlowPane fx:id="flowMesas" hgap="16.0" vgap="16.0" style="-fx-padding: 6px;"/>
-    </ScrollPane>
-
-</VBox>
+    </content>
+</ScrollPane>

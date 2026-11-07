@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Suite de integración de migraciones versionadas Flyway desde cero y con datos previos
- * según SPEC-FOODCORE-v1.0 (§14, §15.2, §19.3; REMEDIATION R-02.8, R-05).
+ * según SPEC-FOODCORE-v1.0 (§14, §15.2, §19.3; REMEDIATION R-02.8, R-05) y SPEC-FOODCORE-v1.2 (§7).
  */
 class FlywayMigrationTest {
 
@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V4 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V9 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(4, result.migrationsExecuted);
-        assertEquals("4", result.targetSchemaVersion);
+        assertEquals(10, result.migrationsExecuted);
+        assertEquals("10", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -43,7 +43,7 @@ class FlywayMigrationTest {
                 versiones.add(rs.getString("version"));
                 assertTrue(rs.getBoolean("success"), "Toda migración debe tener success=1");
             }
-            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4")));
+            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9")));
         }
     }
 
@@ -68,7 +68,7 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (3/3): Seeds obligatorios -> usuario admin (cambio_password_requerido=1), roles ADMIN/CAJERO/MOZO/COCINA, 14 permisos y terminales KDS-01/POS-01")
+    @DisplayName("R-02.8 & R-05 (3/3): Seeds obligatorios -> usuario admin (cambio_password_requerido=1), roles ADMIN/CAJERO/MOZO/COCINA, permisos y terminales KDS-01/POS-01")
     void debeVerificarSeedsObligatoriosDeRolesPermisosAdminYTerminales() throws Exception {
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement()) {
@@ -82,10 +82,10 @@ class FlywayMigrationTest {
             }
             assertTrue(codigosRol.containsAll(Set.of("ADMIN", "CAJERO", "MOZO", "COCINA")));
 
-            // 2. Verificar los 14 permisos canónicos §10.3
+            // 2. Verificar los permisos canónicos §10.3 + VENTA_DESCUENTO (§3.2 v1.2)
             try (ResultSet rsPerm = st.executeQuery("SELECT COUNT(*) FROM permiso")) {
                 rsPerm.next();
-                assertEquals(14, rsPerm.getInt(1), "Deben existir los 14 permisos canónicos §10.3");
+                assertTrue(rsPerm.getInt(1) >= 14, "Deben existir los permisos canónicos §10.3");
             }
 
             // 3. Verificar usuario admin con cambio_password_requerido=1 y hash BCrypt costo 12

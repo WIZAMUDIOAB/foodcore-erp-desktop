@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootAuditoriaStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.AuditoriaController">
+    <children>
+        <BorderPane>
+            <!-- Cabecera -->
+            <top>
+                <VBox spacing="16.0" styleClass="view-topbar" BorderPane.alignment="CENTER">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                            <children>
+                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Bitácora de Auditoría y Trazabilidad (Audit Trail)" />
+                                                <Label styleClass="badge-pill-danger" text="INMUTABLE" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Registro cronológico inmutable de anulaciones, descuentos, diferencias de arqueo y eventos críticos" />
+                                    </children>
+                                </VBox>
+                                <Button fx:id="btnActualizarAuditoria" mnemonicParsing="false" onAction="#cargarEventosAuditoria" styleClass="btn-secondary" text="Actualizar Bitácora" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+            </top>
+
+            <!-- Tabla de Eventos de Auditoría -->
+            <center>
+                <VBox styleClass="kardex-table-wrapper" BorderPane.alignment="CENTER">
+                    <children>
+                        <TableView fx:id="tblAuditoria" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="colIdAuditoria" prefWidth="90.0" text="Audit ID" />
+                                <TableColumn fx:id="colFecha" prefWidth="160.0" text="Fecha y Hora" />
+                                <TableColumn fx:id="colUsuario" prefWidth="140.0" text="Usuario Responsable" />
+                                <TableColumn fx:id="colAccion" prefWidth="150.0" text="Acción Ejecutada" />
+                                <TableColumn fx:id="colEntidad" prefWidth="120.0" text="Entidad Afectada" />
+                                <TableColumn fx:id="colDatosAnteriores" prefWidth="210.0" text="Datos Anteriores" />
+                                <TableColumn fx:id="colDatosNuevos" prefWidth="210.0" text="Datos Nuevos / Motivo" />
+                            </columns>
+                        </TableView>
+                    </children>
+                </VBox>
+            </center>
+        </BorderPane>
+    </children>
+</StackPane>
