@@ -20,17 +20,26 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.IdentityHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Controlador de la pantalla de inicio de sesión (§3 y §4 de UI-REDESIGN-SPEC-FOODCORE-v1.1).
  */
 public class LoginController {
 
-    private static final Logger LOGGER = Logger.getLogger(LoginController.class.getName());
+    private static final Logger LOGGER = LoggerFactory.getLogger(LoginController.class);
+    static final String MENSAJE_ERROR_BD_DESACTUALIZADA =
+        "Error: la base de datos no está actualizada. Reinicie la aplicación o contacte al administrador.";
+    static final String MENSAJE_ERROR_INESPERADO =
+        "Error inesperado al iniciar sesión. Reinicie la aplicación o contacte al administrador.";
 
     @FXML private StackPane rootStackPane;
     @FXML private GridPane loginCardContainer;
@@ -41,10 +50,18 @@ public class LoginController {
     @FXML private Label lblMensaje;
     @FXML private Label lblVersionBadge;
 
-    private final AuthService authService = new AuthServiceImpl();
+    private final AuthService authService;
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
     private boolean autenticating = false;
+
+    public LoginController() {
+        this(new AuthServiceImpl());
+    }
+
+    LoginController(AuthService authService) {
+        this.authService = Objects.requireNonNull(authService, "authService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
@@ -77,17 +94,62 @@ public class LoginController {
             },
             error -> {
                 setEstadoCarga(false);
-                if (error instanceof NegocioException) {
-                    mostrarError(error.getMessage());
-                } else if (error instanceof SQLException) {
-                    LOGGER.log(Level.SEVERE, "Error de conexión a MySQL durante el inicio de sesión", error);
-                    mostrarError("Error de conexión a Base de Datos MySQL: " + error.getMessage());
-                } else {
-                    LOGGER.log(Level.SEVERE, "Error inesperado en inicio de sesión", error);
-                    mostrarError("Error inesperado: " + (error != null ? error.getMessage() : "desconocido"));
-                }
+                mostrarError(resolverMensajeErrorLogin(error));
             }
         );
+    }
+
+    static String resolverMensajeErrorLogin(Throwable error) {
+        if (error instanceof NegocioException) {
+            return error.getMessage();
+        }
+        SQLException sqlEx = extraerSqlException(error);
+        if (sqlEx != null || esErrorBdOEsquema(error)) {
+            LOGGER.error(
+                "Error de conexión MySQL o esquema desactualizado durante el inicio de sesión (SQLState={}, ErrorCode={})",
+                sqlEx != null ? sqlEx.getSQLState() : "N/A",
+                sqlEx != null ? sqlEx.getErrorCode() : -1,
+                error
+            );
+            return MENSAJE_ERROR_BD_DESACTUALIZADA;
+        }
+        LOGGER.error("Error inesperado en inicio de sesión", error);
+        return MENSAJE_ERROR_INESPERADO;
+    }
+
+    private static SQLException extraerSqlException(Throwable error) {
+        Map<Throwable, Boolean> visitados = new IdentityHashMap<>();
+        Throwable actual = error;
+        while (actual != null && !visitados.containsKey(actual)) {
+            if (actual instanceof SQLException sqlEx) {
+                return sqlEx;
+            }
+            visitados.put(actual, Boolean.TRUE);
+            actual = actual.getCause();
+        }
+        return null;
+    }
+
+    private static boolean esErrorBdOEsquema(Throwable error) {
+        Map<Throwable, Boolean> visitados = new IdentityHashMap<>();
+        Throwable actual = error;
+        while (actual != null && !visitados.containsKey(actual)) {
+            String msg = actual.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase(Locale.ROOT);
+                if (lower.contains("unknown column")
+                        || lower.contains("doesn't exist")
+                        || lower.contains("communications link failure")
+                        || lower.contains("connection refused")
+                        || lower.contains("hikaripool")
+                        || lower.contains("access denied for user")) {
+                    return true;
+                }
+            }
+            visitados.put(actual, Boolean.TRUE);
+            actual = actual.getCause();
+        }
+        return false;
     }
 
     /**
@@ -126,7 +188,7 @@ public class LoginController {
                 rootStackPane.getChildren().add(dialogRoot);
             }
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "No se pudo cargar PasswordChangeDialog.fxml", e);
+            LOGGER.error("No se pudo cargar PasswordChangeDialog.fxml", e);
             mostrarError("No se pudo abrir el diálogo de cambio de contraseña.");
         }
     }
@@ -165,7 +227,7 @@ public class LoginController {
                 }
             }
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Error cargando MainLayout.fxml", e);
+            LOGGER.error("Error cargando MainLayout.fxml", e);
             mostrarError("Error cargando vista principal: " + e.getMessage());
         }
     }
