@@ -111,6 +111,16 @@ public class ApiServer {
                 jwtService, corsPolicy, rateLimiter);
     }
 
+    static ApiServer crearServidorAisladoConAuth(JwtService jwtService,
+                                                 CorsPolicy corsPolicy,
+                                                 AuthRateLimiter rateLimiter,
+                                                 AuthService authService,
+                                                 UsuarioDAO usuarioDAO) {
+        return new ApiServer(authService, new ProductoDAOImpl(), new MesaDAOImpl(),
+                new PedidoDAOImpl(), new PedidoService(), usuarioDAO, new CajaService(),
+                jwtService, corsPolicy, rateLimiter);
+    }
+
     public static synchronized ApiServer getInstance() {
         if (instance == null) {
             instance = new ApiServer();

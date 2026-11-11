@@ -56,10 +56,12 @@ public class AuthController {
                 return;
             }
 
-            Usuario usuarioAutenticado;
-            if (esCredencialOperativaValida(username, password)) {
-                usuarioAutenticado = construirUsuarioOperativo(username);
-            } else {
+            Usuario usuarioAutenticado = null;
+            if (AuthTestBypassConfig.isE2eTestProfileActive()
+                    && AuthTestBypassConfig.esCredencialOperativaValida(username, password)) {
+                usuarioAutenticado = AuthTestBypassConfig.construirUsuarioOperativo(username);
+            }
+            if (usuarioAutenticado == null) {
                 try {
                     usuarioAutenticado = authService.login(username, password);
                 } catch (Exception exAuth) {
@@ -69,6 +71,10 @@ public class AuthController {
                     state.responderError(ctx, 401, msgAuth);
                     return;
                 }
+            }
+            if (usuarioAutenticado == null) {
+                state.responderError(ctx, 401, "Credenciales inválidas. Verifique su usuario y contraseña.");
+                return;
             }
 
             String rol = usuarioAutenticado.getNombreRol() != null ? usuarioAutenticado.getNombreRol() : "MOZO";
@@ -199,13 +205,11 @@ public class AuthController {
                 usuarios = usuarioDAO.listarTodosActivos(conn);
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error consultando usuarios activos de BD, usando fallback", e);
+            LOGGER.log(Level.FINE, "Error consultando usuarios activos de BD", e);
         }
 
-        if (usuarios.isEmpty()) {
-            usuarios.add(construirUsuarioOperativo("admin"));
-            usuarios.add(construirUsuarioOperativo("mozo"));
-            usuarios.add(construirUsuarioOperativo("cajero"));
+        if (usuarios.isEmpty() && AuthTestBypassConfig.isE2eTestProfileActive()) {
+            usuarios = AuthTestBypassConfig.listarUsuariosOperativos();
         }
 
         for (Usuario u : usuarios) {
@@ -252,7 +256,12 @@ public class AuthController {
             }
 
             if (!actualizado) {
-                state.pinsMemoria.put(idUsuario, nuevoPin);
+                if (AuthTestBypassConfig.isE2eTestProfileActive()) {
+                    AuthTestBypassConfig.registrarPinMemoria(idUsuario, nuevoPin);
+                } else {
+                    state.responderError(ctx, 500, "No se pudo actualizar el PIN en base de datos.");
+                    return;
+                }
             }
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -278,57 +287,6 @@ public class AuthController {
         return jwtService.verificarToken(token);
     }
 
-    private boolean esCredencialOperativaValida(String user, String pass) {
-        if ("mozo".equalsIgnoreCase(user) || "mozo1".equalsIgnoreCase(user)) {
-            return "Mozo2026!".equals(pass) || "123456".equals(pass) || "3001".equals(pass) || "mozo123".equals(pass);
-        }
-        if ("admin".equalsIgnoreCase(user)) {
-            return "Admin2026!".equals(pass) || "admin123".equals(pass) || "123456".equals(pass) || "1001".equals(pass);
-        }
-        if ("cajero".equalsIgnoreCase(user) || "cajero1".equalsIgnoreCase(user)) {
-            return "Cajero2026!".equals(pass) || "123456".equals(pass) || "2001".equals(pass);
-        }
-        if ("cocinero".equalsIgnoreCase(user) || "cocina".equalsIgnoreCase(user) || "cocina1".equalsIgnoreCase(user)) {
-            return "Cocina2026!".equals(pass) || "cocina123".equals(pass);
-        }
-        return false;
-    }
-
-    private Usuario construirUsuarioOperativo(String username) {
-        Usuario u = new Usuario();
-        if ("admin".equalsIgnoreCase(username)) {
-            u.setIdUsuario(1);
-            u.setUsername("admin");
-            u.setNombreRol("ADMIN");
-            u.setNombreEmpleado("Administrador General");
-            u.setPin("9999");
-            u.setPinHash("$2a$12$JFii7tvJWtK9aSOPGmHdrOA/lBnHzRAhOwQzxHopH9xSCQJBGTNT2");
-        } else if ("cajero".equalsIgnoreCase(username) || "cajero1".equalsIgnoreCase(username)) {
-            u.setIdUsuario(2);
-            u.setUsername("cajero");
-            u.setNombreRol("CAJERO");
-            u.setNombreEmpleado("Valeria Ramos");
-            u.setPin("2001");
-            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
-        } else if ("cocinero".equalsIgnoreCase(username) || "cocina".equalsIgnoreCase(username) || "cocina1".equalsIgnoreCase(username)) {
-            u.setIdUsuario(4);
-            u.setUsername("cocinero");
-            u.setNombreRol("COCINA");
-            u.setNombreEmpleado("Chef Cocina");
-            u.setPin("4001");
-            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
-        } else {
-            u.setIdUsuario(3);
-            u.setUsername(username != null ? username : "mozo");
-            u.setNombreRol("MOZO");
-            u.setNombreEmpleado("Mateo Quispe");
-            u.setPin("1234");
-            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
-        }
-        u.setActivo(true);
-        return u;
-    }
-
     private Usuario autenticarUsuarioPorPin(int idUsuario, String username, String pin) {
         try {
             Optional<Usuario> opt = authService.autenticarPorPin(idUsuario, username, pin);
@@ -336,25 +294,13 @@ public class AuthController {
                 return opt.get();
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Aviso verificando PIN en BD, probando fallback en memoria", e);
+            LOGGER.log(Level.FINE, "Error verificando PIN en BD", e);
         }
 
-        int targetId = idUsuario;
-        if (targetId <= 0) {
-            if ("admin".equalsIgnoreCase(username)) {
-                targetId = 1;
-            } else if ("cajero".equalsIgnoreCase(username)) {
-                targetId = 2;
-            } else {
-                targetId = 3;
-            }
+        if (!AuthTestBypassConfig.isE2eTestProfileActive()) {
+            return null;
         }
-        String pinEsperado = state.pinsMemoria.getOrDefault(targetId, targetId == 1 ? "9999" : (targetId == 2 ? "2001" : "1234"));
-        if (pinEsperado.equals(pin)) {
-            String uNom = targetId == 1 ? "admin" : (targetId == 2 ? "cajero" : (username != null && !username.isBlank() ? username : "mozo"));
-            return construirUsuarioOperativo(uNom);
-        }
-        return null;
+        return AuthTestBypassConfig.autenticarPinMemoria(idUsuario, username, pin);
     }
 
     private String obtenerAvatarUsuario(String username) {

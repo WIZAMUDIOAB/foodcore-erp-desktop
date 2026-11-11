@@ -145,7 +145,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             HttpRequest reqLogin = HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:8080/api/auth/login"))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"mozo\",\"password\":\"Mozo2026!\"}"))
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"mozo\",\"password\":\"Admin#2026!\"}"))
                     .build();
             HttpResponse<String> resLogin = client.send(reqLogin, HttpResponse.BodyHandlers.ofString());
             assertEquals(200, resLogin.statusCode(), "POST /api/auth/login debe retornar HTTP 200");

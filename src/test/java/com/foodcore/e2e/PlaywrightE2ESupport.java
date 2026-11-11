@@ -174,10 +174,10 @@ public final class PlaywrightE2ESupport {
 
     private static String autenticarYExtraerJwt(String rolNormalizado) {
         String[] creds = switch (rolNormalizado) {
-            case "ADMIN" -> new String[]{"admin", "Admin2026!"};
-            case "CAJERO" -> new String[]{"cajero", "Cajero2026!"};
-            case "COCINA" -> new String[]{"cocinero", "Cocina2026!"};
-            default -> new String[]{"mozo", "Mozo2026!"};
+            case "ADMIN" -> new String[]{"admin", "Admin#2026!"};
+            case "CAJERO" -> new String[]{"cajero", "Admin#2026!"};
+            case "COCINA" -> new String[]{"cocinero", "Admin#2026!"};
+            default -> new String[]{"mozo", "Admin#2026!"};
         };
         try {
             HttpClient client = crearInsecureHttpClient();

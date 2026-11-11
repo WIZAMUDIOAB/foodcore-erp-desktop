@@ -50,7 +50,7 @@ public class PwaOrderFlowE2ETest {
             // 1. Login exitoso en la PWA
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
 

@@ -161,11 +161,13 @@ public final class JwtService {
         if (rol == null || rol.isBlank()) {
             return "";
         }
-        String upper = rol.trim().toUpperCase(Locale.ROOT);
-        if ("ADMINISTRADOR".equals(upper)) {
-            return "ADMIN";
-        }
-        return upper;
+        return switch (rol.trim().toUpperCase(Locale.ROOT)) {
+            case "ADMINISTRADOR" -> "ADMIN";
+            case "COCINERO" -> "COCINA";
+            case "MESERO" -> "MOZO";
+            case "ALMACENERO" -> "ALMACEN";
+            default -> rol.trim().toUpperCase(Locale.ROOT);
+        };
     }
 
     private byte[] firmarHmacSha256(String signingInput) throws Exception {

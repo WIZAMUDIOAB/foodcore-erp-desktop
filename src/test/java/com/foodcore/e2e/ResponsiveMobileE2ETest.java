@@ -85,7 +85,7 @@ public class ResponsiveMobileE2ETest {
             assertSinDesbordeHorizontal(page, "index.html (login)");
 
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
 
@@ -263,7 +263,7 @@ public class ResponsiveMobileE2ETest {
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
             Locator mesa01Card = page.locator(".mesa-card", new Page.LocatorOptions().setHasText("Mesa 01")).first();
