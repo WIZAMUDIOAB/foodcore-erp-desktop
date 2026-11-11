@@ -10,6 +10,7 @@ import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.TreeMap;
@@ -73,7 +74,7 @@ public class ReportesController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso consultando KPIs en BD, usando datos en memoria", e);
         }
 
@@ -221,7 +222,7 @@ public class ReportesController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso consultando ventas recientes en BD", e);
         }
 

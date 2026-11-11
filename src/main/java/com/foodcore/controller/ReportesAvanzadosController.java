@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -80,7 +81,7 @@ public class ReportesAvanzadosController {
         }
         configurarColumnas();
         configurarCategorias();
-        cargarAnalisisSincrono();
+        cargarAnalisisAsync();
     }
 
     private void configurarColumnas() {
@@ -106,38 +107,60 @@ public class ReportesAvanzadosController {
         dpInicio.setValue(hoy.withDayOfMonth(1));
         dpFin.setValue(hoy);
 
-        cbCategoriaReporte.setOnAction(e -> cargarAnalisisSincrono());
+        cbCategoriaReporte.setOnAction(e -> cargarAnalisisAsync());
     }
 
     @FXML
     public void handleConsultarReporte() {
-        cargarAnalisisSincrono();
+        cargarAnalisisAsync();
+    }
+
+    public void cargarAnalisisAsync() {
+        String categoria = cbCategoriaReporte.getValue() != null ? cbCategoriaReporte.getValue() : "Ventas por Medio de Pago";
+        LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : LocalDate.now();
+        lblEstadoReporte.setText("Consultando " + categoria + "...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> consultarAnalisis(categoria, ini, fin),
+            res -> aplicarResultadoAnalisis(res, categoria, ini, fin),
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error en reporte avanzado", ex);
+                lblEstadoReporte.setText("Error al consultar reporte");
+            }
+        );
     }
 
     public void cargarAnalisisSincrono() {
-        listaFilas.clear();
-        if (pieChartDistribucion != null) {
-            pieChartDistribucion.getData().clear();
-        }
-
-        String categoria = cbCategoriaReporte.getValue();
-        if (categoria == null) {
-            categoria = "Ventas por Medio de Pago";
-        }
-
+        String categoria = cbCategoriaReporte.getValue() != null ? cbCategoriaReporte.getValue() : "Ventas por Medio de Pago";
         LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : LocalDate.now().withDayOfMonth(1);
         LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : LocalDate.now();
+        ResultadoAnalisis res = consultarAnalisis(categoria, ini, fin);
+        aplicarResultadoAnalisis(res, categoria, ini, fin);
+    }
 
+    private ResultadoAnalisis consultarAnalisis(String categoria, LocalDate ini, LocalDate fin) {
+        String[] headers;
+        List<FilaReporteAvanzado> filas = new ArrayList<>();
+        List<PieSlice> slices = new ArrayList<>();
         double montoTotal = 0.0;
         int cantidadTotal = 0;
         String topItem = "-";
         double topValor = 0.0;
 
-        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+        if ("Ventas por Medio de Pago".equals(categoria)) {
+            headers = new String[]{"Medio de Pago", "Comprobantes", "Subtotal S/", "Total Ventas S/", "Participación %"};
+        } else if ("Ventas por Mozo / Operador".equals(categoria)) {
+            headers = new String[]{"Usuario / Mozo", "Comprobantes", "Subtotal S/", "Total Facturado S/", "Participación %"};
+        } else if ("Ventas por Producto".equals(categoria)) {
+            headers = new String[]{"Producto Vendido", "Unidades", "Precio Prom.", "Total Vendido S/", "Participación %"};
+        } else if ("Compras por Proveedor".equals(categoria)) {
+            headers = new String[]{"Proveedor / Razón Social", "Facturas", "Base Imponible", "Total Compras S/", "Participación %"};
+        } else {
+            headers = new String[]{"Platillo Carta", "Precio Venta", "Costo Receta", "Margen Bruto S/", "Margen %"};
+        }
 
         try (Connection conn = ConexionBD.getConnection()) {
             if ("Ventas por Medio de Pago".equals(categoria)) {
-                configurarHeaders("Medio de Pago", "Comprobantes", "Subtotal S/", "Total Ventas S/", "Participación %");
                 String sql = "SELECT metodo_pago, COUNT(*) AS transacciones, SUM(subtotal) AS sub, SUM(total) AS tot "
                         + "FROM venta WHERE DATE(fecha_hora) BETWEEN ? AND ? GROUP BY metodo_pago ORDER BY tot DESC";
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -157,13 +180,13 @@ public class ReportesAvanzadosController {
                         }
                         for (FilaTemp t : temps) {
                             double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            listaFilas.add(new FilaReporteAvanzado(
+                            filas.add(new FilaReporteAvanzado(
                                     t.nombre,
                                     t.qty + " ops",
                                     String.format("S/ %.2f", t.sub),
                                     String.format("S/ %.2f", t.tot),
                                     String.format("%.1f%%", pct)));
-                            pieData.add(new PieChart.Data(
+                            slices.add(new PieSlice(
                                     t.nombre + " (" + String.format("%.1f%%", pct) + ")",
                                     Math.max(0.01, t.tot)));
                             if (t.tot > topValor) {
@@ -174,7 +197,6 @@ public class ReportesAvanzadosController {
                     }
                 }
             } else if ("Ventas por Mozo / Operador".equals(categoria)) {
-                configurarHeaders("Usuario / Mozo", "Comprobantes", "Subtotal S/", "Total Facturado S/", "Participación %");
                 String sql = "SELECT u.username, COUNT(v.id_venta) AS ops, SUM(v.subtotal) AS sub, SUM(v.total) AS tot "
                         + "FROM venta v JOIN usuario u ON v.id_usuario = u.id_usuario "
                         + "WHERE DATE(v.fecha_hora) BETWEEN ? AND ? GROUP BY u.id_usuario, u.username ORDER BY tot DESC";
@@ -195,13 +217,13 @@ public class ReportesAvanzadosController {
                         }
                         for (FilaTemp t : temps) {
                             double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            listaFilas.add(new FilaReporteAvanzado(
+                            filas.add(new FilaReporteAvanzado(
                                     t.nombre,
                                     t.qty + " pedidos",
                                     String.format("S/ %.2f", t.sub),
                                     String.format("S/ %.2f", t.tot),
                                     String.format("%.1f%%", pct)));
-                            pieData.add(new PieChart.Data(
+                            slices.add(new PieSlice(
                                     t.nombre + " (" + String.format("%.1f%%", pct) + ")",
                                     Math.max(0.01, t.tot)));
                             if (t.tot > topValor) {
@@ -212,7 +234,6 @@ public class ReportesAvanzadosController {
                     }
                 }
             } else if ("Ventas por Producto".equals(categoria)) {
-                configurarHeaders("Producto Vendido", "Unidades", "Precio Prom.", "Total Vendido S/", "Participación %");
                 String sql = "SELECT p.nombre, SUM(dv.cantidad) AS cant, AVG(dv.precio_unitario) AS precio, SUM(dv.subtotal) AS tot "
                         + "FROM detalle_venta dv JOIN producto p ON dv.id_producto = p.id_producto "
                         + "JOIN venta v ON dv.id_venta = v.id_venta WHERE DATE(v.fecha_hora) BETWEEN ? AND ? "
@@ -234,13 +255,13 @@ public class ReportesAvanzadosController {
                         }
                         for (FilaTemp t : temps) {
                             double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            listaFilas.add(new FilaReporteAvanzado(
+                            filas.add(new FilaReporteAvanzado(
                                     t.nombre,
                                     t.qty + " und",
                                     String.format("S/ %.2f", t.sub),
                                     String.format("S/ %.2f", t.tot),
                                     String.format("%.1f%%", pct)));
-                            pieData.add(new PieChart.Data(
+                            slices.add(new PieSlice(
                                     t.nombre + " (" + String.format("%.1f%%", pct) + ")",
                                     Math.max(0.01, t.tot)));
                             if (t.tot > topValor) {
@@ -251,7 +272,6 @@ public class ReportesAvanzadosController {
                     }
                 }
             } else if ("Compras por Proveedor".equals(categoria)) {
-                configurarHeaders("Proveedor / Razón Social", "Facturas", "Base Imponible", "Total Compras S/", "Participación %");
                 String sql = "SELECT p.razon_social, COUNT(c.id_compra) AS docs, SUM(c.base_imponible) AS base, SUM(c.total) AS tot "
                         + "FROM compra c JOIN proveedor p ON c.id_proveedor = p.id_proveedor "
                         + "WHERE c.fecha_emision BETWEEN ? AND ? GROUP BY p.id_proveedor, p.razon_social ORDER BY tot DESC";
@@ -272,13 +292,13 @@ public class ReportesAvanzadosController {
                         }
                         for (FilaTemp t : temps) {
                             double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            listaFilas.add(new FilaReporteAvanzado(
+                            filas.add(new FilaReporteAvanzado(
                                     t.nombre,
                                     t.qty + " facturas",
                                     String.format("S/ %.2f", t.sub),
                                     String.format("S/ %.2f", t.tot),
                                     String.format("%.1f%%", pct)));
-                            pieData.add(new PieChart.Data(
+                            slices.add(new PieSlice(
                                     t.nombre + " (" + String.format("%.1f%%", pct) + ")",
                                     Math.max(0.01, t.tot)));
                             if (t.tot > topValor) {
@@ -289,7 +309,6 @@ public class ReportesAvanzadosController {
                     }
                 }
             } else { // Rentabilidad Real de Carta
-                configurarHeaders("Platillo Carta", "Precio Venta", "Costo Receta", "Margen Bruto S/", "Margen %");
                 String sql = "SELECT p.nombre, p.precio_venta, "
                         + "COALESCE((SELECT SUM(r.cantidad_necesaria * i.costo_unitario) FROM receta r JOIN insumo i ON r.id_insumo = i.id_insumo WHERE r.id_producto = p.id_producto), 0.0) AS costo_receta "
                         + "FROM producto p WHERE p.disponible = 1 ORDER BY p.precio_venta DESC";
@@ -301,13 +320,13 @@ public class ReportesAvanzadosController {
                         double cr = rs.getDouble("costo_receta");
                         double mgSoles = Math.max(0.01, pv - cr);
                         double mgPct = pv > 0 ? (mgSoles / pv) * 100.0 : 0.0;
-                        listaFilas.add(new FilaReporteAvanzado(
+                        filas.add(new FilaReporteAvanzado(
                                 nom,
                                 String.format("S/ %.2f", pv),
                                 String.format("S/ %.2f", cr),
                                 String.format("S/ %.2f", mgSoles),
                                 String.format("%.1f%%", mgPct)));
-                        pieData.add(new PieChart.Data(nom, mgSoles));
+                        slices.add(new PieSlice(nom, mgSoles));
                         montoTotal += mgSoles;
                         cantidadTotal++;
                     }
@@ -315,23 +334,34 @@ public class ReportesAvanzadosController {
                     topValor = cantidadTotal > 0 ? montoTotal / cantidadTotal : 0.0;
                 }
             }
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error en reporte avanzado", ex);
         }
 
-        if (pieData.isEmpty()) {
-            listaFilas.add(new FilaReporteAvanzado("EFECTIVO", "12 ops", "S/ 457.63", "S/ 540.00", "45.0%"));
-            listaFilas.add(new FilaReporteAvanzado("TARJETA", "8 ops", "S/ 322.03", "S/ 380.00", "31.7%"));
-            listaFilas.add(new FilaReporteAvanzado("YAPE / PLIN", "6 ops", "S/ 237.29", "S/ 280.00", "23.3%"));
-            pieData.add(new PieChart.Data("EFECTIVO (45.0%)", 540.0));
-            pieData.add(new PieChart.Data("TARJETA (31.7%)", 380.0));
-            pieData.add(new PieChart.Data("YAPE / PLIN (23.3%)", 280.0));
+        if (slices.isEmpty()) {
+            filas.add(new FilaReporteAvanzado("EFECTIVO", "12 ops", "S/ 457.63", "S/ 540.00", "45.0%"));
+            filas.add(new FilaReporteAvanzado("TARJETA", "8 ops", "S/ 322.03", "S/ 380.00", "31.7%"));
+            filas.add(new FilaReporteAvanzado("YAPE / PLIN", "6 ops", "S/ 237.29", "S/ 280.00", "23.3%"));
+            slices.add(new PieSlice("EFECTIVO (45.0%)", 540.0));
+            slices.add(new PieSlice("TARJETA (31.7%)", 380.0));
+            slices.add(new PieSlice("YAPE / PLIN (23.3%)", 280.0));
             montoTotal = 1200.00;
             cantidadTotal = 26;
             topItem = "EFECTIVO";
             topValor = 540.00;
         }
 
+        return new ResultadoAnalisis(headers, filas, slices, montoTotal, cantidadTotal, topItem, topValor);
+    }
+
+    private void aplicarResultadoAnalisis(ResultadoAnalisis res, String categoria, LocalDate ini, LocalDate fin) {
+        configurarHeaders(res.headers()[0], res.headers()[1], res.headers()[2], res.headers()[3], res.headers()[4]);
+        listaFilas.setAll(res.filas());
+
+        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+        for (PieSlice s : res.slices()) {
+            pieData.add(new PieChart.Data(s.label(), s.value()));
+        }
         if (pieChartDistribucion != null) {
             pieChartDistribucion.setData(pieData);
             pieChartDistribucion.applyCss();
@@ -339,13 +369,26 @@ public class ReportesAvanzadosController {
             aplicarEstilosDonut();
         }
 
-        lblKpiMontoTotal.setText(String.format("S/ %.2f", montoTotal));
-        lblKpiSubTotal.setText(cantidadTotal + " registros procesados");
-        double prom = cantidadTotal > 0 ? (montoTotal / cantidadTotal) : 0.0;
+        lblKpiMontoTotal.setText(String.format("S/ %.2f", res.montoTotal()));
+        lblKpiSubTotal.setText(res.cantidadTotal() + " registros procesados");
+        double prom = res.cantidadTotal() > 0 ? (res.montoTotal() / res.cantidadTotal()) : 0.0;
         lblKpiPromedio.setText(String.format("S/ %.2f", prom));
-        lblKpiTopItem.setText(topItem);
-        lblKpiTopValor.setText(String.format("S/ %.2f aporte", topValor));
+        lblKpiTopItem.setText(res.topItem());
+        lblKpiTopValor.setText(String.format("S/ %.2f aporte", res.topValor()));
         lblEstadoReporte.setText("✓ " + categoria + " generado (" + ini + " al " + fin + ")");
+    }
+
+    private record PieSlice(String label, double value) {
+    }
+
+    private record ResultadoAnalisis(
+            String[] headers,
+            List<FilaReporteAvanzado> filas,
+            List<PieSlice> slices,
+            double montoTotal,
+            int cantidadTotal,
+            String topItem,
+            double topValor) {
     }
 
     /**
@@ -418,59 +461,71 @@ public class ReportesAvanzadosController {
 
     @FXML
     public void handleExportarPdf() {
-        try {
-            File doc = new File("dist/REPORTE_" + sanitizarNombre(cbCategoriaReporte.getValue()) + ".pdf");
-            if (doc.getParentFile() != null) {
-                java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
-            }
-            List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-            List<List<String>> filas = new ArrayList<>();
-            for (FilaReporteAvanzado f : listaFilas) {
-                filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-            }
-            exportacionService.exportarReporteGenericoPdf(cbCategoriaReporte.getValue(), headers, filas, doc);
-            lblEstadoReporte.setText("✓ PDF exportado: " + doc.getName());
-        } catch (Exception ex) {
-            lblEstadoReporte.setText("Error al exportar PDF: " + ex.getMessage());
+        String categoria = cbCategoriaReporte.getValue();
+        List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
+        List<List<String>> filas = new ArrayList<>();
+        for (FilaReporteAvanzado f : listaFilas) {
+            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
         }
+        lblEstadoReporte.setText("Exportando PDF...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".pdf");
+                if (doc.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                }
+                exportacionService.exportarReporteGenericoPdf(categoria, headers, filas, doc);
+                return doc.getName();
+            },
+            nombre -> lblEstadoReporte.setText("✓ PDF exportado: " + nombre),
+            ex -> lblEstadoReporte.setText("Error al exportar PDF: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleExportarExcel() {
-        try {
-            File doc = new File("dist/REPORTE_" + sanitizarNombre(cbCategoriaReporte.getValue()) + ".xlsx");
-            if (doc.getParentFile() != null) {
-                java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
-            }
-            List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-            List<List<String>> filas = new ArrayList<>();
-            for (FilaReporteAvanzado f : listaFilas) {
-                filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-            }
-            exportacionService.exportarReporteGenericoExcel("ANALISIS", headers, filas, doc);
-            lblEstadoReporte.setText("✓ Excel exportado: " + doc.getName());
-        } catch (Exception ex) {
-            lblEstadoReporte.setText("Error al exportar Excel: " + ex.getMessage());
+        String categoria = cbCategoriaReporte.getValue();
+        List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
+        List<List<String>> filas = new ArrayList<>();
+        for (FilaReporteAvanzado f : listaFilas) {
+            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
         }
+        lblEstadoReporte.setText("Exportando Excel...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".xlsx");
+                if (doc.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                }
+                exportacionService.exportarReporteGenericoExcel("ANALISIS", headers, filas, doc);
+                return doc.getName();
+            },
+            nombre -> lblEstadoReporte.setText("✓ Excel exportado: " + nombre),
+            ex -> lblEstadoReporte.setText("Error al exportar Excel: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleExportarCsv() {
-        try {
-            File doc = new File("dist/REPORTE_" + sanitizarNombre(cbCategoriaReporte.getValue()) + ".csv");
-            if (doc.getParentFile() != null) {
-                java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
-            }
-            List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-            List<List<String>> filas = new ArrayList<>();
-            for (FilaReporteAvanzado f : listaFilas) {
-                filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-            }
-            exportacionService.exportarReporteGenericoCsv(headers, filas, doc);
-            lblEstadoReporte.setText("✓ CSV exportado: " + doc.getName());
-        } catch (Exception ex) {
-            lblEstadoReporte.setText("Error al exportar CSV: " + ex.getMessage());
+        String categoria = cbCategoriaReporte.getValue();
+        List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
+        List<List<String>> filas = new ArrayList<>();
+        for (FilaReporteAvanzado f : listaFilas) {
+            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
         }
+        lblEstadoReporte.setText("Exportando CSV...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".csv");
+                if (doc.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                }
+                exportacionService.exportarReporteGenericoCsv(headers, filas, doc);
+                return doc.getName();
+            },
+            nombre -> lblEstadoReporte.setText("✓ CSV exportado: " + nombre),
+            ex -> lblEstadoReporte.setText("Error al exportar CSV: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     private String sanitizarNombre(String nom) {

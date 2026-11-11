@@ -19,6 +19,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,10 +46,7 @@ public class MenuQrModalController {
 
     public void generarMenuYQr() {
         try {
-            File uploadsDir = new File("uploads/qr");
-            if (!uploadsDir.exists()) {
-                uploadsDir.mkdirs();
-            }
+            Files.createDirectories(Path.of("uploads", "qr"));
 
             archivoHtmlGenerado = new File("uploads/qr/menu_digital.html");
             menuQrService.generarMenuDigitalHtml(archivoHtmlGenerado);

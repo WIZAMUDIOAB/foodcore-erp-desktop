@@ -45,7 +45,7 @@ public class ApiRestE2ETest {
             APIResponse loginRes = request.post("/api/auth/login",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
-                            .setData(Map.of("username", "mozo", "password", "Mozo2026!")));
+                            .setData(Map.of("username", "mozo", "password", "Admin#2026!")));
             assertEquals(200, loginRes.status(), "POST /api/auth/login debe devolver 200 OK");
 
             JsonNode loginJson = MAPPER.readTree(loginRes.text());

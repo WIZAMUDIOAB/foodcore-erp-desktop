@@ -47,8 +47,28 @@ public class SubFaseC1PinLoginE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
 
-            // 1. GET /api/usuarios/activos
-            APIResponse respActivos = request.get("/api/usuarios/activos");
+            // 1. POST /api/auth/pin-login con PIN erróneo -> 401
+            APIResponse respLoginFallido = request.post("/api/auth/pin-login",
+                    RequestOptions.create()
+                            .setHeader("Content-Type", "application/json")
+                            .setData(Map.of("pin", "0000", "username", "mozo")));
+            assertEquals(401, respLoginFallido.status(), "PIN erróneo debe responder 401 Unauthorized");
+
+            // 2. POST /api/auth/pin-login con PIN válido '1234' -> 200 OK + JWT
+            APIResponse respLoginOk = request.post("/api/auth/pin-login",
+                    RequestOptions.create()
+                            .setHeader("Content-Type", "application/json")
+                            .setData(Map.of("pin", "1234", "username", "mozo")));
+            assertEquals(200, respLoginOk.status(), "PIN 1234 debe autenticar satisfactoriamente");
+            JsonNode jsonLoginOk = MAPPER.readTree(respLoginOk.text());
+            assertTrue(jsonLoginOk.hasNonNull("token"), "Debe devolver token JWT");
+            assertTrue(jsonLoginOk.hasNonNull("usuario"), "Debe devolver datos de usuario");
+            assertEquals("mozo", jsonLoginOk.path("usuario").path("username").asText());
+            String tokenMozo = jsonLoginOk.path("token").asText();
+
+            // 3. GET /api/usuarios/activos con Bearer JWT obtenido
+            APIResponse respActivos = request.get("/api/usuarios/activos",
+                    RequestOptions.create().setHeader("Authorization", "Bearer " + tokenMozo));
             assertEquals(200, respActivos.status(), "GET /api/usuarios/activos debe responder 200 OK");
             JsonNode listaActivos = MAPPER.readTree(respActivos.text());
             assertTrue(listaActivos.isArray() && !listaActivos.isEmpty(), "Debe retornar al menos un usuario activo");
@@ -63,28 +83,11 @@ public class SubFaseC1PinLoginE2ETest {
             }
             assertTrue(tieneMozo, "La lista de usuarios activos debe incluir al menos al mozo");
 
-            // 2. POST /api/auth/pin-login con PIN erróneo -> 401
-            APIResponse respLoginFallido = request.post("/api/auth/pin-login",
-                    RequestOptions.create()
-                            .setHeader("Content-Type", "application/json")
-                            .setData(Map.of("pin", "0000", "username", "mozo")));
-            assertEquals(401, respLoginFallido.status(), "PIN erróneo debe responder 401 Unauthorized");
-
-            // 3. POST /api/auth/pin-login con PIN válido '1234' -> 200 OK + JWT
-            APIResponse respLoginOk = request.post("/api/auth/pin-login",
-                    RequestOptions.create()
-                            .setHeader("Content-Type", "application/json")
-                            .setData(Map.of("pin", "1234", "username", "mozo")));
-            assertEquals(200, respLoginOk.status(), "PIN 1234 debe autenticar satisfactoriamente");
-            JsonNode jsonLoginOk = MAPPER.readTree(respLoginOk.text());
-            assertTrue(jsonLoginOk.hasNonNull("token"), "Debe devolver token JWT");
-            assertTrue(jsonLoginOk.hasNonNull("usuario"), "Debe devolver datos de usuario");
-            assertEquals("mozo", jsonLoginOk.path("usuario").path("username").asText());
-
-            // 4. POST /api/auth/pin-switch (cambio rápido de mozo) -> 200 OK con nuevo token
+            // 4. POST /api/auth/pin-switch (cambio rápido de mozo) con Bearer JWT -> 200 OK con nuevo token
             APIResponse respSwitchOk = request.post("/api/auth/pin-switch",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
+                            .setHeader("Authorization", "Bearer " + tokenMozo)
                             .setData(Map.of("pin", "9999", "username", "admin")));
             assertEquals(200, respSwitchOk.status(), "Cambio de mozo a admin con PIN 9999 debe ser 200 OK");
             JsonNode jsonSwitchOk = MAPPER.readTree(respSwitchOk.text());
@@ -153,7 +156,7 @@ public class SubFaseC1PinLoginE2ETest {
     void testUiCambioRapidoMozoEnCaliente() {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser);
+             BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 1366, 850, "MOZO");
              Page page = context.newPage()) {
 
             // 1. Abrir directamente catalogo.html con mesa 04

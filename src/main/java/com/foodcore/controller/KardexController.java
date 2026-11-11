@@ -206,7 +206,7 @@ public class KardexController {
                         filas.add(new FilaKardex(fecha, tipo, ins, cant, saldo, usr));
                     }
                 }
-            } catch (Exception e) {
+            } catch (java.sql.SQLException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Cargando datos semilla de Kardex", e);
             }
 

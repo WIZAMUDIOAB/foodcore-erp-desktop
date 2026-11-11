@@ -59,7 +59,7 @@ public class PwaAuthE2ETest {
 
             // 4. Ingresar credenciales correctas y verificar redirección a mesas.html
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             btnIngresar.click();
 
             page.waitForURL("**/mesas.html**");

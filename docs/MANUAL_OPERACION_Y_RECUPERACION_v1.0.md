@@ -86,7 +86,7 @@
 Para que las tablets de los mozos operen la PWA con Service Worker activo y sin advertencias de seguridad en el navegador (mostrando el candado seguro de HTTPS), se debe instalar la Autoridad de Certificación autofirmada `foodcore.cer` en cada dispositivo táctil.
 
 ### 4.1 Ubicación y Descarga del Certificado
-- **Archivo en el servidor**: `keystore.jks` (almacén privado con validez de 10 años, contraseña `foodcore123`) y `foodcore.cer` (certificado público X.509 RFC/PEM).
+- **Archivo en el servidor**: `keystore.jks` (almacén privado PKCS12/JKS protegido con la contraseña definida en `FOODCORE_KEYSTORE_PASS`, mínimo 8 caracteres; ver `keystore.jks.example`) y `foodcore.cer` (certificado público X.509).
 - **Descarga directa en la LAN**:
   Con la tablet conectada a la misma red Wi-Fi del restaurante, abrir el navegador y acceder a:
   ```text

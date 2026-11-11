@@ -310,8 +310,8 @@ public class ExportacionContableService {
 
         document.add(table);
 
-        Paragraph pTot = new Paragraph(String.format("\nTOTALES CONSOLIDADOS DEL MES:\n"
-                + "Total Efectivo Recaudado: S/ %.2f | Total Canales Digitales: S/ %.2f\n"
+        Paragraph pTot = new Paragraph(String.format("%nTOTALES CONSOLIDADOS DEL MES:%n"
+                + "Total Efectivo Recaudado: S/ %.2f | Total Canales Digitales: S/ %.2f%n"
                 + "Total Egresos de Caja: S/ %.2f | Diferencia Neta de Arqueos: S/ %.2f", sumEfec, sumDigit, sumEgr, sumDif), fontTitulo);
         pTot.setSpacingBefore(15);
         document.add(pTot);

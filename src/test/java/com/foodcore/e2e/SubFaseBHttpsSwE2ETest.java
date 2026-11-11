@@ -61,6 +61,24 @@ public class SubFaseBHttpsSwE2ETest {
         assertEquals(200, resHttp.statusCode(), "HTTP en puerto 8080 debe responder 200 OK");
         assertTrue(resHttp.body().contains("UP"), "El estado HTTP 8080 de /api/health debe ser UP");
 
+        // 2.1 Validar endpoint /health de readiness (BD + Flyway) vía GET y HEAD (para wait-on en CI)
+        HttpRequest reqReadyGet = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.HTTP_BASE_URL + "/health"))
+                .timeout(Duration.ofSeconds(4))
+                .GET()
+                .build();
+        HttpResponse<String> resReadyGet = client.send(reqReadyGet, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, resReadyGet.statusCode(), "GET /health debe responder 200 OK cuando BD y Flyway están listos");
+        assertTrue(resReadyGet.body().contains("\"flyway\":\"READY\""), "GET /health debe confirmar Flyway READY");
+
+        HttpRequest reqReadyHead = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.HTTP_BASE_URL + "/health"))
+                .timeout(Duration.ofSeconds(4))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .build();
+        HttpResponse<Void> resReadyHead = client.send(reqReadyHead, HttpResponse.BodyHandlers.discarding());
+        assertEquals(200, resReadyHead.statusCode(), "HEAD /health debe responder 200 OK para wait-on en CI");
+
         // 3. Validar descarga pública de certificado SSL foodcore.cer para tablets
         HttpRequest reqCer = HttpRequest.newBuilder()
                 .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/foodcore.cer"))
@@ -95,11 +113,11 @@ public class SubFaseBHttpsSwE2ETest {
                     + "try {\n"
                     + "  const reg = await navigator.serviceWorker.register('/sw.js');\n"
                     + "  let activeSw = reg.active;\n"
-                    + "  if (!activeSw) {\n"
+                    + "  if (!activeSw || activeSw.state !== 'activated') {\n"
                     + "    const swReadyPromise = navigator.serviceWorker.ready;\n"
                     + "    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 8000));\n"
                     + "    const readyReg = await Promise.race([swReadyPromise, timeoutPromise]);\n"
-                    + "    activeSw = readyReg ? readyReg.active : null;\n"
+                    + "    activeSw = readyReg ? readyReg.active : reg.active;\n"
                     + "  }\n"
                     + "  return activeSw ? activeSw.state : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'registered'));\n"
                     + "} catch (e) {\n"
@@ -109,7 +127,10 @@ public class SubFaseBHttpsSwE2ETest {
 
             System.out.println("RESULTADO SERVICE WORKER EN HTTPS: " + swRegistrado);
             assertNotNull(swRegistrado, "El registro del Service Worker no debe ser nulo");
-            assertTrue("activated".equals(swRegistrado) || "installing".equals(swRegistrado) || "registered".equals(swRegistrado),
+            assertTrue("activated".equals(swRegistrado)
+                            || "activating".equals(swRegistrado)
+                            || "installing".equals(swRegistrado)
+                            || "registered".equals(swRegistrado),
                     "El Service Worker debe registrarse/activarse en HTTPS: " + swRegistrado);
 
             // 3. Validar que la cabecera / indicador de estado reconozca conexión HTTPS
@@ -128,16 +149,24 @@ public class SubFaseBHttpsSwE2ETest {
     }
 
     @Test
-    @DisplayName("Sub-Fase B & v4.3.2: 3. Menú Digital URL de Red — GET /api/menu-digital/view sirve HTML")
+    @DisplayName("Sub-Fase B & v4.3.2: 3. Menú Digital URL de Red — GET /api/public/menu-digital sirve HTML")
     void testMenuDigitalViewEndpoint() throws Exception {
         HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest reqPriv = HttpRequest.newBuilder()
                 .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/menu-digital/view"))
                 .timeout(Duration.ofSeconds(4))
                 .GET()
                 .build();
+        HttpResponse<String> resPriv = client.send(reqPriv, HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, resPriv.statusCode(), "/api/menu-digital/view administrativo debe exigir JWT (401)");
+
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/public/menu-digital"))
+                .timeout(Duration.ofSeconds(4))
+                .GET()
+                .build();
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, res.statusCode(), "/api/menu-digital/view debe retornar 200 OK");
+        assertEquals(200, res.statusCode(), "/api/public/menu-digital debe retornar 200 OK");
         assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("text/html"),
                 "El Content-Type debe ser text/html");
         assertTrue(res.body().contains("FOODCORE RESTOBAR & GRILL"), "Debe contener el título del menú digital");

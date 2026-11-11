@@ -36,7 +36,7 @@
                                     </children>
                                 </VBox>
                                 <Button fx:id="btnNuevoProveedor" mnemonicParsing="false" onAction="#handleAbrirModalNuevo" styleClass="btn-primary" text="+ Nuevo Proveedor" />
-                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarProveedoresSincrono" styleClass="btn-secondary" text="Actualizar" />
+                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarProveedoresAsync" styleClass="btn-secondary" text="Actualizar" />
                             </children>
                         </HBox>
 

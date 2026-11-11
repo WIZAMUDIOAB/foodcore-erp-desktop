@@ -15,6 +15,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -72,7 +73,7 @@ public class HistorialPreciosController {
     public void initialize() {
         configurarColumnas();
         configurarFiltros();
-        cargarHistorialSincrono();
+        cargarHistorialAsync();
     }
 
     private void configurarColumnas() {
@@ -95,14 +96,14 @@ public class HistorialPreciosController {
     private void configurarFiltros() {
         cbFiltroTipo.setItems(FXCollections.observableArrayList("TODOS", "PRODUCTO", "INSUMO"));
         cbFiltroTipo.setValue("TODOS");
-        cbFiltroTipo.setOnAction(e -> cargarHistorialSincrono());
+        cbFiltroTipo.setOnAction(e -> cargarHistorialAsync());
 
         cbModalTipo.setItems(FXCollections.observableArrayList("PRODUCTO", "INSUMO"));
         cbModalTipo.setValue("PRODUCTO");
 
         txtBuscar.textProperty().addListener((obs, oldV, newV) -> {
             if (newV == null || newV.isBlank()) {
-                cargarHistorialSincrono();
+                cargarHistorialAsync();
             } else {
                 String f = newV.toLowerCase().trim();
                 List<HistorialPrecio> filtrados = listaHistorial.stream()
@@ -113,21 +114,31 @@ public class HistorialPreciosController {
         });
     }
 
+    public void cargarHistorialAsync() {
+        final String filtroTipo = cbFiltroTipo.getValue();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    List<HistorialPrecio> todos = historialDAO.listarTodos(conn);
+                    if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
+                        return todos.stream()
+                            .filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad()))
+                            .collect(Collectors.toList());
+                    }
+                    return todos;
+                }
+            },
+            todos -> {
+                listaHistorial.setAll(todos);
+                tblHistorial.setItems(listaHistorial);
+                lblTotalRegistros.setText(listaHistorial.size() + " Modificaciones");
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar historial precios", ex)
+        );
+    }
+
     public void cargarHistorialSincrono() {
-        listaHistorial.clear();
-        String filtroTipo = cbFiltroTipo.getValue();
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<HistorialPrecio> todos = historialDAO.listarTodos(conn);
-            if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
-                todos = todos.stream().filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad())).collect(Collectors.toList());
-            }
-            listaHistorial.addAll(todos);
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar historial precios", ex);
-        }
-
-        lblTotalRegistros.setText(listaHistorial.size() + " Modificaciones");
+        cargarHistorialAsync();
     }
 
     @FXML
@@ -170,26 +181,41 @@ public class HistorialPreciosController {
             return;
         }
 
-        int idEntidad = 1;
-        try (Connection conn = ConexionBD.getConnection()) {
-            if ("PRODUCTO".equalsIgnoreCase(tipo)) {
-                List<Producto> prods = productoDAO.listarTodos(conn);
-                if (!prods.isEmpty()) idEntidad = prods.get(0).getIdProducto();
-            } else {
-                List<Insumo> ins = insumoDAO.listarTodos(conn);
-                if (!ins.isEmpty()) idEntidad = (int) ins.get(0).getIdInsumo();
-            }
-        } catch (Exception ignored) {}
+        final String tipoFinal = tipo;
+        final String nombreFinal = nombre;
+        final double pAntFinal = pAnt;
+        final double pNuevoFinal = pNuevo;
+        final String motivoFinal = motivo;
+        final int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+        final String usuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getUsername() : "admin";
 
-        int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-        String usuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getUsername() : "admin";
-
-        try {
-            finanzasService.registrarCambioPrecioConMotivo(tipo, idEntidad, nombre, pAnt, pNuevo, idUsuario, usuario, motivo);
-            modalAjuste.setVisible(false);
-            cargarHistorialSincrono();
-        } catch (Exception ex) {
-            lblModalAjusteError.setText("Error al guardar: " + ex.getMessage());
-        }
+        lblModalAjusteError.setText("");
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                int idEntidad = 1;
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if ("PRODUCTO".equalsIgnoreCase(tipoFinal)) {
+                        List<Producto> prods = productoDAO.listarTodos(conn);
+                        if (!prods.isEmpty()) {
+                            idEntidad = prods.get(0).getIdProducto();
+                        }
+                    } else {
+                        List<Insumo> ins = insumoDAO.listarTodos(conn);
+                        if (!ins.isEmpty()) {
+                            idEntidad = (int) ins.get(0).getIdInsumo();
+                        }
+                    }
+                } catch (java.sql.SQLException | RuntimeException ignored) {
+                    // Fallback a idEntidad = 1 cuando el catalogo no devuelve filas.
+                }
+                finanzasService.registrarCambioPrecioConMotivo(
+                        tipoFinal, idEntidad, nombreFinal, pAntFinal, pNuevoFinal, idUsuario, usuario, motivoFinal);
+            },
+            () -> {
+                modalAjuste.setVisible(false);
+                cargarHistorialAsync();
+            },
+            error -> lblModalAjusteError.setText("Error al guardar: " + (error != null ? error.getMessage() : "desconocido"))
+        );
     }
 }

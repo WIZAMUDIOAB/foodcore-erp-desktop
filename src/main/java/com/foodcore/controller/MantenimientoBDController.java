@@ -18,8 +18,12 @@ import javafx.scene.control.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MantenimientoBDController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MantenimientoBDController.class);
 
     @FXML private Label lblEstadoBD;
 
@@ -138,7 +142,7 @@ public class MantenimientoBDController {
                     cmbProdCategoria.setItems(listaCategorias);
                 });
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Error al cargar categorías de productos", e);
             }
         }).start();
     }
@@ -292,7 +296,7 @@ public class MantenimientoBDController {
                 List<Receta> componentes = service.listarRecetaPorProducto(idProducto);
                 Platform.runLater(() -> listaRecetas.setAll(componentes));
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Error al cargar receta para el producto {}", idProducto, e);
             }
         }).start();
     }

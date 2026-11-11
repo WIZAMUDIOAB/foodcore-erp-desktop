@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import io.javalin.http.Context;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.logging.Level;
@@ -63,7 +64,7 @@ public class KdsController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso consultando comandas KDS en BD, usando datos en memoria", e);
         }
 

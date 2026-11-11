@@ -68,7 +68,7 @@ public class MenuQrService {
      */
     public static String construirUrlMenuDigital(int puertoHttps) {
         String ip = obtenerIpServidor();
-        return "https://" + ip + ":" + puertoHttps + "/api/menu-digital/view";
+        return "https://" + ip + ":" + puertoHttps + "/api/public/menu-digital";
     }
 
     /**

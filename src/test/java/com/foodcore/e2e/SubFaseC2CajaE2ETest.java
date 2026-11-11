@@ -42,7 +42,7 @@ public class SubFaseC2CajaE2ETest {
     @DisplayName("Sub-Fase C.2: Caja — Flujo completo de turno: Apertura, Cobro con Boleta y Cierre Z")
     void testFlujoCompletoCaja() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "CAJERO");
 
             // 1. Abrir turno de caja
             APIResponse respAbrir = request.post("/api/caja/abrir",

@@ -1,7 +1,10 @@
 package com.foodcore.e2e;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodcore.api.ApiServer;
 import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.microsoft.playwright.APIRequest;
@@ -30,7 +33,9 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -42,6 +47,8 @@ import java.util.logging.Logger;
 public final class PlaywrightE2ESupport {
 
     private static final Logger LOGGER = Logger.getLogger(PlaywrightE2ESupport.class.getName());
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    private static final Map<String, String> TOKENS_POR_ROL = new ConcurrentHashMap<>();
     public static final String BASE_URL = "https://localhost:8443";
     public static final String HTTP_BASE_URL = "http://localhost:8080";
     public static final Path REPORT_DIR = Path.of("target", "playwright-report");
@@ -74,6 +81,8 @@ public final class PlaywrightE2ESupport {
             LOGGER.log(Level.FINE, "ServidorSockets ya activo", e);
         }
 
+        TestSecuritySupport.asegurarKeystoreE2E();
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer.getInstance().iniciar(8080);
         if (!servidorIniciadoEnProceso) {
             servidorIniciadoEnProceso = true;
@@ -137,6 +146,61 @@ public final class PlaywrightE2ESupport {
                 new APIRequest.NewContextOptions()
                         .setBaseURL(BASE_URL)
                         .setIgnoreHTTPSErrors(true));
+    }
+
+    public static APIRequestContext crearApiRequestContextAutenticado(Playwright playwright, String rol) {
+        return playwright.request().newContext(
+                new APIRequest.NewContextOptions()
+                        .setBaseURL(BASE_URL)
+                        .setIgnoreHTTPSErrors(true)
+                        .setExtraHTTPHeaders(Map.of("Authorization", "Bearer " + obtenerTokenRol(rol))));
+    }
+
+    public static BrowserContext crearContextoAutenticado(Browser browser, int width, int height, String rol) {
+        BrowserContext context = crearContexto(browser, width, height);
+        try {
+            String tokenJson = JSON_MAPPER.writeValueAsString(obtenerTokenRol(rol));
+            context.addInitScript("if (!localStorage.getItem('fc_pwa_token')) { localStorage.setItem('fc_pwa_token', " + tokenJson + "); }");
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo inyectar token JWT en BrowserContext", e);
+        }
+        return context;
+    }
+
+    public static String obtenerTokenRol(String rol) {
+        String clave = rol == null ? "MOZO" : rol.trim().toUpperCase(Locale.ROOT);
+        return TOKENS_POR_ROL.computeIfAbsent(clave, PlaywrightE2ESupport::autenticarYExtraerJwt);
+    }
+
+    private static String autenticarYExtraerJwt(String rolNormalizado) {
+        String[] creds = switch (rolNormalizado) {
+            case "ADMIN" -> new String[]{"admin", "Admin#2026!"};
+            case "CAJERO" -> new String[]{"cajero", "Admin#2026!"};
+            case "COCINA" -> new String[]{"cocinero", "Admin#2026!"};
+            default -> new String[]{"mozo", "Admin#2026!"};
+        };
+        try {
+            HttpClient client = crearInsecureHttpClient();
+            String body = JSON_MAPPER.writeValueAsString(Map.of("username", creds[0], "password", creds[1]));
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/auth/login"))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() != 200) {
+                throw new IllegalStateException("Login fallido para rol " + rolNormalizado + ": HTTP " + resp.statusCode());
+            }
+            JsonNode json = JSON_MAPPER.readTree(resp.body());
+            String token = json.path("token").asText("");
+            if (token.isBlank()) {
+                throw new IllegalStateException("Respuesta de login sin JWT para rol " + rolNormalizado);
+            }
+            return token;
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo obtener JWT para rol " + rolNormalizado, e);
+        }
     }
 
     public static HttpClient crearInsecureHttpClient() {

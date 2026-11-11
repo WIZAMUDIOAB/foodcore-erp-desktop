@@ -6,6 +6,7 @@ import com.foodcore.model.Pedido;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,5 +49,15 @@ public class PedidoDAOImpl extends com.foodcore.dao.PedidoDAOImpl {
     @Override
     public void actualizarEstadoMesaConVersion(Connection conn, long idMesa, String nuevoEstado, int versionEsperada) throws SQLException {
         super.actualizarEstadoMesaConVersion(conn, idMesa, nuevoEstado, versionEsperada);
+    }
+
+    @Override
+    public List<Pedido> buscarPorEstado(Connection conn, String estado) throws SQLException {
+        return super.buscarPorEstado(conn, estado);
+    }
+
+    @Override
+    public List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException {
+        return super.buscarPorEstadoYFechas(conn, estado, desde, hasta);
     }
 }

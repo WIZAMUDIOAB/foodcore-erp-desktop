@@ -25,6 +25,7 @@ import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -55,7 +56,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -381,25 +384,35 @@ class FoodcoreV440FlowsTest {
             psUpd4.executeUpdate();
         }
 
+        AtomicReference<DashboardController> dashCtrlRef = new AtomicReference<>();
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
                 Parent root = loader.load();
                 Scene sc = new Scene(root, 1180, 760);
                 App.applyStylesheets(sc);
-
-                DashboardController dashCtrl = loader.getController();
-                List<DashboardController.AlertaVencimiento> alertas = dashCtrl.getAlertasVencimientoActuales();
-                assertFalse(alertas.isEmpty());
-                assertTrue(alertas.stream().anyMatch(a -> a.colaborador().contains("Carlos Mozo")
-                        && a.documento().contains("Contrato")));
-                assertFalse(alertas.stream().anyMatch(a -> a.diasRestantes() > 30),
-                        "Ningún vencimiento mayor a 30 días debe figurar en las alertas");
-                assertFalse(dashCtrl.getVboxAlertasVencimiento().getChildren().isEmpty());
-                assertFalse(((Label) dashCtrl.getLblCountAlertasPersonal()).getText().startsWith("0 "));
+                dashCtrlRef.set(loader.getController());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        });
+
+        DashboardController dashCtrl = dashCtrlRef.get();
+        esperarHastaEnFx(
+                () -> !dashCtrl.getAlertasVencimientoActuales().isEmpty()
+                        && !dashCtrl.getVboxAlertasVencimiento().getChildren().isEmpty(),
+                5000,
+                "Las métricas y alertas del Dashboard deben cargarse asíncronamente");
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            List<DashboardController.AlertaVencimiento> alertas = dashCtrl.getAlertasVencimientoActuales();
+            assertFalse(alertas.isEmpty());
+            assertTrue(alertas.stream().anyMatch(a -> a.colaborador().contains("Carlos Mozo")
+                    && a.documento().contains("Contrato")));
+            assertFalse(alertas.stream().anyMatch(a -> a.diasRestantes() > 30),
+                    "Ningún vencimiento mayor a 30 días debe figurar en las alertas");
+            assertFalse(dashCtrl.getVboxAlertasVencimiento().getChildren().isEmpty());
+            assertFalse(((Label) dashCtrl.getLblCountAlertasPersonal()).getText().startsWith("0 "));
         });
 
         // 4. MainLayout incluye botón de Solicitudes de Ausencia
@@ -459,35 +472,63 @@ class FoodcoreV440FlowsTest {
             httpPort = s1.getLocalPort();
             httpsPort = s2.getLocalPort();
         }
+        TestSecuritySupport.asegurarKeystoreE2E();
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer api = ApiServer.getInstance();
         api.detener();
         api.iniciar(httpPort, httpsPort);
         try {
+            String tokenMozo = api.generarTokenJwt(3, "mozo", "MOZO");
             HttpClient client = HttpClient.newHttpClient();
             HttpResponse<String> resDisp = client.send(
-                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/productos/disponibles")).GET().build(),
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/productos/disponibles"))
+                            .header("Authorization", "Bearer " + tokenMozo)
+                            .GET()
+                            .build(),
                     HttpResponse.BodyHandlers.ofString()
             );
             assertEquals(200, resDisp.statusCode());
             assertFalse(resDisp.body().contains(nombreAgotado),
                     "GET /api/productos/disponibles para PWA NO debe incluir productos agotados");
+
+            HttpResponse<String> resPublicDisp = client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/public/productos/disponibles"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            assertEquals(200, resPublicDisp.statusCode());
+            assertFalse(resPublicDisp.body().contains(nombreAgotado));
         } finally {
             api.detener();
         }
 
         // Verificar KioscoController y VentaController
+        AtomicReference<KioscoController> kioscoRef = new AtomicReference<>();
         AtomicReference<VentaController> vcRef = new AtomicReference<>();
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+        Producto prodNoDisp = new Producto(idAgotado, 1, "AGOT-44", nombreAgotado, "", new BigDecimal("29.00"), BigDecimal.ZERO, false);
 
-                FXMLLoader kioscoLoader = new FXMLLoader(getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
-                Parent kioscoRoot = kioscoLoader.load();
-                new Scene(kioscoRoot, 1180, 720);
-                KioscoController kioscoCtrl = kioscoLoader.getController();
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+
+                    FXMLLoader kioscoLoader = new FXMLLoader(getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
+                    Parent kioscoRoot = kioscoLoader.load();
+                    new Scene(kioscoRoot, 1180, 720);
+                    kioscoRef.set(kioscoLoader.getController());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            KioscoController kioscoCtrl = kioscoRef.get();
+            esperarHastaEnFx(() -> !kioscoCtrl.getTodosLosProductos().isEmpty(), 5000,
+                    "KioscoController debe cargar el catálogo disponible de forma asíncrona");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 assertFalse(kioscoCtrl.getTodosLosProductos().stream().anyMatch(p -> p.getIdProducto() == idAgotado),
                         "KioscoController no debe mostrar productos agotados");
-                Producto prodNoDisp = new Producto(idAgotado, 1, "AGOT-44", nombreAgotado, "", new BigDecimal("29.00"), BigDecimal.ZERO, false);
                 kioscoCtrl.agregarAlCarrito(prodNoDisp);
                 assertTrue(kioscoCtrl.getCarritoItems().isEmpty(), "Kiosco debe bloquear la adición de un producto agotado");
 
@@ -498,12 +539,21 @@ class FoodcoreV440FlowsTest {
                 cajero.setNombreRol("CAJERO");
                 AuthService.setUsuarioSesionActual(cajero);
 
-                FXMLLoader posLoader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
-                Parent posRoot = posLoader.load();
-                new Scene(posRoot, 1280, 740);
-                VentaController ventaCtrl = posLoader.getController();
-                vcRef.set(ventaCtrl);
+                try {
+                    FXMLLoader posLoader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                    Parent posRoot = posLoader.load();
+                    new Scene(posRoot, 1280, 740);
+                    vcRef.set(posLoader.getController());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
+            VentaController ventaCtrl = vcRef.get();
+            esperarHastaEnFx(() -> !ventaCtrl.getTodosLosProductos().isEmpty(), 5000,
+                    "VentaController debe cargar el catálogo POS de forma asíncrona");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 assertFalse(ventaCtrl.getTodosLosProductos().stream().anyMatch(p -> p.getIdProducto() == idAgotado),
                         "POS no debe mostrar productos agotados en el catálogo");
                 ventaCtrl.agregarProductoAVenta(prodNoDisp);
@@ -513,14 +563,14 @@ class FoodcoreV440FlowsTest {
                         "El botón de Descuento en POS debe figurar deshabilitado para CAJERO");
                 assertTrue(ventaCtrl.getBtnAnularVenta().isDisabled(),
                         "El botón de Anular Venta en POS debe figurar deshabilitado para CAJERO");
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            } finally {
+            });
+        } finally {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 if (vcRef.get() != null) {
                     vcRef.get().stopTimeline();
                 }
-            }
-        });
+            });
+        }
 
         // Parte B: Seguridad RBAC estricta para CAJERO vs SUPERVISOR/ADMIN en capa de servicio
         AutorizacionService authz = new AutorizacionService();
@@ -549,5 +599,25 @@ class FoodcoreV440FlowsTest {
         BigDecimal descSup = ventaService.calcularDescuentoAutorizado(
                 new BigDecimal("100.00"), new BigDecimal("10"), true, sesionSupervisor);
         assertEquals(new BigDecimal("10.00"), descSup);
+    }
+
+    private static void esperarHastaEnFx(BooleanSupplier condicion, long timeoutMs, String mensaje) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            AtomicBoolean cumplida = new AtomicBoolean(false);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicion.getAsBoolean()));
+            if (cumplida.get()) {
+                return;
+            }
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        AtomicBoolean cumplidaFinal = new AtomicBoolean(false);
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplidaFinal.set(condicion.getAsBoolean()));
+        assertTrue(cumplidaFinal.get(), mensaje);
     }
 }

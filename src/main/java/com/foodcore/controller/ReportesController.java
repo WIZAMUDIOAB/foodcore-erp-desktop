@@ -14,8 +14,12 @@ import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ReportesController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ReportesController.class);
 
     @FXML private ComboBox<String> cmbPeriodo;
     @FXML private Label lblTotalVentas;
@@ -100,7 +104,7 @@ public class ReportesController {
                     }
                 });
             } catch (Exception e) {
-                e.printStackTrace();
+                LOGGER.error("Error al cargar datos de reportes para {} días", dias, e);
             }
         }).start();
     }

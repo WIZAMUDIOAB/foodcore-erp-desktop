@@ -7,9 +7,9 @@
   <title>FoodCore ERP v4.2 — Dashboard Gerencial</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/dashboard.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" />
-  <!-- Chart.js para gráficos ejecutivos -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="../vendor/fonts/fonts.css" />
+  <!-- Chart.js local para gráficos ejecutivos -->
+  <script src="../vendor/chart.js/chart.min.js"></script>
 </head>
 <body>
   <!-- TOPBAR EJECUTIVO (MOBILE-FIRST) -->
@@ -155,6 +155,20 @@
       FoodCore ERP v4.2.0 — Sistema Integral para Restaurantes y Franquicias
     </footer>
   </main>
+
+  <!-- MODAL AUTENTICACIÓN DASHBOARD (Bearer JWT ADMIN) -->
+  <div id="dashAuthOverlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.82); backdrop-filter:blur(6px); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:16px; padding:24px; width:100%; max-width:360px; color:#0F172A; box-shadow:0 20px 50px rgba(15,23,42,0.35);">
+      <h2 style="margin:0 0 6px; font-size:18px;">Acceso Gerencial</h2>
+      <p style="margin:0 0 16px; font-size:13px; color:#64748B;">Inicie sesión como Administrador para ver KPIs en vivo.</p>
+      <div id="dashLoginError" style="display:none; background:#FEF2F2; color:#B91C1C; border:1px solid #FCA5A5; border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:12px;"></div>
+      <label style="display:block; font-size:12px; color:#475569; margin-bottom:4px;">Usuario</label>
+      <input id="dashLoginUser" type="text" placeholder="Usuario" autocomplete="username" style="width:100%; padding:10px; border-radius:8px; border:1px solid #CBD5E1; background:#F8FAFC; color:#0F172A; margin-bottom:10px; box-sizing:border-box;" />
+      <label style="display:block; font-size:12px; color:#475569; margin-bottom:4px;">Contraseña</label>
+      <input id="dashLoginPass" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%; padding:10px; border-radius:8px; border:1px solid #CBD5E1; background:#F8FAFC; color:#0F172A; margin-bottom:16px; box-sizing:border-box;" />
+      <button id="btnDashLogin" type="button" style="width:100%; padding:12px; border:none; border-radius:8px; background:#EA580C; color:#FFFFFF; font-weight:700; cursor:pointer;">Entrar al Dashboard</button>
+    </div>
+  </div>
 
   <script src="js/dashboard.js"></script>
   <script>

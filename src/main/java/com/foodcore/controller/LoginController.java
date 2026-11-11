@@ -6,6 +6,7 @@ import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -43,6 +44,7 @@ public class LoginController {
     private final AuthService authService = new AuthServiceImpl();
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
+    private boolean autenticating = false;
 
     @FXML
     public void initialize() {
@@ -53,35 +55,39 @@ public class LoginController {
 
     @FXML
     private void handleLogin() {
+        if (autenticating) {
+            return;
+        }
         ocultarError();
         String user = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
         String pass = txtPassword.getText() != null ? txtPassword.getText().trim() : "";
 
         setEstadoCarga(true);
 
-        try {
-            Usuario u = authService.login(user, pass);
-            setEstadoCarga(false);
-
-            if (u.isCambioPasswordRequerido()) {
-                // Regla §3.2 y §4.3: Abrir diálogo modal automáticamente, NUNCA mostrar label rojo en el login
-                abrirDialogoCambioPassword(u);
-                return;
+        UiAsyncExecutor.ejecutarAsync(
+            () -> authService.login(user, pass),
+            usuario -> {
+                setEstadoCarga(false);
+                if (usuario.isCambioPasswordRequerido()) {
+                    // Regla §3.2 y §4.3: Abrir diálogo modal automáticamente, NUNCA mostrar label rojo en el login
+                    abrirDialogoCambioPassword(usuario);
+                    return;
+                }
+                irAlDashboard();
+            },
+            error -> {
+                setEstadoCarga(false);
+                if (error instanceof NegocioException) {
+                    mostrarError(error.getMessage());
+                } else if (error instanceof SQLException) {
+                    LOGGER.log(Level.SEVERE, "Error de conexión a MySQL durante el inicio de sesión", error);
+                    mostrarError("Error de conexión a Base de Datos MySQL: " + error.getMessage());
+                } else {
+                    LOGGER.log(Level.SEVERE, "Error inesperado en inicio de sesión", error);
+                    mostrarError("Error inesperado: " + (error != null ? error.getMessage() : "desconocido"));
+                }
             }
-
-            irAlDashboard();
-        } catch (NegocioException e) {
-            setEstadoCarga(false);
-            mostrarError(e.getMessage());
-        } catch (SQLException e) {
-            setEstadoCarga(false);
-            LOGGER.log(Level.SEVERE, "Error de conexión a MySQL durante el inicio de sesión", e);
-            mostrarError("Error de conexión a Base de Datos MySQL: " + e.getMessage());
-        } catch (Exception e) {
-            setEstadoCarga(false);
-            LOGGER.log(Level.SEVERE, "Error inesperado en inicio de sesión", e);
-            mostrarError("Error inesperado: " + e.getMessage());
-        }
+        );
     }
 
     /**
@@ -165,6 +171,7 @@ public class LoginController {
     }
 
     private void setEstadoCarga(boolean cargando) {
+        this.autenticating = cargando;
         if (btnLogin != null) {
             btnLogin.setDisable(cargando);
         }

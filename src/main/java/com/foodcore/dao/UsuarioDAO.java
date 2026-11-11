@@ -16,6 +16,7 @@ public interface UsuarioDAO {
     void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException;
     void resetearIntentosLogin(Connection conn, int idUsuario) throws SQLException;
     void actualizarPasswordObligatorio(Connection conn, int idUsuario, String nuevoPasswordHash) throws SQLException;
+    void actualizarPasswordHash(Connection conn, int idUsuario, String nuevoPasswordHash) throws SQLException;
     Optional<Empleado> buscarEmpleadoPorDni(Connection conn, String dni) throws SQLException;
     Optional<Asistencia> obtenerAsistenciaHoy(Connection conn, int idEmpleado) throws SQLException;
     void registrarIngresoAsistencia(Connection conn, Asistencia asistencia) throws SQLException;

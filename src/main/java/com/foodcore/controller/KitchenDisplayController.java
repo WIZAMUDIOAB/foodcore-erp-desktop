@@ -220,7 +220,7 @@ public class KitchenDisplayController {
                         recalcularContadoresKanban();
                     });
                 }
-            } catch (Exception e) {
+            } catch (java.sql.SQLException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Sincronización periódica KDS omitida temporalmente", e);
             }
         }).start();
