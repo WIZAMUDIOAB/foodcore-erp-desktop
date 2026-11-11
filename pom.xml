@@ -238,7 +238,6 @@
             <resource>
                 <directory>${project.basedir}</directory>
                 <includes>
-                    <include>keystore.jks</include>
                     <include>foodcore.cer</include>
                 </includes>
             </resource>

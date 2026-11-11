@@ -29,15 +29,20 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -53,7 +58,10 @@ public class ApiServer {
     private static final Logger LOGGER = Logger.getLogger(ApiServer.class.getName());
     public static final int DEFAULT_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
-    public static final String KEYSTORE_PASS = "foodcore123";
+    public static final String ENV_KEYSTORE_PASS = "FOODCORE_KEYSTORE_PASS";
+    public static final String ENV_KEYSTORE_PATH = "FOODCORE_KEYSTORE_PATH";
+    public static final String ENV_CERT_PATH = "FOODCORE_CERT_PATH";
+    public static final int MIN_KEYSTORE_PASS_LENGTH = 8;
 
     private static ApiServer instance;
 
@@ -70,6 +78,7 @@ public class ApiServer {
     private Javalin app;
     private int puertoActual = DEFAULT_PORT;
     private int puertoHttpsActual = DEFAULT_HTTPS_PORT;
+    private volatile byte[] certificadoActivo;
 
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
@@ -140,7 +149,9 @@ public class ApiServer {
         }
         this.puertoActual = httpPort;
         this.puertoHttpsActual = httpsPort;
+        this.certificadoActivo = null;
         File pwaDir = new File("pwa");
+        SslContextFactory.Server sslContextFactory = httpsPort >= 0 ? obtenerSslContextFactory() : null;
 
         app = Javalin.create(config -> {
             config.startup.showJavalinBanner = false;
@@ -170,23 +181,20 @@ public class ApiServer {
                 return httpConnector;
             });
 
-            // Conector HTTPS SSL (8443) con keystore.jks
-            if (httpsPort >= 0) {
-                SslContextFactory.Server sslContextFactory = obtenerSslContextFactory();
-                if (sslContextFactory != null) {
-                    config.jetty.addConnector((server, httpConfig) -> {
-                        HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-                        SecureRequestCustomizer customizer = new SecureRequestCustomizer();
-                        customizer.setSniHostCheck(false);
-                        httpsConfig.addCustomizer(customizer);
+            // Conector HTTPS SSL (8443) con keystore externo
+            if (httpsPort >= 0 && sslContextFactory != null) {
+                config.jetty.addConnector((server, httpConfig) -> {
+                    HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
+                    SecureRequestCustomizer customizer = new SecureRequestCustomizer();
+                    customizer.setSniHostCheck(false);
+                    httpsConfig.addCustomizer(customizer);
 
-                        ServerConnector sslConnector = new ServerConnector(server,
-                                new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
-                                new HttpConnectionFactory(httpsConfig));
-                        sslConnector.setPort(httpsPort);
-                        return sslConnector;
-                    });
-                }
+                    ServerConnector sslConnector = new ServerConnector(server,
+                            new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
+                            new HttpConnectionFactory(httpsConfig));
+                    sslConnector.setPort(httpsPort);
+                    return sslConnector;
+                });
             }
 
             // Seguridad HTTP: CORS por whitelist explícita + API 100% stateless (Authorization: Bearer JWT, sin cookies ni CSRF por cookie)
@@ -298,8 +306,51 @@ public class ApiServer {
         }
     }
 
+    public static String resolverKeystorePasswordObligatorio() {
+        String configured = leerVariableOPropiedad(ENV_KEYSTORE_PASS);
+        if (configured == null || configured.isBlank() || configured.startsWith("${")) {
+            throw new IllegalStateException(
+                "Variable de entorno obligatoria no configurada: " + ENV_KEYSTORE_PASS
+                + " (mínimo " + MIN_KEYSTORE_PASS_LENGTH + " caracteres)."
+            );
+        }
+        if (configured.length() < MIN_KEYSTORE_PASS_LENGTH) {
+            throw new IllegalStateException(
+                ENV_KEYSTORE_PASS + " es demasiado corta; debe tener al menos "
+                + MIN_KEYSTORE_PASS_LENGTH + " caracteres."
+            );
+        }
+        return configured;
+    }
+
+    private static String leerVariableOPropiedad(String name) {
+        String sysProp = System.getProperty(name);
+        if (sysProp != null && !sysProp.isBlank()) {
+            return sysProp.trim();
+        }
+        String envVal = System.getenv(name);
+        if (envVal != null && !envVal.isBlank()) {
+            return envVal.trim();
+        }
+        return null;
+    }
+
     private void servirCertificadoSsl(Context ctx) {
         try {
+            String configuredCert = leerVariableOPropiedad(ENV_CERT_PATH);
+            if (configuredCert != null) {
+                File certFile = new File(configuredCert);
+                if (certFile.exists() && certFile.isFile()) {
+                    ctx.contentType("application/x-x509-ca-cert");
+                    ctx.result(Files.readAllBytes(certFile.toPath()));
+                    return;
+                }
+            }
+            if (certificadoActivo != null && certificadoActivo.length > 0) {
+                ctx.contentType("application/x-x509-ca-cert");
+                ctx.result(certificadoActivo);
+                return;
+            }
             try (InputStream is = getClass().getResourceAsStream("/foodcore.cer")) {
                 if (is != null) {
                     ctx.contentType("application/x-x509-ca-cert");
@@ -324,35 +375,88 @@ public class ApiServer {
     }
 
     private SslContextFactory.Server obtenerSslContextFactory() {
+        String keystorePassword = resolverKeystorePasswordObligatorio();
+        char[] passwordChars = keystorePassword.toCharArray();
         try {
-            KeyStore ks = KeyStore.getInstance("JKS");
-            InputStream is = getClass().getResourceAsStream("/keystore.jks");
-            if (is == null) {
-                File keystoreFile = new File("keystore.jks");
-                if (keystoreFile.exists()) {
-                    is = new FileInputStream(keystoreFile);
+            KeyStore ks = null;
+            String configuredPath = leerVariableOPropiedad(ENV_KEYSTORE_PATH);
+            if (configuredPath != null) {
+                File configuredFile = new File(configuredPath);
+                if (!configuredFile.exists() || !configuredFile.isFile()) {
+                    throw new IllegalStateException(
+                        "No se encontró el keystore HTTPS configurado en " + ENV_KEYSTORE_PATH + ": " + configuredPath
+                    );
+                }
+                ks = KeyStore.getInstance(configuredFile, passwordChars);
+            } else {
+                File defaultFile = new File("keystore.jks");
+                if (defaultFile.exists() && defaultFile.isFile()) {
+                    ks = KeyStore.getInstance(defaultFile, passwordChars);
+                } else {
+                    try (InputStream is = getClass().getResourceAsStream("/keystore.jks")) {
+                        if (is != null) {
+                            ks = cargarKeystoreStream(is.readAllBytes(), passwordChars);
+                        }
+                    }
                 }
             }
 
-            if (is != null) {
-                try (InputStream inStream = is) {
-                    ks.load(inStream, KEYSTORE_PASS.toCharArray());
-                    SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
-                    sslContextFactory.setKeyStore(ks);
-                    sslContextFactory.setKeyStorePassword(KEYSTORE_PASS);
-                    sslContextFactory.setKeyManagerPassword(KEYSTORE_PASS);
-                    return sslContextFactory;
-                }
-            } else {
+            if (ks == null) {
                 LOGGER.warning("No se encontró keystore.jks para SSL HTTPS. El servidor funcionará solo en HTTP.");
+                return null;
+            }
+
+            extraerCertificadoActivo(ks);
+            SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
+            sslContextFactory.setKeyStore(ks);
+            sslContextFactory.setKeyStorePassword(keystorePassword);
+            sslContextFactory.setKeyManagerPassword(keystorePassword);
+            return sslContextFactory;
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                "Error al inicializar el keystore SSL HTTPS en puerto " + DEFAULT_HTTPS_PORT + ": " + e.getMessage(),
+                e
+            );
+        } finally {
+            Arrays.fill(passwordChars, '\0');
+        }
+    }
+
+    private KeyStore cargarKeystoreStream(byte[] rawBytes, char[] passwordChars) {
+        for (String type : new String[]{"PKCS12", "JKS"}) {
+            try {
+                KeyStore ks = KeyStore.getInstance(type);
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(rawBytes)) {
+                    ks.load(bais, passwordChars);
+                    return ks;
+                }
+            } catch (IOException | GeneralSecurityException ignored) {
+                // Probar siguiente formato compatible (PKCS12 / JKS)
+            }
+        }
+        throw new IllegalStateException("Formato de keystore HTTPS inválido o contraseña incorrecta.");
+    }
+
+    private void extraerCertificadoActivo(KeyStore ks) {
+        try {
+            Enumeration<String> aliases = ks.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                Certificate cert = ks.getCertificate(alias);
+                if (cert != null) {
+                    this.certificadoActivo = cert.getEncoded();
+                    return;
+                }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al inicializar SslContextFactory para HTTPS en puerto " + DEFAULT_HTTPS_PORT, e);
+            LOGGER.log(Level.FINE, "No se pudo extraer certificado X.509 desde keystore activo", e);
         }
-        return null;
     }
 
     public synchronized void detener() {
+        this.certificadoActivo = null;
         if (app != null) {
             try {
                 app.stop();

@@ -10,6 +10,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -132,6 +133,8 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
     @Test
     @DisplayName("Validar API REST Javalin (:8080), Idempotencia uuid_local y Capturar PWA Tablet (SPEC v4.0)")
     void testApiRestJavalinV40YPwaTablet() throws Exception {
+        TestSecuritySupport.asegurarKeystoreE2E();
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer api = ApiServer.getInstance();
         api.iniciar(8080);
         try {

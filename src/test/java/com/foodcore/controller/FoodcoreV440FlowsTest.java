@@ -25,6 +25,7 @@ import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -471,6 +472,8 @@ class FoodcoreV440FlowsTest {
             httpPort = s1.getLocalPort();
             httpsPort = s2.getLocalPort();
         }
+        TestSecuritySupport.asegurarKeystoreE2E();
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer api = ApiServer.getInstance();
         api.detener();
         api.iniciar(httpPort, httpsPort);

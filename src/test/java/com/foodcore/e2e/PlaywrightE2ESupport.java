@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodcore.api.ApiServer;
 import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.microsoft.playwright.APIRequest;
@@ -80,6 +81,8 @@ public final class PlaywrightE2ESupport {
             LOGGER.log(Level.FINE, "ServidorSockets ya activo", e);
         }
 
+        TestSecuritySupport.asegurarKeystoreE2E();
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer.getInstance().iniciar(8080);
         if (!servidorIniciadoEnProceso) {
             servidorIniciadoEnProceso = true;

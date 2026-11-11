@@ -1,6 +1,7 @@
 package com.foodcore.api;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.support.TestSecuritySupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,7 @@ class HealthReadinessTest {
     @Test
     @DisplayName("/health reporta DOWN y NOT_READY sin exponer metadatos internos si la conexión es nula o inválida")
     void debeReportarDownCuandoBdNoEstaLista() {
+        TestSecuritySupport.asegurarJwtSecretTest();
         ApiServer api = ApiServer.getInstance();
 
         ObjectNode sinConexion = api.evaluarEstadoSalud(null);

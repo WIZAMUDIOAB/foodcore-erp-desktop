@@ -108,9 +108,21 @@ jobs:
         run: |
           OFFLINE_KEY="$(openssl rand -hex 32)"
           JWT_KEY="$(openssl rand -hex 32)"
+          KS_PASS="$(openssl rand -hex 16)"
+          KS_PATH="$RUNNER_TEMP/e2e-keystore.jks"
+          CERT_PATH="$RUNNER_TEMP/foodcore-e2e.cer"
           echo "::add-mask::$OFFLINE_KEY"
           echo "::add-mask::$JWT_KEY"
+          echo "::add-mask::$KS_PASS"
+          keytool -genkeypair -noprompt \
+            -alias foodcore -keyalg RSA -keysize 2048 -storetype PKCS12 -validity 2 \
+            -keystore "$KS_PATH" -storepass "$KS_PASS" -keypass "$KS_PASS" \
+            -dname "CN=localhost, OU=FoodCore-CI, O=FoodCore, L=Lima, C=PE" \
+            -ext "SAN=DNS:localhost,IP:127.0.0.1"
+          keytool -exportcert -noprompt \
+            -alias foodcore -keystore "$KS_PATH" -storepass "$KS_PASS" -file "$CERT_PATH"
           FOODCORE_OFFLINE_DB_KEY="$OFFLINE_KEY" FOODCORE_JWT_SECRET="$JWT_KEY" \
+            FOODCORE_KEYSTORE_PASS="$KS_PASS" FOODCORE_KEYSTORE_PATH="$KS_PATH" FOODCORE_CERT_PATH="$CERT_PATH" \
             nohup java -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
           npx --yes wait-on http://localhost:8080/health --timeout 60000

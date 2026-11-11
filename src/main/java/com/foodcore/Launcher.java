@@ -24,6 +24,7 @@ public class Launcher {
     public static void main(String[] args) {
         LoggingBootstrap.installBridge();
         ConexionBD.validarVariablesEntornoObligatorias();
+        ApiServer.resolverKeystorePasswordObligatorio();
         boolean modoServidor = Arrays.asList(args).contains("--server")
                 || Arrays.asList(args).contains("--headless")
                 || "true".equalsIgnoreCase(System.getenv("CI"))
