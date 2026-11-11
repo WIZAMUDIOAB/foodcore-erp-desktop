@@ -245,7 +245,7 @@ public class PromocionService {
             for (com.foodcore.model.Producto p : dao.listarTodos(conn)) {
                 map.put(p.getIdProducto(), p.getIdCategoria());
             }
-        } catch (Exception ignored) {}
+        } catch (SQLException | RuntimeException ignored) {}
         return map;
     }
 

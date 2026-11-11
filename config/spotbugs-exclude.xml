@@ -1,7 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Política AppSec de exclusiones SpotBugs — FoodCore ERP
+  Las exclusiones de seguridad requieren revisión de AppSec.
+  Ninguna regla de seguridad o higiene crítica (SQL_INJECTION, SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING,
+  XSS, HARD_CODE_PASSWORD, PATH_TRAVERSAL, PREDICTABLE_RANDOM, WEAK_TRUST_MANAGER, OBL_UNSATISFIED_OBLIGATION,
+  ODR_OPEN_DATABASE_RESOURCE, REC_CATCH_EXCEPTION, IS2_INCONSISTENT_SYNC, NP_*, RV_*, DM_EXIT)
+  puede ser excluida aquí. Las exclusiones se limitan estrictamente a falsos positivos verificados.
+-->
 <FindBugsFilter>
-    <!-- Excluir falsos positivos de inyección @FXML de JavaFX, singletons y adaptadores de paquete -->
+    <!-- Justificación: Los controladores JavaFX inyectan controles @FXML, ObservableList enlazadas y subcontroladores que se exponen por diseño para FXML y pruebas UI; sin alcance sobre clases de seguridad/DAO. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
     <Match>
-        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,EI_EXPOSE_STATIC_REP2,MS_EXPOSE_REP,MS_PKGPROTECT,VA_FORMAT_STRING_USES_NEWLINE,NM_SAME_SIMPLE_NAME_AS_SUPERCLASS,IS2_INCONSISTENT_SYNC,UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR,UwF_UNWRITTEN_FIELD,ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD,SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING,OBL_UNSATISFIED_OBLIGATION,ODR_OPEN_DATABASE_RESOURCE,RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE,REC_CATCH_EXCEPTION,DM_EXIT,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE,SE_BAD_FIELD,RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+        <Package name="~com\.foodcore\.controller(\..*)?"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Justificación: Controladores REST, servicios de negocio y despachador Outbox reciben DAOs/repositorios sin estado mediante inyección de dependencias en constructor; POJOs de dominio (Pedido, Venta, EventoKdsDTO) mantienen referencias directas de sus listas de detalle usadas por DAOs JDBC y mappers JSON. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <Match>
+        <Or>
+            <Class name="com.foodcore.api.KdsController"/>
+            <Class name="com.foodcore.api.PedidoController"/>
+            <Class name="com.foodcore.events.OutboxDispatcher"/>
+            <Package name="~com\.foodcore\.service(\..*)?"/>
+            <Class name="com.foodcore.model.Pedido"/>
+            <Class name="com.foodcore.model.Venta"/>
+            <Class name="com.foodcore.model.dto.EventoKdsDTO"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Justificación: JavaFX expone el Stage principal único para asignar el owner de diálogos modales en el hilo UI. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <Match>
+        <Class name="com.foodcore.App"/>
+        <Method name="getPrimaryStage"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Justificación: Singletons de infraestructura (SyncWorker, ServidorSockets) y el pool compartido Hikari DataSource deben retornar la instancia gestionada única por proceso. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.foodcore.offline.SyncWorker"/>
+                <Method name="getInstancia"/>
+            </And>
+            <And>
+                <Class name="com.foodcore.util.ServidorSockets"/>
+                <Method name="getInstance"/>
+            </And>
+            <And>
+                <Class name="com.foodcore.util.ConexionBD"/>
+                <Method name="getDataSource"/>
+            </And>
+        </Or>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+
+    <!-- Justificación: AuthService mantiene la referencia del Usuario autenticado de la sesión escritorio actual compartida entre controladores JavaFX (el hash de contraseña nunca se usa como secreto expuesto en sesión). Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <Match>
+        <Class name="com.foodcore.service.AuthService"/>
+        <Bug pattern="MS_EXPOSE_REP,EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+
+    <!-- Justificación: Adaptadores de transición en com.foodcore.dao.impl heredan de sus clases base históricas homónimas en com.foodcore.dao para preservar compatibilidad binaria sin duplicar lógica. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <Match>
+        <Class name="~com\.foodcore\.dao\.impl\.(CajaDAOImpl|InsumoDAOImpl|PedidoDAOImpl|UsuarioDAOImpl)"/>
+        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
     </Match>
 </FindBugsFilter>

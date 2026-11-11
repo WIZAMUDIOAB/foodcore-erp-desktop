@@ -9,6 +9,7 @@ import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -363,23 +364,38 @@ public class InventarioController {
         Button btnGuardar = new Button("Confirmar Compra");
         btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
-            try {
-                Insumo ins = cmbInsumo.getValue();
-                if (ins == null) {
-                    return;
-                }
-                registrarCompraTransaccional(
-                    ins.getIdInsumo(),
-                    new BigDecimal(txtCantidad.getText().trim()),
-                    new BigDecimal(txtCostoCompra.getText().trim()),
-                    txtFactura.getText()
-                );
-                rootInventarioStack.getChildren().remove(backdrop);
-                AnimationUtils.mostrarToast(rootInventarioStack, "Compra registrada en Kardex (ENTRADA_COMPRA).", false);
-                cargarInventarioDesdeBD();
-            } catch (Exception ex) {
-                AnimationUtils.mostrarToast(rootInventarioStack, "Error: " + ex.getMessage(), true);
+            Insumo ins = cmbInsumo.getValue();
+            if (ins == null) {
+                return;
             }
+            final BigDecimal cantidad;
+            final BigDecimal costo;
+            try {
+                cantidad = new BigDecimal(txtCantidad.getText().trim());
+                costo = new BigDecimal(txtCostoCompra.getText().trim());
+            } catch (RuntimeException ex) {
+                AnimationUtils.mostrarToast(rootInventarioStack, "Error: Ingrese valores numéricos válidos.", true);
+                return;
+            }
+            String factura = txtFactura.getText();
+            long idInsumo = ins.getIdInsumo();
+            btnGuardar.setDisable(true);
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> registrarCompraTransaccional(idInsumo, cantidad, costo, factura),
+                () -> {
+                    btnGuardar.setDisable(false);
+                    rootInventarioStack.getChildren().remove(backdrop);
+                    AnimationUtils.mostrarToast(rootInventarioStack, "Compra registrada en Kardex (ENTRADA_COMPRA).", false);
+                    cargarInventarioDesdeBD();
+                },
+                ex -> {
+                    btnGuardar.setDisable(false);
+                    AnimationUtils.mostrarToast(
+                            rootInventarioStack,
+                            "Error: " + (ex != null ? ex.getMessage() : "desconocido"),
+                            true);
+                }
+            );
         });
 
         HBox actions = new HBox(12, btnCancelar, btnGuardar);
@@ -398,13 +414,34 @@ public class InventarioController {
             AnimationUtils.mostrarToast(rootInventarioStack, "Seleccione un insumo de la tabla para dar de baja.", true);
             return;
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            insumoDAO.eliminar(conn, sel.getIdInsumo());
-            AnimationUtils.mostrarToast(rootInventarioStack, "Insumo '" + sel.getNombre() + "' dado de baja (Soft Delete activo=0).", false);
-            cargarInventarioDesdeBD();
-        } catch (Exception ex) {
-            AnimationUtils.mostrarToast(rootInventarioStack, "Error al dar de baja insumo: " + ex.getMessage(), true);
+        long idInsumo = sel.getIdInsumo();
+        String nombreInsumo = sel.getNombre();
+        if (btnEliminarInsumo != null) {
+            btnEliminarInsumo.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    insumoDAO.eliminar(conn, idInsumo);
+                }
+            },
+            () -> {
+                if (btnEliminarInsumo != null) {
+                    btnEliminarInsumo.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootInventarioStack, "Insumo '" + nombreInsumo + "' dado de baja (Soft Delete activo=0).", false);
+                cargarInventarioDesdeBD();
+            },
+            ex -> {
+                if (btnEliminarInsumo != null) {
+                    btnEliminarInsumo.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootInventarioStack,
+                        "Error al dar de baja insumo: " + (ex != null ? ex.getMessage() : "desconocido"),
+                        true);
+            }
+        );
     }
 
     public TableView<Insumo> getTblInventario() { return tblInventario; }

@@ -11,10 +11,10 @@ import com.foodcore.service.ReservasService;
 import com.foodcore.model.ReservaMesa;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.TextInputDialog;
 import com.foodcore.util.ConexionBD;
-import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
@@ -64,7 +64,7 @@ public class SalonMesasController {
 
     @FXML
     public void initialize() {
-        cargarMesasSincrono();
+        cargarMesas();
     }
 
     public void cargarMesasSincrono() {
@@ -93,27 +93,28 @@ public class SalonMesasController {
             return;
         }
 
-        new Thread(() -> {
-            Map<String, Pedido> nuevosPedidos = new HashMap<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                if (conn != null) {
-                    List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
-                    for (Pedido p : activos) {
-                        if (p.getNumeroMesa() != null) {
-                            nuevosPedidos.put(p.getNumeroMesa(), p);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                Map<String, Pedido> nuevosPedidos = new HashMap<>();
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if (conn != null) {
+                        List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
+                        for (Pedido p : activos) {
+                            if (p.getNumeroMesa() != null) {
+                                nuevosPedidos.put(p.getNumeroMesa(), p);
+                            }
                         }
                     }
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error al actualizar estado de mesas en BD", e);
-            }
-
-            Platform.runLater(() -> {
+                return nuevosPedidos;
+            },
+            nuevosPedidos -> {
                 pedidosActivosPorMesa.clear();
                 pedidosActivosPorMesa.putAll(nuevosPedidos);
                 renderizarTarjetasMesas();
-            });
-        }).start();
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al actualizar estado de mesas en BD", ex)
+        );
     }
 
     public void renderizarTarjetasMesas() {
@@ -296,18 +297,21 @@ public class SalonMesasController {
         dialog.setTitle("Transferir Mesa");
         dialog.setHeaderText("Mover comanda activa de Mesa " + mesaOrigen + " a otra mesa");
         dialog.setContentText("Seleccione Mesa Destino:");
-        dialog.showAndWait().ifPresent(dest -> {
-            try {
-                salonService.transferirMesa(mesaOrigen, dest, 1);
-                Alert ok = new Alert(Alert.AlertType.INFORMATION, "Comanda transferida exitosamente de Mesa " + mesaOrigen + " a Mesa " + dest);
-                ok.showAndWait();
-                cargarMesas();
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al transferir mesa", ex);
-                Alert err = new Alert(Alert.AlertType.ERROR, "Error al transferir: " + ex.getMessage());
-                err.showAndWait();
-            }
-        });
+        dialog.showAndWait().ifPresent(dest ->
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> salonService.transferirMesa(mesaOrigen, dest, 1),
+                () -> {
+                    Alert ok = new Alert(Alert.AlertType.INFORMATION, "Comanda transferida exitosamente de Mesa " + mesaOrigen + " a Mesa " + dest);
+                    ok.showAndWait();
+                    cargarMesas();
+                },
+                ex -> {
+                    LOGGER.log(Level.WARNING, "Error al transferir mesa", ex);
+                    Alert err = new Alert(Alert.AlertType.ERROR, "Error al transferir: " + (ex != null ? ex.getMessage() : "desconocido"));
+                    err.showAndWait();
+                }
+            )
+        );
     }
 
     public void ejecutarUnionDesde(String mesaPrincipal) {
@@ -328,36 +332,46 @@ public class SalonMesasController {
         dialog.setTitle("Unir Mesas");
         dialog.setHeaderText("Unir Mesa Secundaria con Mesa Principal " + mesaPrincipal);
         dialog.setContentText("Seleccione mesa adicional a unificar:");
-        dialog.showAndWait().ifPresent(sec -> {
-            try {
-                salonService.unirMesas(mesaPrincipal, List.of(sec), 1);
-                Alert ok = new Alert(Alert.AlertType.INFORMATION, "Mesas unidas exitosamente: Mesa " + mesaPrincipal + " + Mesa " + sec);
-                ok.showAndWait();
-                cargarMesas();
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error al unir mesas", ex);
-                Alert err = new Alert(Alert.AlertType.ERROR, "Error al unir mesas: " + ex.getMessage());
-                err.showAndWait();
-            }
-        });
+        dialog.showAndWait().ifPresent(sec ->
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> salonService.unirMesas(mesaPrincipal, List.of(sec), 1),
+                () -> {
+                    Alert ok = new Alert(Alert.AlertType.INFORMATION, "Mesas unidas exitosamente: Mesa " + mesaPrincipal + " + Mesa " + sec);
+                    ok.showAndWait();
+                    cargarMesas();
+                },
+                ex -> {
+                    LOGGER.log(Level.WARNING, "Error al unir mesas", ex);
+                    Alert err = new Alert(Alert.AlertType.ERROR, "Error al unir mesas: " + (ex != null ? ex.getMessage() : "desconocido"));
+                    err.showAndWait();
+                }
+            )
+        );
     }
 
     public void emitirPreCuentaMesa(String mesa, Pedido pedido) {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-            if (detalles.isEmpty()) {
-                Alert warn = new Alert(Alert.AlertType.WARNING, "La comanda no tiene platos registrados.");
-                warn.showAndWait();
-                return;
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
+                }
+            },
+            detalles -> {
+                if (detalles.isEmpty()) {
+                    Alert warn = new Alert(Alert.AlertType.WARNING, "La comanda no tiene platos registrados.");
+                    warn.showAndWait();
+                    return;
+                }
+                impresoraService.imprimirPreCuenta(pedido, detalles, null);
+                Alert ok = new Alert(Alert.AlertType.INFORMATION, "Pre-cuenta emitida e impresa para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").\n*** NO ES COMPROBANTE DE PAGO ***");
+                ok.showAndWait();
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error emitiendo pre-cuenta", ex);
+                Alert err = new Alert(Alert.AlertType.ERROR, "Error al emitir pre-cuenta: " + (ex != null ? ex.getMessage() : "desconocido"));
+                err.showAndWait();
             }
-            impresoraService.imprimirPreCuenta(pedido, detalles, null);
-            Alert ok = new Alert(Alert.AlertType.INFORMATION, "Pre-cuenta emitida e impresa para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").\n*** NO ES COMPROBANTE DE PAGO ***");
-            ok.showAndWait();
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error emitiendo pre-cuenta", ex);
-            Alert err = new Alert(Alert.AlertType.ERROR, "Error al emitir pre-cuenta: " + ex.getMessage());
-            err.showAndWait();
-        }
+        );
     }
 
     @FXML
@@ -409,61 +423,76 @@ public class SalonMesasController {
     }
 
     private void abrirLiquidacionFiscalMesa(String mesa, Pedido pedido) {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<DetallePedido> detallesPed = pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-            if (detallesPed.isEmpty()) {
-                Alert warn = new Alert(Alert.AlertType.WARNING, "El pedido no contiene ítems para facturar.");
-                warn.showAndWait();
-                return;
-            }
-
-            List<DetalleVenta> itemsParaFacturar = new ArrayList<>();
-            for (DetallePedido dp : detallesPed) {
-                DetalleVenta dv = new DetalleVenta(
-                    0,
-                    0,
-                    dp.getIdProducto(),
-                    dp.getCantidad(),
-                    dp.getPrecioUnitario(),
-                    dp.getSubtotal()
-                );
-                dv.setNombreProducto(dp.getNombreProducto());
-                itemsParaFacturar.add(dv);
-            }
-
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
-            Parent root = loader.load();
-
-            CobroModalController ctrl = loader.getController();
-            ctrl.setIdPedidoAsociado(pedido.getIdPedido());
-            ctrl.initData(pedido.getTotal(), "EFECTIVO", itemsParaFacturar, () -> {
-                try {
-                    salonService.liberarMesas(pedido.getIdPedido());
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error al liberar mesas unidas tras cobro", ex);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
                 }
-                cargarMesas();
-            });
+            },
+            detallesPed -> {
+                if (detallesPed.isEmpty()) {
+                    Alert warn = new Alert(Alert.AlertType.WARNING, "El pedido no contiene ítems para facturar.");
+                    warn.showAndWait();
+                    return;
+                }
 
-            Stage stage = new Stage();
-            stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setTitle("Liquidación y Facturación · Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ")");
+                List<DetalleVenta> itemsParaFacturar = new ArrayList<>();
+                for (DetallePedido dp : detallesPed) {
+                    DetalleVenta dv = new DetalleVenta(
+                        0,
+                        0,
+                        dp.getIdProducto(),
+                        dp.getCantidad(),
+                        dp.getPrecioUnitario(),
+                        dp.getSubtotal()
+                    );
+                    dv.setNombreProducto(dp.getNombreProducto());
+                    dv.setNotasPreparacion(dp.getNotasPreparacion());
+                    itemsParaFacturar.add(dv);
+                }
 
-            Scene scene = new Scene(root);
-            App.applyStylesheets(scene);
+                try {
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
+                    Parent root = loader.load();
 
-            AnimationUtils.animateModalEnter(root);
+                    CobroModalController ctrl = loader.getController();
+                    ctrl.setIdPedidoAsociado(pedido.getIdPedido());
+                    ctrl.initData(pedido.getTotal(), "EFECTIVO", itemsParaFacturar, () ->
+                        UiAsyncExecutor.ejecutarVoidAsync(
+                            () -> salonService.liberarMesas(pedido.getIdPedido()),
+                            this::cargarMesas,
+                            ex -> {
+                                LOGGER.log(Level.WARNING, "Error al liberar mesas unidas tras cobro", ex);
+                                cargarMesas();
+                            }
+                        )
+                    );
 
-            stage.setScene(scene);
-            stage.sizeToScene();
-            stage.setResizable(false);
-            stage.showAndWait();
+                    Stage stage = new Stage();
+                    stage.initModality(Modality.APPLICATION_MODAL);
+                    stage.setTitle("Liquidación y Facturación · Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ")");
 
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
-            Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + ex.getMessage());
-            err.showAndWait();
-        }
+                    Scene scene = new Scene(root);
+                    App.applyStylesheets(scene);
+
+                    AnimationUtils.animateModalEnter(root);
+
+                    stage.setScene(scene);
+                    stage.sizeToScene();
+                    stage.setResizable(false);
+                    stage.showAndWait();
+                } catch (IOException ex) {
+                    LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
+                    Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + ex.getMessage());
+                    err.showAndWait();
+                }
+            },
+            ex -> {
+                LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
+                Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + (ex != null ? ex.getMessage() : "desconocido"));
+                err.showAndWait();
+            }
+        );
     }
 
     @FXML

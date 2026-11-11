@@ -10,6 +10,7 @@ import com.foodcore.model.Compra;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.ExportacionContableService.VentaRegistroSunat;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -71,7 +72,13 @@ public class ReportesContablesController {
     public void initialize() {
         configurarColumnas();
         configurarFiltrosPeriodo();
-        cargarDatosPeriodoSincrono();
+        lblTotalVentas.setText("S/ 0.00");
+        lblBaseImponible.setText("S/ 0.00");
+        lblTotalIgv.setText("S/ 0.00");
+        lblTotalCompras.setText("S/ 0.00");
+        lblContadorFilas.setText("0 Comprobantes");
+        lblEstadoExportacion.setText("Cargando período...");
+        cargarDatosPeriodoAsync();
     }
 
     private void configurarColumnas() {
@@ -99,33 +106,50 @@ public class ReportesContablesController {
             if ("Mes Actual".equals(sel)) {
                 dpInicio.setValue(LocalDate.now().withDayOfMonth(1));
                 dpFin.setValue(LocalDate.now());
-                cargarDatosPeriodoSincrono();
+                cargarDatosPeriodoAsync();
             } else if ("Mes Anterior".equals(sel)) {
                 YearMonth prev = YearMonth.now().minusMonths(1);
                 dpInicio.setValue(prev.atDay(1));
                 dpFin.setValue(prev.atEndOfMonth());
-                cargarDatosPeriodoSincrono();
+                cargarDatosPeriodoAsync();
             }
         });
     }
 
     @FXML
     public void handleFiltrar() {
-        cargarDatosPeriodoSincrono();
+        cargarDatosPeriodoAsync();
+    }
+
+    public void cargarDatosPeriodoAsync() {
+        LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : LocalDate.now();
+        lblEstadoExportacion.setText("Consultando período...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> consultarDatosPeriodo(ini, fin),
+            resultado -> aplicarResultadoPeriodo(resultado, ini, fin),
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
+                lblEstadoExportacion.setText("Error al cargar datos contables");
+            }
+        );
     }
 
     public void cargarDatosPeriodoSincrono() {
         LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : LocalDate.now().withDayOfMonth(1);
         LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : LocalDate.now();
+        ResultadoPeriodoContable resultado = consultarDatosPeriodo(ini, fin);
+        aplicarResultadoPeriodo(resultado, ini, fin);
+    }
 
-        listaVentas.clear();
+    private ResultadoPeriodoContable consultarDatosPeriodo(LocalDate ini, LocalDate fin) {
+        List<VentaRegistroSunat> ventas = new java.util.ArrayList<>();
         double sumTotal = 0.0;
         double sumBase = 0.0;
         double sumIgv = 0.0;
         double sumCompras = 0.0;
 
         try (Connection conn = ConexionBD.getConnection()) {
-            // Cargar ventas
             String sqlVentas = "SELECT v.*, p.cliente_nombre "
                     + "FROM venta v "
                     + "LEFT JOIN pedido p ON v.id_pedido = p.id_pedido "
@@ -149,7 +173,7 @@ public class ReportesContablesController {
                         r.medioPago = rs.getString("metodo_pago");
                         r.estado = "COMPLETADA".equalsIgnoreCase(rs.getString("estado")) ? "1" : "2";
 
-                        listaVentas.add(r);
+                        ventas.add(r);
                         sumTotal += r.total;
                         sumBase += r.subtotal;
                         sumIgv += r.igv;
@@ -157,64 +181,86 @@ public class ReportesContablesController {
                 }
             }
 
-            // Cargar total compras
             List<Compra> compras = compraDAO.listarPorRangoFecha(conn, ini, fin);
             for (Compra c : compras) {
                 sumCompras += c.getTotal();
             }
-
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
         }
 
-        lblTotalVentas.setText(String.format(Locale.US, "S/ %,.2f", sumTotal));
-        lblBaseImponible.setText(String.format(Locale.US, "S/ %,.2f", sumBase));
-        lblTotalIgv.setText(String.format(Locale.US, "S/ %,.2f", sumIgv));
-        lblTotalCompras.setText(String.format(Locale.US, "S/ %,.2f", sumCompras));
+        return new ResultadoPeriodoContable(ventas, sumTotal, sumBase, sumIgv, sumCompras);
+    }
+
+    private void aplicarResultadoPeriodo(ResultadoPeriodoContable res, LocalDate ini, LocalDate fin) {
+        listaVentas.setAll(res.ventas());
+        lblTotalVentas.setText(String.format(Locale.US, "S/ %,.2f", res.sumTotal()));
+        lblBaseImponible.setText(String.format(Locale.US, "S/ %,.2f", res.sumBase()));
+        lblTotalIgv.setText(String.format(Locale.US, "S/ %,.2f", res.sumIgv()));
+        lblTotalCompras.setText(String.format(Locale.US, "S/ %,.2f", res.sumCompras()));
         lblContadorFilas.setText(listaVentas.size() + " Comprobantes");
         lblEstadoExportacion.setText("Período cargado: " + ini + " al " + fin);
     }
 
+    private record ResultadoPeriodoContable(
+            List<VentaRegistroSunat> ventas, double sumTotal, double sumBase, double sumIgv, double sumCompras) {
+    }
+
     @FXML
     public void handleExportarVentasSunat() {
-        try {
-            LocalDate ini = dpInicio.getValue();
-            LocalDate fin = dpFin.getValue();
-            File archivo = new File("dist/PLE_SUNAT_14.1_VENTAS_" + ini + "_" + fin + ".xlsx");
-            if (archivo.getParentFile() != null) { java.nio.file.Files.createDirectories(archivo.getParentFile().toPath()); }
-            exportacionService.exportarVentasSunat14_1_Excel(ini, fin, archivo);
-            lblEstadoExportacion.setText("✓ Exportado con éxito: " + archivo.getName());
-        } catch (Exception ex) {
-            lblEstadoExportacion.setText("Error al exportar ventas: " + ex.getMessage());
-        }
+        LocalDate ini = dpInicio.getValue();
+        LocalDate fin = dpFin.getValue();
+        lblEstadoExportacion.setText("Exportando registro de ventas...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File archivo = new File("dist/PLE_SUNAT_14.1_VENTAS_" + ini + "_" + fin + ".xlsx");
+                if (archivo.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
+                }
+                exportacionService.exportarVentasSunat14_1_Excel(ini, fin, archivo);
+                return archivo.getName();
+            },
+            nombre -> lblEstadoExportacion.setText("✓ Exportado con éxito: " + nombre),
+            ex -> lblEstadoExportacion.setText("Error al exportar ventas: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleExportarComprasSunat() {
-        try {
-            LocalDate ini = dpInicio.getValue();
-            LocalDate fin = dpFin.getValue();
-            File archivo = new File("dist/PLE_SUNAT_8.1_COMPRAS_" + ini + "_" + fin + ".xlsx");
-            if (archivo.getParentFile() != null) { java.nio.file.Files.createDirectories(archivo.getParentFile().toPath()); }
-            exportacionService.exportarComprasSunat8_1_Excel(ini, fin, archivo);
-            lblEstadoExportacion.setText("✓ Exportado con éxito: " + archivo.getName());
-        } catch (Exception ex) {
-            lblEstadoExportacion.setText("Error al exportar compras: " + ex.getMessage());
-        }
+        LocalDate ini = dpInicio.getValue();
+        LocalDate fin = dpFin.getValue();
+        lblEstadoExportacion.setText("Exportando registro de compras...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File archivo = new File("dist/PLE_SUNAT_8.1_COMPRAS_" + ini + "_" + fin + ".xlsx");
+                if (archivo.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
+                }
+                exportacionService.exportarComprasSunat8_1_Excel(ini, fin, archivo);
+                return archivo.getName();
+            },
+            nombre -> lblEstadoExportacion.setText("✓ Exportado con éxito: " + nombre),
+            ex -> lblEstadoExportacion.setText("Error al exportar compras: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleExportarResumenCaja() {
-        try {
-            LocalDate ini = dpInicio.getValue();
-            LocalDate fin = dpFin.getValue();
-            File archivo = new File("dist/RESUMEN_CAJA_Z_" + ini + "_" + fin + ".pdf");
-            if (archivo.getParentFile() != null) { java.nio.file.Files.createDirectories(archivo.getParentFile().toPath()); }
-            exportacionService.exportarResumenCajaMensualPdf(ini, fin, archivo);
-            lblEstadoExportacion.setText("✓ Resumen Z generado: " + archivo.getName());
-        } catch (Exception ex) {
-            lblEstadoExportacion.setText("Error al exportar resumen caja: " + ex.getMessage());
-        }
+        LocalDate ini = dpInicio.getValue();
+        LocalDate fin = dpFin.getValue();
+        lblEstadoExportacion.setText("Generando resumen Z...");
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File archivo = new File("dist/RESUMEN_CAJA_Z_" + ini + "_" + fin + ".pdf");
+                if (archivo.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
+                }
+                exportacionService.exportarResumenCajaMensualPdf(ini, fin, archivo);
+                return archivo.getName();
+            },
+            nombre -> lblEstadoExportacion.setText("✓ Resumen Z generado: " + nombre),
+            ex -> lblEstadoExportacion.setText("Error al exportar resumen caja: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     public VBox getCardKpiVentas() {

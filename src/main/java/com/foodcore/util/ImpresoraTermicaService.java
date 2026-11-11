@@ -37,9 +37,16 @@ public class ImpresoraTermicaService {
     private static final Logger LOGGER = Logger.getLogger(ImpresoraTermicaService.class.getName());
 
     public static final int ANCHO_COLUMNAS = 48;
-    public static final byte[] ESC_POS_INIT = new byte[]{0x1B, 0x40};
-    public static final byte[] ESC_POS_CUT = new byte[]{0x1D, 0x56, 0x41, 0x10};
-    public static final byte[] ESC_POS_ABRIR_CAJON = new byte[]{0x1B, 0x70, 0x00, 0x19, (byte) 0xFA};
+    private static final byte[] ESC_POS_INIT = new byte[]{0x1B, 0x40};
+    private static final byte[] ESC_POS_CUT = new byte[]{0x1D, 0x56, 0x41, 0x10};
+    private static final byte[] ESC_POS_ABRIR_CAJON = new byte[]{0x1B, 0x70, 0x00, 0x19, (byte) 0xFA};
+
+    /**
+     * Devuelve una copia defensiva de los bytes de pulso ESC/POS para abrir el cajón portamonedas.
+     */
+    public static byte[] getEscPosAbrirCajon() {
+        return ESC_POS_ABRIR_CAJON.clone();
+    }
 
     private static final String SEPARADOR_DOBLE = "=".repeat(ANCHO_COLUMNAS);
     private static final String SEPARADOR_SIMPLE = "-".repeat(ANCHO_COLUMNAS);
@@ -188,8 +195,9 @@ public class ImpresoraTermicaService {
 
     public void escribirFallbackEnLog(List<String> lineas) {
         try {
-            if (rutaLogFallback.getParent() != null) {
-                Files.createDirectories(rutaLogFallback.getParent());
+            Path parent = rutaLogFallback.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
             }
             String contenido = String.join(System.lineSeparator(), lineas)
                 + System.lineSeparator() + System.lineSeparator();

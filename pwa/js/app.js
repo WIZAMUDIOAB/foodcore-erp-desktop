@@ -8,6 +8,15 @@ const FoodCorePWA = (() => {
     ? `${window.location.origin}/api`
     : 'https://localhost:8443/api';
 
+  function getAuthHeaders(extra = {}) {
+    const token = localStorage.getItem('fc_pwa_token');
+    const headers = { ...extra };
+    if (token && token.trim() !== '') {
+      headers.Authorization = `Bearer ${token.trim()}`;
+    }
+    return headers;
+  }
+
   let catalogoProductos = [];
   let listaMesas = [];
   let carrito = [];
@@ -136,9 +145,9 @@ const FoodCorePWA = (() => {
   function obtenerUsuarioSesion() {
     try {
       const raw = localStorage.getItem('fc_pwa_user');
-      return raw ? JSON.parse(raw) : { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
+      return raw ? JSON.parse(raw) : { id: null, username: '', nombre: 'Operador activo', rol: '' };
     } catch (_) {
-      return { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
+      return { id: null, username: '', nombre: 'Operador activo', rol: '' };
     }
   }
 
@@ -216,7 +225,7 @@ const FoodCorePWA = (() => {
         try {
           const res = await fetch(`${API_BASE}/pedidos`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(pedido)
           });
           if (res.ok) {
@@ -275,26 +284,14 @@ const FoodCorePWA = (() => {
         localStorage.setItem('fc_pwa_user', JSON.stringify(data.usuario));
         window.location.href = 'mesas.html';
       } catch (_) {
-        // Login resiliente en caso de inicio offline
-        const fallbackUser = {
-          id: 3,
-          username: username || 'mozo',
-          nombre: username === 'admin' ? 'Administrador General' : 'Mateo Quispe (Mozo)',
-          rol: username === 'admin' ? 'ADMIN' : 'MOZO'
-        };
-        localStorage.setItem('fc_pwa_user', JSON.stringify(fallbackUser));
-        window.location.href = 'mesas.html';
+        const msg = '⚠ No se pudo conectar con el servidor de autenticación.';
+        if (errBanner) {
+          errBanner.textContent = msg;
+          errBanner.style.display = 'block';
+        }
+        mostrarToast(msg);
       }
     });
-  }
-
-  function rellenarCredencialesDemo(user, pass) {
-    const u = document.getElementById('txtUsername');
-    const p = document.getElementById('txtPassword');
-    if (u && p) {
-      u.value = user;
-      p.value = pass;
-    }
   }
 
   // =========================================================================
@@ -314,7 +311,11 @@ const FoodCorePWA = (() => {
 
   async function cargarMesas(filtroEstado = 'TODAS') {
     try {
-      const res = await fetch(`${API_BASE}/mesas`, { method: 'GET', cache: 'no-store' });
+      const res = await fetch(`${API_BASE}/mesas`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         listaMesas = await res.json();
         await FoodCoreOfflineDB.guardarMesasCache(listaMesas);
@@ -434,7 +435,18 @@ const FoodCorePWA = (() => {
 
   async function cargarCatalogoProductos(silencioso = false) {
     try {
-      const res = await fetch(`${API_BASE}/productos`, { method: 'GET', cache: 'no-store' });
+      const token = localStorage.getItem('fc_pwa_token');
+      const url = (token && token.trim() !== '')
+        ? `${API_BASE}/productos`
+        : `${API_BASE}/public/productos`;
+      let res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
+      if (res.status === 401) {
+        res = await fetch(`${API_BASE}/public/productos`, { method: 'GET', cache: 'no-store' });
+      }
       if (res.ok) {
         catalogoProductos = await res.json();
         await FoodCoreOfflineDB.guardarCatalogoCache(catalogoProductos);
@@ -747,7 +759,7 @@ const FoodCorePWA = (() => {
     try {
       const res = await fetch(`${API_BASE}/pedidos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(pedidoPayload)
       });
 
@@ -781,7 +793,7 @@ const FoodCorePWA = (() => {
   // SUB-FASE C.1: MODO MOZO Y SEGURIDAD PIN (v4.2.0)
   // =========================================================================
   let pinActual = '';
-  let usuarioSeleccionadoPin = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)' };
+  let usuarioSeleccionadoPin = null;
   let pinModalActual = '';
   let usuarioSeleccionadoModal = null;
   let usuariosActivosCache = [];
@@ -809,15 +821,18 @@ const FoodCorePWA = (() => {
     if (!grid) return;
 
     try {
-      const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
-      if (res.ok) {
-        usuariosActivosCache = await res.json();
+      if (localStorage.getItem('fc_pwa_token')) {
+        const res = await fetch(`${API_BASE}/usuarios/activos`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          usuariosActivosCache = await res.json();
+        }
       }
     } catch (_) {
-      usuariosActivosCache = [
-        { id: 3, id_usuario: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO', tiene_pin: true },
-        { id: 1, id_usuario: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN', tiene_pin: true }
-      ];
+      usuariosActivosCache = [];
     }
 
     if (usuariosActivosCache && usuariosActivosCache.length > 0) {
@@ -964,18 +979,8 @@ const FoodCorePWA = (() => {
       }, 400);
 
     } catch (_) {
-      if (pinActual === '1234') {
-        const u = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
-        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
-        window.location.href = 'mesas.html';
-      } else if (pinActual === '9999') {
-        const u = { id: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' };
-        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
-        window.location.href = 'mesas.html';
-      } else {
-        mostrarErrorPin('PIN incorrecto. Verifique e intente nuevamente.');
-        limpiarPin();
-      }
+      mostrarErrorPin('No se pudo conectar con el servidor para validar el PIN.');
+      limpiarPin();
     }
   }
 
@@ -1007,22 +1012,25 @@ const FoodCorePWA = (() => {
 
     if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
       try {
-        const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
-        if (res.ok) {
-          usuariosActivosCache = await res.json();
+        if (localStorage.getItem('fc_pwa_token')) {
+          const res = await fetch(`${API_BASE}/usuarios/activos`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: getAuthHeaders()
+          });
+          if (res.ok) {
+            usuariosActivosCache = await res.json();
+          }
         }
       } catch (_) {}
     }
 
-    if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
-      usuariosActivosCache = [
-        { id: 3, id_usuario: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' },
-        { id: 1, id_usuario: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' }
-      ];
-    }
-
     const currentUser = obtenerUsuarioSesion();
     container.innerHTML = '';
+    if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
+      container.innerHTML = '<div style="padding:10px; color:#6B7280; font-size:13px;">No se pudieron cargar los operadores activos del servidor.</div>';
+      return;
+    }
     usuariosActivosCache.forEach((u, index) => {
       const chip = document.createElement('div');
       const esActual = u.username === currentUser.username;
@@ -1124,7 +1132,7 @@ const FoodCorePWA = (() => {
     try {
       const res = await fetch(`${API_BASE}/auth/pin-switch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -1150,24 +1158,8 @@ const FoodCorePWA = (() => {
       mostrarToast(`✓ Mozo activo transferido a: ${data.usuario.nombre}`);
 
     } catch (_) {
-      if (pinModalActual === '1234') {
-        const u = { id: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO' };
-        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
-        const lblMozo = document.getElementById('lblNombreMozo');
-        if (lblMozo) lblMozo.textContent = u.nombre;
-        cerrarModalCambiarMozo();
-        mostrarToast(`✓ Mozo activo: ${u.nombre}`);
-      } else if (pinModalActual === '9999') {
-        const u = { id: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN' };
-        localStorage.setItem('fc_pwa_user', JSON.stringify(u));
-        const lblMozo = document.getElementById('lblNombreMozo');
-        if (lblMozo) lblMozo.textContent = u.nombre;
-        cerrarModalCambiarMozo();
-        mostrarToast(`✓ Mozo activo: ${u.nombre}`);
-      } else {
-        mostrarErrorPinModal('PIN de mozo incorrecto.');
-        limpiarPinModal();
-      }
+      mostrarErrorPinModal('No se pudo conectar con el servidor para validar el PIN.');
+      limpiarPinModal();
     }
   }
 
@@ -1187,7 +1179,6 @@ const FoodCorePWA = (() => {
 
   return {
     iniciarLoginView,
-    rellenarCredencialesDemo,
     iniciarPinLoginView,
     seleccionarUsuarioPin,
     presionarDigitoPin,

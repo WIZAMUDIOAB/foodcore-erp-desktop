@@ -7,6 +7,7 @@ import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -83,7 +84,7 @@ public class SolicitudesController {
         }
 
         configurarTabla();
-        cargarSolicitudesSincrono();
+        cargarSolicitudesAsync();
     }
 
     private boolean usuarioEsGerente() {
@@ -163,8 +164,10 @@ public class SolicitudesController {
                         lblEsp.getStyleClass().add("text-caption-muted");
                         setGraphic(lblEsp);
                     } else {
-                        btnAprobar.setOnAction(ev -> aprobarSolicitud(sol));
-                        btnRechazar.setOnAction(ev -> rechazarSolicitud(sol));
+                        btnAprobar.setOnAction(ev -> ejecutarCambioEstadoSolicitudAsync(
+                                sol, "APROBADA", "Aprobado por Gerencia"));
+                        btnRechazar.setOnAction(ev -> ejecutarCambioEstadoSolicitudAsync(
+                                sol, "RECHAZADA", "Rechazado por cobertura de turno"));
                         setGraphic(box);
                     }
                 }
@@ -172,6 +175,24 @@ public class SolicitudesController {
         });
 
         tblSolicitudes.setItems(listaSolicitudes);
+    }
+
+    public void cargarSolicitudesAsync() {
+        final boolean esGerente = usuarioEsGerente();
+        final Usuario u = AuthService.getUsuarioSesionActual();
+        final int idUsr = u != null ? u.getIdUsuario() : 1;
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return esGerente ? solicitudDAO.listarTodas(conn) : solicitudDAO.listarPorUsuario(conn, idUsr);
+                }
+            },
+            data -> {
+                listaSolicitudes.setAll(data);
+                actualizarContadores();
+            },
+            e -> LOGGER.log(Level.WARNING, "Aviso al cargar solicitudes de ausencia", e)
+        );
     }
 
     public void cargarSolicitudesSincrono() {
@@ -212,7 +233,7 @@ public class SolicitudesController {
 
     @FXML
     public void handleRefrescar(ActionEvent event) {
-        cargarSolicitudesSincrono();
+        cargarSolicitudesAsync();
     }
 
     @FXML
@@ -234,13 +255,46 @@ public class SolicitudesController {
         Usuario u = AuthService.getUsuarioSesionActual();
         int idUsr = (u != null && u.getIdUsuario() > 0) ? u.getIdUsuario() : 1;
 
-        try {
-            registrarSolicitud(idUsr, tipo, ini, fin, motivo);
-            txtMotivo.clear();
-            mostrarToast("Solicitud enviada correctamente para revisión gerencial.", false);
-        } catch (Exception e) {
-            mostrarToast("Error al registrar solicitud: " + e.getMessage(), true);
+        btnEnviarSolicitud.setDisable(true);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                SolicitudAusencia sol = new SolicitudAusencia(0, idUsr, tipo, ini, fin, motivo, "PENDIENTE");
+                try (Connection conn = ConexionBD.getConnection()) {
+                    solicitudDAO.crear(conn, sol);
+                }
+                return sol;
+            },
+            sol -> {
+                btnEnviarSolicitud.setDisable(false);
+                txtMotivo.clear();
+                mostrarToast("Solicitud enviada correctamente para revisión gerencial.", false);
+                cargarSolicitudesAsync();
+            },
+            e -> {
+                btnEnviarSolicitud.setDisable(false);
+                mostrarToast("Error al registrar solicitud: " + (e != null ? e.getMessage() : "desconocido"), true);
+            }
+        );
+    }
+
+    private void ejecutarCambioEstadoSolicitudAsync(SolicitudAusencia sol, String estado, String comentario) {
+        if (sol == null) {
+            return;
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    solicitudDAO.actualizarEstado(conn, sol.getIdSolicitud(), estado, comentario);
+                }
+            },
+            () -> {
+                sol.setEstado(estado);
+                tblSolicitudes.refresh();
+                actualizarContadores();
+                mostrarToast("Solicitud #" + sol.getIdSolicitud() + " " + estado + ".", false);
+            },
+            e -> mostrarToast("Error al actualizar solicitud: " + (e != null ? e.getMessage() : "desconocido"), true)
+        );
     }
 
     public SolicitudAusencia registrarSolicitud(int idUsuario, String tipo, LocalDate inicio, LocalDate fin, String motivo) throws Exception {

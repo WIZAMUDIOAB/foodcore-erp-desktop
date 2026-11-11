@@ -44,7 +44,7 @@ public class SubFaseACatalogoE2ETest {
     @DisplayName("Sub-Fase A: API — GET /api/productos/disponibles y PATCH /api/productos/{id}/disponibilidad")
     void testApiDisponibilidadYProductosDisponibles() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             // 1. GET /api/productos/disponibles
             APIResponse respDisponibles = request.get("/api/productos/disponibles");

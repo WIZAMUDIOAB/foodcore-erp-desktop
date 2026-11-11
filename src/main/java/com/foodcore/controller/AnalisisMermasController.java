@@ -7,6 +7,7 @@ import com.foodcore.model.Merma;
 import com.foodcore.service.AnalisisMermasService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -134,7 +135,7 @@ public class AnalisisMermasController {
 
         configurarCmbInsumo();
         configurarTablas();
-        cargarDatos();
+        cargarDatosAsync();
     }
 
     private void configurarCmbInsumo() {
@@ -203,33 +204,46 @@ public class AnalisisMermasController {
         tblMermasDetalle.setItems(listaDetalleMermas);
     }
 
+    public void cargarDatosAsync() {
+        int anio = LocalDate.now().getYear();
+        int mes = LocalDate.now().getMonthValue();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> consultarDatosMermas(anio, mes),
+            this::aplicarDatosMermas,
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar datos de mermas", ex)
+        );
+    }
+
     public void cargarDatos() {
         int anio = LocalDate.now().getYear();
         int mes = LocalDate.now().getMonthValue();
+        try {
+            aplicarDatosMermas(consultarDatosMermas(anio, mes));
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al cargar datos de mermas", ex);
+        }
+    }
+
+    private ResultadoDatosMermas consultarDatosMermas(int anio, int mes) {
+        List<Merma> mermas = List.of();
+        List<Merma> top = List.of();
+        Map<String, BigDecimal> porMotivo = new LinkedHashMap<>();
+        Map<String, BigDecimal> porMes = new LinkedHashMap<>();
+        porMes.put("Abr", new BigDecimal("185.00"));
+        porMes.put("May", new BigDecimal("260.00"));
+        porMes.put("Jun", new BigDecimal("210.00"));
+        porMes.put("Jul", new BigDecimal("340.50"));
+        porMes.put("Ago", new BigDecimal("275.00"));
+        porMes.put("Set", new BigDecimal("415.80"));
+        porMes.put("Oct", new BigDecimal("315.40"));
+        porMes.put("Nov", new BigDecimal("490.05"));
+        List<String> alertas = List.of();
+        List<Insumo> insumos = List.of();
 
         try {
-            List<Merma> mermas = mermasService.listarTodas();
-            listaDetalleMermas.setAll(mermas);
-
-            List<Merma> top = mermasService.obtenerTopInsumosPerdida(anio, mes, 5);
-            listaTopInsumos.setAll(top);
-
-            BigDecimal costoTotal = mermas.stream()
-                    .map(Merma::getCostoTotal)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            lblKpiCostoPerdida.setText(String.format("S/ %.2f", costoTotal));
-            lblKpiTotalEventos.setText(String.valueOf(mermas.size()));
-
-            if (!top.isEmpty()) {
-                Merma primerTop = top.get(0);
-                lblKpiInsumoCritico.setText(primerTop.getNombreInsumo()
-                        + " (S/ " + String.format("%.2f", primerTop.getCostoTotal()) + ")");
-            } else {
-                lblKpiInsumoCritico.setText("Carne Angus (S/ 99.75)");
-            }
-
-            // Gráfico por Motivo (PieChart / Donut)
-            Map<String, BigDecimal> porMotivo = mermasService.obtenerMermasPorMotivo(anio, mes);
+            mermas = mermasService.listarTodas();
+            top = mermasService.obtenerTopInsumosPerdida(anio, mes, 5);
+            porMotivo = mermasService.obtenerMermasPorMotivo(anio, mes);
             if (porMotivo.isEmpty()) {
                 porMotivo = new LinkedHashMap<>();
                 porMotivo.put("Quemado", new BigDecimal("145.50"));
@@ -237,37 +251,6 @@ public class AnalisisMermasController {
                 porMotivo.put("Vencido", new BigDecimal("60.00"));
                 porMotivo.put("Sobrante", new BigDecimal("51.30"));
             }
-            ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
-            String motivoMayor = "-";
-            BigDecimal maxVal = BigDecimal.ZERO;
-            for (Map.Entry<String, BigDecimal> e : porMotivo.entrySet()) {
-                pieData.add(new PieChart.Data(
-                        e.getKey() + " (S/ " + String.format("%.1f", e.getValue()) + ")",
-                        e.getValue().doubleValue()));
-                if (e.getValue().compareTo(maxVal) > 0) {
-                    maxVal = e.getValue();
-                    motivoMayor = e.getKey();
-                }
-            }
-            if (chartMermasMotivo != null) {
-                chartMermasMotivo.setData(pieData);
-                chartMermasMotivo.applyCss();
-                chartMermasMotivo.layout();
-                aplicarEstilosPieMotivos();
-            }
-            lblKpiMotivoPredominante.setText(motivoMayor);
-
-            // Gráfico Mensual (Smooth Area Chart con Curva Bézier CubicCurveTo — SPEC v4.0 §1.1)
-            Map<String, BigDecimal> porMes = new LinkedHashMap<>();
-            porMes.put("Abr", new BigDecimal("185.00"));
-            porMes.put("May", new BigDecimal("260.00"));
-            porMes.put("Jun", new BigDecimal("210.00"));
-            porMes.put("Jul", new BigDecimal("340.50"));
-            porMes.put("Ago", new BigDecimal("275.00"));
-            porMes.put("Set", new BigDecimal("415.80"));
-            porMes.put("Oct", new BigDecimal("315.40"));
-            porMes.put("Nov", new BigDecimal("490.05"));
-
             Map<String, BigDecimal> porMesDb = mermasService.obtenerMermasPorMes(anio);
             if (porMesDb != null && !porMesDb.isEmpty()) {
                 for (Map.Entry<String, BigDecimal> e : porMesDb.entrySet()) {
@@ -278,43 +261,89 @@ public class AnalisisMermasController {
                     }
                 }
             }
-
-            if (areaChartMermas != null) {
-                XYChart.Series<String, Number> series = new XYChart.Series<>();
-                series.setName("Pérdidas S/");
-                for (Map.Entry<String, BigDecimal> e : porMes.entrySet()) {
-                    series.getData().add(new XYChart.Data<>(e.getKey(), e.getValue().doubleValue()));
-                }
-                areaChartMermas.getData().clear();
-                areaChartMermas.getData().add(series);
-                areaChartMermas.applyCss();
-                areaChartMermas.layout();
-                suavizarCurvaBezierAreaChart();
-            }
-
-            // Alertas de Reincidencia (>= 3 mermas en el mes)
-            List<String> alertas = mermasService.obtenerAlertasInsumosCriticos(anio, mes);
-            if (!alertas.isEmpty()) {
-                bannerAlertasMermas.setVisible(true);
-                bannerAlertasMermas.setManaged(true);
-                lblTextoAlertaMermas.setText(String.join(" | ", alertas));
-            } else {
-                bannerAlertasMermas.setVisible(false);
-                bannerAlertasMermas.setManaged(false);
-            }
-
-            // Insumos disponibles para el modal
+            alertas = mermasService.obtenerAlertasInsumosCriticos(anio, mes);
             try (Connection conn = ConexionBD.getConnection()) {
-                List<Insumo> insumos = insumoDAO.listarTodos(conn);
-                listaInsumosDisponibles.setAll(insumos);
-                if (!insumos.isEmpty()) {
-                    cmbModalInsumo.setValue(insumos.get(0));
-                }
+                insumos = insumoDAO.listarTodos(conn);
             }
-
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error al cargar datos de mermas", ex);
         }
+        return new ResultadoDatosMermas(mermas, top, porMotivo, porMes, alertas, insumos);
+    }
+
+    private void aplicarDatosMermas(ResultadoDatosMermas datos) {
+        listaDetalleMermas.setAll(datos.mermas());
+        listaTopInsumos.setAll(datos.top());
+
+        BigDecimal costoTotal = datos.mermas().stream()
+                .map(Merma::getCostoTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        lblKpiCostoPerdida.setText(String.format("S/ %.2f", costoTotal));
+        lblKpiTotalEventos.setText(String.valueOf(datos.mermas().size()));
+
+        if (!datos.top().isEmpty()) {
+            Merma primerTop = datos.top().get(0);
+            lblKpiInsumoCritico.setText(primerTop.getNombreInsumo()
+                    + " (S/ " + String.format("%.2f", primerTop.getCostoTotal()) + ")");
+        } else {
+            lblKpiInsumoCritico.setText("Carne Angus (S/ 99.75)");
+        }
+
+        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+        String motivoMayor = "-";
+        BigDecimal maxVal = BigDecimal.ZERO;
+        for (Map.Entry<String, BigDecimal> e : datos.porMotivo().entrySet()) {
+            pieData.add(new PieChart.Data(
+                    e.getKey() + " (S/ " + String.format("%.1f", e.getValue()) + ")",
+                    e.getValue().doubleValue()));
+            if (e.getValue().compareTo(maxVal) > 0) {
+                maxVal = e.getValue();
+                motivoMayor = e.getKey();
+            }
+        }
+        if (chartMermasMotivo != null) {
+            chartMermasMotivo.setData(pieData);
+            chartMermasMotivo.applyCss();
+            chartMermasMotivo.layout();
+            aplicarEstilosPieMotivos();
+        }
+        lblKpiMotivoPredominante.setText(motivoMayor);
+
+        if (areaChartMermas != null) {
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            series.setName("Pérdidas S/");
+            for (Map.Entry<String, BigDecimal> e : datos.porMes().entrySet()) {
+                series.getData().add(new XYChart.Data<>(e.getKey(), e.getValue().doubleValue()));
+            }
+            areaChartMermas.getData().clear();
+            areaChartMermas.getData().add(series);
+            areaChartMermas.applyCss();
+            areaChartMermas.layout();
+            suavizarCurvaBezierAreaChart();
+        }
+
+        if (!datos.alertas().isEmpty()) {
+            bannerAlertasMermas.setVisible(true);
+            bannerAlertasMermas.setManaged(true);
+            lblTextoAlertaMermas.setText(String.join(" | ", datos.alertas()));
+        } else {
+            bannerAlertasMermas.setVisible(false);
+            bannerAlertasMermas.setManaged(false);
+        }
+
+        listaInsumosDisponibles.setAll(datos.insumos());
+        if (!datos.insumos().isEmpty()) {
+            cmbModalInsumo.setValue(datos.insumos().get(0));
+        }
+    }
+
+    private record ResultadoDatosMermas(
+            List<Merma> mermas,
+            List<Merma> top,
+            Map<String, BigDecimal> porMotivo,
+            Map<String, BigDecimal> porMes,
+            List<String> alertas,
+            List<Insumo> insumos) {
     }
 
     /**
@@ -511,18 +540,25 @@ public class AnalisisMermasController {
 
         String motivo = cmbModalMotivo.getValue();
         String obs = txtModalObservacion.getText();
+        long idInsumo = ins.getIdInsumo();
 
-        try {
-            mermasService.registrarMerma(ins.getIdInsumo(), 1, cant, motivo, obs);
-            modalNuevaMerma.setVisible(false);
-            txtModalCantidad.clear();
-            txtModalObservacion.clear();
-            AnimationUtils.mostrarToast(rootMermasStack, "✓ Merma registrada y descontada del stock.", false);
-            cargarDatos();
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al guardar merma", ex);
-            AnimationUtils.mostrarToast(rootMermasStack, "Error: " + ex.getMessage(), true);
-        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> mermasService.registrarMerma(idInsumo, 1, cant, motivo, obs),
+            () -> {
+                modalNuevaMerma.setVisible(false);
+                txtModalCantidad.clear();
+                txtModalObservacion.clear();
+                AnimationUtils.mostrarToast(rootMermasStack, "✓ Merma registrada y descontada del stock.", false);
+                cargarDatosAsync();
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error al guardar merma", ex);
+                AnimationUtils.mostrarToast(
+                        rootMermasStack,
+                        "Error: " + (ex != null ? ex.getMessage() : "desconocido"),
+                        true);
+            }
+        );
     }
 
     public AreaChart<String, Number> getAreaChartMermas() {

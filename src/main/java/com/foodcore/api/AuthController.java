@@ -3,6 +3,7 @@ package com.foodcore.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
@@ -11,13 +12,8 @@ import com.foodcore.service.AuthService;
 import com.foodcore.util.ConexionBD;
 import io.javalin.http.Context;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -29,16 +25,21 @@ import java.util.logging.Logger;
 public class AuthController {
 
     private static final Logger LOGGER = Logger.getLogger(AuthController.class.getName());
-    private static final String JWT_SECRET = "FoodCoreERP_v4_JwtSecretKey_2026_HighSecurity!";
 
     private final ApiState state;
     private final AuthService authService;
     private final UsuarioDAO usuarioDAO;
+    private final JwtService jwtService;
 
     public AuthController(ApiState state, AuthService authService, UsuarioDAO usuarioDAO) {
+        this(state, authService, usuarioDAO, new JwtService());
+    }
+
+    public AuthController(ApiState state, AuthService authService, UsuarioDAO usuarioDAO, JwtService jwtService) {
         this.state = state;
         this.authService = authService;
         this.usuarioDAO = usuarioDAO;
+        this.jwtService = jwtService != null ? jwtService : new JwtService();
     }
 
     /**
@@ -55,10 +56,12 @@ public class AuthController {
                 return;
             }
 
-            Usuario usuarioAutenticado;
-            if (esCredencialOperativaValida(username, password)) {
-                usuarioAutenticado = construirUsuarioOperativo(username);
-            } else {
+            Usuario usuarioAutenticado = null;
+            if (AuthTestBypassConfig.isE2eTestProfileActive()
+                    && AuthTestBypassConfig.esCredencialOperativaValida(username, password)) {
+                usuarioAutenticado = AuthTestBypassConfig.construirUsuarioOperativo(username);
+            }
+            if (usuarioAutenticado == null) {
                 try {
                     usuarioAutenticado = authService.login(username, password);
                 } catch (Exception exAuth) {
@@ -68,6 +71,10 @@ public class AuthController {
                     state.responderError(ctx, 401, msgAuth);
                     return;
                 }
+            }
+            if (usuarioAutenticado == null) {
+                state.responderError(ctx, 401, "Credenciales inválidas. Verifique su usuario y contraseña.");
+                return;
             }
 
             String rol = usuarioAutenticado.getNombreRol() != null ? usuarioAutenticado.getNombreRol() : "MOZO";
@@ -198,13 +205,11 @@ public class AuthController {
                 usuarios = usuarioDAO.listarTodosActivos(conn);
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error consultando usuarios activos de BD, usando fallback", e);
+            LOGGER.log(Level.FINE, "Error consultando usuarios activos de BD", e);
         }
 
-        if (usuarios.isEmpty()) {
-            usuarios.add(construirUsuarioOperativo("admin"));
-            usuarios.add(construirUsuarioOperativo("mozo"));
-            usuarios.add(construirUsuarioOperativo("cajero"));
+        if (usuarios.isEmpty() && AuthTestBypassConfig.isE2eTestProfileActive()) {
+            usuarios = AuthTestBypassConfig.listarUsuariosOperativos();
         }
 
         for (Usuario u : usuarios) {
@@ -251,7 +256,12 @@ public class AuthController {
             }
 
             if (!actualizado) {
-                state.pinsMemoria.put(idUsuario, nuevoPin);
+                if (AuthTestBypassConfig.isE2eTestProfileActive()) {
+                    AuthTestBypassConfig.registrarPinMemoria(idUsuario, nuevoPin);
+                } else {
+                    state.responderError(ctx, 500, "No se pudo actualizar el PIN en base de datos.");
+                    return;
+                }
             }
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -270,68 +280,11 @@ public class AuthController {
     }
 
     public String generarTokenJwt(int idUsuario, String username, String rol) {
-        try {
-            String headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-            long iat = Instant.now().getEpochSecond();
-            long exp = iat + 28800;
-            String payloadJson = String.format(
-                    "{\"sub\":\"%s\",\"uid\":%d,\"rol\":\"%s\",\"iat\":%d,\"exp\":%d}",
-                    username, idUsuario, rol, iat, exp);
-
-            Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
-            String headerB64 = encoder.encodeToString(headerJson.getBytes(StandardCharsets.UTF_8));
-            String payloadB64 = encoder.encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
-            String signingInput = headerB64 + "." + payloadB64;
-
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(JWT_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String signatureB64 = encoder.encodeToString(mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8)));
-
-            return signingInput + "." + signatureB64;
-        } catch (Exception e) {
-            return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtb3pvIn0.foodcore_sig";
-        }
+        return jwtService.generarToken(idUsuario, username, rol);
     }
 
-    private boolean esCredencialOperativaValida(String user, String pass) {
-        if ("mozo".equalsIgnoreCase(user) || "mozo1".equalsIgnoreCase(user)) {
-            return "Mozo2026!".equals(pass) || "123456".equals(pass) || "3001".equals(pass) || "mozo123".equals(pass);
-        }
-        if ("admin".equalsIgnoreCase(user)) {
-            return "Admin2026!".equals(pass) || "admin123".equals(pass) || "123456".equals(pass) || "1001".equals(pass);
-        }
-        if ("cajero".equalsIgnoreCase(user) || "cajero1".equalsIgnoreCase(user)) {
-            return "Cajero2026!".equals(pass) || "123456".equals(pass) || "2001".equals(pass);
-        }
-        return false;
-    }
-
-    private Usuario construirUsuarioOperativo(String username) {
-        Usuario u = new Usuario();
-        if ("admin".equalsIgnoreCase(username)) {
-            u.setIdUsuario(1);
-            u.setUsername("admin");
-            u.setNombreRol("ADMIN");
-            u.setNombreEmpleado("Administrador General");
-            u.setPin("9999");
-            u.setPinHash("$2a$12$JFii7tvJWtK9aSOPGmHdrOA/lBnHzRAhOwQzxHopH9xSCQJBGTNT2");
-        } else if ("cajero".equalsIgnoreCase(username) || "cajero1".equalsIgnoreCase(username)) {
-            u.setIdUsuario(2);
-            u.setUsername("cajero");
-            u.setNombreRol("CAJERO");
-            u.setNombreEmpleado("Valeria Ramos");
-            u.setPin("2001");
-            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
-        } else {
-            u.setIdUsuario(3);
-            u.setUsername(username != null ? username : "mozo");
-            u.setNombreRol("MOZO");
-            u.setNombreEmpleado("Mateo Quispe");
-            u.setPin("1234");
-            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
-        }
-        u.setActivo(true);
-        return u;
+    public Optional<JwtService.JwtClaims> verificarTokenJwt(String token) {
+        return jwtService.verificarToken(token);
     }
 
     private Usuario autenticarUsuarioPorPin(int idUsuario, String username, String pin) {
@@ -341,25 +294,13 @@ public class AuthController {
                 return opt.get();
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Aviso verificando PIN en BD, probando fallback en memoria", e);
+            LOGGER.log(Level.FINE, "Error verificando PIN en BD", e);
         }
 
-        int targetId = idUsuario;
-        if (targetId <= 0) {
-            if ("admin".equalsIgnoreCase(username)) {
-                targetId = 1;
-            } else if ("cajero".equalsIgnoreCase(username)) {
-                targetId = 2;
-            } else {
-                targetId = 3;
-            }
+        if (!AuthTestBypassConfig.isE2eTestProfileActive()) {
+            return null;
         }
-        String pinEsperado = state.pinsMemoria.getOrDefault(targetId, targetId == 1 ? "9999" : (targetId == 2 ? "2001" : "1234"));
-        if (pinEsperado.equals(pin)) {
-            String uNom = targetId == 1 ? "admin" : (targetId == 2 ? "cajero" : (username != null && !username.isBlank() ? username : "mozo"));
-            return construirUsuarioOperativo(uNom);
-        }
-        return null;
+        return AuthTestBypassConfig.autenticarPinMemoria(idUsuario, username, pin);
     }
 
     private String obtenerAvatarUsuario(String username) {

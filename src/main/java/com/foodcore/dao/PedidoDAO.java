@@ -6,6 +6,7 @@ import com.foodcore.model.Pedido;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +18,8 @@ public interface PedidoDAO {
     int crearComanda(Connection conn, Comanda comanda) throws SQLException;
     List<Pedido> listarPedidosActivos(Connection conn) throws SQLException;
     List<Pedido> listarPedidosPendientesCocina(Connection conn) throws SQLException;
+    List<Pedido> buscarPorEstado(Connection conn, String estado) throws SQLException;
+    List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException;
     List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException;
     List<DetallePedido> listarItemsPendientesCocina(Connection conn) throws SQLException;
     boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException;

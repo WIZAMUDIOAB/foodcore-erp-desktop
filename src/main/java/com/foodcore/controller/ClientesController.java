@@ -5,6 +5,7 @@ import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.model.Cliente;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -81,7 +82,7 @@ public class ClientesController {
         configurarSeleccion();
         configurarBusqueda();
         configurarModal();
-        cargarClientesSincrono();
+        cargarClientesAsync();
     }
 
     private void configurarColumnas() {
@@ -137,7 +138,7 @@ public class ClientesController {
     private void configurarBusqueda() {
         txtBuscar.textProperty().addListener((obs, oldV, newV) -> {
             if (newV == null || newV.isBlank()) {
-                cargarClientesSincrono();
+                cargarClientesAsync();
             } else {
                 String f = newV.toLowerCase().trim();
                 List<Cliente> filtrados = listaClientes.stream()
@@ -153,19 +154,28 @@ public class ClientesController {
         cbModalTipoDoc.setValue("RUC");
     }
 
+    public void cargarClientesAsync() {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return clienteDAO.listarTodos(conn);
+                }
+            },
+            todos -> {
+                listaClientes.setAll(todos);
+                tblClientes.setItems(listaClientes);
+                lblTotalClientes.setText(todos.size() + " Clientes");
+                if (!todos.isEmpty()) {
+                    tblClientes.getSelectionModel().selectFirst();
+                    seleccionarCliente(todos.get(0));
+                }
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar clientes", ex)
+        );
+    }
+
     public void cargarClientesSincrono() {
-        listaClientes.clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Cliente> todos = clienteDAO.listarTodos(conn);
-            listaClientes.addAll(todos);
-            lblTotalClientes.setText(todos.size() + " Clientes");
-            if (!todos.isEmpty()) {
-                tblClientes.getSelectionModel().selectFirst();
-                seleccionarCliente(todos.get(0));
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar clientes", ex);
-        }
+        cargarClientesAsync();
     }
 
     public void seleccionarCliente(Cliente c) {
@@ -237,58 +247,95 @@ public class ClientesController {
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
         } catch (Exception ignored) {}
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (modoEdicion && clienteSeleccionado != null) {
-                clienteSeleccionado.setTipoDocumento(cbModalTipoDoc.getValue());
-                clienteSeleccionado.setNumeroDocumento(num);
-                clienteSeleccionado.setRazonSocial(razon);
-                clienteSeleccionado.setContacto(txtModalContacto.getText().trim());
-                clienteSeleccionado.setTelefono(txtModalTelefono.getText().trim());
-                clienteSeleccionado.setEmail(txtModalEmail.getText().trim());
-                clienteSeleccionado.setLimiteCredito(lim);
-                clienteSeleccionado.setDiasCredito(dias);
-                clienteDAO.actualizar(conn, clienteSeleccionado);
-            } else {
-                Cliente nuevo = new Cliente();
-                nuevo.setTipoDocumento(cbModalTipoDoc.getValue());
-                nuevo.setNumeroDocumento(num);
-                nuevo.setRazonSocial(razon);
-                nuevo.setContacto(txtModalContacto.getText().trim());
-                nuevo.setTelefono(txtModalTelefono.getText().trim());
-                nuevo.setEmail(txtModalEmail.getText().trim());
-                nuevo.setLimiteCredito(lim);
-                nuevo.setDiasCredito(dias);
-                clienteDAO.insertar(conn, nuevo);
-            }
-            modalCliente.setVisible(false);
-            cargarClientesSincrono();
-        } catch (Exception ex) {
-            lblModalError.setText("Error al guardar: " + ex.getMessage());
-        }
+        final String tipoDoc = cbModalTipoDoc.getValue();
+        final String contacto = txtModalContacto.getText().trim();
+        final String telefono = txtModalTelefono.getText().trim();
+        final String email = txtModalEmail.getText().trim();
+        final double limFinal = lim;
+        final int diasFinal = dias;
+        final boolean edicion = modoEdicion && clienteSeleccionado != null;
+        final Cliente objEdicion = clienteSeleccionado;
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if (edicion) {
+                        objEdicion.setTipoDocumento(tipoDoc);
+                        objEdicion.setNumeroDocumento(num);
+                        objEdicion.setRazonSocial(razon);
+                        objEdicion.setContacto(contacto);
+                        objEdicion.setTelefono(telefono);
+                        objEdicion.setEmail(email);
+                        objEdicion.setLimiteCredito(limFinal);
+                        objEdicion.setDiasCredito(diasFinal);
+                        clienteDAO.actualizar(conn, objEdicion);
+                    } else {
+                        Cliente nuevo = new Cliente();
+                        nuevo.setTipoDocumento(tipoDoc);
+                        nuevo.setNumeroDocumento(num);
+                        nuevo.setRazonSocial(razon);
+                        nuevo.setContacto(contacto);
+                        nuevo.setTelefono(telefono);
+                        nuevo.setEmail(email);
+                        nuevo.setLimiteCredito(limFinal);
+                        nuevo.setDiasCredito(diasFinal);
+                        clienteDAO.insertar(conn, nuevo);
+                    }
+                }
+            },
+            () -> {
+                modalCliente.setVisible(false);
+                cargarClientesAsync();
+            },
+            ex -> lblModalError.setText("Error al guardar: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleCambiarEstado() {
         if (clienteSeleccionado == null) return;
-        try (Connection conn = ConexionBD.getConnection()) {
-            boolean nuevoEstado = !clienteSeleccionado.isActivo();
-            clienteDAO.cambiarEstado(conn, clienteSeleccionado.getIdCliente(), nuevoEstado);
-            cargarClientesSincrono();
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cambiar estado", ex);
-        }
+        final int idCli = clienteSeleccionado.getIdCliente();
+        final boolean nuevoEstado = !clienteSeleccionado.isActivo();
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    clienteDAO.cambiarEstado(conn, idCli, nuevoEstado);
+                }
+            },
+            this::cargarClientesAsync,
+            ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado", ex)
+        );
     }
 
     @FXML
     public void handleGenerarEstadoCuentaPdf() {
         if (clienteSeleccionado == null) return;
-        try {
-            File doc = new File("dist/ESTADO_CUENTA_" + clienteSeleccionado.getNumeroDocumento() + ".pdf");
-            if (doc.getParentFile() != null) { java.nio.file.Files.createDirectories(doc.getParentFile().toPath()); }
-            finanzasService.generarEstadoCuentaClientePdf(clienteSeleccionado.getIdCliente(), doc);
-            lblDetalleComprobantes.setText("✓ Estado de cuenta generado: " + doc.getName());
-        } catch (Exception ex) {
-            lblDetalleComprobantes.setText("Error PDF: " + ex.getMessage());
+        final int idCli = clienteSeleccionado.getIdCliente();
+        final String numDoc = clienteSeleccionado.getNumeroDocumento();
+        if (btnEstadoCuentaPdf != null) {
+            btnEstadoCuentaPdf.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                File doc = new File("dist/ESTADO_CUENTA_" + numDoc + ".pdf");
+                if (doc.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                }
+                finanzasService.generarEstadoCuentaClientePdf(idCli, doc);
+                return doc;
+            },
+            doc -> {
+                if (btnEstadoCuentaPdf != null) {
+                    btnEstadoCuentaPdf.setDisable(false);
+                }
+                lblDetalleComprobantes.setText("✓ Estado de cuenta generado: " + doc.getName());
+            },
+            ex -> {
+                if (btnEstadoCuentaPdf != null) {
+                    btnEstadoCuentaPdf.setDisable(false);
+                }
+                lblDetalleComprobantes.setText("Error PDF: " + (ex != null ? ex.getMessage() : "desconocido"));
+            }
+        );
     }
 }

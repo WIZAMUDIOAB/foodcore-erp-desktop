@@ -147,9 +147,20 @@ public class Hotfix433VisualTest {
             root.layout();
         });
 
-        // Validar en BD que la categoría "Pizzas" fue creada automáticamente
+        // Esperar persistencia asíncrona fuera del hilo JavaFX
         CategoriaDAO catDAO = new CategoriaDAOImpl();
         ProductoDAO prodDAO = new ProductoDAOImpl();
+        long limite = System.currentTimeMillis() + 5000L;
+        while (System.currentTimeMillis() < limite) {
+            try (Connection conn = ConexionBD.getConnection()) {
+                boolean platilloGuardado = prodDAO.listarTodos(conn).stream()
+                        .anyMatch(p -> nuevoPlatillo.equalsIgnoreCase(p.getNombre()));
+                if (platilloGuardado) {
+                    break;
+                }
+            }
+            Thread.sleep(25);
+        }
         try (Connection conn = ConexionBD.getConnection()) {
             List<Categoria> cats = catDAO.listarTodas(conn);
             boolean catExiste = cats.stream().anyMatch(c -> nuevaCategoria.equalsIgnoreCase(c.getNombre()));
@@ -349,7 +360,7 @@ public class Hotfix433VisualTest {
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.locator("#txtUsername").waitFor();
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
 

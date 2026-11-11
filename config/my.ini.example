@@ -1,6 +1,8 @@
 # ==============================================================================
-# FoodCore ERP v1.0 - Configuracion Segura de MySQL 8.0 (SPEC-FOODCORE-v1.0 §10.4, §17.2, R-15)
-# Aislar el puerto 3306 exclusivamente a loopback local (127.0.0.1)
+# FoodCore ERP - Ejemplo de configuracion segura para MySQL 8.0
+# Copiar a my.ini / /etc/mysql/mysql.conf.d/foodcore.cnf en el servidor anfitrion.
+# Aislar el puerto 3306 exclusivamente a loopback local (127.0.0.1);
+# en topologias LAN restringir por firewall y exigir TLS (require_secure_transport=ON).
 # ==============================================================================
 [mysqld]
 port=3306

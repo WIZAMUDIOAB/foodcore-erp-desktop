@@ -38,7 +38,7 @@
                                     </children>
                                 </VBox>
                                 <Button fx:id="btnAbonar" mnemonicParsing="false" onAction="#handleAbrirModalPago" styleClass="btn-primary" text="Registrar Pago / Abono" />
-                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarCuentasSincrono" styleClass="btn-secondary" text="Actualizar" />
+                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarCuentasAsync" styleClass="btn-secondary" text="Actualizar" />
                             </children>
                         </HBox>
 

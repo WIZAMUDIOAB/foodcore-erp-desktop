@@ -12,6 +12,7 @@ import com.foodcore.model.CuentaPorCobrar;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -68,7 +69,7 @@ public class CuentasPorCobrarController {
     public void initialize() {
         configurarColumnas();
         configurarFiltros();
-        cargarCuentasSincrono();
+        cargarCuentasAsync();
     }
 
     private void configurarColumnas() {
@@ -90,50 +91,52 @@ public class CuentasPorCobrarController {
     private void configurarFiltros() {
         cbFiltroEstado.setItems(FXCollections.observableArrayList("TODAS", "PENDIENTE", "VENCIDA", "COBRADA"));
         cbFiltroEstado.setValue("TODAS");
-        cbFiltroEstado.setOnAction(e -> cargarCuentasSincrono());
+        cbFiltroEstado.setOnAction(e -> cargarCuentasAsync());
 
         cbModalMetodoPago.setItems(FXCollections.observableArrayList("EFECTIVO", "TRANSFERENCIA", "YAPE", "TARJETA"));
         cbModalMetodoPago.setValue("TRANSFERENCIA");
     }
 
+    public void cargarCuentasAsync() {
+        final String filtro = cbFiltroEstado.getValue();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return (filtro == null || "TODAS".equals(filtro))
+                        ? cuentaPorCobrarDAO.listarTodas(conn)
+                        : cuentaPorCobrarDAO.listarPorEstado(conn, filtro);
+                }
+            },
+            cuentas -> {
+                listaCxc.setAll(cuentas);
+                double saldoTotal = 0.0;
+                int vencidas = 0;
+                for (CuentaPorCobrar c : cuentas) {
+                    if (!"COBRADA".equalsIgnoreCase(c.getEstado())) {
+                        saldoTotal += c.getSaldo();
+                    }
+                    if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
+                        vencidas++;
+                    }
+                }
+                if (!cuentas.isEmpty()) {
+                    tblCuentasPorCobrar.getSelectionModel().selectFirst();
+                }
+                lblSaldoTotal.setText(String.format("S/ %.2f", saldoTotal));
+                lblContadorCxc.setText(listaCxc.size() + " Comprobantes");
+                if (vencidas > 0) {
+                    lblBadgeAlertaVencidas.setText(vencidas + " COMPROBANTES VENCIDOS");
+                    lblBadgeAlertaVencidas.setVisible(true);
+                } else {
+                    lblBadgeAlertaVencidas.setVisible(false);
+                }
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar cuentas por cobrar", ex)
+        );
+    }
+
     public void cargarCuentasSincrono() {
-        listaCxc.clear();
-        double saldoTotal = 0.0;
-        int vencidas = 0;
-
-        String filtro = cbFiltroEstado.getValue();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<CuentaPorCobrar> cuentas;
-            if (filtro == null || "TODAS".equals(filtro)) {
-                cuentas = cuentaPorCobrarDAO.listarTodas(conn);
-            } else {
-                cuentas = cuentaPorCobrarDAO.listarPorEstado(conn, filtro);
-            }
-
-            listaCxc.addAll(cuentas);
-            for (CuentaPorCobrar c : cuentas) {
-                if (!"COBRADA".equalsIgnoreCase(c.getEstado())) {
-                    saldoTotal += c.getSaldo();
-                }
-                if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
-                    vencidas++;
-                }
-            }
-            if (!cuentas.isEmpty()) {
-                tblCuentasPorCobrar.getSelectionModel().selectFirst();
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar cuentas por cobrar", ex);
-        }
-
-        lblSaldoTotal.setText(String.format("S/ %.2f", saldoTotal));
-        lblContadorCxc.setText(listaCxc.size() + " Comprobantes");
-        if (vencidas > 0) {
-            lblBadgeAlertaVencidas.setText(vencidas + " COMPROBANTES VENCIDOS");
-            lblBadgeAlertaVencidas.setVisible(true);
-        } else {
-            lblBadgeAlertaVencidas.setVisible(false);
-        }
+        cargarCuentasAsync();
     }
 
     @FXML
@@ -173,20 +176,30 @@ public class CuentasPorCobrarController {
         String nota = txtModalNota.getText().trim();
         int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
 
-        Integer idCaja = null;
-        try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
-            if (cajaOpt.isPresent()) {
-                idCaja = cajaOpt.get().getIdCaja();
-            }
-        } catch (Exception ignored) {}
+        final int idCuenta = cuentaSeleccionada.getIdCuentaCobrar();
+        final double montoFinal = monto;
+        final String metodoFinal = metodo;
+        final String notaFinal = nota;
+        final int idUsrFinal = idUsuario;
 
-        try {
-            finanzasService.registrarCobroCliente(cuentaSeleccionada.getIdCuentaCobrar(), monto, metodo, idCaja, idUsuario, nota);
-            modalCobro.setVisible(false);
-            cargarCuentasSincrono();
-        } catch (Exception ex) {
-            lblModalCobroError.setText("Error al cobrar: " + ex.getMessage());
-        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                Integer idCaja = null;
+                try (Connection conn = ConexionBD.getConnection()) {
+                    Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
+                    if (cajaOpt.isPresent()) {
+                        idCaja = cajaOpt.get().getIdCaja();
+                    }
+                } catch (java.sql.SQLException | RuntimeException ignored) {
+                    // Caja opcional para este flujo
+                }
+                finanzasService.registrarCobroCliente(idCuenta, montoFinal, metodoFinal, idCaja, idUsrFinal, notaFinal);
+            },
+            () -> {
+                modalCobro.setVisible(false);
+                cargarCuentasAsync();
+            },
+            ex -> lblModalCobroError.setText("Error al cobrar: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 }

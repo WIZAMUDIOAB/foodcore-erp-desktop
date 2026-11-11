@@ -27,6 +27,7 @@ import com.foodcore.service.VentaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImpresoraTermicaService;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -215,8 +216,8 @@ public class VentaController {
         txtBuscar.textProperty().addListener((obs, oldVal, newVal) -> filtrarCatalogo());
 
         cargarCategorias();
-        cargarCatalogoProductos();
-        refrescarMesasYCanalesSincrono();
+        cargarCatalogoProductosAsync();
+        refrescarMesasYCanalesAsync();
         iniciarAutoRefrescoPos();
 
         Platform.runLater(this::registrarAtajosTeclado);
@@ -245,21 +246,20 @@ public class VentaController {
         if (tabPanePosCatalogo != null && tabMesas != null) {
             tabPanePosCatalogo.getSelectionModel().select(tabMesas);
         }
-        refrescarMesasYCanalesSincrono();
+        refrescarMesasYCanalesAsync();
     }
 
     @FXML
     public void handleRefrescarMesasPos(ActionEvent event) {
-        refrescarMesasYCanalesSincrono();
+        refrescarMesasYCanalesAsync();
     }
 
     private void refrescarMesasYCanalesAsync() {
-        Thread t = new Thread(() -> {
-            List<Pedido> activos = consultarPedidosActivosDesdeBD();
-            Platform.runLater(() -> aplicarPedidosActivosEnUI(activos));
-        }, "POS-Multichannel-Sync");
-        t.setDaemon(true);
-        t.start();
+        UiAsyncExecutor.ejecutarAsync(
+            this::consultarPedidosActivosDesdeBD,
+            this::aplicarPedidosActivosEnUI,
+            ex -> LOGGER.log(Level.FINE, "Aviso consultando pedidos multicanal en POS", ex)
+        );
     }
 
     public void refrescarMesasYCanalesSincrono() {
@@ -507,17 +507,27 @@ public class VentaController {
             actualizarCabeceraCanal("Mesa " + mesaNorm + " · Salón", badge, "MESA");
         }
 
-        List<DetallePedido> detalles = pedido.getDetalles();
-        if ((detalles == null || detalles.isEmpty()) && pedido.getIdPedido() > 0) {
-            try (Connection conn = ConexionBD.getConnection()) {
-                if (conn != null) {
-                    detalles = pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Aviso cargando detalles de pedido #" + pedido.getIdPedido(), e);
-            }
+        List<DetallePedido> detallesIniciales = pedido.getDetalles();
+        aplicarDetallesPedidoEnPOS(detallesIniciales);
+        if ((detallesIniciales == null || detallesIniciales.isEmpty()) && pedido.getIdPedido() > 0) {
+            final int idObjetivo = pedido.getIdPedido();
+            UiAsyncExecutor.ejecutarAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        return conn != null ? pedidoDAO.listarDetallesPorPedido(conn, idObjetivo) : List.<DetallePedido>of();
+                    }
+                },
+                detallesCargados -> {
+                    if (Integer.valueOf(idObjetivo).equals(this.pedidoActivoId)) {
+                        aplicarDetallesPedidoEnPOS(detallesCargados);
+                    }
+                },
+                ex -> LOGGER.log(Level.FINE, "Aviso cargando detalles de pedido #" + idObjetivo, ex)
+            );
         }
+    }
 
+    private void aplicarDetallesPedidoEnPOS(List<DetallePedido> detalles) {
         itemsVenta.clear();
         if (detalles != null) {
             for (DetallePedido dp : detalles) {
@@ -676,26 +686,27 @@ public class VentaController {
         });
         boxCategorias.getChildren().add(btnTodos);
 
-        new Thread(() -> {
-            try (Connection conn = ConexionBD.getConnection()) {
-                List<Categoria> cats = productoDAO.listarCategorias(conn);
-                Platform.runLater(() -> {
-                    for (Categoria c : cats) {
-                        Button btn = new Button(c.getNombre());
-                        btn.getStyleClass().add("category-chip");
-                        AnimationUtils.attachTactileFeedback(btn);
-                        btn.setOnAction(ev -> {
-                            categoriaFiltroSeleccionada = c.getIdCategoria();
-                            actualizarEstiloBotonesCategorias(btn);
-                            filtrarCatalogo();
-                        });
-                        boxCategorias.getChildren().add(btn);
-                    }
-                });
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Categorías no disponibles en arranque", e);
-            }
-        }).start();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return productoDAO.listarCategorias(conn);
+                }
+            },
+            cats -> {
+                for (Categoria c : cats) {
+                    Button btn = new Button(c.getNombre());
+                    btn.getStyleClass().add("category-chip");
+                    AnimationUtils.attachTactileFeedback(btn);
+                    btn.setOnAction(ev -> {
+                        categoriaFiltroSeleccionada = c.getIdCategoria();
+                        actualizarEstiloBotonesCategorias(btn);
+                        filtrarCatalogo();
+                    });
+                    boxCategorias.getChildren().add(btn);
+                }
+            },
+            ex -> LOGGER.log(Level.FINE, "Categorías no disponibles en arranque", ex)
+        );
     }
 
     private void actualizarEstiloBotonesCategorias(Button activo) {
@@ -709,21 +720,34 @@ public class VentaController {
         });
     }
 
-    public void cargarCatalogoProductos() {
+    public void cargarCatalogoProductosAsync() {
         tileProductos.getChildren().clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Producto> productos = productoDAO.listarProductosDisponibles(conn);
-            todosLosProductos.clear();
-            if (productos != null && !productos.isEmpty()) {
-                todosLosProductos.addAll(productos);
-            } else {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return productoDAO.listarProductosDisponibles(conn);
+                }
+            },
+            productos -> {
+                todosLosProductos.clear();
+                if (productos != null && !productos.isEmpty()) {
+                    todosLosProductos.addAll(productos);
+                } else {
+                    poblarProductosDemostracion();
+                }
+                filtrarCatalogo();
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error al cargar catalogo desde BD, activando catalogo demo: {0}",
+                    ex != null ? ex.getMessage() : "desconocido");
                 poblarProductosDemostracion();
+                filtrarCatalogo();
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al cargar catalogo desde BD, activando catalogo demo: {0}", e.getMessage());
-            poblarProductosDemostracion();
-        }
-        filtrarCatalogo();
+        );
+    }
+
+    public void cargarCatalogoProductos() {
+        cargarCatalogoProductosAsync();
     }
 
     private void poblarProductosDemostracion() {
@@ -1150,7 +1174,7 @@ public class VentaController {
                 descuentoActivo = BigDecimal.ZERO;
                 pedidoActivoId = null;
                 recalcularTotales();
-                refrescarMesasYCanalesSincrono();
+                refrescarMesasYCanalesAsync();
             });
 
             Stage stage = new Stage();
@@ -1335,66 +1359,80 @@ public class VentaController {
         Optional<String> res = dlg.showAndWait();
         if (res.isPresent() && !res.get().isBlank()) {
             String doc = res.get().trim();
-            Cliente cli = null;
-            try (Connection conn = ConexionBD.getConnection()) {
-                cli = new ClienteDAOImpl().buscarPorDocumento(conn, doc).orElse(null);
-            } catch (Exception ignored) {}
-
-            if (cli == null) {
-                cli = new Cliente();
-                cli.setIdCliente(1);
-                cli.setRazonSocial("Corporación Minera Andina S.A.C.");
-                cli.setPuntosAcumulados(350);
-                cli.setPuntosFidelidad(350);
-                cli.setFechaNacimiento(LocalDate.of(1990, LocalDate.now().getMonthValue(), 15));
-            }
-
-            int puntos = cli.getPuntosAcumulados();
-            boolean esCumple = cli.esMesDeCumpleanos();
-            BigDecimal descPuntos = BigDecimal.valueOf(puntos)
-                    .divide(BigDecimal.valueOf(FidelizacionService.PUNTOS_POR_SOL_DESCUENTO), 2, RoundingMode.HALF_UP);
-
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Beneficios de Cliente");
-            alert.setHeaderText("Cliente: " + cli.getRazonSocial());
-            String info = "• Puntos Acumulados: " + puntos + " pts (Equivale a S/ " + descPuntos + " de descuento)\n";
-            if (esCumple) {
-                info += "🎂 ¡MES DE CUMPLEAÑOS! Cupón especial 15% OFF disponible.\n";
-            }
-            info += "\n¿Desea aplicar el beneficio a esta venta?";
-            alert.setContentText(info);
-
-            ButtonType btnCanjearPtos = new ButtonType("Canjear Puntos");
-            ButtonType btnCupon = new ButtonType("Cupón 15% Cumpleaños");
-            ButtonType btnCancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-            if (esCumple) {
-                alert.getButtonTypes().setAll(btnCanjearPtos, btnCupon, btnCancelar);
-            } else {
-                alert.getButtonTypes().setAll(btnCanjearPtos, btnCancelar);
-            }
-
-            Optional<ButtonType> click = alert.showAndWait();
-            if (click.isPresent()) {
-                if (click.get() == btnCanjearPtos) {
-                    BigDecimal totalNeto = obtenerTotalNetoActual();
-                    BigDecimal descAplicado = fidelizacionService.canjearPuntos(cli.getIdCliente(), puntos, totalNeto);
-                    this.descuentoActivo = descAplicado;
-                    this.descuentoManualFijado = true;
-                    recalcularTotales();
-                    mostrarAlerta("Puntos Canjeados", "Se aplicó un descuento de S/ " + descAplicado + " por canje de puntos.", Alert.AlertType.INFORMATION);
-                } else if (click.get() == btnCupon) {
-                    BigDecimal totalBruto = BigDecimal.ZERO;
-                    for (DetalleVenta dv : itemsVenta) {
-                        totalBruto = totalBruto.add(dv.getSubtotal());
+            UiAsyncExecutor.ejecutarAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        return new ClienteDAOImpl().buscarPorDocumento(conn, doc).orElse(null);
+                    } catch (java.sql.SQLException | RuntimeException ignored) {
+                        return null;
                     }
-                    BigDecimal desc15 = totalBruto.multiply(new BigDecimal("0.15")).setScale(2, RoundingMode.HALF_UP);
-                    this.descuentoActivo = desc15;
-                    this.descuentoManualFijado = true;
-                    fidelizacionService.verificarYGenerarCuponCumpleanos(cli.getIdCliente());
-                    recalcularTotales();
-                    mostrarAlerta("Cupón Aplicado", "¡Feliz Cumpleaños! Se aplicó un 15% de descuento (S/ " + desc15 + ").", Alert.AlertType.INFORMATION);
+                },
+                cliObtenido -> mostrarDialogoCanjeFidelizacion(cliObtenido),
+                ex -> mostrarDialogoCanjeFidelizacion(null)
+            );
+        }
+    }
+
+    private void mostrarDialogoCanjeFidelizacion(Cliente cli) {
+        if (cli == null) {
+            cli = new Cliente();
+            cli.setIdCliente(1);
+            cli.setRazonSocial("Corporación Minera Andina S.A.C.");
+            cli.setPuntosAcumulados(350);
+            cli.setPuntosFidelidad(350);
+            cli.setFechaNacimiento(LocalDate.of(1990, LocalDate.now().getMonthValue(), 15));
+        }
+
+        int puntos = cli.getPuntosAcumulados();
+        boolean esCumple = cli.esMesDeCumpleanos();
+        BigDecimal descPuntos = BigDecimal.valueOf(puntos)
+                .divide(BigDecimal.valueOf(FidelizacionService.PUNTOS_POR_SOL_DESCUENTO), 2, RoundingMode.HALF_UP);
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Beneficios de Cliente");
+        alert.setHeaderText("Cliente: " + cli.getRazonSocial());
+        String info = "• Puntos Acumulados: " + puntos + " pts (Equivale a S/ " + descPuntos + " de descuento)\n";
+        if (esCumple) {
+            info += "🎂 ¡MES DE CUMPLEAÑOS! Cupón especial 15% OFF disponible.\n";
+        }
+        info += "\n¿Desea aplicar el beneficio a esta venta?";
+        alert.setContentText(info);
+
+        ButtonType btnCanjearPtos = new ButtonType("Canjear Puntos");
+        ButtonType btnCupon = new ButtonType("Cupón 15% Cumpleaños");
+        ButtonType btnCancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        if (esCumple) {
+            alert.getButtonTypes().setAll(btnCanjearPtos, btnCupon, btnCancelar);
+        } else {
+            alert.getButtonTypes().setAll(btnCanjearPtos, btnCancelar);
+        }
+
+        Optional<ButtonType> click = alert.showAndWait();
+        if (click.isPresent()) {
+            if (click.get() == btnCanjearPtos) {
+                BigDecimal totalNeto = obtenerTotalNetoActual();
+                BigDecimal descAplicado = fidelizacionService.canjearPuntos(cli.getIdCliente(), puntos, totalNeto);
+                this.descuentoActivo = descAplicado;
+                this.descuentoManualFijado = true;
+                recalcularTotales();
+                mostrarAlerta("Puntos Canjeados", "Se aplicó un descuento de S/ " + descAplicado + " por canje de puntos.", Alert.AlertType.INFORMATION);
+            } else if (click.get() == btnCupon) {
+                BigDecimal totalBruto = BigDecimal.ZERO;
+                for (DetalleVenta dv : itemsVenta) {
+                    totalBruto = totalBruto.add(dv.getSubtotal());
                 }
+                BigDecimal desc15 = totalBruto.multiply(new BigDecimal("0.15")).setScale(2, RoundingMode.HALF_UP);
+                this.descuentoActivo = desc15;
+                this.descuentoManualFijado = true;
+                final int idClienteFidelizado = cli.getIdCliente();
+                UiAsyncExecutor.ejecutarVoidAsync(
+                    () -> fidelizacionService.verificarYGenerarCuponCumpleanos(idClienteFidelizado),
+                    null,
+                    ex -> LOGGER.log(Level.FINE, "Aviso generando cupón de cumpleaños", ex)
+                );
+                recalcularTotales();
+                mostrarAlerta("Cupón Aplicado", "¡Feliz Cumpleaños! Se aplicó un 15% de descuento (S/ " + desc15 + ").", Alert.AlertType.INFORMATION);
             }
         }
     }

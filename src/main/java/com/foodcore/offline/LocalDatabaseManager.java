@@ -1,10 +1,22 @@
 package com.foodcore.offline;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryFlag;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,26 +38,83 @@ public final class LocalDatabaseManager {
         dbPath = customPath != null ? customPath : DEFAULT_DB_PATH;
     }
 
+    public static synchronized String getDbPath() {
+        return dbPath;
+    }
+
     public static synchronized Connection getLocalConnection() throws SQLException {
-        File dbFile = new File(dbPath);
-        File parent = dbFile.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
-            LOGGER.log(Level.WARNING, "No se pudo crear el directorio de base de datos local: " + parent.getAbsolutePath());
+        OfflineCryptoService.requireKey();
+
+        Path dbFilePath = Path.of(dbPath).toAbsolutePath().normalize();
+        Path parent = dbFilePath.getParent();
+        try {
+            if (parent != null && Files.notExists(parent)) {
+                Files.createDirectories(parent);
+                aplicarPermisosRestrictivos(parent);
+            }
+            if (Files.notExists(dbFilePath)) {
+                Files.createFile(dbFilePath);
+            }
+            aplicarPermisosRestrictivos(dbFilePath);
+        } catch (IOException ex) {
+            throw new SQLException(
+                    "No se pudo preparar permisos seguros para la base de datos local: " + dbFilePath, ex);
         }
+
         String url = "jdbc:sqlite:" + dbPath;
         Connection conn = DriverManager.getConnection(url);
-        try (Statement st = conn.createStatement()) {
-            st.execute("PRAGMA foreign_keys = ON;");
+        try {
+            ejecutarDdlSeguro(conn, "PRAGMA foreign_keys = ON;");
+            aplicarPermisosRestrictivos(dbFilePath);
+            return conn;
+        } catch (SQLException | IOException | RuntimeException ex) {
+            try {
+                conn.close();
+            } catch (SQLException ignored) {
+                // Conservar la excepción original al fallar inicialización segura
+            }
+            if (ex instanceof SQLException sqlEx) {
+                throw sqlEx;
+            }
+            throw new SQLException("Fallo al asegurar la conexión SQLite local.", ex);
         }
-        return conn;
+    }
+
+    static void aplicarPermisosRestrictivos(Path targetPath) throws IOException {
+        if (targetPath == null || Files.notExists(targetPath)) {
+            return;
+        }
+        PosixFileAttributeView posixView = Files.getFileAttributeView(targetPath, PosixFileAttributeView.class);
+        if (posixView != null) {
+            posixView.setPermissions(PosixFilePermissions.fromString(
+                    Files.isDirectory(targetPath) ? "rwx------" : "rw-------"));
+            return;
+        }
+        AclFileAttributeView aclView = Files.getFileAttributeView(targetPath, AclFileAttributeView.class);
+        if (aclView != null) {
+            UserPrincipal owner = aclView.getOwner();
+            AclEntry.Builder builder = AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(owner)
+                    .setPermissions(EnumSet.allOf(AclEntryPermission.class));
+            if (Files.isDirectory(targetPath)) {
+                builder.setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT);
+            }
+            aclView.setAcl(List.of(builder.build()));
+        }
+    }
+
+    private static void ejecutarDdlSeguro(Connection conn, String sql) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.execute();
+        }
     }
 
     public static synchronized void inicializarEsquemaLocal() throws SQLException {
-        try (Connection conn = getLocalConnection();
-             Statement st = conn.createStatement()) {
+        try (Connection conn = getLocalConnection()) {
 
             // 1. Tabla local item_vendible / productos
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS item_vendible (
                     id_producto INTEGER PRIMARY KEY,
                     codigo TEXT,
@@ -59,7 +128,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 2. Tabla local mesa
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS mesa (
                     id_mesa INTEGER PRIMARY KEY,
                     numero TEXT NOT NULL UNIQUE,
@@ -69,7 +138,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 3. Tabla local pedido
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS pedido (
                     id_pedido_local INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_servidor INTEGER,
@@ -89,7 +158,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 4. Tabla local detalle_pedido
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS detalle_pedido (
                     id_detalle_local INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_local INTEGER NOT NULL,
@@ -104,7 +173,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 5. Tabla local outbox_sync (§1.2 Patrón Outbox Local)
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS outbox_sync (
                     id_outbox INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_local INTEGER NOT NULL,

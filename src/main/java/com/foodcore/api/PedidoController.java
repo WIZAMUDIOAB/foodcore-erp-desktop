@@ -3,6 +3,8 @@ package com.foodcore.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.api.security.ApiSecurityFilter;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.ProductoDAO;
@@ -22,9 +24,11 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,27 +73,9 @@ public class PedidoController {
         ctx.header("Pragma", "no-cache");
 
         ArrayNode array = state.mapper.createArrayNode();
-        List<Producto> productos = new ArrayList<>();
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                productos = productoDAO.listarTodos(conn);
-                if (productos.isEmpty()) {
-                    productos = productoDAO.listarProductosDisponibles(conn);
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Usando catálogo de respaldo en GET /api/productos", e);
-        }
-
-        if (productos.isEmpty()) {
-            productos = obtenerCatalogoRespaldo();
-        }
-
-        for (Producto p : productos) {
+        for (Producto p : obtenerCatalogoProductos(false)) {
             array.add(construirJsonProducto(p));
         }
-
         ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
     }
 
@@ -98,27 +84,58 @@ public class PedidoController {
         ctx.header("Pragma", "no-cache");
 
         ArrayNode array = state.mapper.createArrayNode();
-        List<Producto> productos = new ArrayList<>();
+        for (Producto p : obtenerCatalogoProductos(true)) {
+            array.add(construirJsonProducto(p));
+        }
+        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+    }
 
+    /**
+     * GET /api/public/productos - Solo lectura pública del catálogo (carta digital sin datos internos).
+     */
+    public void handleListarProductosPublicos(Context ctx) {
+        ctx.header("Cache-Control", "public, max-age=30");
+        ArrayNode array = state.mapper.createArrayNode();
+        for (Producto p : obtenerCatalogoProductos(false)) {
+            array.add(construirJsonProductoPublico(p));
+        }
+        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+    }
+
+    /**
+     * GET /api/public/productos/disponibles - Solo lectura pública de platos disponibles.
+     */
+    public void handleListarProductosDisponiblesPublicos(Context ctx) {
+        ctx.header("Cache-Control", "public, max-age=30");
+        ArrayNode array = state.mapper.createArrayNode();
+        for (Producto p : obtenerCatalogoProductos(true)) {
+            array.add(construirJsonProductoPublico(p));
+        }
+        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+    }
+
+    private List<Producto> obtenerCatalogoProductos(boolean soloDisponibles) {
+        List<Producto> productos = new ArrayList<>();
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
-                productos = productoDAO.listarProductosDisponibles(conn);
+                productos = soloDisponibles
+                        ? productoDAO.listarProductosDisponibles(conn)
+                        : productoDAO.listarTodos(conn);
+                if (!soloDisponibles && productos.isEmpty()) {
+                    productos = productoDAO.listarProductosDisponibles(conn);
+                }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Usando catálogo de respaldo en GET /api/productos/disponibles", e);
+            LOGGER.log(Level.FINE, "Usando catálogo de respaldo para listado de productos", e);
         }
 
         if (productos.isEmpty()) {
-            productos = obtenerCatalogoRespaldo().stream().filter(Producto::isDisponible).toList();
-        } else {
+            productos = obtenerCatalogoRespaldo();
+        }
+        if (soloDisponibles) {
             productos = productos.stream().filter(Producto::isDisponible).toList();
         }
-
-        for (Producto p : productos) {
-            array.add(construirJsonProducto(p));
-        }
-
-        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+        return productos;
     }
 
     public void handleActualizarDisponibilidad(Context ctx) {
@@ -195,9 +212,23 @@ public class PedidoController {
     }
 
     public void handleServirUploadPlatillo(Context ctx) {
-        String archivo = ctx.pathParam("archivo").replaceAll("[^a-zA-Z0-9._-]", "");
-        File file = new File("uploads/platillos/" + archivo);
-        servirArchivoImagen(ctx, file);
+        String rawArchivo = ctx.pathParam("archivo");
+        if (rawArchivo.contains("/") || rawArchivo.contains("\\") || rawArchivo.contains("..")) {
+            ctx.status(403);
+            return;
+        }
+        String archivo = rawArchivo.replaceAll("[^a-zA-Z0-9._-]", "");
+        if (archivo.isBlank()) {
+            ctx.status(404);
+            return;
+        }
+        Path baseDir = Path.of("uploads", "platillos").toAbsolutePath().normalize();
+        Path target = baseDir.resolve(archivo).normalize();
+        if (!target.startsWith(baseDir)) {
+            ctx.status(403);
+            return;
+        }
+        servirArchivoImagen(ctx, target.toFile());
     }
 
     public void handleListarMesas(Context ctx) {
@@ -236,7 +267,7 @@ public class PedidoController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Usando estado de mesas por defecto en GET /api/mesas", e);
         }
 
@@ -282,10 +313,17 @@ public class PedidoController {
                 numeroMesa = "0" + numeroMesa;
             }
 
-            int idUsuario = body.hasNonNull("id_usuario") ? body.get("id_usuario").asInt(1)
-                    : (body.hasNonNull("idUsuario") ? body.get("idUsuario").asInt(1) : 1);
-            int idUsuarioCreador = body.hasNonNull("id_usuario_creador") ? body.get("id_usuario_creador").asInt(idUsuario)
+            JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+            int defaultUserId = claims != null ? claims.idUsuario() : 1;
+            int idUsuario = body.hasNonNull("id_usuario") ? body.get("id_usuario").asInt(defaultUserId)
+                    : (body.hasNonNull("idUsuario") ? body.get("idUsuario").asInt(defaultUserId) : defaultUserId);
+            int idUsuarioCreador = body.hasNonNull("id_usuario_creador")
+                    ? body.get("id_usuario_creador").asInt(idUsuario)
                     : (body.hasNonNull("idUsuarioCreador") ? body.get("idUsuarioCreador").asInt(idUsuario) : idUsuario);
+            if (claims != null && !"ADMIN".equals(claims.rol()) && !"SUPERVISOR".equals(claims.rol())) {
+                idUsuario = claims.idUsuario();
+                idUsuarioCreador = claims.idUsuario();
+            }
 
             JsonNode itemsNode = body.has("items") ? body.get("items") : body.get("detalles");
             if (itemsNode == null || !itemsNode.isArray() || itemsNode.isEmpty()) {
@@ -409,7 +447,7 @@ public class PedidoController {
                     .contentType("application/json; charset=UTF-8")
                     .result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error procesando POST /api/pedidos", e);
             state.responderError(ctx, 500, "No se pudo registrar el pedido: " + e.getMessage());
         }
@@ -553,7 +591,7 @@ public class PedidoController {
             resp.put("mensaje", "Turno de caja #" + idCaja + " abierto exitosamente con fondo S/ " + montoInicial);
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al abrir turno de caja", e);
             state.responderError(ctx, 500, "No se pudo abrir la caja: " + e.getMessage());
         }
@@ -570,7 +608,7 @@ public class PedidoController {
 
             try {
                 cajaService.cerrarTurnoCaja(idCaja, idUsuario, contado);
-            } catch (Exception e) {
+            } catch (SQLException | com.foodcore.exception.NegocioException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Aviso cerrando caja en BD, cerrando en memoria", e);
             }
 
@@ -588,7 +626,7 @@ public class PedidoController {
             resp.put("mensaje", "Turno de caja cerrado exitosamente (Cierre Z).");
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al cerrar turno de caja", e);
             state.responderError(ctx, 500, "No se pudo cerrar la caja: " + e.getMessage());
         }
@@ -665,7 +703,7 @@ public class PedidoController {
 
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al procesar cobro en caja", e);
             state.responderError(ctx, 500, "Error al procesar cobro: " + e.getMessage());
         }
@@ -684,6 +722,30 @@ public class PedidoController {
         item.put("id", p.getIdProducto());
         item.put("idProducto", p.getIdProducto());
         item.put("codigo", p.getCodigo() != null ? p.getCodigo() : "PROD-" + p.getIdProducto());
+        item.put("nombre", p.getNombre());
+        item.put("descripcion", p.getDescripcion() != null ? p.getDescripcion() : "Especialidad de la casa");
+        item.put("precio", precio);
+        item.put("imagen_url", img);
+        item.put("categoria", cat);
+        item.put("disponible", p.isDisponible());
+        item.put("es_menu_del_dia", p.isEsMenuDelDia());
+        return item;
+    }
+
+    private ObjectNode construirJsonProductoPublico(Producto p) {
+        ObjectNode item = state.mapper.createObjectNode();
+        double precio = p.getPrecioVenta() != null
+                ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        String img = normalizarImagenUrl(p);
+        if (img.startsWith("/api/productos/")) {
+            img = "/api/public/productos/" + img.substring("/api/productos/".length());
+        }
+        String cat = (p.getNombreCategoria() != null && !p.getNombreCategoria().isBlank())
+                ? p.getNombreCategoria()
+                : resolverNombreCategoria(p.getIdCategoria());
+
+        item.put("id", p.getIdProducto());
         item.put("nombre", p.getNombre());
         item.put("descripcion", p.getDescripcion() != null ? p.getDescripcion() : "Especialidad de la casa");
         item.put("precio", precio);

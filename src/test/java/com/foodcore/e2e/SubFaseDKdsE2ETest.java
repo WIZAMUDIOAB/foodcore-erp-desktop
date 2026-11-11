@@ -43,7 +43,7 @@ public class SubFaseDKdsE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
             // Resolución estándar Tablet Cocina en pared (1280x800)
-            BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, 1280, 800);
+            BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 1280, 800, "COCINA");
             Page page = context.newPage();
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/kds/");
@@ -87,7 +87,7 @@ public class SubFaseDKdsE2ETest {
     void testTransicionEstadosComandaEnKds() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-            BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, 1280, 800);
+            BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 1280, 800, "COCINA");
             Page page = context.newPage();
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/kds/");

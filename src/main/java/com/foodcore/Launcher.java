@@ -1,7 +1,10 @@
 package com.foodcore;
 
 import com.foodcore.api.ApiServer;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.config.FlywayMigrator;
+import com.foodcore.config.LoggingBootstrap;
+import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 
 import java.awt.GraphicsEnvironment;
@@ -20,6 +23,10 @@ public class Launcher {
     private static final Logger LOGGER = Logger.getLogger(Launcher.class.getName());
 
     public static void main(String[] args) {
+        LoggingBootstrap.installBridge();
+        ConexionBD.validarVariablesEntornoObligatorias();
+        ApiServer.resolverKeystorePasswordObligatorio();
+        JwtService.validarConfiguracionObligatoria();
         boolean modoServidor = Arrays.asList(args).contains("--server")
                 || Arrays.asList(args).contains("--headless")
                 || "true".equalsIgnoreCase(System.getenv("CI"))
@@ -33,6 +40,8 @@ public class Launcher {
 
         try {
             App.main(args);
+        } catch (IllegalStateException ex) {
+            throw ex;
         } catch (Throwable t) {
             LOGGER.log(Level.WARNING, "Entorno sin display gráfico detectado; iniciando modo Servidor Headless", t);
             iniciarModoServidorHeadless();
@@ -40,10 +49,18 @@ public class Launcher {
     }
 
     private static void iniciarModoServidorHeadless() {
+        ConexionBD.validarVariablesEntornoObligatorias();
         try {
             FlywayMigrator.migrateOnBootstrap();
+        } catch (IllegalStateException ex) {
+            LOGGER.log(Level.SEVERE, "Error crítico de configuración/migración Flyway en el arranque", ex);
+            throw ex;
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Migraciones Flyway diferidas en arranque headless", e);
+            LOGGER.log(Level.SEVERE, "Error crítico ejecutando migraciones Flyway en el arranque; se aborta el inicio", e);
+            throw new IllegalStateException(
+                    "No se pudieron ejecutar las migraciones Flyway en el arranque: " + e.getMessage(),
+                    e
+            );
         }
         try {
             ServidorSockets.getInstance().iniciar();

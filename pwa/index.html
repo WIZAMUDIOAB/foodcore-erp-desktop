@@ -43,24 +43,15 @@
         <p>Identifíquese para tomar comandas y sincronizar con Cocina (KDS)</p>
       </div>
 
-      <div class="quick-users">
-        <button type="button" class="quick-user-chip" onclick="FoodCorePWA.rellenarCredencialesDemo('mozo', 'Mozo2026!')">
-          👤 Mateo Quispe (Mozo)
-        </button>
-        <button type="button" class="quick-user-chip" onclick="FoodCorePWA.rellenarCredencialesDemo('admin', 'Admin2026!')">
-          🛡️ Administrador
-        </button>
-      </div>
-
       <form id="loginForm">
         <div class="form-group">
           <label for="txtUsername">Usuario o Código de Operador</label>
-          <input type="text" id="txtUsername" class="form-input" value="mozo" placeholder="Ej. mozo" required />
+          <input type="text" id="txtUsername" class="form-input" placeholder="Usuario" autocomplete="username" required />
         </div>
 
         <div class="form-group">
           <label for="txtPassword">Contraseña / PIN de Turno</label>
-          <input type="password" id="txtPassword" class="form-input" value="Mozo2026!" placeholder="••••••••" required />
+          <input type="password" id="txtPassword" class="form-input" placeholder="Contraseña" autocomplete="current-password" required />
         </div>
 
         <div id="loginErrorMsg" class="login-error-banner" role="alert" style="display:none; color:#B91C1C; background:#FEF2F2; border:1px solid #FECACA; padding:10px 14px; border-radius:10px; font-size:13.5px; font-weight:600; margin-bottom:14px;"></div>

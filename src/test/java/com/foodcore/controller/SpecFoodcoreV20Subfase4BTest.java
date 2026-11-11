@@ -86,7 +86,9 @@ class SpecFoodcoreV20Subfase4BTest {
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement()) {
             st.execute("DELETE FROM asistencia WHERE id_usuario = 1 AND fecha = CURRENT_DATE");
-            st.execute("UPDATE usuario SET hora_entrada_programada = ADDTIME(CURRENT_TIME(), '01:00:00') WHERE id_usuario = 1");
+            st.execute("UPDATE usuario SET hora_entrada_programada = "
+                    + "CASE WHEN CURRENT_TIME() >= '22:55:00' THEN '23:59:59' ELSE ADDTIME(CURRENT_TIME(), '01:00:00') END "
+                    + "WHERE id_usuario = 1");
         }
 
         // Marcaje de entrada usando DNI de admin ("45892147")

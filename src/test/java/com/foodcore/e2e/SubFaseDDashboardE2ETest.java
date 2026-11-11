@@ -42,7 +42,7 @@ public class SubFaseDDashboardE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
             // Resolución Mobile iPhone 14 / Samsung Galaxy (390x844)
-            BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, 390, 844);
+            BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 390, 844, "ADMIN");
             Page page = context.newPage();
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/dashboard/");
@@ -87,7 +87,7 @@ public class SubFaseDDashboardE2ETest {
     void testDrawerMenuNavegacion() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-            BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, 390, 844);
+            BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 390, 844, "ADMIN");
             Page page = context.newPage();
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/dashboard/");

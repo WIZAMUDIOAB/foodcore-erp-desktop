@@ -9,8 +9,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
+import java.io.IOException;
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -45,6 +47,7 @@ public class SyncWorker {
     private final AtomicBoolean redDisponible = new AtomicBoolean(true);
     private final PedidoService pedidoService = new PedidoService();
     private ScheduledExecutorService scheduler;
+    private String esquemaInicializadoRuta;
     private final List<SyncStatusListener> listeners = new ArrayList<>();
 
     public interface SyncStatusListener {
@@ -56,10 +59,22 @@ public class SyncWorker {
     }
 
     private SyncWorker() {
+        // Inicialización diferida: la base de datos SQLite cifrada se crea únicamente cuando se activa o usa modo offline.
+    }
+
+    private synchronized void asegurarEsquemaInicializado() throws SQLException {
+        OfflineCryptoService.requireKey();
+        String rutaActual = LocalDatabaseManager.getDbPath();
+        Path dbFile = Path.of(rutaActual).toAbsolutePath().normalize();
+        boolean archivoInexistenteOVacio;
         try {
+            archivoInexistenteOVacio = Files.notExists(dbFile) || Files.size(dbFile) == 0;
+        } catch (IOException ex) {
+            throw new SQLException("No se pudo verificar estado de la base de datos SQLite local.", ex);
+        }
+        if (!rutaActual.equals(esquemaInicializadoRuta) || archivoInexistenteOVacio) {
             LocalDatabaseManager.inicializarEsquemaLocal();
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "No se pudo auto-inicializar SQLite local", e);
+            esquemaInicializadoRuta = rutaActual;
         }
     }
 
@@ -79,6 +94,14 @@ public class SyncWorker {
     }
 
     public void setSimularDesconexionRed(boolean sinRed) {
+        if (sinRed) {
+            OfflineCryptoService.requireKey();
+            try {
+                asegurarEsquemaInicializado();
+            } catch (SQLException ex) {
+                throw new IllegalStateException("No se pudo inicializar almacenamiento SQLite local cifrado.", ex);
+            }
+        }
         this.redDisponible.set(!sinRed);
         notificarListeners(sinRed ? "Modo Offline activado: Sin conexión con el servidor central." : "Red reestablecida.");
     }
@@ -87,9 +110,17 @@ public class SyncWorker {
      * Sincroniza el catálogo de productos y mesas hacia la BD local (§1.1).
      */
     public synchronized boolean sincronizarCatalogoHaciaLocal() {
+        OfflineCryptoService.requireKey();
         if (!verificarConectividadServidor()) {
             redDisponible.set(false);
             notificarListeners("Sin conexión: Operando con catálogo local en caché.");
+            return false;
+        }
+
+        try {
+            asegurarEsquemaInicializado();
+        } catch (SQLException e) {
+            LOGGER.log(Level.WARNING, "Error al preparar esquema SQLite local cifrado", e);
             return false;
         }
 
@@ -97,10 +128,10 @@ public class SyncWorker {
              Connection localConn = LocalDatabaseManager.getLocalConnection()) {
 
             // Sincronizar item_vendible
-            try (Statement stRemote = remoteConn.createStatement();
-                 ResultSet rsRemote = stRemote.executeQuery(
-                     "SELECT p.id_producto, p.codigo, p.nombre, p.precio_venta, p.id_categoria, c.nombre as cat_nombre, p.disponible, p.activo " +
-                     "FROM producto p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria WHERE p.activo = 1");
+            String sqlProd = "SELECT p.id_producto, p.codigo, p.nombre, p.precio_venta, p.id_categoria, c.nombre as cat_nombre, p.disponible, p.activo "
+                    + "FROM producto p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria WHERE p.activo = 1";
+            try (PreparedStatement stRemote = remoteConn.prepareStatement(sqlProd);
+                 ResultSet rsRemote = stRemote.executeQuery();
                  PreparedStatement psLocal = localConn.prepareStatement(
                      "INSERT OR REPLACE INTO item_vendible (id_producto, codigo, nombre, precio_venta, id_categoria, nombre_categoria, disponible, activo) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
@@ -120,8 +151,8 @@ public class SyncWorker {
             }
 
             // Sincronizar mesa
-            try (Statement stRemote = remoteConn.createStatement();
-                 ResultSet rsRemote = stRemote.executeQuery("SELECT id_mesa, numero, estado, activo FROM mesa WHERE activo = 1");
+            try (PreparedStatement stRemote = remoteConn.prepareStatement("SELECT id_mesa, numero, estado, activo FROM mesa WHERE activo = 1");
+                 ResultSet rsRemote = stRemote.executeQuery();
                  PreparedStatement psLocal = localConn.prepareStatement(
                      "INSERT OR REPLACE INTO mesa (id_mesa, numero, estado, activo) VALUES (?, ?, ?, ?)")) {
 
@@ -138,7 +169,7 @@ public class SyncWorker {
             redDisponible.set(true);
             notificarListeners(null);
             return true;
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al sincronizar catálogo remoto hacia BD local", e);
             redDisponible.set(false);
             notificarListeners("Error al sincronizar catálogo con servidor central.");
@@ -147,9 +178,12 @@ public class SyncWorker {
     }
 
     /**
-     * Guarda el pedido localmente en SQLite y lo encola en outbox_sync (§1.2).
+     * Guarda el pedido localmente en SQLite con campos sensibles cifrados y lo encola en outbox_sync (§1.2).
      */
     public synchronized int guardarPedidoEnOutboxLocal(Pedido pedido, List<DetallePedido> detalles) throws SQLException {
+        String cryptoKey = OfflineCryptoService.requireKey();
+        asegurarEsquemaInicializado();
+
         try (Connection conn = LocalDatabaseManager.getLocalConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -161,10 +195,10 @@ public class SyncWorker {
                     ps.setInt(1, pedido.getIdUsuario() > 0 ? pedido.getIdUsuario() : 1);
                     ps.setString(2, pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "DELIVERY");
                     ps.setString(3, pedido.getTipoPedido() != null ? pedido.getTipoPedido() : "MESA");
-                    ps.setString(4, pedido.getClienteNombre());
-                    ps.setString(5, pedido.getClienteTelefono());
-                    ps.setString(6, pedido.getClienteDireccion());
-                    ps.setString(7, pedido.getClienteReferencia());
+                    ps.setString(4, OfflineCryptoService.encrypt(cryptoKey, pedido.getClienteNombre()));
+                    ps.setString(5, OfflineCryptoService.encrypt(cryptoKey, pedido.getClienteTelefono()));
+                    ps.setString(6, OfflineCryptoService.encrypt(cryptoKey, pedido.getClienteDireccion()));
+                    ps.setString(7, OfflineCryptoService.encrypt(cryptoKey, pedido.getClienteReferencia()));
                     ps.setDouble(8, pedido.getCostoEnvio() != null ? pedido.getCostoEnvio().doubleValue() : 0.0);
                     ps.setDouble(9, pedido.getTotal() != null ? pedido.getTotal().doubleValue() : 0.0);
                     ps.setString(10, pedido.getEstado() != null ? pedido.getEstado() : "REGISTRADO");
@@ -201,18 +235,19 @@ public class SyncWorker {
                 payload.add("pedido", GSON.toJsonTree(pedido));
                 payload.add("detalles", GSON.toJsonTree(detalles));
 
+                String payloadCifrado = OfflineCryptoService.encrypt(cryptoKey, payload.toString());
                 String sqlOutbox = "INSERT INTO outbox_sync (id_pedido_local, idempotency_key, payload_json, estado) VALUES (?, ?, ?, 'PENDIENTE')";
                 try (PreparedStatement ps = conn.prepareStatement(sqlOutbox)) {
                     ps.setInt(1, idPedidoLocal);
                     ps.setString(2, pedido.getIdempotencyKey());
-                    ps.setString(3, payload.toString());
+                    ps.setString(3, payloadCifrado);
                     ps.executeUpdate();
                 }
 
                 conn.commit();
                 notificarListeners(null);
                 return idPedidoLocal;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             }
@@ -220,9 +255,11 @@ public class SyncWorker {
     }
 
     /**
-     * Procesa los registros pendientes de outbox_sync intentando enviarlos al servidor central (§1.2).
+     * Procesa los registros pendientes de outbox_sync descifrando sus payloads e intentando enviarlos al servidor (§1.2).
+     * Los pedidos confirmados en el servidor se purgan automáticamente de la base local SQLite.
      */
     public synchronized int procesarOutboxSync() {
+        String cryptoKey = OfflineCryptoService.requireKey();
         if (!verificarConectividadServidor()) {
             redDisponible.set(false);
             notificarListeners(null);
@@ -232,13 +269,21 @@ public class SyncWorker {
         redDisponible.set(true);
         int exitosos = 0;
 
+        try {
+            asegurarEsquemaInicializado();
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Fallo al preparar esquema SQLite local cifrado", e);
+            return 0;
+        }
+
         try (Connection conn = LocalDatabaseManager.getLocalConnection()) {
+            purgarRegistrosSincronizados(conn);
             String sqlSelect = "SELECT id_outbox, id_pedido_local, idempotency_key, payload_json, intentos FROM outbox_sync " +
                 "WHERE estado = 'PENDIENTE' ORDER BY id_outbox ASC LIMIT 20";
 
             List<OutboxItem> pendientes = new ArrayList<>();
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery(sqlSelect)) {
+            try (PreparedStatement st = conn.prepareStatement(sqlSelect);
+                 ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     pendientes.add(new OutboxItem(
                         rs.getInt("id_outbox"),
@@ -252,29 +297,17 @@ public class SyncWorker {
 
             for (OutboxItem item : pendientes) {
                 try {
-                    JsonObject obj = GSON.fromJson(item.payloadJson, JsonObject.class);
+                    String jsonPlano = OfflineCryptoService.decrypt(cryptoKey, item.payloadJson);
+                    JsonObject obj = GSON.fromJson(jsonPlano, JsonObject.class);
                     Pedido pedido = GSON.fromJson(obj.get("pedido"), Pedido.class);
                     Type listType = new TypeToken<List<DetallePedido>>(){}.getType();
                     List<DetallePedido> detalles = GSON.fromJson(obj.get("detalles"), listType);
 
                     // Enviar al servidor central de forma transaccional e idempotente
-                    Pedido pRegistrado = pedidoService.registrarPedidoYEnviarComanda(pedido, detalles);
+                    pedidoService.registrarPedidoYEnviarComanda(pedido, detalles);
 
-                    // Actualizar outbox a SINCRONIZADO
-                    try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE outbox_sync SET estado = 'SINCRONIZADO', updated_at = datetime('now', 'localtime') WHERE id_outbox = ?")) {
-                        ps.setInt(1, item.idOutbox);
-                        ps.executeUpdate();
-                    }
-
-                    // Actualizar pedido local con el ID remoto
-                    try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE pedido SET id_pedido_servidor = ?, estado = ? WHERE id_pedido_local = ?")) {
-                        ps.setInt(1, pRegistrado.getIdPedido());
-                        ps.setString(2, pRegistrado.getEstado());
-                        ps.setInt(3, item.idPedidoLocal);
-                        ps.executeUpdate();
-                    }
+                    // Purgar inmediatamente el registro sincronizado para no retener PII/pedidos en SQLite local
+                    eliminarRegistroSincronizado(conn, item.idOutbox, item.idPedidoLocal);
                     exitosos++;
                 } catch (Exception ex) {
                     LOGGER.log(Level.WARNING, "Error al sincronizar item outbox #" + item.idOutbox, ex);
@@ -301,7 +334,7 @@ public class SyncWorker {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.SEVERE, "Fallo al procesar cola outbox local", e);
         }
 
@@ -310,12 +343,83 @@ public class SyncWorker {
     }
 
     public synchronized int contarPedidosPendientes() {
+        if (!OfflineCryptoService.isKeyConfigured() && redDisponible.get()) {
+            return 0;
+        }
+        try {
+            asegurarEsquemaInicializado();
+        } catch (SQLException e) {
+            return 0;
+        }
         try (Connection conn = LocalDatabaseManager.getLocalConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM outbox_sync WHERE estado = 'PENDIENTE'")) {
+             PreparedStatement st = conn.prepareStatement("SELECT COUNT(*) FROM outbox_sync WHERE estado = 'PENDIENTE'");
+             ResultSet rs = st.executeQuery()) {
             return rs.next() ? rs.getInt(1) : 0;
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    /**
+     * Purga filas marcadas como {@code SINCRONIZADO} y pedidos huérfanos ya sincronizados.
+     */
+    public synchronized int purgarRegistrosSincronizados() throws SQLException {
+        OfflineCryptoService.requireKey();
+        asegurarEsquemaInicializado();
+        try (Connection conn = LocalDatabaseManager.getLocalConnection()) {
+            return purgarRegistrosSincronizados(conn);
+        }
+    }
+
+    private void eliminarRegistroSincronizado(Connection conn, int idOutbox, int idPedidoLocal) throws SQLException {
+        boolean prevAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM outbox_sync WHERE id_outbox = ? OR estado = 'SINCRONIZADO'")) {
+                ps.setInt(1, idOutbox);
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement("DELETE FROM detalle_pedido WHERE id_pedido_local = ?")) {
+                ps.setInt(1, idPedidoLocal);
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM pedido WHERE id_pedido_local = ? AND NOT EXISTS (SELECT 1 FROM outbox_sync o WHERE o.id_pedido_local = pedido.id_pedido_local)")) {
+                ps.setInt(1, idPedidoLocal);
+                ps.executeUpdate();
+            }
+            conn.commit();
+        } catch (SQLException | RuntimeException ex) {
+            conn.rollback();
+            throw ex;
+        } finally {
+            conn.setAutoCommit(prevAutoCommit);
+        }
+    }
+
+    private int purgarRegistrosSincronizados(Connection conn) throws SQLException {
+        boolean prevAutoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            int purgados;
+            try (PreparedStatement psOut = conn.prepareStatement("DELETE FROM outbox_sync WHERE estado = 'SINCRONIZADO'")) {
+                purgados = psOut.executeUpdate();
+            }
+            try (PreparedStatement psDet = conn.prepareStatement(
+                    "DELETE FROM detalle_pedido WHERE id_pedido_local NOT IN (SELECT id_pedido_local FROM outbox_sync)")) {
+                psDet.executeUpdate();
+            }
+            try (PreparedStatement psPed = conn.prepareStatement(
+                    "DELETE FROM pedido WHERE id_pedido_local NOT IN (SELECT id_pedido_local FROM outbox_sync)")) {
+                psPed.executeUpdate();
+            }
+            conn.commit();
+            return purgados;
+        } catch (SQLException | RuntimeException ex) {
+            conn.rollback();
+            throw ex;
+        } finally {
+            conn.setAutoCommit(prevAutoCommit);
         }
     }
 

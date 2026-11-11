@@ -47,7 +47,7 @@ public class PwaOfflineSyncE2ETest {
             // 1. Login en la PWA y navegación al catálogo de Mesa 03
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
 
@@ -94,6 +94,7 @@ public class PwaOfflineSyncE2ETest {
             HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
             HttpRequest reqVerif = HttpRequest.newBuilder()
                     .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/pedidos/" + uuidOffline))
+                    .header("Authorization", "Bearer " + PlaywrightE2ESupport.obtenerTokenRol("MOZO"))
                     .GET()
                     .build();
             HttpResponse<String> resVerif = client.send(reqVerif, HttpResponse.BodyHandlers.ofString());

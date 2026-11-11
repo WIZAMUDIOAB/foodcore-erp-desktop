@@ -50,7 +50,7 @@ public class PwaOrderFlowE2ETest {
             // 1. Login exitoso en la PWA
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
-            page.fill("#txtPassword", "Mozo2026!");
+            page.fill("#txtPassword", "Admin#2026!");
             page.click("button[type='submit']");
             page.waitForURL("**/mesas.html**");
 
@@ -103,6 +103,7 @@ public class PwaOrderFlowE2ETest {
             HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
             HttpRequest reqPedidos = HttpRequest.newBuilder()
                     .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/pedidos"))
+                    .header("Authorization", "Bearer " + PlaywrightE2ESupport.obtenerTokenRol("MOZO"))
                     .GET()
                     .build();
             HttpResponse<String> resPedidos = client.send(reqPedidos, HttpResponse.BodyHandlers.ofString());

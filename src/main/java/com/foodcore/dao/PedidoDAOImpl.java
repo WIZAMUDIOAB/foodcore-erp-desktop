@@ -195,6 +195,66 @@ public class PedidoDAOImpl implements PedidoDAO {
     }
 
     @Override
+    public List<Pedido> buscarPorEstado(Connection conn, String estado) throws SQLException {
+        if (estado == null || estado.isBlank()) {
+            return List.of();
+        }
+        List<Pedido> lista = new ArrayList<>();
+        String sql = "SELECT * FROM pedido WHERE estado = ? ORDER BY id_pedido DESC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, estado.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapearPedido(rs));
+                }
+            }
+        }
+        return lista;
+    }
+
+    @Override
+    public List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException {
+        List<Pedido> lista = new ArrayList<>();
+        String estadoNormalizado = (estado != null && !estado.isBlank()) ? estado.trim() : null;
+        String sql = "SELECT * FROM pedido "
+                + "WHERE (? IS NULL OR estado = ?) "
+                + "  AND (? IS NULL OR fecha_hora >= ?) "
+                + "  AND (? IS NULL OR fecha_hora <= ?) "
+                + "ORDER BY fecha_hora DESC, id_pedido DESC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (estadoNormalizado != null) {
+                ps.setString(1, estadoNormalizado);
+                ps.setString(2, estadoNormalizado);
+            } else {
+                ps.setNull(1, Types.VARCHAR);
+                ps.setNull(2, Types.VARCHAR);
+            }
+            if (desde != null) {
+                Timestamp tsDesde = Timestamp.valueOf(desde);
+                ps.setTimestamp(3, tsDesde);
+                ps.setTimestamp(4, tsDesde);
+            } else {
+                ps.setNull(3, Types.TIMESTAMP);
+                ps.setNull(4, Types.TIMESTAMP);
+            }
+            if (hasta != null) {
+                Timestamp tsHasta = Timestamp.valueOf(hasta);
+                ps.setTimestamp(5, tsHasta);
+                ps.setTimestamp(6, tsHasta);
+            } else {
+                ps.setNull(5, Types.TIMESTAMP);
+                ps.setNull(6, Types.TIMESTAMP);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapearPedido(rs));
+                }
+            }
+        }
+        return lista;
+    }
+
+    @Override
     public List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException {
         List<DetallePedido> lista = new ArrayList<>();
         String sql = "SELECT dp.*, p.nombre AS nombre_prod, ped.numero_mesa FROM detalle_pedido dp " +

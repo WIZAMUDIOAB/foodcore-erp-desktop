@@ -20,11 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ApiState {
 
     public final ObjectMapper mapper = new ObjectMapper();
-    public final Map<Integer, String> pinsMemoria = new ConcurrentHashMap<>(Map.of(
-            1, "9999",
-            2, "2001",
-            3, "1234"
-    ));
     public final AtomicInteger secuenciaComprobantes = new AtomicInteger(100);
     public final AtomicBoolean cajaTurnoActivoMemoria = new AtomicBoolean(false);
     public volatile String cajaNombreMemoria = "Caja Principal";
