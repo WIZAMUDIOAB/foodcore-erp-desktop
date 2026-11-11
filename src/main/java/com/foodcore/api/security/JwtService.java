@@ -8,7 +8,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -24,8 +23,9 @@ public final class JwtService {
 
     private static final int MIN_SECRET_BYTES = 32;
     private static final long TOKEN_TTL_SECONDS = 28_800L;
+    private static final String ERROR_SECRET_OBLIGATORIO =
+            "FOODCORE_JWT_SECRET is required and must be at least 32 bytes (UTF-8)";
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final byte[] secretBytes;
 
@@ -38,43 +38,44 @@ public final class JwtService {
 
     public JwtService(byte[] secretBytes) {
         if (secretBytes == null || secretBytes.length < MIN_SECRET_BYTES) {
-            throw new IllegalStateException(
-                "La clave JWT debe tener al menos " + MIN_SECRET_BYTES + " bytes de entropía."
-            );
+            throw new IllegalStateException(ERROR_SECRET_OBLIGATORIO);
         }
         this.secretBytes = secretBytes.clone();
     }
 
+    /**
+     * Valida en el arranque (fail-fast) que FOODCORE_JWT_SECRET esté configurada con al menos 32 bytes UTF-8.
+     */
+    public static void validarConfiguracionObligatoria() {
+        resolverClaveSecreta();
+    }
+
     private static byte[] resolverClaveSecreta() {
         String configured = leerSecretConfigurado();
-        if (configured != null && !configured.isBlank() && !configured.startsWith("${")) {
-            byte[] raw = configured.getBytes(StandardCharsets.UTF_8);
-            if (raw.length < MIN_SECRET_BYTES) {
-                throw new IllegalStateException(
-                    "FOODCORE_JWT_SECRET es demasiado corto; mínimo " + MIN_SECRET_BYTES + " bytes."
-                );
-            }
-            return raw;
+        if (configured == null || configured.isBlank() || configured.startsWith("${")) {
+            throw new IllegalStateException(ERROR_SECRET_OBLIGATORIO);
         }
-        // Clave efímera aleatoria por instancia cuando no se especifica FOODCORE_JWT_SECRET en entorno dev/test
-        byte[] ephemeral = new byte[MIN_SECRET_BYTES];
-        SECURE_RANDOM.nextBytes(ephemeral);
-        return ephemeral;
+        byte[] raw = configured.getBytes(StandardCharsets.UTF_8);
+        if (raw.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(ERROR_SECRET_OBLIGATORIO);
+        }
+        return raw;
     }
 
     private static String leerSecretConfigurado() {
         String sysProp = System.getProperty("FOODCORE_JWT_SECRET");
-        if (sysProp != null && !sysProp.isBlank()) {
+        if (sysProp != null) {
             return sysProp.trim();
         }
         String envVal = System.getenv("FOODCORE_JWT_SECRET");
-        if (envVal != null && !envVal.isBlank()) {
+        if (envVal != null) {
             return envVal.trim();
         }
         Properties props = new Properties();
         cargarSiExiste(props, "/application.properties");
         cargarSiExiste(props, "/application-test.properties");
-        return props.getProperty("jwt.secret");
+        String propVal = props.getProperty("jwt.secret");
+        return propVal != null ? propVal.trim() : null;
     }
 
     private static void cargarSiExiste(Properties target, String path) {

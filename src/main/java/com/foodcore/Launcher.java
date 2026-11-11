@@ -1,6 +1,7 @@
 package com.foodcore;
 
 import com.foodcore.api.ApiServer;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.config.FlywayMigrator;
 import com.foodcore.config.LoggingBootstrap;
 import com.foodcore.util.ConexionBD;
@@ -25,6 +26,7 @@ public class Launcher {
         LoggingBootstrap.installBridge();
         ConexionBD.validarVariablesEntornoObligatorias();
         ApiServer.resolverKeystorePasswordObligatorio();
+        JwtService.validarConfiguracionObligatoria();
         boolean modoServidor = Arrays.asList(args).contains("--server")
                 || Arrays.asList(args).contains("--headless")
                 || "true".equalsIgnoreCase(System.getenv("CI"))
