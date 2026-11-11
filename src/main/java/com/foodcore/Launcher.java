@@ -2,6 +2,7 @@ package com.foodcore;
 
 import com.foodcore.api.ApiServer;
 import com.foodcore.config.FlywayMigrator;
+import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 
 import java.awt.GraphicsEnvironment;
@@ -20,6 +21,7 @@ public class Launcher {
     private static final Logger LOGGER = Logger.getLogger(Launcher.class.getName());
 
     public static void main(String[] args) {
+        ConexionBD.validarVariablesEntornoObligatorias();
         boolean modoServidor = Arrays.asList(args).contains("--server")
                 || Arrays.asList(args).contains("--headless")
                 || "true".equalsIgnoreCase(System.getenv("CI"))
@@ -33,6 +35,8 @@ public class Launcher {
 
         try {
             App.main(args);
+        } catch (IllegalStateException ex) {
+            throw ex;
         } catch (Throwable t) {
             LOGGER.log(Level.WARNING, "Entorno sin display gráfico detectado; iniciando modo Servidor Headless", t);
             iniciarModoServidorHeadless();
@@ -40,8 +44,11 @@ public class Launcher {
     }
 
     private static void iniciarModoServidorHeadless() {
+        ConexionBD.validarVariablesEntornoObligatorias();
         try {
             FlywayMigrator.migrateOnBootstrap();
+        } catch (IllegalStateException ex) {
+            throw ex;
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Migraciones Flyway diferidas en arranque headless", e);
         }

@@ -414,9 +414,7 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>10.15.0</version>
                 <configuration>
-                    <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
-                    <user>root</user>
-                    <password>root</password>
+                    <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
                     <cleanDisabled>false</cleanDisabled>
                 </configuration>
                 <dependencies>

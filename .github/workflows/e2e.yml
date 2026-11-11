@@ -23,10 +23,9 @@ jobs:
       FOODCORE_DB_HOST: 127.0.0.1
       FOODCORE_DB_PORT: 3306
       FOODCORE_DB_NAME: foodcore_test
-      FOODCORE_DB_USER: root
-      FOODCORE_DB_PASS: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
-      FOODCORE_MIGRATOR_USER: root
-      FOODCORE_MIGRATOR_PASS: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
+      FOODCORE_DB_SSL_MODE: REQUIRED
+      FOODCORE_DB_USER: foodcore_app
+      FOODCORE_MIGRATOR_USER: foodcore_migrator
 
     steps:
       - name: Checkout repository
@@ -44,10 +43,45 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Provision Least-Privilege MySQL Accounts (DDL vs DML)
+        env:
+          CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
+        run: |
+          if [ -z "$CI_MYSQL_ROOT_PASSWORD" ]; then
+            echo "::error::Secret CI_MYSQL_ROOT_PASSWORD is required."
+            exit 1
+          fi
+          if ! command -v mysql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y mysql-client
+          fi
+          MIGRATOR_PASS="$(openssl rand -hex 24)"
+          APP_PASS="$(openssl rand -hex 24)"
+          echo "::add-mask::$MIGRATOR_PASS"
+          echo "::add-mask::$APP_PASS"
+          echo "FOODCORE_MIGRATOR_PASS=$MIGRATOR_PASS" >> "$GITHUB_ENV"
+          echo "FOODCORE_DB_PASS=$APP_PASS" >> "$GITHUB_ENV"
+
+          mysql --host=127.0.0.1 --port=3306 --ssl-mode=REQUIRED -u root -p"$CI_MYSQL_ROOT_PASSWORD" <<SQL
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'%' IDENTIFIED BY '${MIGRATOR_PASS}';
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'127.0.0.1' IDENTIFIED BY '${MIGRATOR_PASS}';
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'localhost' IDENTIFIED BY '${MIGRATOR_PASS}';
+          GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'%' WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'127.0.0.1' WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'localhost' WITH GRANT OPTION;
+
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'%' IDENTIFIED BY '${APP_PASS}';
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'127.0.0.1' IDENTIFIED BY '${APP_PASS}';
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'localhost' IDENTIFIED BY '${APP_PASS}';
+          GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'%';
+          GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'127.0.0.1';
+          GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'localhost';
+          FLUSH PRIVILEGES;
+          SQL
+
       - name: Prepare Database with Flyway
         run: |
           mvn compile flyway:migrate \
-            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
+            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
             -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
             -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
 

@@ -3,6 +3,7 @@ package com.foodcore;
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.api.ApiServer;
 import com.foodcore.config.FlywayMigrator;
+import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -27,6 +28,7 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
+        ConexionBD.validarVariablesEntornoObligatorias();
         primaryStage = stage;
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         cargarFuentesSistema();
