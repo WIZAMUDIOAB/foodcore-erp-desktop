@@ -100,13 +100,17 @@ class AuthServiceImplTest {
     @Test
     @DisplayName("B3-bis (3/6): Login con bloqueo expirado desbloquea la cuenta, resetea intentos y autentica")
     void testLogin_BloqueoExpirado_Desbloquea() throws Exception {
-        LocalDateTime pasado = LocalDateTime.now(ZONA_LIMA).minusMinutes(5);
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE usuario SET intentos_fallidos = 5, bloqueado_hasta = ? WHERE username = 'cajero'"
-             )) {
-            ps.setObject(1, pasado);
-            ps.executeUpdate();
+        try (Connection conn = ConexionBD.getConnection()) {
+            try (PreparedStatement clean = conn.prepareStatement(
+                    "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE username = 'cajero'")) {
+                clean.executeUpdate();
+            }
+            LocalDateTime pasado = LocalDateTime.now(ZONA_LIMA).minusMinutes(5);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE usuario SET intentos_fallidos = 5, bloqueado_hasta = ? WHERE username = 'cajero'")) {
+                ps.setObject(1, pasado);
+                ps.executeUpdate();
+            }
         }
 
         Usuario autenticado = authService.login("cajero", "Admin#2026!");

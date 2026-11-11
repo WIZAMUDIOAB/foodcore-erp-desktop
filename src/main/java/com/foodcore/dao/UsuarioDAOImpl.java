@@ -11,13 +11,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class UsuarioDAOImpl implements UsuarioDAO {
 
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private final EncriptadorPassword encriptador = new EncriptadorPassword();
 
     @Override
@@ -59,15 +62,9 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                     u.setNombreEmpleado(rs.getString("empleado_nombre"));
                     try {
                         u.setIntentosFallidos(rs.getInt("intentos_fallidos"));
-                        Timestamp tsBloqueo = rs.getTimestamp("bloqueado_hasta");
-                        if (tsBloqueo != null) {
-                            u.setBloqueadoHasta(tsBloqueo.toLocalDateTime());
-                        }
+                        u.setBloqueadoHasta(leerFechaLima(rs, "bloqueado_hasta"));
                         u.setCambioPasswordRequerido(rs.getBoolean("cambio_password_requerido"));
-                        Timestamp tsUltimo = rs.getTimestamp("ultimo_login");
-                        if (tsUltimo != null) {
-                            u.setUltimoLogin(tsUltimo.toLocalDateTime());
-                        }
+                        u.setUltimoLogin(leerFechaLima(rs, "ultimo_login"));
                         try {
                             u.setDni(rs.getString("dni"));
                             u.setPin(rs.getString("pin"));
@@ -83,11 +80,24 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         return Optional.empty();
     }
 
+    private static LocalDateTime leerFechaLima(ResultSet rs, String columna) throws SQLException {
+        Timestamp ts = rs.getTimestamp(columna);
+        return ts != null ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime() : null;
+    }
+
     @Override
     public void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException {
-        String sql = bloquear15Minutos
-            ? "UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id_usuario = ?"
-            : "UPDATE usuario SET intentos_fallidos = ? WHERE id_usuario = ?";
+        if (bloquear15Minutos) {
+            String sql = "UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE id_usuario = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, nuevosIntentos);
+                ps.setObject(2, LocalDateTime.now(ZONA_LIMA).plusMinutes(15));
+                ps.setInt(3, idUsuario);
+                ps.executeUpdate();
+            }
+            return;
+        }
+        String sql = "UPDATE usuario SET intentos_fallidos = ? WHERE id_usuario = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, nuevosIntentos);
             ps.setInt(2, idUsuario);
@@ -97,9 +107,10 @@ public class UsuarioDAOImpl implements UsuarioDAO {
 
     @Override
     public void resetearIntentosLogin(Connection conn, int idUsuario) throws SQLException {
-        String sql = "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_login = NOW() WHERE id_usuario = ?";
+        String sql = "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_login = ? WHERE id_usuario = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idUsuario);
+            ps.setObject(1, LocalDateTime.now(ZONA_LIMA));
+            ps.setInt(2, idUsuario);
             ps.executeUpdate();
         }
     }
