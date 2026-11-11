@@ -143,7 +143,7 @@ public class ApiServer {
         File pwaDir = new File("pwa");
 
         app = Javalin.create(config -> {
-            config.showJavalinBanner = false;
+            config.startup.showJavalinBanner = false;
             if (esDevLoggingHabilitado()) {
                 config.bundledPlugins.enableDevLogging();
             }
@@ -188,85 +188,85 @@ public class ApiServer {
                     });
                 }
             }
-        });
 
-        // Seguridad HTTP: CORS por whitelist explícita + API 100% stateless (Authorization: Bearer JWT, sin cookies ni CSRF por cookie)
-        app.before(ctx -> corsPolicy.apply(ctx));
-        app.options("/*", ctx -> {
-            if (!ctx.res().isCommitted()) {
-                ctx.status(204);
-            }
-        });
-        app.before("/api/*", securityFilter::handle);
+            // Seguridad HTTP: CORS por whitelist explícita + API 100% stateless (Authorization: Bearer JWT, sin cookies ni CSRF por cookie)
+            config.routes.before(ctx -> corsPolicy.apply(ctx));
+            config.routes.options("/*", ctx -> {
+                if (!ctx.res().isCommitted()) {
+                    ctx.status(204);
+                }
+            });
+            config.routes.before("/api/*", securityFilter::handle);
 
-        // 1. Health, AuthController & Catálogo Público de Solo Lectura
-        app.get("/health", this::handleHealthReadiness);
-        app.head("/health", this::handleHealthReadiness);
-        app.get("/api/health", this::handleHealth);
-        app.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
-        app.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
-        app.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
-        app.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
-        app.post("/api/auth/login", authController::handleLogin);
-        app.post("/api/auth/pin-login", authController::handlePinLogin);
-        app.post("/api/auth/pin-switch", authController::handlePinSwitch);
-        app.get("/api/usuarios/activos", authController::handleListarUsuariosActivos);
-        app.patch("/api/usuarios/{id}/pin", authController::handleActualizarPinUsuario);
+            // 1. Health, AuthController & Catálogo Público de Solo Lectura
+            config.routes.get("/health", this::handleHealthReadiness);
+            config.routes.head("/health", this::handleHealthReadiness);
+            config.routes.get("/api/health", this::handleHealth);
+            config.routes.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
+            config.routes.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
+            config.routes.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
+            config.routes.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
+            config.routes.post("/api/auth/login", authController::handleLogin);
+            config.routes.post("/api/auth/pin-login", authController::handlePinLogin);
+            config.routes.post("/api/auth/pin-switch", authController::handlePinSwitch);
+            config.routes.get("/api/usuarios/activos", authController::handleListarUsuariosActivos);
+            config.routes.patch("/api/usuarios/{id}/pin", authController::handleActualizarPinUsuario);
 
-        // 2. PedidoController (Catálogo, Mesas, Pedidos y Caja)
-        app.get("/api/productos", pedidoController::handleListarProductos);
-        app.get("/api/productos/disponibles", pedidoController::handleListarProductosDisponibles);
-        app.patch("/api/productos/{id}/disponibilidad", pedidoController::handleActualizarDisponibilidad);
-        app.get("/api/productos/{id}/imagen", pedidoController::handleImagenProducto);
-        app.get("/uploads/platillos/{archivo}", pedidoController::handleServirUploadPlatillo);
-        app.get("/api/mesas", pedidoController::handleListarMesas);
-        app.get("/api/pedidos", pedidoController::handleListarPedidos);
-        app.get("/api/pedidos/{uuid}", pedidoController::handleObtenerPedidoPorUuid);
-        app.post("/api/pedidos", pedidoController::handleCrearPedido);
-        app.patch("/api/pedidos/{id}/estado", pedidoController::handleActualizarEstadoPedido);
-        app.get("/api/caja/estado", pedidoController::handleCajaEstado);
-        app.post("/api/caja/abrir", pedidoController::handleCajaAbrir);
-        app.post("/api/caja/cerrar", pedidoController::handleCajaCerrar);
-        app.post("/api/caja/cobrar", pedidoController::handleCajaCobrar);
+            // 2. PedidoController (Catálogo, Mesas, Pedidos y Caja)
+            config.routes.get("/api/productos", pedidoController::handleListarProductos);
+            config.routes.get("/api/productos/disponibles", pedidoController::handleListarProductosDisponibles);
+            config.routes.patch("/api/productos/{id}/disponibilidad", pedidoController::handleActualizarDisponibilidad);
+            config.routes.get("/api/productos/{id}/imagen", pedidoController::handleImagenProducto);
+            config.routes.get("/uploads/platillos/{archivo}", pedidoController::handleServirUploadPlatillo);
+            config.routes.get("/api/mesas", pedidoController::handleListarMesas);
+            config.routes.get("/api/pedidos", pedidoController::handleListarPedidos);
+            config.routes.get("/api/pedidos/{uuid}", pedidoController::handleObtenerPedidoPorUuid);
+            config.routes.post("/api/pedidos", pedidoController::handleCrearPedido);
+            config.routes.patch("/api/pedidos/{id}/estado", pedidoController::handleActualizarEstadoPedido);
+            config.routes.get("/api/caja/estado", pedidoController::handleCajaEstado);
+            config.routes.post("/api/caja/abrir", pedidoController::handleCajaAbrir);
+            config.routes.post("/api/caja/cerrar", pedidoController::handleCajaCerrar);
+            config.routes.post("/api/caja/cobrar", pedidoController::handleCajaCobrar);
 
-        // 3. KdsController (Cocina / Bar)
-        app.get("/api/kds/comandas", kdsController::handleKdsComandas);
-        app.get("/api/kds/items", kdsController::handleKdsItems);
-        app.get("/api/kds/pendientes", kdsController::handleKdsItems);
-        app.patch("/api/kds/items/{id}/estado", kdsController::handleActualizarEstadoItemKds);
-        app.patch("/api/kds/{id}/estado", kdsController::handleActualizarEstadoItemKds);
-        app.patch("/api/kds/pedidos/{id}/entregar", kdsController::handleMarcarPedidoEntregado);
+            // 3. KdsController (Cocina / Bar)
+            config.routes.get("/api/kds/comandas", kdsController::handleKdsComandas);
+            config.routes.get("/api/kds/items", kdsController::handleKdsItems);
+            config.routes.get("/api/kds/pendientes", kdsController::handleKdsItems);
+            config.routes.patch("/api/kds/items/{id}/estado", kdsController::handleActualizarEstadoItemKds);
+            config.routes.patch("/api/kds/{id}/estado", kdsController::handleActualizarEstadoItemKds);
+            config.routes.patch("/api/kds/pedidos/{id}/entregar", kdsController::handleMarcarPedidoEntregado);
 
-        // 4. ReportesController (Dashboard Ejecutivo)
-        app.get("/api/dashboard/kpis", reportesController::handleDashboardKpis);
-        app.get("/api/reportes/dashboard", reportesController::handleDashboardKpis);
-        app.get("/api/dashboard/ventas-por-hora", reportesController::handleDashboardVentasPorHora);
-        app.get("/api/dashboard/top-platos", reportesController::handleDashboardTopPlatos);
-        app.get("/api/dashboard/ventas-recientes", reportesController::handleDashboardVentasRecientes);
-        app.get("/api/menu-digital/view", reportesController::handleMenuDigitalView);
+            // 4. ReportesController (Dashboard Ejecutivo)
+            config.routes.get("/api/dashboard/kpis", reportesController::handleDashboardKpis);
+            config.routes.get("/api/reportes/dashboard", reportesController::handleDashboardKpis);
+            config.routes.get("/api/dashboard/ventas-por-hora", reportesController::handleDashboardVentasPorHora);
+            config.routes.get("/api/dashboard/top-platos", reportesController::handleDashboardTopPlatos);
+            config.routes.get("/api/dashboard/ventas-recientes", reportesController::handleDashboardVentasRecientes);
+            config.routes.get("/api/menu-digital/view", reportesController::handleMenuDigitalView);
 
-        // 5. Rutas directas para PWAs y Certificado SSL (con soporte classpath getResourceAsStream y filesystem)
-        app.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
-        app.get("/kds/", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
-        app.get("/dashboard", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
-        app.get("/dashboard/", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
-        app.get("/foodcore.cer", this::servirCertificadoSsl);
+            // 5. Rutas directas para PWAs y Certificado SSL (con soporte classpath getResourceAsStream y filesystem)
+            config.routes.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
+            config.routes.get("/kds/", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
+            config.routes.get("/dashboard", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
+            config.routes.get("/dashboard/", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
+            config.routes.get("/foodcore.cer", this::servirCertificadoSsl);
 
-        app.get("/", ctx -> {
-            File indexFile = new File("pwa/index.html");
-            if (indexFile.exists()) {
-                ctx.contentType("text/html; charset=UTF-8");
-                ctx.result(Files.readString(indexFile.toPath(), StandardCharsets.UTF_8));
-                return;
-            }
-            try (InputStream is = getClass().getResourceAsStream("/pwa/index.html")) {
-                if (is != null) {
+            config.routes.get("/", ctx -> {
+                File indexFile = new File("pwa/index.html");
+                if (indexFile.exists()) {
                     ctx.contentType("text/html; charset=UTF-8");
-                    ctx.result(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+                    ctx.result(Files.readString(indexFile.toPath(), StandardCharsets.UTF_8));
                     return;
                 }
-            }
-            ctx.json(Map.of("service", "FoodCore ERP API v4.4.0", "status", "ONLINE"));
+                try (InputStream is = getClass().getResourceAsStream("/pwa/index.html")) {
+                    if (is != null) {
+                        ctx.contentType("text/html; charset=UTF-8");
+                        ctx.result(new String(is.readAllBytes(), StandardCharsets.UTF_8));
+                        return;
+                    }
+                }
+                ctx.json(Map.of("service", "FoodCore ERP API v4.4.0", "status", "ONLINE"));
+            });
         });
 
         app.start();
