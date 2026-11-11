@@ -6,7 +6,7 @@ import com.foodcore.model.Rol;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -79,7 +79,7 @@ public class RolesController {
         });
 
         construirMatrizPermisosVisual();
-        cargarRolesSincrono();
+        cargarRolesDesdeBD();
     }
 
     public static String getPermisoLabel(Permiso permiso) {
@@ -186,25 +186,26 @@ public class RolesController {
     }
 
     public void cargarRolesDesdeBD() {
-        new Thread(() -> {
-            List<Rol> resultado = new ArrayList<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                resultado = rolDAO.listarTodos(conn);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando roles", e);
-            }
-
-            final List<Rol> roles = resultado;
-            Platform.runLater(() -> {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return conn != null ? rolDAO.listarTodos(conn) : new ArrayList<Rol>();
+                }
+            },
+            roles -> {
                 listaRoles.setAll(roles);
                 if (!listaRoles.isEmpty()) {
                     tblRoles.getSelectionModel().selectFirst();
                 }
-            });
-        }).start();
+            },
+            ex -> LOGGER.log(Level.FINE, "Error cargando roles", ex)
+        );
     }
 
     public void seleccionarRol(Rol r) {
+        if (r == null) {
+            return;
+        }
         this.rolSeleccionadoActual = r;
         lblRolSeleccionadoTitulo.setText("Permisos del Rol: " + r.getNombre() + " (" + r.getCodigo() + ")");
         lblRolDescripcion.setText(r.getDescripcion() != null ? r.getDescripcion() : "Sin descripción.");
@@ -212,21 +213,20 @@ public class RolesController {
         // Desmarcar todos primero
         mapCheckboxes.values().forEach(chk -> chk.setSelected(false));
 
-        new Thread(() -> {
-            Set<Permiso> permisos = EnumSet.noneOf(Permiso.class);
-            try (Connection conn = ConexionBD.getConnection()) {
-                permisos = rolDAO.obtenerPermisosPorRol(conn, r.getCodigo());
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando permisos del rol", e);
-            }
-
-            final Set<Permiso> permsFinal = permisos;
-            Platform.runLater(() -> {
+        final String codigoRol = r.getCodigo();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return conn != null ? rolDAO.obtenerPermisosPorRol(conn, codigoRol) : EnumSet.noneOf(Permiso.class);
+                }
+            },
+            permsFinal -> {
                 for (Map.Entry<Permiso, CheckBox> entry : mapCheckboxes.entrySet()) {
                     entry.getValue().setSelected(permsFinal.contains(entry.getKey()));
                 }
-            });
-        }).start();
+            },
+            ex -> LOGGER.log(Level.FINE, "Error cargando permisos del rol", ex)
+        );
     }
 
     @FXML
@@ -236,19 +236,37 @@ public class RolesController {
             return;
         }
 
-        Set<Permiso> nuevosPermisos = EnumSet.noneOf(Permiso.class);
+        final String codigoRol = rolSeleccionadoActual.getCodigo();
+        final String nombreRol = rolSeleccionadoActual.getNombre();
+        final Set<Permiso> nuevosPermisos = EnumSet.noneOf(Permiso.class);
         for (Map.Entry<Permiso, CheckBox> entry : mapCheckboxes.entrySet()) {
             if (entry.getValue().isSelected()) {
                 nuevosPermisos.add(entry.getKey());
             }
         }
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            rolDAO.actualizarPermisosRol(conn, rolSeleccionadoActual.getCodigo(), nuevosPermisos);
-            AnimationUtils.mostrarToast(rootRolesStack, "Permisos del rol '" + rolSeleccionadoActual.getNombre() + "' guardados exitosamente en BD.", false);
-        } catch (Exception e) {
-            AnimationUtils.mostrarToast(rootRolesStack, "Error al guardar permisos: " + e.getMessage(), true);
+        if (btnGuardarPermisos != null) {
+            btnGuardarPermisos.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    rolDAO.actualizarPermisosRol(conn, codigoRol, nuevosPermisos);
+                }
+            },
+            () -> {
+                if (btnGuardarPermisos != null) {
+                    btnGuardarPermisos.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootRolesStack, "Permisos del rol '" + nombreRol + "' guardados exitosamente en BD.", false);
+            },
+            ex -> {
+                if (btnGuardarPermisos != null) {
+                    btnGuardarPermisos.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootRolesStack, "Error al guardar permisos: " + (ex != null ? ex.getMessage() : "desconocido"), true);
+            }
+        );
     }
 
     @FXML
@@ -282,14 +300,24 @@ public class RolesController {
                 return;
             }
 
-            try (Connection conn = ConexionBD.getConnection()) {
-                rolDAO.crearRol(conn, cod, nom, desc);
-                rootRolesStack.getChildren().remove(backdrop);
-                AnimationUtils.mostrarToast(rootRolesStack, "Rol '" + nom + "' creado con éxito.", false);
-                cargarRolesDesdeBD();
-            } catch (Exception ex) {
-                AnimationUtils.mostrarToast(rootRolesStack, "Error al crear rol: " + ex.getMessage(), true);
-            }
+            btnGuardar.setDisable(true);
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        rolDAO.crearRol(conn, cod, nom, desc);
+                    }
+                },
+                () -> {
+                    btnGuardar.setDisable(false);
+                    rootRolesStack.getChildren().remove(backdrop);
+                    AnimationUtils.mostrarToast(rootRolesStack, "Rol '" + nom + "' creado con éxito.", false);
+                    cargarRolesDesdeBD();
+                },
+                ex -> {
+                    btnGuardar.setDisable(false);
+                    AnimationUtils.mostrarToast(rootRolesStack, "Error al crear rol: " + (ex != null ? ex.getMessage() : "desconocido"), true);
+                }
+            );
         });
 
         HBox actions = new HBox(12, btnCancelar, btnGuardar);

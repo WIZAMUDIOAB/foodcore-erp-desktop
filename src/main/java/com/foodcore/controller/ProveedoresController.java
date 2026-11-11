@@ -11,6 +11,7 @@ import com.foodcore.model.Insumo;
 import com.foodcore.model.Proveedor;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -77,7 +78,7 @@ public class ProveedoresController {
         configurarColumnas();
         configurarSeleccion();
         configurarBusqueda();
-        cargarProveedoresSincrono();
+        cargarProveedoresAsync();
     }
 
     private void configurarColumnas() {
@@ -102,7 +103,7 @@ public class ProveedoresController {
     private void configurarBusqueda() {
         txtBuscar.textProperty().addListener((obs, oldV, newV) -> {
             if (newV == null || newV.isBlank()) {
-                cargarProveedoresSincrono();
+                cargarProveedoresAsync();
             } else {
                 String filtro = newV.toLowerCase().trim();
                 List<Proveedor> filtrados = listaProveedores.stream()
@@ -113,19 +114,28 @@ public class ProveedoresController {
         });
     }
 
+    public void cargarProveedoresAsync() {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return proveedorDAO.listarTodos(conn);
+                }
+            },
+            todos -> {
+                listaProveedores.setAll(todos);
+                tblProveedores.setItems(listaProveedores);
+                lblTotalProveedores.setText(todos.size() + " Proveedores");
+                if (!todos.isEmpty()) {
+                    tblProveedores.getSelectionModel().selectFirst();
+                    seleccionarProveedor(todos.get(0));
+                }
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar proveedores", ex)
+        );
+    }
+
     public void cargarProveedoresSincrono() {
-        listaProveedores.clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Proveedor> todos = proveedorDAO.listarTodos(conn);
-            listaProveedores.addAll(todos);
-            lblTotalProveedores.setText(todos.size() + " Proveedores");
-            if (!todos.isEmpty()) {
-                tblProveedores.getSelectionModel().selectFirst();
-                seleccionarProveedor(todos.get(0));
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar proveedores", ex);
-        }
+        cargarProveedoresAsync();
     }
 
     public void seleccionarProveedor(Proveedor p) {
@@ -190,65 +200,87 @@ public class ProveedoresController {
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
         } catch (Exception ignored) {}
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (modoEdicion && proveedorSeleccionado != null) {
-                proveedorSeleccionado.setRuc(ruc);
-                proveedorSeleccionado.setRazonSocial(razon);
-                proveedorSeleccionado.setContacto(txtModalContacto.getText().trim());
-                proveedorSeleccionado.setTelefono(txtModalTelefono.getText().trim());
-                proveedorSeleccionado.setEmail(txtModalEmail.getText().trim());
-                proveedorSeleccionado.setDiasCredito(dias);
-                proveedorDAO.actualizar(conn, proveedorSeleccionado);
-            } else {
-                Proveedor nuevo = new Proveedor();
-                nuevo.setRuc(ruc);
-                nuevo.setRazonSocial(razon);
-                nuevo.setContacto(txtModalContacto.getText().trim());
-                nuevo.setTelefono(txtModalTelefono.getText().trim());
-                nuevo.setEmail(txtModalEmail.getText().trim());
-                nuevo.setDiasCredito(dias);
-                proveedorDAO.insertar(conn, nuevo);
-            }
-            modalProveedor.setVisible(false);
-            cargarProveedoresSincrono();
-        } catch (Exception ex) {
-            lblModalError.setText("Error al guardar: " + ex.getMessage());
-        }
+        final int diasFinal = dias;
+        final String contacto = txtModalContacto.getText().trim();
+        final String telefono = txtModalTelefono.getText().trim();
+        final String email = txtModalEmail.getText().trim();
+        final boolean editarFinal = modoEdicion && proveedorSeleccionado != null;
+        final Proveedor sel = proveedorSeleccionado;
+
+        lblModalError.setText("");
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if (editarFinal) {
+                        sel.setRuc(ruc);
+                        sel.setRazonSocial(razon);
+                        sel.setContacto(contacto);
+                        sel.setTelefono(telefono);
+                        sel.setEmail(email);
+                        sel.setDiasCredito(diasFinal);
+                        proveedorDAO.actualizar(conn, sel);
+                    } else {
+                        Proveedor nuevo = new Proveedor();
+                        nuevo.setRuc(ruc);
+                        nuevo.setRazonSocial(razon);
+                        nuevo.setContacto(contacto);
+                        nuevo.setTelefono(telefono);
+                        nuevo.setEmail(email);
+                        nuevo.setDiasCredito(diasFinal);
+                        proveedorDAO.insertar(conn, nuevo);
+                    }
+                }
+            },
+            () -> {
+                modalProveedor.setVisible(false);
+                cargarProveedoresAsync();
+            },
+            ex -> lblModalError.setText("Error al guardar: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 
     @FXML
     public void handleCambiarEstado() {
         if (proveedorSeleccionado == null) return;
-        try (Connection conn = ConexionBD.getConnection()) {
-            boolean nuevoEstado = !proveedorSeleccionado.isActivo();
-            proveedorDAO.cambiarEstado(conn, proveedorSeleccionado.getIdProveedor(), nuevoEstado);
-            cargarProveedoresSincrono();
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cambiar estado de proveedor", ex);
-        }
+        final int idProveedor = proveedorSeleccionado.getIdProveedor();
+        final boolean nuevoEstado = !proveedorSeleccionado.isActivo();
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    proveedorDAO.cambiarEstado(conn, idProveedor, nuevoEstado);
+                }
+            },
+            this::cargarProveedoresAsync,
+            ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado de proveedor", ex)
+        );
     }
 
     @FXML
     public void handleGenerarOrdenCompra() {
         if (proveedorSeleccionado == null) return;
-        try {
-            List<Insumo> insumosBajos;
-            try (Connection conn = ConexionBD.getConnection()) {
-                insumosBajos = insumoDAO.listarTodos(conn).stream()
-                        .filter(i -> i.getStockActualDisponible() != null && i.getStockMinimo() != null
-                                && i.getStockActualDisponible().compareTo(i.getStockMinimo()) <= 0)
-                        .collect(Collectors.toList());
-                if (insumosBajos.isEmpty()) {
-                    // Para demostración incluir insumos activos
-                    insumosBajos = insumoDAO.listarTodos(conn).stream().limit(3).collect(Collectors.toList());
+        final int idProveedor = proveedorSeleccionado.getIdProveedor();
+        final String ruc = proveedorSeleccionado.getRuc();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Insumo> insumosBajos;
+                try (Connection conn = ConexionBD.getConnection()) {
+                    insumosBajos = insumoDAO.listarTodos(conn).stream()
+                            .filter(i -> i.getStockActualDisponible() != null && i.getStockMinimo() != null
+                                    && i.getStockActualDisponible().compareTo(i.getStockMinimo()) <= 0)
+                            .collect(Collectors.toList());
+                    if (insumosBajos.isEmpty()) {
+                        insumosBajos = insumoDAO.listarTodos(conn).stream().limit(3).collect(Collectors.toList());
+                    }
                 }
-            }
-            File doc = new File("dist/ORDEN_COMPRA_" + proveedorSeleccionado.getRuc() + ".pdf");
-            if (doc.getParentFile() != null) { java.nio.file.Files.createDirectories(doc.getParentFile().toPath()); }
-            finanzasService.generarOrdenCompraPdf(proveedorSeleccionado.getIdProveedor(), insumosBajos, doc);
-            lblDetalleFacturas.setText("✓ Orden de compra generada: " + doc.getName());
-        } catch (Exception ex) {
-            lblDetalleFacturas.setText("Error en PDF: " + ex.getMessage());
-        }
+                File doc = new File("dist/ORDEN_COMPRA_" + ruc + ".pdf");
+                if (doc.getParentFile() != null) {
+                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                }
+                finanzasService.generarOrdenCompraPdf(idProveedor, insumosBajos, doc);
+                return doc.getName();
+            },
+            docName -> lblDetalleFacturas.setText("✓ Orden de compra generada: " + docName),
+            ex -> lblDetalleFacturas.setText("Error en PDF: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 }

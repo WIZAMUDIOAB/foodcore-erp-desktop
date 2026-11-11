@@ -12,6 +12,7 @@ import com.foodcore.model.CuentaPorPagar;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -68,7 +69,7 @@ public class CuentasPorPagarController {
     public void initialize() {
         configurarColumnas();
         configurarFiltros();
-        cargarCuentasSincrono();
+        cargarCuentasAsync();
     }
 
     private void configurarColumnas() {
@@ -90,50 +91,52 @@ public class CuentasPorPagarController {
     private void configurarFiltros() {
         cbFiltroEstado.setItems(FXCollections.observableArrayList("TODAS", "PENDIENTE", "VENCIDA", "PAGADA"));
         cbFiltroEstado.setValue("TODAS");
-        cbFiltroEstado.setOnAction(e -> cargarCuentasSincrono());
+        cbFiltroEstado.setOnAction(e -> cargarCuentasAsync());
 
         cbModalMetodoPago.setItems(FXCollections.observableArrayList("EFECTIVO", "TRANSFERENCIA", "TARJETA"));
         cbModalMetodoPago.setValue("EFECTIVO");
     }
 
+    public void cargarCuentasAsync() {
+        final String filtro = cbFiltroEstado.getValue();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return (filtro == null || "TODAS".equals(filtro))
+                        ? cuentaPorPagarDAO.listarTodas(conn)
+                        : cuentaPorPagarDAO.listarPorEstado(conn, filtro);
+                }
+            },
+            cuentas -> {
+                listaCxp.setAll(cuentas);
+                double deudaTotal = 0.0;
+                int vencidas = 0;
+                for (CuentaPorPagar c : cuentas) {
+                    if (!"PAGADA".equalsIgnoreCase(c.getEstado())) {
+                        deudaTotal += c.getSaldo();
+                    }
+                    if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
+                        vencidas++;
+                    }
+                }
+                if (!cuentas.isEmpty()) {
+                    tblCuentasPorPagar.getSelectionModel().selectFirst();
+                }
+                lblDeudaTotal.setText(String.format("S/ %.2f", deudaTotal));
+                lblContadorCxp.setText(listaCxp.size() + " Facturas");
+                if (vencidas > 0) {
+                    lblBadgeAlertaVencidas.setText(vencidas + " FACTURAS VENCIDAS");
+                    lblBadgeAlertaVencidas.setVisible(true);
+                } else {
+                    lblBadgeAlertaVencidas.setVisible(false);
+                }
+            },
+            ex -> LOGGER.log(Level.WARNING, "Error al cargar cuentas por pagar", ex)
+        );
+    }
+
     public void cargarCuentasSincrono() {
-        listaCxp.clear();
-        double deudaTotal = 0.0;
-        int vencidas = 0;
-
-        String filtro = cbFiltroEstado.getValue();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<CuentaPorPagar> cuentas;
-            if (filtro == null || "TODAS".equals(filtro)) {
-                cuentas = cuentaPorPagarDAO.listarTodas(conn);
-            } else {
-                cuentas = cuentaPorPagarDAO.listarPorEstado(conn, filtro);
-            }
-
-            listaCxp.addAll(cuentas);
-            for (CuentaPorPagar c : cuentas) {
-                if (!"PAGADA".equalsIgnoreCase(c.getEstado())) {
-                    deudaTotal += c.getSaldo();
-                }
-                if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
-                    vencidas++;
-                }
-            }
-            if (!cuentas.isEmpty()) {
-                tblCuentasPorPagar.getSelectionModel().selectFirst();
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar cuentas por pagar", ex);
-        }
-
-        lblDeudaTotal.setText(String.format("S/ %.2f", deudaTotal));
-        lblContadorCxp.setText(listaCxp.size() + " Facturas");
-        if (vencidas > 0) {
-            lblBadgeAlertaVencidas.setText(vencidas + " FACTURAS VENCIDAS");
-            lblBadgeAlertaVencidas.setVisible(true);
-        } else {
-            lblBadgeAlertaVencidas.setVisible(false);
-        }
+        cargarCuentasAsync();
     }
 
     @FXML
@@ -173,20 +176,30 @@ public class CuentasPorPagarController {
         String nota = txtModalNota.getText().trim();
         int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
 
-        Integer idCaja = null;
-        try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
-            if (cajaOpt.isPresent()) {
-                idCaja = cajaOpt.get().getIdCaja();
-            }
-        } catch (java.sql.SQLException | RuntimeException ignored) {}
+        final int idCuenta = cuentaSeleccionada.getIdCuentaPagar();
+        final double montoFinal = monto;
+        final String metodoFinal = metodo;
+        final String notaFinal = nota;
+        final int idUsrFinal = idUsuario;
 
-        try {
-            finanzasService.registrarPagoProveedor(cuentaSeleccionada.getIdCuentaPagar(), monto, metodo, idCaja, idUsuario, nota);
-            modalPago.setVisible(false);
-            cargarCuentasSincrono();
-        } catch (Exception ex) {
-            lblModalPagoError.setText("Error al abonar: " + ex.getMessage());
-        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                Integer idCaja = null;
+                try (Connection conn = ConexionBD.getConnection()) {
+                    Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
+                    if (cajaOpt.isPresent()) {
+                        idCaja = cajaOpt.get().getIdCaja();
+                    }
+                } catch (java.sql.SQLException | RuntimeException ignored) {
+                    // Caja opcional para este flujo
+                }
+                finanzasService.registrarPagoProveedor(idCuenta, montoFinal, metodoFinal, idCaja, idUsrFinal, notaFinal);
+            },
+            () -> {
+                modalPago.setVisible(false);
+                cargarCuentasAsync();
+            },
+            ex -> lblModalPagoError.setText("Error al abonar: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
     }
 }

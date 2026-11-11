@@ -8,6 +8,7 @@ import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -406,66 +407,97 @@ public class MenuController {
 
     @FXML
     public void handleGuardarPlatillo(ActionEvent event) {
+        String textoCat = null;
+        if (cmbCategoria.getEditor() != null && cmbCategoria.getEditor().getText() != null) {
+            textoCat = cmbCategoria.getEditor().getText().trim();
+        }
+        if ((textoCat == null || textoCat.isBlank()) && cmbCategoria.getValue() != null) {
+            textoCat = cmbCategoria.getValue().getNombre();
+        }
+        if (textoCat == null || textoCat.isBlank()) {
+            textoCat = "General";
+        }
+        final String categoriaNombre = textoCat;
+
+        Categoria catExistente = null;
+        for (Categoria c : listaCategorias) {
+            if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(categoriaNombre)) {
+                catExistente = c;
+                break;
+            }
+        }
+
+        String cod = txtCodigo.getText() != null ? txtCodigo.getText().trim() : ("PLT-" + (System.currentTimeMillis() % 10000));
+        String nom = txtNombre.getText() != null ? txtNombre.getText().trim() : "";
+        if (nom.isEmpty()) {
+            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre del platillo.", true);
+            return;
+        }
+        final BigDecimal precio;
         try {
-            String textoCat = null;
-            if (cmbCategoria.getEditor() != null && cmbCategoria.getEditor().getText() != null) {
-                textoCat = cmbCategoria.getEditor().getText().trim();
-            }
-            if ((textoCat == null || textoCat.isBlank()) && cmbCategoria.getValue() != null) {
-                textoCat = cmbCategoria.getValue().getNombre();
-            }
-            if (textoCat == null || textoCat.isBlank()) {
-                textoCat = "General";
-            }
+            precio = new BigDecimal(txtPrecio.getText().trim()).setScale(2, RoundingMode.HALF_UP);
+        } catch (RuntimeException ex) {
+            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese un precio numérico válido.", true);
+            return;
+        }
+        final boolean disp = (chkDisponible != null) ? chkDisponible.isSelected() : chkActivo.isSelected();
+        final boolean menuDia = (chkMenuDelDia != null) && chkMenuDelDia.isSelected();
+        final String imagenUrl = rutaImagenRelativaActual;
+        final Categoria catInicial = catExistente;
 
-            int idCat = 1;
-            Categoria catExistente = null;
-            for (Categoria c : listaCategorias) {
-                if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(textoCat)) {
-                    catExistente = c;
-                    break;
-                }
-            }
-
-            if (catExistente != null && catExistente.getIdCategoria() > 0) {
-                idCat = catExistente.getIdCategoria();
-            } else {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    List<Categoria> enBD = categoriaDAO.listarTodas(conn);
-                    for (Categoria c : enBD) {
-                        if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(textoCat)) {
-                            catExistente = c;
-                            break;
+        if (btnGuardarPlatillo != null) {
+            btnGuardarPlatillo.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                int idCat;
+                Categoria nuevaCatCreada = null;
+                if (catInicial != null && catInicial.getIdCategoria() > 0) {
+                    idCat = catInicial.getIdCategoria();
+                } else {
+                    Categoria enListaBd = null;
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        List<Categoria> enBD = categoriaDAO.listarTodas(conn);
+                        for (Categoria c : enBD) {
+                            if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(categoriaNombre)) {
+                                enListaBd = c;
+                                break;
+                            }
+                        }
+                        if (enListaBd != null && enListaBd.getIdCategoria() > 0) {
+                            idCat = enListaBd.getIdCategoria();
+                        } else {
+                            Categoria nuevaCat = new Categoria(0, categoriaNombre, "Categoría creada dinámicamente", true);
+                            idCat = categoriaDAO.crear(conn, nuevaCat);
+                            nuevaCatCreada = nuevaCat;
                         }
                     }
-                    if (catExistente != null && catExistente.getIdCategoria() > 0) {
-                        idCat = catExistente.getIdCategoria();
-                    } else {
-                        Categoria nuevaCat = new Categoria(0, textoCat, "Categoría creada dinámicamente", true);
-                        idCat = categoriaDAO.crear(conn, nuevaCat);
-                        final Categoria catParaLista = nuevaCat;
-                        listaCategorias.add(catParaLista);
-                        cmbCategoria.setValue(catParaLista);
-                    }
                 }
+                guardarPlatilloEnBD(idCat, cod, nom, precio, disp, menuDia, imagenUrl);
+                return nuevaCatCreada;
+            },
+            nuevaCat -> {
+                if (btnGuardarPlatillo != null) {
+                    btnGuardarPlatillo.setDisable(false);
+                }
+                if (nuevaCat != null) {
+                    listaCategorias.add(nuevaCat);
+                    cmbCategoria.setValue(nuevaCat);
+                }
+                AnimationUtils.mostrarToast(rootMenuStack, "Platillo guardado exitosamente.", false);
+                handleNuevoPlatillo(null);
+                cargarDatosMenu();
+            },
+            e -> {
+                if (btnGuardarPlatillo != null) {
+                    btnGuardarPlatillo.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootMenuStack,
+                        "Error al guardar platillo: " + (e != null ? e.getMessage() : "desconocido"),
+                        true);
             }
-
-            String cod = txtCodigo.getText() != null ? txtCodigo.getText().trim() : ("PLT-" + (System.currentTimeMillis() % 10000));
-            String nom = txtNombre.getText() != null ? txtNombre.getText().trim() : "";
-            if (nom.isEmpty()) {
-                AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre del platillo.", true);
-                return;
-            }
-            BigDecimal precio = new BigDecimal(txtPrecio.getText().trim()).setScale(2, RoundingMode.HALF_UP);
-            boolean disp = (chkDisponible != null) ? chkDisponible.isSelected() : chkActivo.isSelected();
-            boolean menuDia = (chkMenuDelDia != null) && chkMenuDelDia.isSelected();
-            guardarPlatilloEnBD(idCat, cod, nom, precio, disp, menuDia, rutaImagenRelativaActual);
-            AnimationUtils.mostrarToast(rootMenuStack, "Platillo guardado exitosamente.", false);
-            handleNuevoPlatillo(null);
-            cargarDatosMenu();
-        } catch (java.sql.SQLException | RuntimeException e) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Error al guardar platillo: " + e.getMessage(), true);
-        }
+        );
     }
 
     public ObservableList<Producto> getListaProductos() {

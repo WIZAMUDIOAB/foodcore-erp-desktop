@@ -10,6 +10,7 @@ import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -141,26 +142,33 @@ public class KioscoController {
         });
         boxCategoriasKiosco.getChildren().add(btnTodos);
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Categoria> cats = productoDAO.listarCategorias(conn);
-            if (cats != null && !cats.isEmpty()) {
-                for (Categoria c : cats) {
-                    Button chip = new Button(c.getNombre());
-                    chip.getStyleClass().add("category-chip");
-                    AnimationUtils.attachTactileFeedback(chip);
-                    chip.setOnAction(ev -> {
-                        categoriaSeleccionada = c.getIdCategoria();
-                        actualizarEstiloChips(chip);
-                        renderizarMosaicoProductos();
-                    });
-                    boxCategoriasKiosco.getChildren().add(chip);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return productoDAO.listarCategorias(conn);
+                } catch (java.sql.SQLException | RuntimeException e) {
+                    return java.util.Collections.<Categoria>emptyList();
                 }
-            } else {
-                poblarCategoriasDemo();
-            }
-        } catch (java.sql.SQLException | RuntimeException e) {
-            poblarCategoriasDemo();
-        }
+            },
+            cats -> {
+                if (cats != null && !cats.isEmpty()) {
+                    for (Categoria c : cats) {
+                        Button chip = new Button(c.getNombre());
+                        chip.getStyleClass().add("category-chip");
+                        AnimationUtils.attachTactileFeedback(chip);
+                        chip.setOnAction(ev -> {
+                            categoriaSeleccionada = c.getIdCategoria();
+                            actualizarEstiloChips(chip);
+                            renderizarMosaicoProductos();
+                        });
+                        boxCategoriasKiosco.getChildren().add(chip);
+                    }
+                } else {
+                    poblarCategoriasDemo();
+                }
+            },
+            ex -> poblarCategoriasDemo()
+        );
     }
 
     private void poblarCategoriasDemo() {
@@ -191,17 +199,29 @@ public class KioscoController {
 
     public void cargarCatalogo() {
         todosLosProductos.clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Producto> lista = productoDAO.listarProductosDisponibles(conn);
-            if (lista != null && !lista.isEmpty()) {
-                todosLosProductos.addAll(lista);
-            } else {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return productoDAO.listarProductosDisponibles(conn);
+                } catch (java.sql.SQLException | RuntimeException e) {
+                    return java.util.Collections.<Producto>emptyList();
+                }
+            },
+            lista -> {
+                todosLosProductos.clear();
+                if (lista != null && !lista.isEmpty()) {
+                    todosLosProductos.addAll(lista);
+                } else {
+                    poblarProductosDemo();
+                }
+                renderizarMosaicoProductos();
+            },
+            ex -> {
+                todosLosProductos.clear();
                 poblarProductosDemo();
+                renderizarMosaicoProductos();
             }
-        } catch (java.sql.SQLException | RuntimeException e) {
-            poblarProductosDemo();
-        }
-        renderizarMosaicoProductos();
+        );
     }
 
     private void poblarProductosDemo() {
@@ -332,49 +352,68 @@ public class KioscoController {
             total = total.add(item.getSubtotal());
         }
 
+        final BigDecimal totalFinal = total;
+        List<DetallePedido> detallesSnapshot = new ArrayList<>(carritoItems);
+        int turnoPedido = this.turnoActual;
         Pedido ordenKiosco = new Pedido();
         ordenKiosco.setTipoPedido("KIOSCO");
-        ordenKiosco.setNumeroMesa("T-" + turnoActual);
-        ordenKiosco.setClienteNombre("Cliente Kiosco #T-" + turnoActual);
+        ordenKiosco.setNumeroMesa("T-" + turnoPedido);
+        ordenKiosco.setClienteNombre("Cliente Kiosco #T-" + turnoPedido);
         ordenKiosco.setEstado("EN_PREPARACION");
-        ordenKiosco.setTotal(total);
+        ordenKiosco.setTotal(totalFinal);
         ordenKiosco.setIdUsuario(1);
-        ordenKiosco.setDetalles(new ArrayList<>(carritoItems));
+        ordenKiosco.setDetalles(detallesSnapshot);
 
-        try (Connection conn = ConexionBD.getConnection()) {
-            int id = pedidoDAO.crearPedido(conn, ordenKiosco);
-            ordenKiosco.setIdPedido(id);
-            for (DetallePedido d : carritoItems) {
-                d.setIdPedido(id);
-                try {
-                    pedidoDAO.insertarDetallePedido(conn, d);
-                } catch (Exception ex) {
-                    LOGGER.log(Level.FINE, "Detalle guardado: {0}", ex.getMessage());
+        if (btnConfirmarKiosco != null) {
+            btnConfirmarKiosco.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    int id = pedidoDAO.crearPedido(conn, ordenKiosco);
+                    ordenKiosco.setIdPedido(id);
+                    for (DetallePedido d : detallesSnapshot) {
+                        d.setIdPedido(id);
+                        try {
+                            pedidoDAO.insertarDetallePedido(conn, d);
+                        } catch (Exception ex) {
+                            LOGGER.log(Level.FINE, "Detalle guardado: {0}", ex.getMessage());
+                        }
+                    }
+                } catch (java.sql.SQLException | RuntimeException e) {
+                    LOGGER.log(Level.WARNING, "Error al guardar orden de kiosco en BD: {0}", e.getMessage());
+                    ordenKiosco.setIdPedido(9100 + turnoPedido);
                 }
+            },
+            () -> {
+                if (btnConfirmarKiosco != null) {
+                    btnConfirmarKiosco.setDisable(false);
+                }
+                LOGGER.log(Level.INFO, "Ticket emitido exitosamente para turno #{0}. Orden despachada a cocina.", turnoPedido);
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("FoodCore Kiosco · Pedido Confirmado");
+                alert.setHeaderText("¡Su orden ha sido enviada a Cocina!");
+                alert.setContentText("TURNO ASIGNADO: #T-" + turnoPedido + "\n\n"
+                        + "Total Pagado: S/ " + totalFinal + "\n"
+                        + "Su ticket térmico se está imprimiendo en la bandeja inferior.\n"
+                        + "Por favor tome su ticket y espere su turno en pantalla.");
+                alert.showAndWait();
+
+                carritoItems.clear();
+                recalcularTotales();
+                this.turnoActual = SECUENCIA_TURNO.incrementAndGet();
+                if (lblTurnoActual != null) {
+                    lblTurnoActual.setText("TURNO #T-" + turnoActual);
+                }
+            },
+            ex -> {
+                if (btnConfirmarKiosco != null) {
+                    btnConfirmarKiosco.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error inesperado en confirmación de kiosco", ex);
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al guardar orden de kiosco en BD: {0}", e.getMessage());
-            ordenKiosco.setIdPedido(9100 + turnoActual);
-        }
-
-        LOGGER.log(Level.INFO, "Ticket emitido exitosamente para turno #{0}. Orden despachada a cocina.", turnoActual);
-
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("FoodCore Kiosco · Pedido Confirmado");
-        alert.setHeaderText("¡Su orden ha sido enviada a Cocina!");
-        alert.setContentText("TURNO ASIGNADO: #T-" + turnoActual + "\n\n"
-                + "Total Pagado: S/ " + total + "\n"
-                + "Su ticket térmico se está imprimiendo en la bandeja inferior.\n"
-                + "Por favor tome su ticket y espere su turno en pantalla.");
-        alert.showAndWait();
-
-        // Preparar para el siguiente cliente
-        carritoItems.clear();
-        recalcularTotales();
-        this.turnoActual = SECUENCIA_TURNO.incrementAndGet();
-        if (lblTurnoActual != null) {
-            lblTurnoActual.setText("TURNO #T-" + turnoActual);
-        }
+        );
     }
 
     public ObservableList<DetallePedido> getCarritoItems() {

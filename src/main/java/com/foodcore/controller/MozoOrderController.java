@@ -10,6 +10,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -118,13 +119,28 @@ public class MozoOrderController {
         colNotas.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNotasPreparacion()));
 
         tblItems.setItems(items);
-        cargarPlatosDisponiblesSincrono();
+        cargarPlatosDisponiblesAsync();
+    }
+
+    public void cargarPlatosDisponiblesAsync() {
+        if (tilePlatos == null) {
+            return;
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            this::consultarPlatosDisponiblesConRespaldo,
+            this::renderizarPlatosEnTilePane,
+            ex -> renderizarPlatosEnTilePane(crearCatalogoDemoRespaldo())
+        );
     }
 
     public void cargarPlatosDisponiblesSincrono() {
         if (tilePlatos == null) {
             return;
         }
+        renderizarPlatosEnTilePane(consultarPlatosDisponiblesConRespaldo());
+    }
+
+    private List<Producto> consultarPlatosDisponiblesConRespaldo() {
         List<Producto> productos = new ArrayList<>();
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
@@ -133,17 +149,25 @@ public class MozoOrderController {
         } catch (java.sql.SQLException | RuntimeException ignored) {
             // Se usará catálogo demostrativo de respaldo
         }
+        return productos.isEmpty() ? crearCatalogoDemoRespaldo() : productos;
+    }
 
-        if (productos.isEmpty()) {
-            productos.add(new Producto(1, 1, "HAM-01", "Hamburguesa Royal Doble", "", new BigDecimal("24.50"), new BigDecimal("9.50"), true));
-            productos.add(new Producto(2, 1, "HAM-02", "Cheese Burger Clásica", "", new BigDecimal("18.00"), new BigDecimal("6.80"), true));
-            productos.add(new Producto(3, 2, "ALI-01", "Alitas BBQ Picantes x6", "", new BigDecimal("22.00"), new BigDecimal("8.50"), true));
-            productos.add(new Producto(4, 2, "CRIS-01", "Combo Pollo Crispy 3 Pzs", "", new BigDecimal("26.00"), new BigDecimal("10.20"), true));
-            productos.add(new Producto(5, 3, "BEB-01", "Limonada Frozen 1L", "", new BigDecimal("14.00"), new BigDecimal("3.50"), true));
-            productos.add(new Producto(6, 3, "BEB-02", "Chicha Morada 1L", "", new BigDecimal("12.00"), new BigDecimal("3.00"), true));
-            productos.add(new Producto(7, 4, "COM-01", "Papas Fritas Supremas", "", new BigDecimal("11.50"), new BigDecimal("4.00"), true));
+    private List<Producto> crearCatalogoDemoRespaldo() {
+        List<Producto> productos = new ArrayList<>();
+        productos.add(new Producto(1, 1, "HAM-01", "Hamburguesa Royal Doble", "", new BigDecimal("24.50"), new BigDecimal("9.50"), true));
+        productos.add(new Producto(2, 1, "HAM-02", "Cheese Burger Clásica", "", new BigDecimal("18.00"), new BigDecimal("6.80"), true));
+        productos.add(new Producto(3, 2, "ALI-01", "Alitas BBQ Picantes x6", "", new BigDecimal("22.00"), new BigDecimal("8.50"), true));
+        productos.add(new Producto(4, 2, "CRIS-01", "Combo Pollo Crispy 3 Pzs", "", new BigDecimal("26.00"), new BigDecimal("10.20"), true));
+        productos.add(new Producto(5, 3, "BEB-01", "Limonada Frozen 1L", "", new BigDecimal("14.00"), new BigDecimal("3.50"), true));
+        productos.add(new Producto(6, 3, "BEB-02", "Chicha Morada 1L", "", new BigDecimal("12.00"), new BigDecimal("3.00"), true));
+        productos.add(new Producto(7, 4, "COM-01", "Papas Fritas Supremas", "", new BigDecimal("11.50"), new BigDecimal("4.00"), true));
+        return productos;
+    }
+
+    private void renderizarPlatosEnTilePane(List<Producto> productos) {
+        if (tilePlatos == null) {
+            return;
         }
-
         tilePlatos.getChildren().clear();
         for (Producto p : productos) {
             HBox card = new HBox(10.0);
@@ -295,34 +319,47 @@ public class MozoOrderController {
         pedido.setClienteReferencia(this.clienteReferencia);
         pedido.setCostoEnvio(this.costoEnvio);
 
-        try {
-            com.foodcore.offline.SyncWorker worker = com.foodcore.offline.SyncWorker.getInstancia();
-            if (worker.isOnline()) {
-                try {
-                    pedidoService.registrarPedidoYEnviarComanda(pedido, items);
-                } catch (Exception exNet) {
-                    worker.guardarPedidoEnOutboxLocal(pedido, items);
-                    mostrarAlerta("Modo Offline", "Sin conexión con el servidor. El pedido se guardó localmente en la terminal y se sincronizará automáticamente.", Alert.AlertType.INFORMATION);
-                    Stage s = (Stage) lblTotal.getScene().getWindow();
-                    s.close();
-                    s.setScene(null);
-                    return;
+        List<DetallePedido> snapshot = new ArrayList<>(items);
+        if (btnEnviarCocina != null) {
+            btnEnviarCocina.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                com.foodcore.offline.SyncWorker worker = com.foodcore.offline.SyncWorker.getInstancia();
+                if (worker.isOnline()) {
+                    try {
+                        pedidoService.registrarPedidoYEnviarComanda(pedido, snapshot);
+                        return "ONLINE";
+                    } catch (Exception exNet) {
+                        worker.guardarPedidoEnOutboxLocal(pedido, snapshot);
+                        return "OFFLINE_FALLBACK";
+                    }
                 }
-            } else {
-                worker.guardarPedidoEnOutboxLocal(pedido, items);
-                mostrarAlerta("Modo Offline", "Terminal desconectada. Pedido encolado en Outbox Local SQLite con éxito.", Alert.AlertType.INFORMATION);
+                worker.guardarPedidoEnOutboxLocal(pedido, snapshot);
+                return "OFFLINE";
+            },
+            estado -> {
+                if (btnEnviarCocina != null) {
+                    btnEnviarCocina.setDisable(false);
+                }
+                if ("OFFLINE_FALLBACK".equals(estado)) {
+                    mostrarAlerta("Modo Offline", "Sin conexión con el servidor. El pedido se guardó localmente en la terminal y se sincronizará automáticamente.", Alert.AlertType.INFORMATION);
+                } else if ("OFFLINE".equals(estado)) {
+                    mostrarAlerta("Modo Offline", "Terminal desconectada. Pedido encolado en Outbox Local SQLite con éxito.", Alert.AlertType.INFORMATION);
+                } else {
+                    mostrarAlerta("Comanda Despachada", "La comanda de la Mesa " + mesa + " fue registrada en BD y enviada en tiempo real vía Socket TCP 9090 a Cocina.", Alert.AlertType.INFORMATION);
+                }
                 Stage s = (Stage) lblTotal.getScene().getWindow();
                 s.close();
                 s.setScene(null);
-                return;
+            },
+            e -> {
+                if (btnEnviarCocina != null) {
+                    btnEnviarCocina.setDisable(false);
+                }
+                mostrarAlerta("Error al Enviar", e != null ? e.getMessage() : "desconocido", Alert.AlertType.ERROR);
             }
-            mostrarAlerta("Comanda Despachada", "La comanda de la Mesa " + mesa + " fue registrada en BD y enviada en tiempo real vía Socket TCP 9090 a Cocina.", Alert.AlertType.INFORMATION);
-            Stage s = (Stage) lblTotal.getScene().getWindow();
-            s.close();
-            s.setScene(null);
-        } catch (Exception e) {
-            mostrarAlerta("Error al Enviar", e.getMessage(), Alert.AlertType.ERROR);
-        }
+        );
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {

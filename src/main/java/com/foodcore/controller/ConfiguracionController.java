@@ -2,7 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -39,49 +39,77 @@ public class ConfiguracionController {
     }
 
     public void cargarConfiguracion() {
-        new Thread(() -> {
-            String sql = "SELECT nombre_restaurante, direccion, telefono, ruc, nombre_impresora "
-                + "FROM configuracion_restaurante WHERE id_config = 1";
-            try (Connection conn = ConexionBD.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    String nom = rs.getString("nombre_restaurante");
-                    String dir = rs.getString("direccion");
-                    String tel = rs.getString("telefono");
-                    String ruc = rs.getString("ruc");
-                    String imp = rs.getString("nombre_impresora");
-                    Platform.runLater(() -> {
-                        txtNombreRestaurante.setText(nom);
-                        txtDireccion.setText(dir);
-                        txtTelefono.setText(tel);
-                        txtRuc.setText(ruc != null ? ruc : "");
-                        txtImpresora.setText(imp);
-                    });
+        String sql = "SELECT nombre_restaurante, direccion, telefono, ruc, nombre_impresora "
+            + "FROM configuracion_restaurante WHERE id_config = 1";
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(sql);
+                     ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return new String[] {
+                            rs.getString("nombre_restaurante"),
+                            rs.getString("direccion"),
+                            rs.getString("telefono"),
+                            rs.getString("ruc"),
+                            rs.getString("nombre_impresora")
+                        };
+                    }
+                    return null;
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Usando configuración por defecto", e);
-            }
-        }).start();
+            },
+            datos -> {
+                if (datos != null) {
+                    txtNombreRestaurante.setText(datos[0]);
+                    txtDireccion.setText(datos[1]);
+                    txtTelefono.setText(datos[2]);
+                    txtRuc.setText(datos[3] != null ? datos[3] : "");
+                    txtImpresora.setText(datos[4]);
+                }
+            },
+            e -> LOGGER.log(Level.FINE, "Usando configuración por defecto", e)
+        );
     }
 
     @FXML
     public void handleGuardarConfiguracion(ActionEvent event) {
-        String sql = "INSERT INTO configuracion_restaurante (id_config, nombre_restaurante, direccion, telefono, ruc, nombre_impresora) "
+        final String nombre = txtNombreRestaurante.getText();
+        final String direccion = txtDireccion.getText();
+        final String telefono = txtTelefono.getText();
+        final String ruc = txtRuc.getText();
+        final String impresora = txtImpresora.getText();
+        final String sql = "INSERT INTO configuracion_restaurante (id_config, nombre_restaurante, direccion, telefono, ruc, nombre_impresora) "
             + "VALUES (1, ?, ?, ?, ?, ?) "
             + "ON DUPLICATE KEY UPDATE nombre_restaurante = VALUES(nombre_restaurante), direccion = VALUES(direccion), "
             + "telefono = VALUES(telefono), ruc = VALUES(ruc), nombre_impresora = VALUES(nombre_impresora)";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, txtNombreRestaurante.getText());
-            ps.setString(2, txtDireccion.getText());
-            ps.setString(3, txtTelefono.getText());
-            ps.setString(4, txtRuc.getText());
-            ps.setString(5, txtImpresora.getText());
-            ps.executeUpdate();
-            AnimationUtils.mostrarToast(rootConfigStack, "Configuración del restaurante e impresora guardada.", false);
-        } catch (Exception e) {
-            AnimationUtils.mostrarToast(rootConfigStack, "Error al guardar configuración: " + e.getMessage(), true);
+
+        if (btnGuardarConfig != null) {
+            btnGuardarConfig.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, nombre);
+                    ps.setString(2, direccion);
+                    ps.setString(3, telefono);
+                    ps.setString(4, ruc);
+                    ps.setString(5, impresora);
+                    ps.executeUpdate();
+                }
+            },
+            () -> {
+                if (btnGuardarConfig != null) {
+                    btnGuardarConfig.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootConfigStack, "Configuración del restaurante e impresora guardada.", false);
+            },
+            e -> {
+                if (btnGuardarConfig != null) {
+                    btnGuardarConfig.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootConfigStack, "Error al guardar configuración: " + (e != null ? e.getMessage() : "desconocido"), true);
+            }
+        );
     }
 }

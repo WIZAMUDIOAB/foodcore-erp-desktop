@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.App;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -133,7 +134,7 @@ public class DashboardController {
             });
         }
         configurarTablas();
-        cargarMetricasDashboardSincrono();
+        cargarMetricasDashboard();
     }
 
     /**
@@ -329,9 +330,7 @@ public class DashboardController {
     }
 
     public void cargarMetricasDashboard() {
-        Thread t = new Thread(this::cargarMetricasDashboardSincrono, "Dashboard-Loader");
-        t.setDaemon(true);
-        t.start();
+        UiAsyncExecutor.ejecutarVoidAsync(this::cargarMetricasDashboardSincrono, null, null);
     }
 
     public void cargarMetricasDashboardSincrono() {

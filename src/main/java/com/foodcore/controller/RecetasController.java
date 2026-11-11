@@ -11,6 +11,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -164,13 +165,19 @@ public class RecetasController {
         if (lblPlatilloActivoHeader != null) {
             lblPlatilloActivoHeader.setText("Platillo: " + p.getNombre());
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Receta> recs = recetaDAO.listarPorProducto(conn, p.getIdProducto());
-            listaComponentes.setAll(recs);
-            actualizarEscandallo(p, recs);
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error al consultar receta del producto", e);
-        }
+        int idProducto = p.getIdProducto();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    return recetaDAO.listarPorProducto(conn, idProducto);
+                }
+            },
+            recs -> {
+                listaComponentes.setAll(recs);
+                actualizarEscandallo(p, recs);
+            },
+            e -> LOGGER.log(Level.FINE, "Error al consultar receta del producto", e)
+        );
     }
 
     private void actualizarEscandallo(Producto p, List<Receta> recs) {
@@ -214,14 +221,37 @@ public class RecetasController {
         if (prod == null || ins == null) {
             return;
         }
+        final BigDecimal cant;
         try {
-            BigDecimal cant = new BigDecimal(txtCantidadReceta.getText().trim());
-            asociarInsumoARecetaEnBD(prod.getIdProducto(), ins.getIdInsumo(), cant);
-            cargarRecetaDePlatillo(prod);
-            AnimationUtils.mostrarToast(rootRecetasStack, "Insumo asociado a la receta de " + prod.getNombre(), false);
-        } catch (Exception e) {
-            AnimationUtils.mostrarToast(rootRecetasStack, "Error: " + e.getMessage(), true);
+            cant = new BigDecimal(txtCantidadReceta.getText().trim());
+        } catch (RuntimeException e) {
+            AnimationUtils.mostrarToast(rootRecetasStack, "Error: Ingrese una cantidad numérica válida.", true);
+            return;
         }
+        int idProducto = prod.getIdProducto();
+        long idInsumo = ins.getIdInsumo();
+        if (btnAgregarInsumo != null) {
+            btnAgregarInsumo.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> asociarInsumoARecetaEnBD(idProducto, idInsumo, cant),
+            () -> {
+                if (btnAgregarInsumo != null) {
+                    btnAgregarInsumo.setDisable(false);
+                }
+                cargarRecetaDePlatillo(prod);
+                AnimationUtils.mostrarToast(rootRecetasStack, "Insumo asociado a la receta de " + prod.getNombre(), false);
+            },
+            e -> {
+                if (btnAgregarInsumo != null) {
+                    btnAgregarInsumo.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootRecetasStack,
+                        "Error: " + (e != null ? e.getMessage() : "desconocido"),
+                        true);
+            }
+        );
     }
 
     @FXML
@@ -231,12 +261,32 @@ public class RecetasController {
         if (sel == null || prod == null) {
             return;
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            recetaDAO.eliminarComponente(conn, sel.getIdReceta());
-            cargarRecetaDePlatillo(prod);
-        } catch (Exception e) {
-            AnimationUtils.mostrarToast(rootRecetasStack, "No se pudo quitar el insumo: " + e.getMessage(), true);
+        int idReceta = sel.getIdReceta();
+        if (btnQuitarInsumo != null) {
+            btnQuitarInsumo.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    recetaDAO.eliminarComponente(conn, idReceta);
+                }
+            },
+            () -> {
+                if (btnQuitarInsumo != null) {
+                    btnQuitarInsumo.setDisable(false);
+                }
+                cargarRecetaDePlatillo(prod);
+            },
+            e -> {
+                if (btnQuitarInsumo != null) {
+                    btnQuitarInsumo.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootRecetasStack,
+                        "No se pudo quitar el insumo: " + (e != null ? e.getMessage() : "desconocido"),
+                        true);
+            }
+        );
     }
 
     public ObservableList<Receta> getListaComponentes() {

@@ -34,7 +34,7 @@
                                     </children>
                                 </VBox>
                                 <Button fx:id="btnNuevoCambio" mnemonicParsing="false" onAction="#handleAbrirModalAjuste" styleClass="btn-primary" text="+ Ajustar Precio" />
-                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarHistorialSincrono" styleClass="btn-secondary" text="Actualizar" />
+                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#cargarHistorialAsync" styleClass="btn-secondary" text="Actualizar" />
                             </children>
                         </HBox>
 

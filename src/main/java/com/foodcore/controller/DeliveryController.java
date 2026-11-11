@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.model.Pedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -68,7 +69,7 @@ public class DeliveryController {
         AnimationUtils.attachTactileFeedback(btnMarcarEntregado);
 
         configurarColumnas();
-        cargarPedidosDeliverySincrono();
+        cargarPedidosDelivery();
     }
 
     private void configurarColumnas() {
@@ -217,26 +218,48 @@ public class DeliveryController {
         Button btnGuardar = new Button("Confirmar y Enviar a Cocina");
         btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
-            try (Connection conn = ConexionBD.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO pedido (id_usuario, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, " +
-                     "cliente_direccion, cliente_referencia, costo_envio, total, estado, idempotency_key) " +
-                     "VALUES (1, ?, 'DELIVERY', ?, ?, ?, ?, ?, ?, 'EN_COCINA', UUID())")) {
-                ps.setString(1, "DL-" + (System.currentTimeMillis() % 10000));
-                ps.setString(2, txtNom.getText());
-                ps.setString(3, txtTel.getText());
-                ps.setString(4, txtDir.getText());
-                ps.setString(5, txtRef.getText());
-                ps.setBigDecimal(6, new BigDecimal(txtEnvio.getText().trim()));
-                ps.setBigDecimal(7, new BigDecimal(txtTotal.getText().trim()));
-                ps.executeUpdate();
-
-                rootDeliveryStack.getChildren().remove(backdrop);
-                AnimationUtils.mostrarToast(rootDeliveryStack, "Pedido Delivery registrado y enviado a cocina.", false);
-                cargarPedidosDelivery();
-            } catch (Exception ex) {
-                AnimationUtils.mostrarToast(rootDeliveryStack, "Error: " + ex.getMessage(), true);
+            final BigDecimal envioVal;
+            final BigDecimal totalVal;
+            try {
+                envioVal = new BigDecimal(txtEnvio.getText().trim());
+                totalVal = new BigDecimal(txtTotal.getText().trim());
+            } catch (NumberFormatException ex) {
+                AnimationUtils.mostrarToast(rootDeliveryStack, "Ingrese montos numéricos válidos.", true);
+                return;
             }
+            final String nombre = txtNom.getText();
+            final String tel = txtTel.getText();
+            final String dir = txtDir.getText();
+            final String ref = txtRef.getText();
+            btnGuardar.setDisable(true);
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection();
+                         PreparedStatement ps = conn.prepareStatement(
+                             "INSERT INTO pedido (id_usuario, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, " +
+                             "cliente_direccion, cliente_referencia, costo_envio, total, estado, idempotency_key) " +
+                             "VALUES (1, ?, 'DELIVERY', ?, ?, ?, ?, ?, ?, 'EN_COCINA', UUID())")) {
+                        ps.setString(1, "DL-" + (System.currentTimeMillis() % 10000));
+                        ps.setString(2, nombre);
+                        ps.setString(3, tel);
+                        ps.setString(4, dir);
+                        ps.setString(5, ref);
+                        ps.setBigDecimal(6, envioVal);
+                        ps.setBigDecimal(7, totalVal);
+                        ps.executeUpdate();
+                    }
+                },
+                () -> {
+                    btnGuardar.setDisable(false);
+                    rootDeliveryStack.getChildren().remove(backdrop);
+                    AnimationUtils.mostrarToast(rootDeliveryStack, "Pedido Delivery registrado y enviado a cocina.", false);
+                    cargarPedidosDelivery();
+                },
+                ex -> {
+                    btnGuardar.setDisable(false);
+                    AnimationUtils.mostrarToast(rootDeliveryStack, "Error: " + (ex != null ? ex.getMessage() : "desconocido"), true);
+                }
+            );
         });
 
         HBox actions = new HBox(12, btnCancelar, btnGuardar);
@@ -281,19 +304,27 @@ public class DeliveryController {
     }
 
     private void actualizarEstadoYRepartidor(int idPedido, String nuevoEstado, String repartidor) {
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "UPDATE pedido SET estado = ?, repartidor = ? WHERE id_pedido = ?")) {
-            ps.setString(1, nuevoEstado);
-            ps.setString(2, repartidor != null ? repartidor : "");
-            ps.setInt(3, idPedido);
-            ps.executeUpdate();
-
-            AnimationUtils.mostrarToast(rootDeliveryStack, "Pedido #" + idPedido + " actualizado a " + nuevoEstado, false);
-            cargarPedidosDelivery();
-        } catch (Exception ex) {
-            AnimationUtils.mostrarToast(rootDeliveryStack, "Error al actualizar pedido: " + ex.getMessage(), true);
-        }
+        final String repVal = repartidor != null ? repartidor : "";
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(
+                         "UPDATE pedido SET estado = ?, repartidor = ? WHERE id_pedido = ?")) {
+                    ps.setString(1, nuevoEstado);
+                    ps.setString(2, repVal);
+                    ps.setInt(3, idPedido);
+                    ps.executeUpdate();
+                }
+            },
+            () -> {
+                AnimationUtils.mostrarToast(rootDeliveryStack, "Pedido #" + idPedido + " actualizado a " + nuevoEstado, false);
+                cargarPedidosDelivery();
+            },
+            ex -> AnimationUtils.mostrarToast(
+                    rootDeliveryStack,
+                    "Error al actualizar pedido: " + (ex != null ? ex.getMessage() : "desconocido"),
+                    true)
+        );
     }
 
     public ObservableList<Pedido> getListaPedidosDelivery() {

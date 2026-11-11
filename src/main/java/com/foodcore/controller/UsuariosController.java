@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -155,63 +156,79 @@ public class UsuariosController {
 
     @FXML
     public void handleCrearUsuario(ActionEvent event) {
-        try {
-            String user = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
-            String nom = txtNombreCompleto.getText() != null ? txtNombreCompleto.getText().trim() : user;
-            String rol = cmbRol.getValue() != null ? cmbRol.getValue() : "CAJERO";
-            String pass = txtPasswordTemporal.getText() != null && !txtPasswordTemporal.getText().isBlank()
-                ? txtPasswordTemporal.getText() : "Temporal#2026!";
-            if (user.isEmpty()) {
-                AnimationUtils.mostrarToast(rootUsuariosStack, "Ingrese el username del usuario.", true);
-                return;
-            }
-            String hash = encriptador.hashear(pass);
-            int idRol = switch (rol) {
-                case "ADMIN" -> 1;
-                case "CAJERO" -> 2;
-                case "MOZO" -> 3;
-                case "COCINA" -> 4;
-                default -> 5;
-            };
-
-            String dni = txtDni != null && txtDni.getText() != null ? txtDni.getText().trim() : null;
-            double sueldo = 1200.0;
-            if (txtSueldoBase != null && txtSueldoBase.getText() != null && !txtSueldoBase.getText().isBlank()) {
-                try {
-                    sueldo = Double.parseDouble(txtSueldoBase.getText().trim());
-                } catch (Exception ignored) {
-                    sueldo = 1200.0;
-                }
-            }
-            String horario = txtHorarioLaboral != null && txtHorarioLaboral.getText() != null && !txtHorarioLaboral.getText().isBlank()
-                ? txtHorarioLaboral.getText().trim() : "08:00-16:00";
-
-            String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
-                + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, sueldo_base, horario_laboral) "
-                + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?) "
-                + "ON DUPLICATE KEY UPDATE nombre_completo = VALUES(nombre_completo), codigo_rol = VALUES(codigo_rol), activo = VALUES(activo), "
-                + "dni = VALUES(dni), sueldo_base = VALUES(sueldo_base), horario_laboral = VALUES(horario_laboral)";
-            try (Connection conn = ConexionBD.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, idRol);
-                ps.setString(2, user);
-                ps.setString(3, user);
-                ps.setString(4, nom);
-                ps.setString(5, hash);
-                ps.setString(6, hash);
-                ps.setString(7, rol);
-                ps.setBoolean(8, chkUsuarioActivo.isSelected());
-                ps.setString(9, dni);
-                ps.setString(10, dni != null && dni.length() >= 4 ? dni.substring(dni.length() - 4) : "1234");
-                ps.setBigDecimal(11, java.math.BigDecimal.valueOf(sueldo));
-                ps.setString(12, horario);
-                ps.executeUpdate();
-            }
-            AnimationUtils.mostrarToast(rootUsuariosStack, "Usuario '" + user + "' guardado con cambio de clave obligatorio.", false);
-            cargarUsuarios();
-        } catch (java.sql.SQLException | RuntimeException e) {
-            AnimationUtils.mostrarToast(rootUsuariosStack, "Error: " + e.getMessage(), true);
+        String user = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
+        String nom = txtNombreCompleto.getText() != null ? txtNombreCompleto.getText().trim() : user;
+        String rol = cmbRol.getValue() != null ? cmbRol.getValue() : "CAJERO";
+        String pass = txtPasswordTemporal.getText() != null && !txtPasswordTemporal.getText().isBlank()
+            ? txtPasswordTemporal.getText() : "Temporal#2026!";
+        if (user.isEmpty()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack, "Ingrese el username del usuario.", true);
+            return;
         }
+        int idRol = switch (rol) {
+            case "ADMIN" -> 1;
+            case "CAJERO" -> 2;
+            case "MOZO" -> 3;
+            case "COCINA" -> 4;
+            default -> 5;
+        };
+
+        String dni = txtDni != null && txtDni.getText() != null ? txtDni.getText().trim() : null;
+        double sueldo = 1200.0;
+        if (txtSueldoBase != null && txtSueldoBase.getText() != null && !txtSueldoBase.getText().isBlank()) {
+            try {
+                sueldo = Double.parseDouble(txtSueldoBase.getText().trim());
+            } catch (Exception ignored) {
+                sueldo = 1200.0;
+            }
+        }
+        String horario = txtHorarioLaboral != null && txtHorarioLaboral.getText() != null && !txtHorarioLaboral.getText().isBlank()
+            ? txtHorarioLaboral.getText().trim() : "08:00-16:00";
+        boolean activoSel = chkUsuarioActivo.isSelected();
+        final double sueldoFinal = sueldo;
+
+        if (btnCrearUsuario != null) {
+            btnCrearUsuario.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                String hash = encriptador.hashear(pass);
+                String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
+                    + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, sueldo_base, horario_laboral) "
+                    + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?) "
+                    + "ON DUPLICATE KEY UPDATE nombre_completo = VALUES(nombre_completo), codigo_rol = VALUES(codigo_rol), activo = VALUES(activo), "
+                    + "dni = VALUES(dni), sueldo_base = VALUES(sueldo_base), horario_laboral = VALUES(horario_laboral)";
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, idRol);
+                    ps.setString(2, user);
+                    ps.setString(3, user);
+                    ps.setString(4, nom);
+                    ps.setString(5, hash);
+                    ps.setString(6, hash);
+                    ps.setString(7, rol);
+                    ps.setBoolean(8, activoSel);
+                    ps.setString(9, dni);
+                    ps.setString(10, dni != null && dni.length() >= 4 ? dni.substring(dni.length() - 4) : "1234");
+                    ps.setBigDecimal(11, java.math.BigDecimal.valueOf(sueldoFinal));
+                    ps.setString(12, horario);
+                    ps.executeUpdate();
+                }
+            },
+            () -> {
+                if (btnCrearUsuario != null) {
+                    btnCrearUsuario.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootUsuariosStack, "Usuario '" + user + "' guardado con cambio de clave obligatorio.", false);
+                cargarUsuarios();
+            },
+            e -> {
+                if (btnCrearUsuario != null) {
+                    btnCrearUsuario.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootUsuariosStack, "Error: " + (e != null ? e.getMessage() : "desconocido"), true);
+            }
+        );
     }
 
     @FXML
@@ -221,14 +238,26 @@ public class UsuariosController {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario de la tabla.", true);
             return;
         }
-        try {
-            String temp = txtPasswordTemporal.getText();
-            resetearPasswordForzandoCambio(sel.idUsuario(), temp);
-            AnimationUtils.mostrarToast(rootUsuariosStack, "Contraseña reseteada para " + sel.username() + " (cambio_password_requerido = 1).", false);
-            cargarUsuarios();
-        } catch (Exception e) {
-            AnimationUtils.mostrarToast(rootUsuariosStack, "Error al resetear clave: " + e.getMessage(), true);
+        String temp = txtPasswordTemporal.getText();
+        if (btnResetearPassword != null) {
+            btnResetearPassword.setDisable(true);
         }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> resetearPasswordForzandoCambio(sel.idUsuario(), temp),
+            () -> {
+                if (btnResetearPassword != null) {
+                    btnResetearPassword.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootUsuariosStack, "Contraseña reseteada para " + sel.username() + " (cambio_password_requerido = 1).", false);
+                cargarUsuarios();
+            },
+            e -> {
+                if (btnResetearPassword != null) {
+                    btnResetearPassword.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootUsuariosStack, "Error al resetear clave: " + (e != null ? e.getMessage() : "desconocido"), true);
+            }
+        );
     }
 
     @FXML
@@ -251,14 +280,26 @@ public class UsuariosController {
                 AnimationUtils.mostrarToast(rootUsuariosStack, "El PIN debe tener entre 4 y 6 dígitos numéricos.", true);
                 return;
             }
-            try {
-                actualizarPinUsuario(sel.idUsuario(), pin);
-                AnimationUtils.mostrarToast(rootUsuariosStack, "PIN actualizado exitosamente para " + sel.username() + ".", false);
-                cargarUsuarios();
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error al configurar PIN", e);
-                AnimationUtils.mostrarToast(rootUsuariosStack, "Error actualizando PIN: " + e.getMessage(), true);
+            if (btnConfigurarPin != null) {
+                btnConfigurarPin.setDisable(true);
             }
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> actualizarPinUsuario(sel.idUsuario(), pin),
+                () -> {
+                    if (btnConfigurarPin != null) {
+                        btnConfigurarPin.setDisable(false);
+                    }
+                    AnimationUtils.mostrarToast(rootUsuariosStack, "PIN actualizado exitosamente para " + sel.username() + ".", false);
+                    cargarUsuarios();
+                },
+                e -> {
+                    if (btnConfigurarPin != null) {
+                        btnConfigurarPin.setDisable(false);
+                    }
+                    LOGGER.log(Level.WARNING, "Error al configurar PIN", e);
+                    AnimationUtils.mostrarToast(rootUsuariosStack, "Error actualizando PIN: " + (e != null ? e.getMessage() : "desconocido"), true);
+                }
+            );
         }
     }
 

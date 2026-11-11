@@ -1,11 +1,13 @@
 package com.foodcore.controller;
 
+import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -101,40 +103,43 @@ public class PasswordChangeDialogController {
             return;
         }
 
-        // 2. Estado de carga: spinner + botón deshabilitado (§3.3)
+        // 2. Estado de carga: spinner + botón deshabilitado (§3.3) en segundo plano sin bloquear el hilo JavaFX
         setEstadoCarga(true);
+        final String hashActual = usuario.getPasswordHash();
+        final int idUsuarioObjetivo = usuario.getIdUsuario();
+        final String usernameObjetivo = usuario.getUsername();
 
-        try {
-            // Validación en backend de contraseña actual (§3.3)
-            String hashActual = usuario.getPasswordHash();
-            boolean actualValida = (hashActual != null && hashActual.startsWith("$2"))
-                ? encriptador.verificar(actual, hashActual)
-                : actual.equals(hashActual);
-
-            if (!actualValida) {
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                boolean actualValida = (hashActual != null && hashActual.startsWith("$2"))
+                    ? encriptador.verificar(actual, hashActual)
+                    : actual.equals(hashActual);
+                if (!actualValida) {
+                    throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS,
+                        "La contraseña actual ingresada es incorrecta. Verifique e intente nuevamente.");
+                }
+                authService.cambiarPasswordObligatorio(idUsuarioObjetivo, nueva);
+                authService.login(usernameObjetivo, nueva);
+            },
+            () -> {
                 setEstadoCarga(false);
-                mostrarError("La contraseña actual ingresada es incorrecta. Verifique e intente nuevamente.");
-                return;
+                if (onCambioExitoso != null) {
+                    onCambioExitoso.run();
+                }
+            },
+            error -> {
+                setEstadoCarga(false);
+                if (error instanceof NegocioException) {
+                    mostrarError(error.getMessage());
+                } else if (error instanceof SQLException) {
+                    LOGGER.log(Level.SEVERE, "Error de base de datos al actualizar contraseña obligatoria", error);
+                    mostrarError("Error de conexión con la base de datos al actualizar la contraseña.");
+                } else {
+                    LOGGER.log(Level.SEVERE, "Error inesperado al actualizar contraseña obligatoria", error);
+                    mostrarError("Error inesperado al actualizar contraseña.");
+                }
             }
-
-            // Actualizar hash en BD y poner cambio_password_requerido = 0 (§3.2)
-            authService.cambiarPasswordObligatorio(usuario.getIdUsuario(), nueva);
-
-            // Login automático con la nueva clave (§3.2)
-            authService.login(usuario.getUsername(), nueva);
-
-            setEstadoCarga(false);
-            if (onCambioExitoso != null) {
-                onCambioExitoso.run();
-            }
-        } catch (NegocioException e) {
-            setEstadoCarga(false);
-            mostrarError(e.getMessage());
-        } catch (SQLException e) {
-            setEstadoCarga(false);
-            LOGGER.log(Level.SEVERE, "Error de base de datos al actualizar contraseña obligatoria", e);
-            mostrarError("Error de conexión con la base de datos al actualizar la contraseña.");
-        }
+        );
     }
 
     @FXML
