@@ -46,6 +46,14 @@ Este documento establece los controles de seguridad de aplicación (AppSec) obli
 
 ---
 
+## KDS Socket
+
+- **Estado:** `risk accepted — pending v4.4.x remediation` (ver registro completo en [`docs/RISK_ACCEPTANCE.md`](docs/RISK_ACCEPTANCE.md), riesgo `R-KDS-TLS-01`).
+- **Advertencia obligatoria:** **No exponer 9090 fuera de la LAN aislada POS/KDS** (`socket.kds.tls.enabled=false` en [`ServidorSockets.java`](src/main/java/com/foodcore/util/ServidorSockets.java)). En despliegues monopuesto restringir `9090` por firewall de host a loopback (`127.0.0.1`) y en multi-terminal únicamente a la subred LAN cableada POS/KDS, bloqueando Wi-Fi de invitados e Internet.
+- **Controles vigentes mientras no haya TLS:** autenticación por terminal (`HELLO`/`AUTH_TERMINAL`), firma `HMAC-SHA256` por evento (`EventoKdsDTO`), límite de trama `MAX_FRAME_BYTES = 1 MB` y exclusión de PII en eventos de comanda.
+
+---
+
 ## Contacto de Seguridad y Divulgación Responsable
 
 - Si detectas una vulnerabilidad de seguridad en **FoodCore ERP** (inyección SQL, omisión de autenticación/RBAC, exposición de secretos, problemas criptográficos o CVEs en dependencias), **no abras un issue público** con detalles explotables.
