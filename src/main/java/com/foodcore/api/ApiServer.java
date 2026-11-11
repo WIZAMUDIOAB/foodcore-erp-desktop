@@ -444,13 +444,13 @@ public class ApiServer {
             if (is != null) {
                 props.load(is);
             }
-        } catch (Exception ignored) {
+        } catch (java.io.IOException ignored) {
         }
         try (InputStream is = ApiServer.class.getResourceAsStream("/application-test.properties")) {
             if (is != null) {
                 props.load(is);
             }
-        } catch (Exception ignored) {
+        } catch (java.io.IOException ignored) {
         }
         return Boolean.parseBoolean(props.getProperty("app.devLogging", "false").trim());
     }

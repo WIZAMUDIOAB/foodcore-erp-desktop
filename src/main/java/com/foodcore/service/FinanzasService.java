@@ -139,7 +139,7 @@ public class FinanzasService {
 
                 conn.commit();
                 return true;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             } finally {
@@ -196,7 +196,7 @@ public class FinanzasService {
 
                 conn.commit();
                 return true;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             } finally {
@@ -247,7 +247,7 @@ public class FinanzasService {
 
                 conn.commit();
                 return idVenta;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             } finally {
@@ -297,7 +297,7 @@ public class FinanzasService {
 
                 conn.commit();
                 return true;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             } finally {

@@ -9,17 +9,20 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,7 +38,7 @@ public class ServidorSockets {
     public static final int MAX_FRAME_BYTES = TerminalAuthService.MAX_FRAME_BYTES; // 1 MB
 
     private static ServidorSockets instance;
-    private ServerSocket serverSocket;
+    private final AtomicReference<ServerSocket> serverSocket = new AtomicReference<>();
     private ExecutorService threadPool = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "ServidorSockets-Worker");
         t.setDaemon(true);
@@ -77,14 +80,15 @@ public class ServidorSockets {
         corriendo = true;
         threadPool.execute(() -> {
             try {
-                serverSocket = new ServerSocket(puerto);
+                ServerSocket ss = new ServerSocket(puerto);
+                serverSocket.set(ss);
                 LOGGER.info("Servidor de Sockets escuchando en el puerto " + puerto);
 
-                while (corriendo && !serverSocket.isClosed()) {
-                    Socket clientSocket = serverSocket.accept();
+                while (corriendo && !ss.isClosed()) {
+                    Socket clientSocket = ss.accept();
                     atenderCliente(clientSocket);
                 }
-            } catch (Exception e) {
+            } catch (IOException | RuntimeException e) {
                 if (corriendo) {
                     LOGGER.log(Level.WARNING, "Aviso en ServidorSockets", e);
                 }
@@ -107,7 +111,7 @@ public class ServidorSockets {
                         out.println(respuesta.toString());
                     }
                 }
-            } catch (Exception e) {
+            } catch (IOException | RuntimeException e) {
                 LOGGER.fine("Cliente desconectado: " + socket.getRemoteSocketAddress());
             } finally {
                 if (out != null) {
@@ -210,7 +214,7 @@ public class ServidorSockets {
                 transmitirATodos(linea, remitente);
             }
             return null;
-        } catch (Exception parseEx) {
+        } catch (SQLException | RuntimeException parseEx) {
             return crearError("INVALID_JSON", "Mensaje JSON malformado");
         }
     }
@@ -257,12 +261,13 @@ public class ServidorSockets {
     public synchronized void detener() {
         corriendo = false;
         try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
+            ServerSocket ss = serverSocket.getAndSet(null);
+            if (ss != null && !ss.isClosed()) {
+                ss.close();
             }
             threadPool.shutdownNow();
             LOGGER.info("Servidor de Sockets detenido.");
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al detener ServidorSockets", e);
         }
     }

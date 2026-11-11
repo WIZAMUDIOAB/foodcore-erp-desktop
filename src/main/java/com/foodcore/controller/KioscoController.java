@@ -158,7 +158,7 @@ public class KioscoController {
             } else {
                 poblarCategoriasDemo();
             }
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             poblarCategoriasDemo();
         }
     }
@@ -198,7 +198,7 @@ public class KioscoController {
             } else {
                 poblarProductosDemo();
             }
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             poblarProductosDemo();
         }
         renderizarMosaicoProductos();

@@ -73,7 +73,7 @@ public final class SesionUsuario {
     }
 
     public Set<Permiso> getPermisos() {
-        return permisos;
+        return Set.copyOf(permisos);
     }
 
     public String getIdTerminal() {

@@ -179,7 +179,7 @@ public class CuentasPorPagarController {
             if (cajaOpt.isPresent()) {
                 idCaja = cajaOpt.get().getIdCaja();
             }
-        } catch (Exception ignored) {}
+        } catch (java.sql.SQLException | RuntimeException ignored) {}
 
         try {
             finanzasService.registrarPagoProveedor(cuentaSeleccionada.getIdCuentaPagar(), monto, metodo, idCaja, idUsuario, nota);

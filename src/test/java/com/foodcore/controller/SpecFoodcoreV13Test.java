@@ -162,7 +162,7 @@ class SpecFoodcoreV13Test {
     @Test
     @DisplayName("SPEC v1.3 SEC-4: Apertura de cajon emite pulsos ESC-POS")
     void testAperturaCajonPulsoEscPos() {
-        byte[] pulso = ImpresoraTermicaService.ESC_POS_ABRIR_CAJON;
+        byte[] pulso = ImpresoraTermicaService.getEscPosAbrirCajon();
         assertNotNull(pulso);
         assertEquals(5, pulso.length);
         assertEquals((byte) 0x1B, pulso[0]);

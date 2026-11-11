@@ -130,7 +130,7 @@ public class MozoOrderController {
             if (conn != null) {
                 productos = productoDAO.listarProductosDisponibles(conn);
             }
-        } catch (Exception ignored) {
+        } catch (java.sql.SQLException | RuntimeException ignored) {
             // Se usará catálogo demostrativo de respaldo
         }
 

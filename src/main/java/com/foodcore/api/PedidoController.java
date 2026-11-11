@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -266,7 +267,7 @@ public class PedidoController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Usando estado de mesas por defecto en GET /api/mesas", e);
         }
 
@@ -446,7 +447,7 @@ public class PedidoController {
                     .contentType("application/json; charset=UTF-8")
                     .result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error procesando POST /api/pedidos", e);
             state.responderError(ctx, 500, "No se pudo registrar el pedido: " + e.getMessage());
         }
@@ -590,7 +591,7 @@ public class PedidoController {
             resp.put("mensaje", "Turno de caja #" + idCaja + " abierto exitosamente con fondo S/ " + montoInicial);
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al abrir turno de caja", e);
             state.responderError(ctx, 500, "No se pudo abrir la caja: " + e.getMessage());
         }
@@ -607,7 +608,7 @@ public class PedidoController {
 
             try {
                 cajaService.cerrarTurnoCaja(idCaja, idUsuario, contado);
-            } catch (Exception e) {
+            } catch (SQLException | com.foodcore.exception.NegocioException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Aviso cerrando caja en BD, cerrando en memoria", e);
             }
 
@@ -625,7 +626,7 @@ public class PedidoController {
             resp.put("mensaje", "Turno de caja cerrado exitosamente (Cierre Z).");
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al cerrar turno de caja", e);
             state.responderError(ctx, 500, "No se pudo cerrar la caja: " + e.getMessage());
         }
@@ -702,7 +703,7 @@ public class PedidoController {
 
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al procesar cobro en caja", e);
             state.responderError(ctx, 500, "Error al procesar cobro: " + e.getMessage());
         }

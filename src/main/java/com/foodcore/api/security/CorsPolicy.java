@@ -72,7 +72,7 @@ public final class CorsPolicy {
             if (is != null) {
                 target.load(is);
             }
-        } catch (Exception ignored) {
+        } catch (java.io.IOException ignored) {
         }
     }
 
@@ -84,7 +84,7 @@ public final class CorsPolicy {
     }
 
     public Set<String> getAllowedOrigins() {
-        return allowedOrigins;
+        return Set.copyOf(allowedOrigins);
     }
 
     /**

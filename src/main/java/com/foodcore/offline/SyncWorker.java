@@ -138,7 +138,7 @@ public class SyncWorker {
             redDisponible.set(true);
             notificarListeners(null);
             return true;
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al sincronizar catálogo remoto hacia BD local", e);
             redDisponible.set(false);
             notificarListeners("Error al sincronizar catálogo con servidor central.");
@@ -212,7 +212,7 @@ public class SyncWorker {
                 conn.commit();
                 notificarListeners(null);
                 return idPedidoLocal;
-            } catch (Exception ex) {
+            } catch (SQLException | RuntimeException ex) {
                 conn.rollback();
                 throw ex;
             }
@@ -301,7 +301,7 @@ public class SyncWorker {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.SEVERE, "Fallo al procesar cola outbox local", e);
         }
 

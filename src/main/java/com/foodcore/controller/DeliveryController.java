@@ -146,7 +146,7 @@ public class DeliveryController {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al cargar pedidos delivery sincrónicamente: " + e.getMessage());
         }
 
@@ -178,7 +178,7 @@ public class DeliveryController {
                     p.setRepartidor(rs.getString("repartidor"));
                     pedidos.add(p);
                 }
-            } catch (Exception e) {
+            } catch (java.sql.SQLException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Error cargando pedidos delivery", e);
             }
 

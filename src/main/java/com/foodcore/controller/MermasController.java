@@ -97,7 +97,7 @@ public class MermasController {
                         filas.add(new FilaMerma(fecha, nom, cant, saldo, obs != null ? obs : "Merma de cocina"));
                     }
                 }
-            } catch (Exception e) {
+            } catch (java.sql.SQLException | RuntimeException e) {
                 LOGGER.log(Level.FINE, "Error cargando mermas", e);
             }
             final List<Insumo> insFinal = ins;

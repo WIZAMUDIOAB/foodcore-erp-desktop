@@ -31,7 +31,7 @@ public class App extends Application {
     public void start(Stage stage) {
         LoggingBootstrap.installBridge();
         ConexionBD.validarVariablesEntornoObligatorias();
-        primaryStage = stage;
+        setPrimaryStage(stage);
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         cargarFuentesSistema();
 
@@ -116,6 +116,10 @@ public class App extends Application {
             primaryStage.setMinHeight(720);
             primaryStage.setMaximized(true);
         }
+    }
+
+    private static void setPrimaryStage(Stage stage) {
+        primaryStage = stage;
     }
 
     public static Stage getPrimaryStage() {

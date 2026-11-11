@@ -48,7 +48,7 @@ public final class AuthRateLimiter {
             if (is != null) {
                 target.load(is);
             }
-        } catch (Exception ignored) {
+        } catch (java.io.IOException ignored) {
         }
     }
 

@@ -435,7 +435,7 @@ public class DashboardController {
 
                 alertasPersonal = obtenerAlertasVencimiento30Dias(conn);
             }
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Cargando métricas demostrativas del Dashboard", e);
         }
 

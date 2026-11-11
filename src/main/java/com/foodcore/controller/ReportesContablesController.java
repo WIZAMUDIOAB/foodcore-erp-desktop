@@ -163,7 +163,7 @@ public class ReportesContablesController {
                 sumCompras += c.getTotal();
             }
 
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
         }
 

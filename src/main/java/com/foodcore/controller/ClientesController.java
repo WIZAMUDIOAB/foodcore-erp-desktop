@@ -262,7 +262,7 @@ public class ClientesController {
             }
             modalCliente.setVisible(false);
             cargarClientesSincrono();
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             lblModalError.setText("Error al guardar: " + ex.getMessage());
         }
     }

@@ -232,19 +232,19 @@ public class CobroModalController {
         sb.append("Cliente: ").append(txtNombreCliente.getText().trim()).append("\n");
         sb.append("Documento: ").append(txtDocCliente.getText().trim()).append("\n");
         sb.append("----------------------------------------------------\n");
-        sb.append(String.format("%-28s %4s %9s\n", "PRODUCTO", "CANT", "TOTAL"));
+        sb.append(String.format("%-28s %4s %9s%n", "PRODUCTO", "CANT", "TOTAL"));
         sb.append("----------------------------------------------------\n");
         for (DetalleVenta dv : itemsVenta) {
-            sb.append(String.format("%-28s %4d  S/ %6.2f\n", dv.getNombreProducto(), dv.getCantidad(), dv.getSubtotal()));
+            sb.append(String.format("%-28s %4d  S/ %6.2f%n", dv.getNombreProducto(), dv.getCantidad(), dv.getSubtotal()));
         }
         sb.append("----------------------------------------------------\n");
-        sb.append(String.format("%-34s S/ %7.2f\n", "SUBTOTAL:", venta.getSubtotal()));
-        sb.append(String.format("%-34s S/ %7.2f\n", "IGV (18%):", venta.getIgv()));
-        sb.append(String.format("%-34s S/ %7.2f\n", "TOTAL A PAGAR:", venta.getTotal()));
+        sb.append(String.format("%-34s S/ %7.2f%n", "SUBTOTAL:", venta.getSubtotal()));
+        sb.append(String.format("%-34s S/ %7.2f%n", "IGV (18%):", venta.getIgv()));
+        sb.append(String.format("%-34s S/ %7.2f%n", "TOTAL A PAGAR:", venta.getTotal()));
         sb.append("----------------------------------------------------\n");
-        sb.append(String.format("%-34s %s\n", "MÉTODO DE PAGO:", venta.getMetodoPago()));
-        sb.append(String.format("%-34s S/ %7.2f\n", "IMPORTE RECIBIDO:", recibido));
-        sb.append(String.format("%-34s S/ %7.2f\n", "VUELTO / CAMBIO:", vuelto));
+        sb.append(String.format("%-34s %s%n", "MÉTODO DE PAGO:", venta.getMetodoPago()));
+        sb.append(String.format("%-34s S/ %7.2f%n", "IMPORTE RECIBIDO:", recibido));
+        sb.append(String.format("%-34s S/ %7.2f%n", "VUELTO / CAMBIO:", vuelto));
         sb.append("====================================================\n");
         sb.append("           ¡GRACIAS POR SU PREFERENCIA!\n");
         sb.append("         Insumos descontados de inventario\n");

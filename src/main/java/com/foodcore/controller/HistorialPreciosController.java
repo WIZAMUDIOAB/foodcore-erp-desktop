@@ -179,7 +179,7 @@ public class HistorialPreciosController {
                 List<Insumo> ins = insumoDAO.listarTodos(conn);
                 if (!ins.isEmpty()) idEntidad = (int) ins.get(0).getIdInsumo();
             }
-        } catch (Exception ignored) {}
+        } catch (java.sql.SQLException | RuntimeException ignored) {}
 
         int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
         String usuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getUsername() : "admin";

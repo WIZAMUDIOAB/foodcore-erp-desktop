@@ -315,7 +315,7 @@ public class ReportesAvanzadosController {
                     topValor = cantidadTotal > 0 ? montoTotal / cantidadTotal : 0.0;
                 }
             }
-        } catch (Exception ex) {
+        } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error en reporte avanzado", ex);
         }
 

@@ -1338,7 +1338,7 @@ public class VentaController {
             Cliente cli = null;
             try (Connection conn = ConexionBD.getConnection()) {
                 cli = new ClienteDAOImpl().buscarPorDocumento(conn, doc).orElse(null);
-            } catch (Exception ignored) {}
+            } catch (java.sql.SQLException | RuntimeException ignored) {}
 
             if (cli == null) {
                 cli = new Cliente();

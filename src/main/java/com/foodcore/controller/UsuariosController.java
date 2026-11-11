@@ -209,7 +209,7 @@ public class UsuariosController {
             }
             AnimationUtils.mostrarToast(rootUsuariosStack, "Usuario '" + user + "' guardado con cambio de clave obligatorio.", false);
             cargarUsuarios();
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Error: " + e.getMessage(), true);
         }
     }

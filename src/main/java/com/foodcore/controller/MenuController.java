@@ -333,7 +333,7 @@ public class MenuController {
                                         BigDecimal precioVenta,
                                         boolean disponible,
                                         boolean esMenuDelDia,
-                                        String imagenUrl) throws Exception {
+                                        String imagenUrl) throws java.sql.SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
                 productoEnEdicion.setIdCategoria(idCategoria);
@@ -358,7 +358,7 @@ public class MenuController {
                                         String nombre,
                                         BigDecimal precioVenta,
                                         boolean disponible,
-                                        String imagenUrl) throws Exception {
+                                        String imagenUrl) throws java.sql.SQLException {
         return guardarPlatilloEnBD(idCategoria, codigo, nombre, precioVenta, disponible, false, imagenUrl);
     }
 
@@ -463,7 +463,7 @@ public class MenuController {
             AnimationUtils.mostrarToast(rootMenuStack, "Platillo guardado exitosamente.", false);
             handleNuevoPlatillo(null);
             cargarDatosMenu();
-        } catch (Exception e) {
+        } catch (java.sql.SQLException | RuntimeException e) {
             AnimationUtils.mostrarToast(rootMenuStack, "Error al guardar platillo: " + e.getMessage(), true);
         }
     }
