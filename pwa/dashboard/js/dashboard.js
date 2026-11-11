@@ -6,9 +6,73 @@ const FoodCoreDashboard = (() => {
   let chartInstance = null;
   let pollInterval = null;
 
+  function getAuthHeaders(extra = {}) {
+    const token = localStorage.getItem('fc_pwa_token');
+    const headers = { ...extra };
+    if (token && token.trim() !== '') {
+      headers.Authorization = `Bearer ${token.trim()}`;
+    }
+    return headers;
+  }
+
+  function mostrarModalAuthDash(mensajeError = '') {
+    const overlay = document.getElementById('dashAuthOverlay');
+    const errEl = document.getElementById('dashLoginError');
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
+    if (errEl) {
+      if (mensajeError) {
+        errEl.textContent = mensajeError;
+        errEl.style.display = 'block';
+      } else {
+        errEl.style.display = 'none';
+      }
+    }
+  }
+
+  function ocultarModalAuthDash() {
+    const overlay = document.getElementById('dashAuthOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  }
+
+  function configurarAuthModal() {
+    const btn = document.getElementById('btnDashLogin');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const userEl = document.getElementById('dashLoginUser');
+      const passEl = document.getElementById('dashLoginPass');
+      const username = userEl ? userEl.value.trim() : '';
+      const password = passEl ? passEl.value.trim() : '';
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.token) {
+          mostrarModalAuthDash(data.message || 'Credenciales inválidas.');
+          return;
+        }
+        localStorage.setItem('fc_pwa_token', data.token);
+        if (data.usuario) {
+          localStorage.setItem('fc_pwa_user', JSON.stringify(data.usuario));
+        }
+        ocultarModalAuthDash();
+        cargarDashboardData();
+      } catch (e) {
+        mostrarModalAuthDash('No se pudo conectar con el servidor de autenticación.');
+      }
+    });
+  }
+
   function init() {
     registrarServiceWorker();
     configurarDrawer();
+    configurarAuthModal();
     cargarDashboardData();
 
     // Actualizar KPIs cada 10 segundos
@@ -57,8 +121,17 @@ const FoodCoreDashboard = (() => {
 
   async function cargarKpis() {
     try {
-      const resp = await fetch('/api/dashboard/kpis', { credentials: 'same-origin' });
+      const resp = await fetch('/api/dashboard/kpis', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        mostrarModalAuthDash(resp.status === 403 ? 'Requiere rol ADMIN para consultar métricas.' : '');
+        return;
+      }
       if (resp.ok) {
+        ocultarModalAuthDash();
         const kpis = await resp.json();
         actualizarKpisUI(kpis);
         return;
@@ -119,7 +192,11 @@ const FoodCoreDashboard = (() => {
   async function cargarVentasPorHora() {
     let puntos = [];
     try {
-      const resp = await fetch('/api/dashboard/ventas-por-hora', { credentials: 'same-origin' });
+      const resp = await fetch('/api/dashboard/ventas-por-hora', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
       if (resp.ok) {
         const data = await resp.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -303,7 +380,11 @@ const FoodCoreDashboard = (() => {
 
     let platos = [];
     try {
-      const resp = await fetch('/api/dashboard/top-platos', { credentials: 'same-origin' });
+      const resp = await fetch('/api/dashboard/top-platos', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
       if (resp.ok) {
         platos = await resp.json();
       }
@@ -342,7 +423,11 @@ const FoodCoreDashboard = (() => {
 
     let txs = [];
     try {
-      const resp = await fetch('/api/dashboard/ventas-recientes', { credentials: 'same-origin' });
+      const resp = await fetch('/api/dashboard/ventas-recientes', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
       if (resp.ok) {
         txs = await resp.json();
       }

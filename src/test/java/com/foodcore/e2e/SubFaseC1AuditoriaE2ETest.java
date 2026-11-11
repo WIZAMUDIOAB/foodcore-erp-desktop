@@ -49,7 +49,7 @@ public class SubFaseC1AuditoriaE2ETest {
     @DisplayName("Sub-Fase C.1: API — PATCH /api/usuarios/{id}/pin actualiza PIN y valida 4-6 dígitos")
     void testPatchPinUsuarioYValidacion() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             // 1. PIN inválido (< 4 dígitos) -> 400 Bad Request
             APIResponse respInvalido = request.patch("/api/usuarios/3/pin",
@@ -97,7 +97,7 @@ public class SubFaseC1AuditoriaE2ETest {
     @DisplayName("Sub-Fase C.1: API — POST /api/pedidos registra y audita 'id_usuario_creador'")
     void testCrearPedidoAuditaUsuarioCreador() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             String uuidPedido = UUID.randomUUID().toString();
             Map<String, Object> payload = Map.of(

@@ -44,7 +44,7 @@ public class ApiIdempotencyE2ETest {
     @DisplayName("E2E 5: Prevención de Duplicados — Segundo POST /api/pedidos con mismo uuid_local devuelve 200 OK sin duplicar")
     void testPrevencionDuplicadosIdempotenciaUuidLocal() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "MOZO");
 
             String uuidFijo = "test-uuid-123-" + UUID.randomUUID().toString().substring(0, 8);
             Map<String, Object> payload = Map.of(

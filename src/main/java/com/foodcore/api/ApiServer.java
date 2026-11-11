@@ -1,6 +1,10 @@
 package com.foodcore.api;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.api.security.ApiSecurityFilter;
+import com.foodcore.api.security.AuthRateLimiter;
+import com.foodcore.api.security.CorsPolicy;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
@@ -54,6 +58,10 @@ public class ApiServer {
     private static ApiServer instance;
 
     private final ApiState state = new ApiState();
+    private final JwtService jwtService;
+    private final CorsPolicy corsPolicy;
+    private final AuthRateLimiter rateLimiter;
+    private final ApiSecurityFilter securityFilter;
     private final AuthController authController;
     private final PedidoController pedidoController;
     private final KdsController kdsController;
@@ -65,16 +73,33 @@ public class ApiServer {
 
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService());
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
+                new JwtService(), CorsPolicy.cargarDesdeConfiguracion(), AuthRateLimiter.cargarDesdeConfiguracion());
     }
 
     private ApiServer(AuthService authService, ProductoDAO productoDAO, MesaDAO mesaDAO,
                       PedidoDAO pedidoDAO, PedidoService pedidoService, UsuarioDAO usuarioDAO,
-                      CajaService cajaService) {
-        this.authController = new AuthController(state, authService, usuarioDAO);
+                      CajaService cajaService, JwtService jwtService, CorsPolicy corsPolicy,
+                      AuthRateLimiter rateLimiter) {
+        this.jwtService = jwtService != null ? jwtService : new JwtService();
+        this.corsPolicy = corsPolicy != null ? corsPolicy : CorsPolicy.cargarDesdeConfiguracion();
+        this.rateLimiter = rateLimiter != null ? rateLimiter : new AuthRateLimiter();
+        this.securityFilter = new ApiSecurityFilter(state, this.jwtService, this.rateLimiter);
+        this.authController = new AuthController(state, authService, usuarioDAO, this.jwtService);
         this.pedidoController = new PedidoController(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService);
         this.kdsController = new KdsController(state, pedidoDAO);
         this.reportesController = new ReportesController(state);
+    }
+
+    /**
+     * Crea una instancia aislada para pruebas de seguridad HTTP sin interferir con el singleton compartido.
+     */
+    public static ApiServer crearServidorAislado(JwtService jwtService,
+                                                 CorsPolicy corsPolicy,
+                                                 AuthRateLimiter rateLimiter) {
+        return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
+                jwtService, corsPolicy, rateLimiter);
     }
 
     public static synchronized ApiServer getInstance() {
@@ -119,7 +144,9 @@ public class ApiServer {
 
         app = Javalin.create(config -> {
             config.showJavalinBanner = false;
-            config.bundledPlugins.enableCors(cors -> cors.addRule(it -> it.anyHost()));
+            if (esDevLoggingHabilitado()) {
+                config.bundledPlugins.enableDevLogging();
+            }
 
             if (pwaDir.exists() && pwaDir.isDirectory()) {
                 config.staticFiles.add(staticFiles -> {
@@ -144,35 +171,42 @@ public class ApiServer {
             });
 
             // Conector HTTPS SSL (8443) con keystore.jks
-            SslContextFactory.Server sslContextFactory = obtenerSslContextFactory();
-            if (sslContextFactory != null) {
-                config.jetty.addConnector((server, httpConfig) -> {
-                    HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-                    SecureRequestCustomizer customizer = new SecureRequestCustomizer();
-                    customizer.setSniHostCheck(false);
-                    httpsConfig.addCustomizer(customizer);
+            if (httpsPort >= 0) {
+                SslContextFactory.Server sslContextFactory = obtenerSslContextFactory();
+                if (sslContextFactory != null) {
+                    config.jetty.addConnector((server, httpConfig) -> {
+                        HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
+                        SecureRequestCustomizer customizer = new SecureRequestCustomizer();
+                        customizer.setSniHostCheck(false);
+                        httpsConfig.addCustomizer(customizer);
 
-                    ServerConnector sslConnector = new ServerConnector(server,
-                            new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
-                            new HttpConnectionFactory(httpsConfig));
-                    sslConnector.setPort(httpsPort);
-                    return sslConnector;
-                });
+                        ServerConnector sslConnector = new ServerConnector(server,
+                                new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
+                                new HttpConnectionFactory(httpsConfig));
+                        sslConnector.setPort(httpsPort);
+                        return sslConnector;
+                    });
+                }
             }
         });
 
-        app.before(ctx -> {
-            ctx.header("Access-Control-Allow-Origin", "*");
-            ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-            ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Idempotency-Key, X-Requested-With");
+        // Seguridad HTTP: CORS por whitelist explícita + API 100% stateless (Authorization: Bearer JWT, sin cookies ni CSRF por cookie)
+        app.before(ctx -> corsPolicy.apply(ctx));
+        app.options("/*", ctx -> {
+            if (!ctx.res().isCommitted()) {
+                ctx.status(204);
+            }
         });
+        app.before("/api/*", securityFilter::handle);
 
-        app.options("/*", ctx -> ctx.status(204));
-
-        // 1. Health & AuthController
+        // 1. Health, AuthController & Catálogo Público de Solo Lectura
         app.get("/health", this::handleHealthReadiness);
         app.head("/health", this::handleHealthReadiness);
         app.get("/api/health", this::handleHealth);
+        app.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
+        app.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
+        app.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
+        app.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
         app.post("/api/auth/login", authController::handleLogin);
         app.post("/api/auth/pin-login", authController::handlePinLogin);
         app.post("/api/auth/pin-switch", authController::handlePinSwitch);
@@ -236,7 +270,10 @@ public class ApiServer {
         });
 
         app.start();
-        LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + httpPort + ") y HTTPS SSL (puerto " + httpsPort + ")");
+        if (httpPort == 0) {
+            this.puertoActual = app.port();
+        }
+        LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + this.puertoActual + ") y HTTPS SSL (puerto " + httpsPort + ")");
     }
 
     private void servirPwaHtml(Context ctx, String ruta) {
@@ -384,17 +421,37 @@ public class ApiServer {
         node.put("status", flywayListo ? "UP" : "DOWN");
         node.put("db", dbOk ? "UP" : "DOWN");
         node.put("flyway", flywayListo ? "READY" : "NOT_READY");
-        node.put("migrationsApplied", migracionesAplicadas);
-        node.put("version", "4.4.0");
-        node.put("port", puertoActual);
         return node;
     }
 
     private void handleHealth(Context ctx) {
         ObjectNode node = state.mapper.createObjectNode();
         node.put("status", "UP");
-        node.put("version", "4.4.0");
-        node.put("port", puertoActual);
         ctx.status(200).contentType("application/json; charset=UTF-8").result(node.toString());
+    }
+
+    private static boolean esDevLoggingHabilitado() {
+        String sysProp = System.getProperty("FOODCORE_DEV_LOGGING");
+        if (sysProp != null) {
+            return Boolean.parseBoolean(sysProp.trim());
+        }
+        String envVal = System.getenv("FOODCORE_DEV_LOGGING");
+        if (envVal != null) {
+            return Boolean.parseBoolean(envVal.trim());
+        }
+        Properties props = new Properties();
+        try (InputStream is = ApiServer.class.getResourceAsStream("/application.properties")) {
+            if (is != null) {
+                props.load(is);
+            }
+        } catch (Exception ignored) {
+        }
+        try (InputStream is = ApiServer.class.getResourceAsStream("/application-test.properties")) {
+            if (is != null) {
+                props.load(is);
+            }
+        } catch (Exception ignored) {
+        }
+        return Boolean.parseBoolean(props.getProperty("app.devLogging", "false").trim());
     }
 }

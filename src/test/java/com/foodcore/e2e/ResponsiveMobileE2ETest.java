@@ -177,7 +177,7 @@ public class ResponsiveMobileE2ETest {
     void testDashboardCelularPequeno() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, MOBILE_WIDTH, MOBILE_HEIGHT);
+             BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, MOBILE_WIDTH, MOBILE_HEIGHT, "ADMIN");
              Page page = context.newPage()) {
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/dashboard/");
@@ -233,7 +233,7 @@ public class ResponsiveMobileE2ETest {
     void testKdsCelularPequeno() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = PlaywrightE2ESupport.crearContexto(browser, MOBILE_WIDTH, MOBILE_HEIGHT);
+             BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, MOBILE_WIDTH, MOBILE_HEIGHT, "COCINA");
              Page page = context.newPage()) {
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/kds/");
@@ -288,7 +288,8 @@ public class ResponsiveMobileE2ETest {
             assertEquals(c0.y, c1.y, TOLERANCIA_PX, "En tablet los dos primeros platos deben compartir la misma fila");
             assertTrue(c1.x > c0.x + c0.width - TOLERANCIA_PX, "En tablet el segundo plato debe estar a la derecha del primero");
 
-            // Dashboard: 4 KPIs en una sola fila
+            // Dashboard: 4 KPIs en una sola fila (con token ADMIN en localStorage)
+            page.evaluate("t => localStorage.setItem('fc_pwa_token', t)", PlaywrightE2ESupport.obtenerTokenRol("ADMIN"));
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/dashboard/");
             Locator kpis = page.locator(".kpi-card");
             kpis.first().waitFor();

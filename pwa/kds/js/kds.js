@@ -8,8 +8,72 @@ const FoodCoreKDS = (() => {
   let pollInterval = null;
   let timerInterval = null;
 
+  function getAuthHeaders(extra = {}) {
+    const token = localStorage.getItem('fc_pwa_token');
+    const headers = { ...extra };
+    if (token && token.trim() !== '') {
+      headers.Authorization = `Bearer ${token.trim()}`;
+    }
+    return headers;
+  }
+
+  function mostrarModalAuthKds(mensajeError = '') {
+    const overlay = document.getElementById('kdsAuthOverlay');
+    const errEl = document.getElementById('kdsLoginError');
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
+    if (errEl) {
+      if (mensajeError) {
+        errEl.textContent = mensajeError;
+        errEl.style.display = 'block';
+      } else {
+        errEl.style.display = 'none';
+      }
+    }
+  }
+
+  function ocultarModalAuthKds() {
+    const overlay = document.getElementById('kdsAuthOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  }
+
+  function configurarAuthModal() {
+    const btn = document.getElementById('btnKdsLogin');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const userEl = document.getElementById('kdsLoginUser');
+      const passEl = document.getElementById('kdsLoginPass');
+      const username = userEl ? userEl.value.trim() : '';
+      const password = passEl ? passEl.value.trim() : '';
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.token) {
+          mostrarModalAuthKds(data.message || 'Credenciales inválidas.');
+          return;
+        }
+        localStorage.setItem('fc_pwa_token', data.token);
+        if (data.usuario) {
+          localStorage.setItem('fc_pwa_user', JSON.stringify(data.usuario));
+        }
+        ocultarModalAuthKds();
+        cargarItemsKds();
+      } catch (e) {
+        mostrarModalAuthKds('No se pudo conectar con el servidor de autenticación.');
+      }
+    });
+  }
+
   function init() {
     registrarServiceWorker();
+    configurarAuthModal();
     iniciarReloj();
     cargarItemsKds();
 
@@ -52,8 +116,18 @@ const FoodCoreKDS = (() => {
 
   async function cargarItemsKds() {
     try {
-      const resp = await fetch('/api/kds/items', { credentials: 'same-origin' });
+      const resp = await fetch('/api/kds/items', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        mostrarModalAuthKds(resp.status === 403 ? 'Rol sin permiso para KDS (requiere COCINA o ADMIN).' : '');
+        actualizarPillConexion(true);
+        return;
+      }
       if (resp.ok) {
+        ocultarModalAuthKds();
         const data = await resp.json();
         if (Array.isArray(data) && data.length > 0) {
           // Normalizar enviado_en a timestamp
@@ -257,11 +331,14 @@ const FoodCoreKDS = (() => {
 
     // 2. Notificar al Backend Javalin
     try {
-      await fetch(`/api/kds/items/${idDetalle}/estado`, {
+      const resp = await fetch(`/api/kds/items/${idDetalle}/estado`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ estado: nuevoEstado })
       });
+      if (resp.status === 401) {
+        mostrarModalAuthKds('Sesión requerida para actualizar comanda.');
+      }
     } catch (e) {
       console.warn('[KDS] Error al sincronizar estado con backend', e);
     }

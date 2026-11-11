@@ -94,6 +94,7 @@ public class PwaOfflineSyncE2ETest {
             HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
             HttpRequest reqVerif = HttpRequest.newBuilder()
                     .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/pedidos/" + uuidOffline))
+                    .header("Authorization", "Bearer " + PlaywrightE2ESupport.obtenerTokenRol("MOZO"))
                     .GET()
                     .build();
             HttpResponse<String> resVerif = client.send(reqVerif, HttpResponse.BodyHandlers.ofString());

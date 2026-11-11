@@ -43,7 +43,7 @@ public class SubFaseC2KdsE2ETest {
     @DisplayName("Sub-Fase C.2: KDS — GET /api/kds/comandas retorna comandas activas con ítems y mesa")
     void testConsultarComandasKdsYEstructura() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
             APIResponse resp = request.get("/api/kds/comandas");
             assertEquals(200, resp.status(), "GET /api/kds/comandas debe responder 200 OK");
@@ -72,7 +72,7 @@ public class SubFaseC2KdsE2ETest {
     @DisplayName("Sub-Fase C.2: KDS — GET /api/kds/items retorna lista plana para Kanban de preparación")
     void testConsultarItemsKanbanKds() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
             APIResponse resp = request.get("/api/kds/items");
             assertEquals(200, resp.status(), "GET /api/kds/items debe responder 200 OK");
@@ -94,7 +94,7 @@ public class SubFaseC2KdsE2ETest {
     @DisplayName("Sub-Fase C.2: KDS — PATCH /api/kds/items/{id}/estado avanza flujo PENDIENTE -> EN_PREPARACION -> LISTO")
     void testActualizarEstadoItemKds() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
             // 1. Cambiar a EN_PREPARACION
             APIResponse respPrep = request.patch("/api/kds/items/501/estado",
@@ -123,7 +123,7 @@ public class SubFaseC2KdsE2ETest {
     @DisplayName("Sub-Fase C.2: KDS — PATCH /api/pedidos/{id}/estado actualiza comanda completa")
     void testActualizarEstadoPedido() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
             APIResponse resp = request.patch("/api/pedidos/101/estado",
                     RequestOptions.create()

@@ -40,7 +40,7 @@ public class SubFaseC2DashboardE2ETest {
     @DisplayName("Sub-Fase C.2: Dashboard — GET /api/dashboard/kpis retorna métricas gerenciales")
     void testDashboardKpis() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             APIResponse resp = request.get("/api/dashboard/kpis");
             assertEquals(200, resp.status(), "GET /api/dashboard/kpis debe responder 200 OK");
@@ -61,7 +61,7 @@ public class SubFaseC2DashboardE2ETest {
     @DisplayName("Sub-Fase C.2: Dashboard — GET /api/dashboard/ventas-por-hora provee datos para gráfica Bézier")
     void testDashboardVentasPorHora() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             APIResponse resp = request.get("/api/dashboard/ventas-por-hora");
             assertEquals(200, resp.status(), "GET /api/dashboard/ventas-por-hora debe responder 200 OK");
@@ -82,7 +82,7 @@ public class SubFaseC2DashboardE2ETest {
     @DisplayName("Sub-Fase C.2: Dashboard — GET /api/dashboard/top-platos y /api/dashboard/ventas-recientes")
     void testDashboardTopPlatosYVentasRecientes() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
 
             // 1. Top platos
             APIResponse respTop = request.get("/api/dashboard/top-platos");

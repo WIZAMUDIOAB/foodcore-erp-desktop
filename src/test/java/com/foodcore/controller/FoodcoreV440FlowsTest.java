@@ -463,14 +463,27 @@ class FoodcoreV440FlowsTest {
         api.detener();
         api.iniciar(httpPort, httpsPort);
         try {
+            String tokenMozo = api.generarTokenJwt(3, "mozo", "MOZO");
             HttpClient client = HttpClient.newHttpClient();
             HttpResponse<String> resDisp = client.send(
-                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/productos/disponibles")).GET().build(),
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/productos/disponibles"))
+                            .header("Authorization", "Bearer " + tokenMozo)
+                            .GET()
+                            .build(),
                     HttpResponse.BodyHandlers.ofString()
             );
             assertEquals(200, resDisp.statusCode());
             assertFalse(resDisp.body().contains(nombreAgotado),
                     "GET /api/productos/disponibles para PWA NO debe incluir productos agotados");
+
+            HttpResponse<String> resPublicDisp = client.send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + httpPort + "/api/public/productos/disponibles"))
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            assertEquals(200, resPublicDisp.statusCode());
+            assertFalse(resPublicDisp.body().contains(nombreAgotado));
         } finally {
             api.detener();
         }

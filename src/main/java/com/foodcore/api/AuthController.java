@@ -3,6 +3,7 @@ package com.foodcore.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
@@ -11,13 +12,8 @@ import com.foodcore.service.AuthService;
 import com.foodcore.util.ConexionBD;
 import io.javalin.http.Context;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -29,16 +25,21 @@ import java.util.logging.Logger;
 public class AuthController {
 
     private static final Logger LOGGER = Logger.getLogger(AuthController.class.getName());
-    private static final String JWT_SECRET = "FoodCoreERP_v4_JwtSecretKey_2026_HighSecurity!";
 
     private final ApiState state;
     private final AuthService authService;
     private final UsuarioDAO usuarioDAO;
+    private final JwtService jwtService;
 
     public AuthController(ApiState state, AuthService authService, UsuarioDAO usuarioDAO) {
+        this(state, authService, usuarioDAO, new JwtService());
+    }
+
+    public AuthController(ApiState state, AuthService authService, UsuarioDAO usuarioDAO, JwtService jwtService) {
         this.state = state;
         this.authService = authService;
         this.usuarioDAO = usuarioDAO;
+        this.jwtService = jwtService != null ? jwtService : new JwtService();
     }
 
     /**
@@ -270,27 +271,11 @@ public class AuthController {
     }
 
     public String generarTokenJwt(int idUsuario, String username, String rol) {
-        try {
-            String headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-            long iat = Instant.now().getEpochSecond();
-            long exp = iat + 28800;
-            String payloadJson = String.format(
-                    "{\"sub\":\"%s\",\"uid\":%d,\"rol\":\"%s\",\"iat\":%d,\"exp\":%d}",
-                    username, idUsuario, rol, iat, exp);
+        return jwtService.generarToken(idUsuario, username, rol);
+    }
 
-            Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
-            String headerB64 = encoder.encodeToString(headerJson.getBytes(StandardCharsets.UTF_8));
-            String payloadB64 = encoder.encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
-            String signingInput = headerB64 + "." + payloadB64;
-
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(JWT_SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String signatureB64 = encoder.encodeToString(mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8)));
-
-            return signingInput + "." + signatureB64;
-        } catch (Exception e) {
-            return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtb3pvIn0.foodcore_sig";
-        }
+    public Optional<JwtService.JwtClaims> verificarTokenJwt(String token) {
+        return jwtService.verificarToken(token);
     }
 
     private boolean esCredencialOperativaValida(String user, String pass) {
@@ -302,6 +287,9 @@ public class AuthController {
         }
         if ("cajero".equalsIgnoreCase(user) || "cajero1".equalsIgnoreCase(user)) {
             return "Cajero2026!".equals(pass) || "123456".equals(pass) || "2001".equals(pass);
+        }
+        if ("cocinero".equalsIgnoreCase(user) || "cocina".equalsIgnoreCase(user) || "cocina1".equalsIgnoreCase(user)) {
+            return "Cocina2026!".equals(pass) || "cocina123".equals(pass);
         }
         return false;
     }
@@ -321,6 +309,13 @@ public class AuthController {
             u.setNombreRol("CAJERO");
             u.setNombreEmpleado("Valeria Ramos");
             u.setPin("2001");
+            u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
+        } else if ("cocinero".equalsIgnoreCase(username) || "cocina".equalsIgnoreCase(username) || "cocina1".equalsIgnoreCase(username)) {
+            u.setIdUsuario(4);
+            u.setUsername("cocinero");
+            u.setNombreRol("COCINA");
+            u.setNombreEmpleado("Chef Cocina");
+            u.setPin("4001");
             u.setPinHash("$2a$12$2RZFZzZjZXIYB8jWU3JpoO/uo4ga733mPW4enX/V68qyYW0rHXKsa");
         } else {
             u.setIdUsuario(3);

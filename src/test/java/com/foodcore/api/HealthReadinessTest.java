@@ -8,6 +8,7 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Pruebas unitarias para el readiness check de /health cuando BD o Flyway no están listos.
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class HealthReadinessTest {
 
     @Test
-    @DisplayName("/health reporta DOWN y NOT_READY si la conexión es nula o inválida")
+    @DisplayName("/health reporta DOWN y NOT_READY sin exponer metadatos internos si la conexión es nula o inválida")
     void debeReportarDownCuandoBdNoEstaLista() {
         ApiServer api = ApiServer.getInstance();
 
@@ -23,7 +24,9 @@ class HealthReadinessTest {
         assertEquals("DOWN", sinConexion.path("status").asText());
         assertEquals("DOWN", sinConexion.path("db").asText());
         assertEquals("NOT_READY", sinConexion.path("flyway").asText());
-        assertEquals(0, sinConexion.path("migrationsApplied").asInt());
+        assertFalse(sinConexion.has("migrationsApplied"));
+        assertFalse(sinConexion.has("port"));
+        assertFalse(sinConexion.has("version"));
 
         Connection connInvalida = (Connection) Proxy.newProxyInstance(
                 Connection.class.getClassLoader(),

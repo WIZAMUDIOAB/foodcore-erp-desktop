@@ -146,16 +146,24 @@ public class SubFaseBHttpsSwE2ETest {
     }
 
     @Test
-    @DisplayName("Sub-Fase B & v4.3.2: 3. Menú Digital URL de Red — GET /api/menu-digital/view sirve HTML")
+    @DisplayName("Sub-Fase B & v4.3.2: 3. Menú Digital URL de Red — GET /api/public/menu-digital sirve HTML")
     void testMenuDigitalViewEndpoint() throws Exception {
         HttpClient client = PlaywrightE2ESupport.crearInsecureHttpClient();
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest reqPriv = HttpRequest.newBuilder()
                 .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/menu-digital/view"))
                 .timeout(Duration.ofSeconds(4))
                 .GET()
                 .build();
+        HttpResponse<String> resPriv = client.send(reqPriv, HttpResponse.BodyHandlers.ofString());
+        assertEquals(401, resPriv.statusCode(), "/api/menu-digital/view administrativo debe exigir JWT (401)");
+
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/api/public/menu-digital"))
+                .timeout(Duration.ofSeconds(4))
+                .GET()
+                .build();
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, res.statusCode(), "/api/menu-digital/view debe retornar 200 OK");
+        assertEquals(200, res.statusCode(), "/api/public/menu-digital debe retornar 200 OK");
         assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("text/html"),
                 "El Content-Type debe ser text/html");
         assertTrue(res.body().contains("FOODCORE RESTOBAR & GRILL"), "Debe contener el título del menú digital");

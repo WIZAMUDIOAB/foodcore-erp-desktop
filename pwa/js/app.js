@@ -8,6 +8,15 @@ const FoodCorePWA = (() => {
     ? `${window.location.origin}/api`
     : 'https://localhost:8443/api';
 
+  function getAuthHeaders(extra = {}) {
+    const token = localStorage.getItem('fc_pwa_token');
+    const headers = { ...extra };
+    if (token && token.trim() !== '') {
+      headers.Authorization = `Bearer ${token.trim()}`;
+    }
+    return headers;
+  }
+
   let catalogoProductos = [];
   let listaMesas = [];
   let carrito = [];
@@ -216,7 +225,7 @@ const FoodCorePWA = (() => {
         try {
           const res = await fetch(`${API_BASE}/pedidos`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(pedido)
           });
           if (res.ok) {
@@ -314,7 +323,11 @@ const FoodCorePWA = (() => {
 
   async function cargarMesas(filtroEstado = 'TODAS') {
     try {
-      const res = await fetch(`${API_BASE}/mesas`, { method: 'GET', cache: 'no-store' });
+      const res = await fetch(`${API_BASE}/mesas`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         listaMesas = await res.json();
         await FoodCoreOfflineDB.guardarMesasCache(listaMesas);
@@ -434,7 +447,18 @@ const FoodCorePWA = (() => {
 
   async function cargarCatalogoProductos(silencioso = false) {
     try {
-      const res = await fetch(`${API_BASE}/productos`, { method: 'GET', cache: 'no-store' });
+      const token = localStorage.getItem('fc_pwa_token');
+      const url = (token && token.trim() !== '')
+        ? `${API_BASE}/productos`
+        : `${API_BASE}/public/productos`;
+      let res = await fetch(url, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: getAuthHeaders()
+      });
+      if (res.status === 401) {
+        res = await fetch(`${API_BASE}/public/productos`, { method: 'GET', cache: 'no-store' });
+      }
       if (res.ok) {
         catalogoProductos = await res.json();
         await FoodCoreOfflineDB.guardarCatalogoCache(catalogoProductos);
@@ -747,7 +771,7 @@ const FoodCorePWA = (() => {
     try {
       const res = await fetch(`${API_BASE}/pedidos`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(pedidoPayload)
       });
 
@@ -809,11 +833,21 @@ const FoodCorePWA = (() => {
     if (!grid) return;
 
     try {
-      const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
-      if (res.ok) {
-        usuariosActivosCache = await res.json();
+      if (localStorage.getItem('fc_pwa_token')) {
+        const res = await fetch(`${API_BASE}/usuarios/activos`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          usuariosActivosCache = await res.json();
+        }
       }
     } catch (_) {
+      usuariosActivosCache = [];
+    }
+
+    if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
       usuariosActivosCache = [
         { id: 3, id_usuario: 3, username: 'mozo', nombre: 'Mateo Quispe (Mozo)', rol: 'MOZO', tiene_pin: true },
         { id: 1, id_usuario: 1, username: 'admin', nombre: 'Administrador General', rol: 'ADMIN', tiene_pin: true }
@@ -1007,9 +1041,15 @@ const FoodCorePWA = (() => {
 
     if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
       try {
-        const res = await fetch(`${API_BASE}/usuarios/activos`, { method: 'GET', cache: 'no-store' });
-        if (res.ok) {
-          usuariosActivosCache = await res.json();
+        if (localStorage.getItem('fc_pwa_token')) {
+          const res = await fetch(`${API_BASE}/usuarios/activos`, {
+            method: 'GET',
+            cache: 'no-store',
+            headers: getAuthHeaders()
+          });
+          if (res.ok) {
+            usuariosActivosCache = await res.json();
+          }
         }
       } catch (_) {}
     }
@@ -1124,7 +1164,7 @@ const FoodCorePWA = (() => {
     try {
       const res = await fetch(`${API_BASE}/auth/pin-switch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       const data = await res.json();

@@ -138,9 +138,22 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             HttpClient client = HttpClient.newHttpClient();
             ObjectMapper mapper = new ObjectMapper();
 
-            // 1. GET /api/productos (Validar consumo dinámico de imagen_url sin emojis en v4.0.1)
+            // 1. POST /api/auth/login -> obtener JWT Bearer real
+            HttpRequest reqLogin = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:8080/api/auth/login"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"mozo\",\"password\":\"Mozo2026!\"}"))
+                    .build();
+            HttpResponse<String> resLogin = client.send(reqLogin, HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, resLogin.statusCode(), "POST /api/auth/login debe retornar HTTP 200");
+            JsonNode loginJson = mapper.readTree(resLogin.body());
+            String tokenJwt = loginJson.path("token").asText("");
+            assertTrue(tokenJwt.startsWith("eyJ"));
+
+            // 2. GET /api/productos autenticado (Validar consumo dinámico de imagen_url sin emojis en v4.0.1)
             HttpRequest reqProd = HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:8080/api/productos"))
+                    .header("Authorization", "Bearer " + tokenJwt)
                     .GET()
                     .build();
             HttpResponse<String> resProd = client.send(reqProd, HttpResponse.BodyHandlers.ofString());
@@ -151,7 +164,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             assertEquals("", prodJson.get(0).get("imagen_url").asText(),
                     "Los productos sin foto deben retornar imagen_url vacío para activar el fallback SaaS de iniciales");
 
-            // 1.1 Verificar actualización en tiempo real cuando Backoffice actualiza imagen_url en BD
+            // 2.1 Verificar actualización en tiempo real cuando Backoffice actualiza imagen_url en BD
             try (Connection conn = ConexionBD.getConnection();
                  Statement st = conn.createStatement()) {
                 st.executeUpdate("UPDATE producto SET imagen_url = '/uploads/platillos/royal_doble.png' WHERE id_producto = 1");
@@ -165,20 +178,10 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
                 st.executeUpdate("UPDATE producto SET imagen_url = NULL WHERE id_producto = 1");
             }
 
-            // 2. POST /api/auth/login
-            HttpRequest reqLogin = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:8080/api/auth/login"))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{\"username\":\"mozo\",\"password\":\"Mozo2026!\"}"))
-                    .build();
-            HttpResponse<String> resLogin = client.send(reqLogin, HttpResponse.BodyHandlers.ofString());
-            assertEquals(200, resLogin.statusCode(), "POST /api/auth/login debe retornar HTTP 200");
-            JsonNode loginJson = mapper.readTree(resLogin.body());
-            assertTrue(loginJson.hasNonNull("token") && loginJson.get("token").asText().startsWith("eyJ"));
-
             // 3. GET /api/mesas
             HttpRequest reqMesas = HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:8080/api/mesas"))
+                    .header("Authorization", "Bearer " + tokenJwt)
                     .GET()
                     .build();
             HttpResponse<String> resMesas = client.send(reqMesas, HttpResponse.BodyHandlers.ofString());
@@ -191,7 +194,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             String payloadPedido = "{"
                     + "\"uuid_local\":\"" + uuidLocal + "\","
                     + "\"numero_mesa\":\"04\","
-                    + "\"id_usuario\":1,"
+                    + "\"id_usuario\":3,"
                     + "\"items\":["
                     + "{\"id_producto\":1,\"nombre\":\"Hamburguesa Royal Doble\",\"cantidad\":2,\"precio_unitario\":24.50,\"notas\":\"Sin mayonesa\"},"
                     + "{\"id_producto\":3,\"nombre\":\"Alitas BBQ Picantes x6\",\"cantidad\":1,\"precio_unitario\":22.00,\"notas\":\"Extra salsa\"}"
@@ -200,6 +203,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             HttpRequest reqPed1 = HttpRequest.newBuilder()
                     .uri(URI.create("http://localhost:8080/api/pedidos"))
                     .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + tokenJwt)
                     .POST(HttpRequest.BodyPublishers.ofString(payloadPedido))
                     .build();
             HttpResponse<String> resPed1 = client.send(reqPed1, HttpResponse.BodyHandlers.ofString());
