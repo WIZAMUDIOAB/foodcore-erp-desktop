@@ -100,7 +100,7 @@ public class InsumoDAOImpl implements InsumoDAO {
             return saldosBloqueados;
         }
         List<Long> ordenados = idsInsumos.stream().distinct().sorted().collect(Collectors.toList());
-        String placeholders = ordenados.stream().map(x -> "?").collect(Collectors.joining(","));
+        String placeholders = SqlQueryBuilder.buildInPlaceholders(ordenados.size());
         String sql = "SELECT id_insumo, stock_actual_disponible FROM insumo " +
                      "WHERE id_insumo IN (" + placeholders + ") ORDER BY id_insumo ASC FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

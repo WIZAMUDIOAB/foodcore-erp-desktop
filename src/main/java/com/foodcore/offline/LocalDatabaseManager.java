@@ -3,8 +3,8 @@ package com.foodcore.offline;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,18 +34,21 @@ public final class LocalDatabaseManager {
         }
         String url = "jdbc:sqlite:" + dbPath;
         Connection conn = DriverManager.getConnection(url);
-        try (Statement st = conn.createStatement()) {
-            st.execute("PRAGMA foreign_keys = ON;");
-        }
+        ejecutarDdlSeguro(conn, "PRAGMA foreign_keys = ON;");
         return conn;
     }
 
+    private static void ejecutarDdlSeguro(Connection conn, String sql) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.execute();
+        }
+    }
+
     public static synchronized void inicializarEsquemaLocal() throws SQLException {
-        try (Connection conn = getLocalConnection();
-             Statement st = conn.createStatement()) {
+        try (Connection conn = getLocalConnection()) {
 
             // 1. Tabla local item_vendible / productos
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS item_vendible (
                     id_producto INTEGER PRIMARY KEY,
                     codigo TEXT,
@@ -59,7 +62,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 2. Tabla local mesa
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS mesa (
                     id_mesa INTEGER PRIMARY KEY,
                     numero TEXT NOT NULL UNIQUE,
@@ -69,7 +72,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 3. Tabla local pedido
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS pedido (
                     id_pedido_local INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_servidor INTEGER,
@@ -89,7 +92,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 4. Tabla local detalle_pedido
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS detalle_pedido (
                     id_detalle_local INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_local INTEGER NOT NULL,
@@ -104,7 +107,7 @@ public final class LocalDatabaseManager {
             """);
 
             // 5. Tabla local outbox_sync (§1.2 Patrón Outbox Local)
-            st.execute("""
+            ejecutarDdlSeguro(conn, """
                 CREATE TABLE IF NOT EXISTS outbox_sync (
                     id_outbox INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_pedido_local INTEGER NOT NULL,

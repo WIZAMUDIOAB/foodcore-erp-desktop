@@ -97,10 +97,10 @@ public class SyncWorker {
              Connection localConn = LocalDatabaseManager.getLocalConnection()) {
 
             // Sincronizar item_vendible
-            try (Statement stRemote = remoteConn.createStatement();
-                 ResultSet rsRemote = stRemote.executeQuery(
-                     "SELECT p.id_producto, p.codigo, p.nombre, p.precio_venta, p.id_categoria, c.nombre as cat_nombre, p.disponible, p.activo " +
-                     "FROM producto p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria WHERE p.activo = 1");
+            String sqlProd = "SELECT p.id_producto, p.codigo, p.nombre, p.precio_venta, p.id_categoria, c.nombre as cat_nombre, p.disponible, p.activo "
+                    + "FROM producto p LEFT JOIN categoria c ON p.id_categoria = c.id_categoria WHERE p.activo = 1";
+            try (PreparedStatement stRemote = remoteConn.prepareStatement(sqlProd);
+                 ResultSet rsRemote = stRemote.executeQuery();
                  PreparedStatement psLocal = localConn.prepareStatement(
                      "INSERT OR REPLACE INTO item_vendible (id_producto, codigo, nombre, precio_venta, id_categoria, nombre_categoria, disponible, activo) " +
                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
@@ -120,8 +120,8 @@ public class SyncWorker {
             }
 
             // Sincronizar mesa
-            try (Statement stRemote = remoteConn.createStatement();
-                 ResultSet rsRemote = stRemote.executeQuery("SELECT id_mesa, numero, estado, activo FROM mesa WHERE activo = 1");
+            try (PreparedStatement stRemote = remoteConn.prepareStatement("SELECT id_mesa, numero, estado, activo FROM mesa WHERE activo = 1");
+                 ResultSet rsRemote = stRemote.executeQuery();
                  PreparedStatement psLocal = localConn.prepareStatement(
                      "INSERT OR REPLACE INTO mesa (id_mesa, numero, estado, activo) VALUES (?, ?, ?, ?)")) {
 
@@ -237,8 +237,8 @@ public class SyncWorker {
                 "WHERE estado = 'PENDIENTE' ORDER BY id_outbox ASC LIMIT 20";
 
             List<OutboxItem> pendientes = new ArrayList<>();
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery(sqlSelect)) {
+            try (PreparedStatement st = conn.prepareStatement(sqlSelect);
+                 ResultSet rs = st.executeQuery()) {
                 while (rs.next()) {
                     pendientes.add(new OutboxItem(
                         rs.getInt("id_outbox"),
@@ -311,8 +311,8 @@ public class SyncWorker {
 
     public synchronized int contarPedidosPendientes() {
         try (Connection conn = LocalDatabaseManager.getLocalConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM outbox_sync WHERE estado = 'PENDIENTE'")) {
+             PreparedStatement st = conn.prepareStatement("SELECT COUNT(*) FROM outbox_sync WHERE estado = 'PENDIENTE'");
+             ResultSet rs = st.executeQuery()) {
             return rs.next() ? rs.getInt(1) : 0;
         } catch (Exception e) {
             return 0;
