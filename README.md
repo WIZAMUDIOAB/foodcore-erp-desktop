@@ -35,3 +35,5 @@ Sistema ERP de escritorio para restaurantes de comida rápida bajo arquitectura 
 - Usuario: `admin`
 - Contraseña: la configurada en el seed Flyway (ver `V3__seed_admin.sql`)
 
+<!-- CI trigger: v4.3.5 -->
+
