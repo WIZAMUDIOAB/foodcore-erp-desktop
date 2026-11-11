@@ -15,3 +15,17 @@ Este documento establece los controles de seguridad de aplicación (AppSec) obli
 3. **Verificación automatizada:**
    - SpotBugs ejecuta sin exclusiones para `SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING` y `SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE`.
    - La suite de integración `SqlInjectionPreventionIT` verifica payloads clásicos de inyección (`' OR '1'='1`, `'; DROP TABLE ...; --`, `' UNION SELECT ...`) contra login, búsqueda de pedidos por estado y filtros de fecha en MySQL real.
+
+---
+
+## Gestión de Secretos y Cifrado Offline (SQLite)
+
+1. **Variables de entorno obligatorias (Fail-Fast, sin fallbacks hardcodeados):**
+   - `FOODCORE_DB_PASS`, `FOODCORE_MIGRATOR_PASS`, `FOODCORE_JWT_SECRET` y `FOODCORE_OFFLINE_DB_KEY` deben configurarse explícitamente en variables de entorno o propiedades JVM (`-D...`).
+   - `ConexionBD` y `OfflineCryptoService` fallan explícitamente con `IllegalStateException` ante credenciales o claves ausentes, vacías o placeholders `${...}` sin resolver.
+2. **Protección criptográfica en reposo (`com.foodcore.offline`):**
+   - Los datos personales de clientes (`cliente_nombre`, `cliente_telefono`, `cliente_direccion`, `cliente_referencia`) y los payloads del outbox (`outbox_sync.payload_json`) almacenados en `terminal_local.db` se cifran registro a registro con **AES-256-GCM** (`AES/GCM/NoPadding`, etiqueta de autenticación de 128 bits).
+   - Cada operación de cifrado deriva una clave de 256 bits mediante **`PBKDF2WithHmacSHA256`** (65,536 iteraciones) con **salt de 16 bytes e IV de 12 bytes aleatorios** generados por `SecureRandom`, serializados como `v1:<b64salt>:<b64iv>:<b64cipher>`.
+3. **Permisos de sistema de archivos y purga automática:**
+   - `LocalDatabaseManager` inicializa la base SQLite con permisos restrictivos exclusivos del propietario (`rw-------` / `600` en POSIX y ACL limitada únicamente al propietario en Windows NTFS).
+   - Al confirmarse la sincronización con MySQL central en `SyncWorker.procesarOutboxSync()`, los registros `SINCRONIZADO` y sus filas locales en `outbox_sync`, `detalle_pedido` y `pedido` se purgan automáticamente.

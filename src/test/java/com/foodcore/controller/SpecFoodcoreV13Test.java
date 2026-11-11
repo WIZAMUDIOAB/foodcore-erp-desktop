@@ -15,7 +15,10 @@ import com.foodcore.model.RegistroAuditoria;
 import com.foodcore.model.Rol;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.enums.Permiso;
+import com.foodcore.offline.LocalDatabaseManager;
+import com.foodcore.offline.OfflineCryptoService;
 import com.foodcore.offline.SyncWorker;
+import org.junit.jupiter.api.io.TempDir;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.support.JavaFxTestSupport;
@@ -77,43 +80,57 @@ class SpecFoodcoreV13Test {
 
     @Test
     @DisplayName("SPEC v1.3 SEC-1: SyncWorker encola en SQLite local en modo offline y sincroniza con MySQL al volver online")
-    void testResilienciaYOfflineSyncWorker() throws Exception {
+    void testResilienciaYOfflineSyncWorker(@TempDir Path tempOfflineDir) throws Exception {
         SyncWorker syncWorker = SyncWorker.getInstancia();
         assertNotNull(syncWorker);
 
-        syncWorker.setSimularDesconexionRed(true);
-        assertFalse(syncWorker.isOnline(), "Debe marcar estado offline");
+        String previousOfflineKey = System.getProperty(OfflineCryptoService.ENV_OFFLINE_DB_KEY);
+        System.setProperty(OfflineCryptoService.ENV_OFFLINE_DB_KEY, "SpecV13-Offline-TestKey#2026");
+        LocalDatabaseManager.setDbPath(tempOfflineDir.resolve("terminal_local.db").toString());
+        try {
+            syncWorker.setSimularDesconexionRed(true);
+            assertFalse(syncWorker.isOnline(), "Debe marcar estado offline");
 
-        Pedido pedidoLocal = new Pedido();
-        pedidoLocal.setIdMesa(1);
-        pedidoLocal.setNumeroMesa("DELIV-01");
-        pedidoLocal.setTipoPedido("DELIVERY");
-        pedidoLocal.setClienteNombre("Carlos Mendoza");
-        pedidoLocal.setClienteTelefono("987654321");
-        pedidoLocal.setClienteDireccion("Av. Larco 456");
-        pedidoLocal.setCostoEnvio(new BigDecimal("5.00"));
-        pedidoLocal.setTotal(new BigDecimal("35.00"));
+            Pedido pedidoLocal = new Pedido();
+            pedidoLocal.setIdMesa(1);
+            pedidoLocal.setNumeroMesa("DELIV-01");
+            pedidoLocal.setTipoPedido("DELIVERY");
+            pedidoLocal.setClienteNombre("Carlos Mendoza");
+            pedidoLocal.setClienteTelefono("987654321");
+            pedidoLocal.setClienteDireccion("Av. Larco 456");
+            pedidoLocal.setCostoEnvio(new BigDecimal("5.00"));
+            pedidoLocal.setTotal(new BigDecimal("35.00"));
 
-        List<DetallePedido> detalles = new ArrayList<>();
-        DetallePedido d = new DetallePedido();
-        d.setIdProducto(1);
-        d.setNombreProducto("Hamburguesa Clasica");
-        d.setCantidad(1);
-        d.setPrecioUnitario(new BigDecimal("30.00"));
-        d.setSubtotal(new BigDecimal("30.00"));
-        detalles.add(d);
+            List<DetallePedido> detalles = new ArrayList<>();
+            DetallePedido d = new DetallePedido();
+            d.setIdProducto(1);
+            d.setNombreProducto("Hamburguesa Clasica");
+            d.setCantidad(1);
+            d.setPrecioUnitario(new BigDecimal("30.00"));
+            d.setSubtotal(new BigDecimal("30.00"));
+            detalles.add(d);
 
-        int outboxId = syncWorker.guardarPedidoEnOutboxLocal(pedidoLocal, detalles);
-        assertTrue(outboxId > 0, "Debe generar un ID en outbox local");
+            int outboxId = syncWorker.guardarPedidoEnOutboxLocal(pedidoLocal, detalles);
+            assertTrue(outboxId > 0, "Debe generar un ID en outbox local");
 
-        int pendientes = syncWorker.contarPedidosPendientes();
-        assertTrue(pendientes >= 1, "Debe existir al menos 1 pedido pendiente en outbox local");
+            int pendientes = syncWorker.contarPedidosPendientes();
+            assertTrue(pendientes >= 1, "Debe existir al menos 1 pedido pendiente en outbox local");
 
-        syncWorker.setSimularDesconexionRed(false);
-        assertTrue(syncWorker.isOnline(), "Debe marcar estado online");
+            syncWorker.setSimularDesconexionRed(false);
+            assertTrue(syncWorker.isOnline(), "Debe marcar estado online");
 
-        int sincronizados = syncWorker.procesarOutboxSync();
-        assertTrue(sincronizados >= 0, "Debe procesar la cola de sincronizacion");
+            int sincronizados = syncWorker.procesarOutboxSync();
+            assertTrue(sincronizados >= 0, "Debe procesar la cola de sincronizacion");
+            assertEquals(0, syncWorker.contarPedidosPendientes(), "Los registros sincronizados deben purgarse localmente");
+        } finally {
+            syncWorker.setSimularDesconexionRed(false);
+            LocalDatabaseManager.setDbPath(null);
+            if (previousOfflineKey != null) {
+                System.setProperty(OfflineCryptoService.ENV_OFFLINE_DB_KEY, previousOfflineKey);
+            } else {
+                System.clearProperty(OfflineCryptoService.ENV_OFFLINE_DB_KEY);
+            }
+        }
     }
 
     @Test
