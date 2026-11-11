@@ -53,9 +53,14 @@ public class Launcher {
         try {
             FlywayMigrator.migrateOnBootstrap();
         } catch (IllegalStateException ex) {
+            LOGGER.log(Level.SEVERE, "Error crítico de configuración/migración Flyway en el arranque", ex);
             throw ex;
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Migraciones Flyway diferidas en arranque headless", e);
+            LOGGER.log(Level.SEVERE, "Error crítico ejecutando migraciones Flyway en el arranque; se aborta el inicio", e);
+            throw new IllegalStateException(
+                    "No se pudieron ejecutar las migraciones Flyway en el arranque: " + e.getMessage(),
+                    e
+            );
         }
         try {
             ServidorSockets.getInstance().iniciar();
