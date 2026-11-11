@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.0.36
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
           MYSQL_DATABASE: foodcore_test
         ports:
           - 3306:3306
@@ -24,9 +24,9 @@ jobs:
       FOODCORE_DB_PORT: 3306
       FOODCORE_DB_NAME: foodcore_test
       FOODCORE_DB_USER: root
-      FOODCORE_DB_PASS: root
+      FOODCORE_DB_PASS: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
       FOODCORE_MIGRATOR_USER: root
-      FOODCORE_MIGRATOR_PASS: root
+      FOODCORE_MIGRATOR_PASS: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -46,19 +46,35 @@ jobs:
 
       - name: Prepare Database with Flyway
         run: |
-          mvn compile flyway:migrate -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" -Dflyway.user=root -Dflyway.password=root
+          mvn compile flyway:migrate \
+            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
+            -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
+            -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
 
       - name: Install Playwright Browsers
         run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
 
+      - name: Quality Gate (Maven Verify — Unit, Integration, E2E, Checkstyle, SpotBugs)
+        run: mvn verify
+
+      - name: Coverage Gate
+        run: mvn jacoco:check@jacoco-check
+
       - name: Start FoodCore Server (Javalin)
         run: |
-          mvn package -DskipTests
-          java -jar target/foodcore-erp.jar &
-          npx wait-on http://localhost:8080 --timeout 60000
+          nohup java -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
+          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
+          npx --yes wait-on http://localhost:8080/health --timeout 60000
 
-      - name: Run E2E Tests (Playwright + TestFX)
+      - name: Run E2E Tests (Playwright)
         run: mvn test -Dtest="*E2ETest"
+
+      - name: Stop FoodCore Server
+        if: always()
+        run: |
+          if [ -n "${SERVER_PID:-}" ]; then
+            kill "$SERVER_PID" || true
+          fi
 
       - name: Upload Playwright Report & Screenshots
         if: always()
@@ -68,4 +84,5 @@ jobs:
           path: |
             target/playwright-report/
             target/surefire-reports/
+            target/foodcore-server.log
           retention-days: 7

@@ -61,6 +61,24 @@ public class SubFaseBHttpsSwE2ETest {
         assertEquals(200, resHttp.statusCode(), "HTTP en puerto 8080 debe responder 200 OK");
         assertTrue(resHttp.body().contains("UP"), "El estado HTTP 8080 de /api/health debe ser UP");
 
+        // 2.1 Validar endpoint /health de readiness (BD + Flyway) vía GET y HEAD (para wait-on en CI)
+        HttpRequest reqReadyGet = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.HTTP_BASE_URL + "/health"))
+                .timeout(Duration.ofSeconds(4))
+                .GET()
+                .build();
+        HttpResponse<String> resReadyGet = client.send(reqReadyGet, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, resReadyGet.statusCode(), "GET /health debe responder 200 OK cuando BD y Flyway están listos");
+        assertTrue(resReadyGet.body().contains("\"flyway\":\"READY\""), "GET /health debe confirmar Flyway READY");
+
+        HttpRequest reqReadyHead = HttpRequest.newBuilder()
+                .uri(URI.create(PlaywrightE2ESupport.HTTP_BASE_URL + "/health"))
+                .timeout(Duration.ofSeconds(4))
+                .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                .build();
+        HttpResponse<Void> resReadyHead = client.send(reqReadyHead, HttpResponse.BodyHandlers.discarding());
+        assertEquals(200, resReadyHead.statusCode(), "HEAD /health debe responder 200 OK para wait-on en CI");
+
         // 3. Validar descarga pública de certificado SSL foodcore.cer para tablets
         HttpRequest reqCer = HttpRequest.newBuilder()
                 .uri(URI.create(PlaywrightE2ESupport.BASE_URL + "/foodcore.cer"))

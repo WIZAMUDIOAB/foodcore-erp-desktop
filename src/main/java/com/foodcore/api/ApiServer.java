@@ -13,6 +13,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.impl.AuthServiceImpl;
+import com.foodcore.util.ConexionBD;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
@@ -30,6 +31,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.KeyStore;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -166,6 +170,8 @@ public class ApiServer {
         app.options("/*", ctx -> ctx.status(204));
 
         // 1. Health & AuthController
+        app.get("/health", this::handleHealthReadiness);
+        app.head("/health", this::handleHealthReadiness);
         app.get("/api/health", this::handleHealth);
         app.post("/api/auth/login", authController::handleLogin);
         app.post("/api/auth/pin-login", authController::handlePinLogin);
@@ -335,6 +341,53 @@ public class ApiServer {
 
     public String generarTokenJwt(int idUsuario, String username, String rol) {
         return authController.generarTokenJwt(idUsuario, username, rol);
+    }
+
+    private void handleHealthReadiness(Context ctx) {
+        try (Connection conn = ConexionBD.getConnection()) {
+            ObjectNode node = evaluarEstadoSalud(conn);
+            int status = "UP".equals(node.path("status").asText()) ? 200 : 503;
+            ctx.status(status)
+                    .contentType("application/json; charset=UTF-8")
+                    .result(node.toString());
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Readiness /health en espera de BD/Flyway", e);
+            ObjectNode node = evaluarEstadoSalud(null);
+            ctx.status(503)
+                    .contentType("application/json; charset=UTF-8")
+                    .result(node.toString());
+        }
+    }
+
+    ObjectNode evaluarEstadoSalud(Connection conn) {
+        ObjectNode node = state.mapper.createObjectNode();
+        boolean dbOk = false;
+        int migracionesAplicadas = 0;
+        if (conn != null) {
+            try {
+                if (conn.isValid(2)) {
+                    dbOk = true;
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1");
+                         ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            migracionesAplicadas = rs.getInt(1);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "BD o historial Flyway aún no disponible para /health", e);
+            }
+        }
+
+        boolean flywayListo = dbOk && migracionesAplicadas > 0;
+        node.put("status", flywayListo ? "UP" : "DOWN");
+        node.put("db", dbOk ? "UP" : "DOWN");
+        node.put("flyway", flywayListo ? "READY" : "NOT_READY");
+        node.put("migrationsApplied", migracionesAplicadas);
+        node.put("version", "4.4.0");
+        node.put("port", puertoActual);
+        return node;
     }
 
     private void handleHealth(Context ctx) {
