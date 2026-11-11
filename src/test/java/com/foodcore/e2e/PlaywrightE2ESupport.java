@@ -18,7 +18,6 @@ import com.microsoft.playwright.Playwright;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,6 +25,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.cert.X509Certificate;
 import java.sql.Connection;
@@ -52,6 +52,7 @@ public final class PlaywrightE2ESupport {
     public static final String BASE_URL = "https://localhost:8443";
     public static final String HTTP_BASE_URL = "http://localhost:8080";
     public static final Path REPORT_DIR = Path.of("target", "playwright-report");
+    public static final Path SCREENSHOTS_DIR = Path.of("target", "screenshots");
 
     private static boolean servidorIniciadoEnProceso = false;
 
@@ -121,20 +122,36 @@ public final class PlaywrightE2ESupport {
                     .setTimeout(PLAYWRIGHT_TIMEOUT_MS)
                     .setArgs(browserArgs));
         } catch (Exception exChromium) {
-            File edgeX86 = new File("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
-            if (edgeX86.exists()) {
+            Path edgeExe = resolverEdgeEjecutable();
+            if (edgeExe != null) {
                 return playwright.chromium().launch(
                         new BrowserType.LaunchOptions()
-                                .setExecutablePath(edgeX86.toPath())
+                                .setExecutablePath(edgeExe)
                                 .setHeadless(true)
+                                .setTimeout(PLAYWRIGHT_TIMEOUT_MS)
                                 .setArgs(browserArgs));
             }
             return playwright.chromium().launch(
                     new BrowserType.LaunchOptions()
                             .setChannel("msedge")
                             .setHeadless(true)
+                            .setTimeout(PLAYWRIGHT_TIMEOUT_MS)
                             .setArgs(browserArgs));
         }
+    }
+
+    public static Path resolverEdgeEjecutable() {
+        for (String envVar : List.of("ProgramFiles(x86)", "ProgramFiles")) {
+            String baseDir = System.getenv(envVar);
+            if (baseDir == null || baseDir.isBlank()) {
+                continue;
+            }
+            Path candidate = Path.of(baseDir, "Microsoft", "Edge", "Application", "msedge.exe");
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     public static BrowserContext crearContexto(Browser browser) {
@@ -279,6 +296,22 @@ public final class PlaywrightE2ESupport {
             Files.writeString(indexHtml, entry, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Aviso escribiendo index.html de reporte E2E", e);
+        }
+    }
+
+    /** Copia una captura generada en {@code target/playwright-report} hacia {@code target/screenshots}. */
+    public static void copiarEvidenciaAScreenshots(String fileName) {
+        try {
+            Path src = REPORT_DIR.resolve(fileName);
+            if (!Files.exists(src)) {
+                return;
+            }
+            if (!Files.exists(SCREENSHOTS_DIR)) {
+                Files.createDirectories(SCREENSHOTS_DIR);
+            }
+            Files.copy(src, SCREENSHOTS_DIR.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception ignored) {
+            // La copia de evidencias es opcional y no debe afectar el resultado del test
         }
     }
 

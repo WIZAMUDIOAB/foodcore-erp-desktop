@@ -14,9 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -152,7 +149,7 @@ public class ResponsiveMobileE2ETest {
 
             page.evaluate("() => window.scrollTo(0, 0)");
             PlaywrightE2ESupport.guardarEvidencia(page, "v4.3.1 Responsive - Catálogo Mozo iPhone SE", "v431_catalogo_mobile_375.png");
-            copiarEvidenciaAlArtifactDirectory("v431_catalogo_mobile_375.png");
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots("v431_catalogo_mobile_375.png");
             guardarCapturaViewport(page, "v431_catalogo_mobile_375_viewport.png");
         }
     }
@@ -223,7 +220,7 @@ public class ResponsiveMobileE2ETest {
             assertTrue(drawer.boundingBox().x >= MOBILE_WIDTH - TOLERANCIA_PX, "El drawer debe volver a ocultarse fuera de la pantalla");
 
             PlaywrightE2ESupport.guardarEvidencia(page, "v4.3.1 Responsive - Dashboard iPhone SE", "v431_dashboard_mobile_375.png");
-            copiarEvidenciaAlArtifactDirectory("v431_dashboard_mobile_375.png");
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots("v431_dashboard_mobile_375.png");
             guardarCapturaViewport(page, "v431_dashboard_mobile_375_viewport.png");
         }
     }
@@ -249,7 +246,7 @@ public class ResponsiveMobileE2ETest {
 
             assertSinDesbordeHorizontal(page, "kds/index.html");
             PlaywrightE2ESupport.guardarEvidencia(page, "v4.3.1 Responsive - KDS Celular", "v431_kds_mobile_375.png");
-            copiarEvidenciaAlArtifactDirectory("v431_kds_mobile_375.png");
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots("v431_kds_mobile_375.png");
         }
     }
 
@@ -329,21 +326,9 @@ public class ResponsiveMobileE2ETest {
             page.screenshot(new Page.ScreenshotOptions()
                     .setPath(PlaywrightE2ESupport.REPORT_DIR.resolve(fileName))
                     .setFullPage(false));
-            copiarEvidenciaAlArtifactDirectory(fileName);
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots(fileName);
         } catch (Exception ignored) {
             // La evidencia visual es opcional y no debe afectar el resultado del test
-        }
-    }
-
-    private static void copiarEvidenciaAlArtifactDirectory(String fileName) {
-        try {
-            Path src = Paths.get("target", "playwright-report", fileName);
-            Path dest = Paths.get("C:/Users/HP/.gemini/antigravity/brain/1a2d19c5-8aa0-4627-8a35-de732abf3cab", fileName);
-            if (Files.exists(src) && Files.exists(dest.getParent())) {
-                Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception ignored) {
-            // La copia de evidencias es opcional (no aplica en CI)
         }
     }
 }

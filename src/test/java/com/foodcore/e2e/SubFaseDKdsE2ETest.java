@@ -10,12 +10,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,7 +72,7 @@ public class SubFaseDKdsE2ETest {
 
             // Guardar evidencia visual
             PlaywrightE2ESupport.guardarEvidencia(page, "SubFaseD - KDS Tablet Modo Oscuro", "subfase_d_kds_tablet.png");
-            copiarEvidenciaAlArtifactDirectory("subfase_d_kds_tablet.png");
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots("subfase_d_kds_tablet.png");
         }
     }
 
@@ -123,17 +117,6 @@ public class SubFaseDKdsE2ETest {
             page.waitForCondition(() -> page.locator("#colListo .kds-card").count() < listosParaEntregar);
 
             PlaywrightE2ESupport.guardarEvidencia(page, "SubFaseD - Transición Kanban KDS", "subfase_d_kds_transicion.png");
-        }
-    }
-
-    private static void copiarEvidenciaAlArtifactDirectory(String fileName) {
-        try {
-            Path src = Paths.get("target", "playwright-report", fileName);
-            Path dest = Paths.get("C:/Users/HP/.gemini/antigravity/brain/1a2d19c5-8aa0-4627-8a35-de732abf3cab", fileName);
-            if (Files.exists(src)) {
-                Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception ignored) {
         }
     }
 }

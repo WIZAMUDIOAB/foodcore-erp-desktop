@@ -10,11 +10,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,7 +73,7 @@ public class SubFaseDDashboardE2ETest {
 
             // Guardar evidencia visual móvil
             PlaywrightE2ESupport.guardarEvidencia(page, "SubFaseD - Dashboard Dueño Móvil", "subfase_d_dashboard_mobile.png");
-            copiarEvidenciaAlArtifactDirectory("subfase_d_dashboard_mobile.png");
+            PlaywrightE2ESupport.copiarEvidenciaAScreenshots("subfase_d_dashboard_mobile.png");
         }
     }
 
@@ -113,17 +108,6 @@ public class SubFaseDDashboardE2ETest {
             assertFalse(drawer.getAttribute("class").contains("open"), "El drawer debe cerrarse correctamente");
 
             PlaywrightE2ESupport.guardarEvidencia(page, "SubFaseD - Drawer Navegación Dashboard", "subfase_d_dashboard_drawer.png");
-        }
-    }
-
-    private static void copiarEvidenciaAlArtifactDirectory(String fileName) {
-        try {
-            Path src = Paths.get("target", "playwright-report", fileName);
-            Path dest = Paths.get("C:/Users/HP/.gemini/antigravity/brain/1a2d19c5-8aa0-4627-8a35-de732abf3cab", fileName);
-            if (Files.exists(src)) {
-                Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception ignored) {
         }
     }
 }
