@@ -200,4 +200,37 @@ class AuthServiceImplTest {
             assertTrue(completa.contains("JORNADA COMPLETA"));
         }
     }
+
+    @Test
+    @DisplayName("Tarea 4: Login exitoso con hash BCrypt coste 10 actualiza automáticamente a coste 12 en BD")
+    void testLogin_ActualizaHashCoste10ACoste12() throws Exception {
+        String passwordPlano = "Admin#2026!";
+        String hashAntiguo = EncriptadorPassword.generarHashConCoste(passwordPlano, 10);
+        assertTrue(EncriptadorPassword.needsUpgrade(hashAntiguo));
+
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE usuario SET password_hash = ?, activo = 1, intentos_fallidos = 0, bloqueado_hasta = NULL WHERE username = 'mozo'"
+             )) {
+            ps.setString(1, hashAntiguo);
+            ps.executeUpdate();
+        }
+
+        Usuario autenticado = authService.login("mozo", passwordPlano);
+        assertNotNull(autenticado);
+        assertTrue(autenticado.getPasswordHash().startsWith("$2a$12$"),
+                "El hash en memoria tras login debe haberse actualizado a coste 12");
+        assertFalse(EncriptadorPassword.needsUpgrade(autenticado.getPasswordHash()));
+
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT password_hash FROM usuario WHERE username = 'mozo'");
+             ResultSet rs = ps.executeQuery()) {
+            assertTrue(rs.next());
+            String dbHash = rs.getString("password_hash");
+            assertNotNull(dbHash);
+            assertTrue(dbHash.startsWith("$2a$12$"), "El hash persistido en BD debe ser BCrypt coste 12: " + dbHash);
+            assertFalse(EncriptadorPassword.needsUpgrade(dbHash));
+            assertTrue(EncriptadorPassword.verificarPassword(passwordPlano, dbHash));
+        }
+    }
 }

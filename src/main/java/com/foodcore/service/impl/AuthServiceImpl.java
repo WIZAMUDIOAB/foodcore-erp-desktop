@@ -108,6 +108,12 @@ public class AuthServiceImpl extends AuthService {
         usuario.setIntentosFallidos(0);
         usuario.setBloqueadoHasta(null);
 
+        if (hash == null || !hash.startsWith("$2") || EncriptadorPassword.needsUpgrade(hash)) {
+            String hashActualizado = encriptador.hashear(password);
+            usuarioDAO.actualizarPasswordHash(conn, usuario.getIdUsuario(), hashActualizado);
+            usuario.setPasswordHash(hashActualizado);
+        }
+
         iniciarSesionParaUsuario(usuario, ahora);
         return usuario;
     }
@@ -141,7 +147,13 @@ public class AuthServiceImpl extends AuthService {
         }
 
         if (encontrado.isPresent()) {
-            iniciarSesionParaUsuario(encontrado.get(), LocalDateTime.now(ZONA_LIMA));
+            Usuario usuarioPin = encontrado.get();
+            if (EncriptadorPassword.needsUpgrade(usuarioPin.getPinHash())) {
+                String upgradedPinHash = encriptador.hashear(pinLimpio);
+                usuarioDAO.actualizarPin(conn, usuarioPin.getIdUsuario(), pinLimpio, upgradedPinHash);
+                usuarioPin.setPinHash(upgradedPinHash);
+            }
+            iniciarSesionParaUsuario(usuarioPin, LocalDateTime.now(ZONA_LIMA));
         }
         return encontrado;
     }

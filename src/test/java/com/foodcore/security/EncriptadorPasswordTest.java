@@ -19,11 +19,30 @@ class EncriptadorPasswordTest {
         String hash = EncriptadorPassword.generarHash(passwordPlano);
 
         assertNotNull(hash);
+        assertNotEquals(passwordPlano, hash);
         assertEquals(60, hash.length());
-        assertTrue(hash.startsWith("$2a$12$"), "El hash debe utilizar factor de costo 12: " + hash);
+        assertTrue(hash.startsWith("$2a$12$"), "El hash debe utilizar factor de costo explícito 12: " + hash);
+        assertFalse(EncriptadorPassword.needsUpgrade(hash), "Hash coste 12 no requiere actualización");
 
         assertTrue(EncriptadorPassword.verificarPassword(passwordPlano, hash));
         assertFalse(EncriptadorPassword.verificarPassword("PasswordIncorrecto1", hash));
+    }
+
+    @Test
+    @DisplayName("needsUpgrade debe detectar hashes de coste inferior (< 12) y rechazar entradas inválidas")
+    void debeDetectarNecesidadUpgradeParaHashesDeCosteInferior() {
+        String hashCoste10 = EncriptadorPassword.generarHashConCoste("FoodCoreLegacy2026!", 10);
+        assertTrue(hashCoste10.startsWith("$2a$10$"));
+        assertTrue(EncriptadorPassword.verificarPassword("FoodCoreLegacy2026!", hashCoste10));
+        assertTrue(EncriptadorPassword.needsUpgrade(hashCoste10), "Hash de coste 10 debe requerir upgrade a coste 12");
+
+        String hashCoste12 = EncriptadorPassword.generarHash("FoodCore2026!");
+        assertFalse(EncriptadorPassword.needsUpgrade(hashCoste12));
+
+        assertFalse(EncriptadorPassword.needsUpgrade(null));
+        assertFalse(EncriptadorPassword.needsUpgrade(""));
+        assertFalse(EncriptadorPassword.needsUpgrade("no-es-bcrypt"));
+        assertFalse(EncriptadorPassword.needsUpgrade("$2a$XX$longitud_exacta_sesenta_caracteres_invalido_123456789012345"));
     }
 
     @Test

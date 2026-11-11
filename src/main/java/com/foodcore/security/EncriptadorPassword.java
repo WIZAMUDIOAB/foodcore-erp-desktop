@@ -1,10 +1,12 @@
 package com.foodcore.security;
 
-import org.mindrot.jbcrypt.BCrypt;
+import at.favre.lib.crypto.bcrypt.BCrypt;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Servicio criptográfico de hashing y verificación de contraseñas y secretos de terminal
- * usando BCrypt con factor de costo 12 (SPEC-FOODCORE-v1.0 §3.1, §10.1, §15.1).
+ * usando BCrypt con factor de costo explícito 12 (at.favre.lib:bcrypt).
  */
 public final class EncriptadorPassword {
 
@@ -22,19 +24,53 @@ public final class EncriptadorPassword {
     }
 
     /**
-     * Genera un hash BCrypt con costo 12.
+     * Genera un hash BCrypt con coste explícito {@link #BCRYPT_COST}.
      */
     public static String generarHash(String passwordPlano) {
         if (passwordPlano == null || passwordPlano.isBlank()) {
             throw new IllegalArgumentException("La contraseña a encriptar no puede ser nula ni vacía.");
         }
-        return BCrypt.hashpw(passwordPlano, BCrypt.gensalt(BCRYPT_COST));
+        return BCrypt.with(BCrypt.Version.VERSION_2A)
+                .hashToString(BCRYPT_COST, passwordPlano.toCharArray());
+    }
+
+    /**
+     * Genera un hash BCrypt con un factor de coste explícito (uso de soporte/migración).
+     */
+    public static String generarHashConCoste(String passwordPlano, int cost) {
+        if (passwordPlano == null || passwordPlano.isBlank()) {
+            throw new IllegalArgumentException("La contraseña a encriptar no puede ser nula ni vacía.");
+        }
+        if (cost < 4 || cost > 31) {
+            throw new IllegalArgumentException("El coste BCrypt debe estar entre 4 y 31.");
+        }
+        return BCrypt.with(BCrypt.Version.VERSION_2A)
+                .hashToString(cost, passwordPlano.toCharArray());
+    }
+
+    /**
+     * Indica si un hash BCrypt almacenado utiliza un coste inferior a {@link #BCRYPT_COST}.
+     */
+    public static boolean needsUpgrade(String storedHash) {
+        if (storedHash == null) {
+            return false;
+        }
+        String hash = storedHash.trim();
+        if (!esFormatoBcryptValido(hash)) {
+            return false;
+        }
+        try {
+            int cost = Integer.parseInt(hash.substring(4, 6));
+            return cost < BCRYPT_COST;
+        } catch (NumberFormatException ex) {
+            return false;
+        }
     }
 
     /**
      * Verifica una contraseña en texto plano contra un hash BCrypt almacenado.
      * Maneja de forma segura {@code null}, cadenas vacías y hashes malformados o no-BCrypt
-     * retornando {@code false} sin propagar excepciones (§10.1, §15.1).
+     * retornando {@code false} sin propagar excepciones.
      */
     public static boolean verificarPassword(String passwordPlano, String hashAlmacenado) {
         if (passwordPlano == null || passwordPlano.isEmpty()) {
@@ -44,17 +80,24 @@ public final class EncriptadorPassword {
             return false;
         }
         String hash = hashAlmacenado.trim();
-        if (!hash.startsWith("$2a$") && !hash.startsWith("$2b$") && !hash.startsWith("$2y$")) {
-            return false;
-        }
-        if (hash.length() != 60) {
+        if (!esFormatoBcryptValido(hash)) {
             return false;
         }
         try {
-            return BCrypt.checkpw(passwordPlano, hash);
+            BCrypt.Result result = BCrypt.verifyer()
+                    .verify(passwordPlano.getBytes(StandardCharsets.UTF_8),
+                            hash.getBytes(StandardCharsets.UTF_8));
+            return result.verified;
         } catch (IllegalArgumentException ex) {
             return false;
         }
+    }
+
+    private static boolean esFormatoBcryptValido(String hash) {
+        if (hash.length() != 60) {
+            return false;
+        }
+        return hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$");
     }
 
     /**

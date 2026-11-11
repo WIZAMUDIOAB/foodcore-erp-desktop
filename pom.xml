@@ -135,11 +135,11 @@
             <version>2.17.0</version>
         </dependency>
 
-        <!-- Seguridad Criptográfica BCrypt (Costo 12) SPEC-FOODCORE-v1.0 §3.1 -->
+        <!-- Seguridad Criptográfica BCrypt (Costo 12): proyecto sin Spring, librería dedicada at.favre.lib:bcrypt -->
         <dependency>
-            <groupId>org.mindrot</groupId>
-            <artifactId>jbcrypt</artifactId>
-            <version>0.4</version>
+            <groupId>at.favre.lib</groupId>
+            <artifactId>bcrypt</artifactId>
+            <version>0.10.2</version>
         </dependency>
 
         <!-- Suite de Pruebas Unitarias, Integración (Testcontainers MySQL 8), UI (TestFX Headless) y E2E (Playwright) -->

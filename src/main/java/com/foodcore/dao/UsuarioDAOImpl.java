@@ -115,6 +115,16 @@ public class UsuarioDAOImpl implements UsuarioDAO {
     }
 
     @Override
+    public void actualizarPasswordHash(Connection conn, int idUsuario, String nuevoPasswordHash) throws SQLException {
+        String sql = "UPDATE usuario SET password_hash = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, nuevoPasswordHash);
+            ps.setInt(2, idUsuario);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
     public Optional<Empleado> buscarEmpleadoPorDni(Connection conn, String dni) throws SQLException {
         String sql = "SELECT * FROM empleado WHERE dni = ? AND estado = TRUE";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
