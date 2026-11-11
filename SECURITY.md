@@ -54,6 +54,21 @@ Este documento establece los controles de seguridad de aplicación (AppSec) obli
 
 ---
 
+## PWA en LAN y Política CORS
+
+1. **CORS por lista blanca explícita:**
+   - [`src/main/resources/application.properties`](src/main/resources/application.properties) mantiene `cors.allowed.origins=` vacío como default seguro (deniega todo origen cross-origin).
+   - En producción, definir `FOODCORE_CORS_ALLOWED_ORIGINS` con los orígenes LAN reales (ej. `https://192.168.1.50:8443`) según se documenta en [`src/main/resources/application-prod.properties`](src/main/resources/application-prod.properties). **Nunca usar `*`.**
+2. **Sin credenciales demo ni bypass offline en cliente:**
+   - La interfaz web en `pwa/` no expone credenciales de demostración ni realiza autenticación local de respaldo; todo login o acceso por PIN debe validarse contra `/api/auth/login`, `/api/auth/pin-login` y `/api/auth/pin-switch`.
+3. **Sin dependencia de CDNs externos (vendorización local):**
+   - La PWA no debe depender de CDNs externos en despliegue LAN-only. Todos los assets estáticos (`Inter`, `JetBrains Mono` y `Chart.js`) residen localmente en `pwa/vendor/`.
+4. **Certificado TLS (`pwa/foodcore.cer`), HTTPS `8443` y Service Workers:**
+   - El archivo [`pwa/foodcore.cer`](pwa/foodcore.cer) incluido en el repositorio es un **certificado autofirmado de laboratorio** (`Owner == Issuer`, sujeto `CN=localhost`), sin clave privada. En despliegue real debe generarse un keystore y certificado propios con `keytool` siguiendo [`keystore.jks.example`](keystore.jks.example) para la IP/hostname real de producción.
+   - Si la PWA se sirve en **HTTPS `8443`**, las tablets deben instalar manualmente el certificado público `foodcore.cer` de producción para habilitar el registro de Service Workers (`sw.js`) y la operación PWA confiable. Si se sirviera únicamente por **HTTP `8080`** en tablets LAN (fuera de `localhost`), los navegadores **no registrarán `sw.js`** y el modo offline de la PWA no funcionará.
+
+---
+
 ## Contacto de Seguridad y Divulgación Responsable
 
 - Si detectas una vulnerabilidad de seguridad en **FoodCore ERP** (inyección SQL, omisión de autenticación/RBAC, exposición de secretos, problemas criptográficos o CVEs en dependencias), **no abras un issue público** con detalles explotables.

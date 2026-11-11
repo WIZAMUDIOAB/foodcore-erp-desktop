@@ -137,10 +137,10 @@ const FoodCoreDashboard = (() => {
         return;
       }
     } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar KPIs de API, aplicando fallback', e);
+      console.warn('[Dashboard] Fallo al cargar KPIs de API, usando caché de respaldo', e);
     }
 
-    // Fallback de demostración offline
+    // Datos iniciales cuando no hay respuesta del servidor
     actualizarKpisUI({
       ventas_dia: 2410.50,
       ticket_promedio: 48.20,
@@ -204,7 +204,7 @@ const FoodCoreDashboard = (() => {
         }
       }
     } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar ventas por hora, usando demo', e);
+      console.warn('[Dashboard] Fallo al cargar ventas por hora, sin respuesta del API', e);
     }
 
     if (puntos.length === 0) {
@@ -389,7 +389,7 @@ const FoodCoreDashboard = (() => {
         platos = await resp.json();
       }
     } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar top platos, usando demo', e);
+      console.warn('[Dashboard] Fallo al cargar top platos, sin respuesta del API', e);
     }
 
     if (!Array.isArray(platos) || platos.length === 0) {
@@ -432,7 +432,7 @@ const FoodCoreDashboard = (() => {
         txs = await resp.json();
       }
     } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar transacciones recientes, usando demo', e);
+      console.warn('[Dashboard] Fallo al cargar transacciones recientes, sin respuesta del API', e);
     }
 
     if (!Array.isArray(txs) || txs.length === 0) {

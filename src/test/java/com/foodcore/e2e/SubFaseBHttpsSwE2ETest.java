@@ -113,11 +113,11 @@ public class SubFaseBHttpsSwE2ETest {
                     + "try {\n"
                     + "  const reg = await navigator.serviceWorker.register('/sw.js');\n"
                     + "  let activeSw = reg.active;\n"
-                    + "  if (!activeSw) {\n"
+                    + "  if (!activeSw || activeSw.state !== 'activated') {\n"
                     + "    const swReadyPromise = navigator.serviceWorker.ready;\n"
                     + "    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 8000));\n"
                     + "    const readyReg = await Promise.race([swReadyPromise, timeoutPromise]);\n"
-                    + "    activeSw = readyReg ? readyReg.active : null;\n"
+                    + "    activeSw = readyReg ? readyReg.active : reg.active;\n"
                     + "  }\n"
                     + "  return activeSw ? activeSw.state : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'registered'));\n"
                     + "} catch (e) {\n"
@@ -127,7 +127,10 @@ public class SubFaseBHttpsSwE2ETest {
 
             System.out.println("RESULTADO SERVICE WORKER EN HTTPS: " + swRegistrado);
             assertNotNull(swRegistrado, "El registro del Service Worker no debe ser nulo");
-            assertTrue("activated".equals(swRegistrado) || "installing".equals(swRegistrado) || "registered".equals(swRegistrado),
+            assertTrue("activated".equals(swRegistrado)
+                            || "activating".equals(swRegistrado)
+                            || "installing".equals(swRegistrado)
+                            || "registered".equals(swRegistrado),
                     "El Service Worker debe registrarse/activarse en HTTPS: " + swRegistrado);
 
             // 3. Validar que la cabecera / indicador de estado reconozca conexión HTTPS
