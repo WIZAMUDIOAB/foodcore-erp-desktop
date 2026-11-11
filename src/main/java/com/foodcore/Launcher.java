@@ -2,6 +2,7 @@ package com.foodcore;
 
 import com.foodcore.api.ApiServer;
 import com.foodcore.config.FlywayMigrator;
+import com.foodcore.config.LoggingBootstrap;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 
@@ -21,6 +22,7 @@ public class Launcher {
     private static final Logger LOGGER = Logger.getLogger(Launcher.class.getName());
 
     public static void main(String[] args) {
+        LoggingBootstrap.installBridge();
         ConexionBD.validarVariablesEntornoObligatorias();
         boolean modoServidor = Arrays.asList(args).contains("--server")
                 || Arrays.asList(args).contains("--headless")
