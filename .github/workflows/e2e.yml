@@ -92,16 +92,29 @@ jobs:
         run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
 
       - name: Quality Gate (Maven Verify — Unit, Integration, E2E, Checkstyle, SpotBugs, OWASP)
+        timeout-minutes: 20
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          MONOCLE_HEADLESS: "true"
         run: |
           DC_ARGS=""
           if [ -n "${NVD_API_KEY:-}" ]; then
             DC_ARGS="-DnvdApiKey=${NVD_API_KEY}"
           fi
-          mvn verify ${DC_ARGS}
+          mvn clean verify \
+            -DreuseForks=false \
+            -DforkCount=1 \
+            -Dtestfx.headless=true \
+            -Dtestfx.robot=glass \
+            -Dglass.platform=Monocle \
+            -Dmonocle.platform=Headless \
+            -Dprism.order=sw \
+            -Dprism.text=t2k \
+            -Djava.awt.headless=true \
+            ${DC_ARGS}
 
       - name: Coverage Gate
+        timeout-minutes: 5
         run: mvn jacoco:check@jacoco-check
 
       - name: Start FoodCore Server (Javalin)
@@ -129,7 +142,8 @@ jobs:
           npx --yes wait-on http://localhost:8080/health --timeout 60000
 
       - name: Run E2E Tests (Playwright)
-        run: mvn test -Dtest="*E2ETest"
+        timeout-minutes: 10
+        run: mvn test -Dtest="*E2ETest" -DreuseForks=false -DforkCount=1
 
       - name: Stop FoodCore Server
         if: always()

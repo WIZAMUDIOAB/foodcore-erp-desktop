@@ -14,6 +14,12 @@
         <maven.compiler.target>17</maven.compiler.target>
         <javafx.version>21.0.2</javafx.version>
         <odc.ossindex.enabled>false</odc.ossindex.enabled>
+        <testfx.headless>true</testfx.headless>
+        <testfx.robot>glass</testfx.robot>
+        <glass.platform>Monocle</glass.platform>
+        <monocle.platform>Headless</monocle.platform>
+        <prism.order>sw</prism.order>
+        <prism.text>t2k</prism.text>
     </properties>
 
     <dependencyManagement>
@@ -337,6 +343,15 @@
                 <version>3.2.5</version>
                 <configuration>
                     <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                    <systemPropertyVariables>
+                        <java.awt.headless>true</java.awt.headless>
+                        <testfx.headless>${testfx.headless}</testfx.headless>
+                        <testfx.robot>${testfx.robot}</testfx.robot>
+                        <glass.platform>${glass.platform}</glass.platform>
+                        <monocle.platform>${monocle.platform}</monocle.platform>
+                        <prism.order>${prism.order}</prism.order>
+                        <prism.text>${prism.text}</prism.text>
+                    </systemPropertyVariables>
                     <excludes>
                         <exclude>**/FlywayMigrationTest.java</exclude>
                         <exclude>**/KardexIntegridadTest.java</exclude>

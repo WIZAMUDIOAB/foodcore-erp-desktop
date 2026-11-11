@@ -104,15 +104,21 @@ public final class PlaywrightE2ESupport {
                 .setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")));
     }
 
+    private static final double PLAYWRIGHT_TIMEOUT_MS = 30_000d;
+
     public static Browser lanzarNavegador(Playwright playwright) {
         List<String> browserArgs = List.of(
                 "--ignore-certificate-errors",
                 "--allow-insecure-localhost",
-                "--disable-web-security"
+                "--disable-web-security",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
         );
         try {
             return playwright.chromium().launch(new BrowserType.LaunchOptions()
                     .setHeadless(true)
+                    .setTimeout(PLAYWRIGHT_TIMEOUT_MS)
                     .setArgs(browserArgs));
         } catch (Exception exChromium) {
             File edgeX86 = new File("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
@@ -136,16 +142,20 @@ public final class PlaywrightE2ESupport {
     }
 
     public static BrowserContext crearContexto(Browser browser, int width, int height) {
-        return browser.newContext(new Browser.NewContextOptions()
+        BrowserContext context = browser.newContext(new Browser.NewContextOptions()
                 .setViewportSize(width, height)
                 .setIgnoreHTTPSErrors(true));
+        context.setDefaultTimeout(PLAYWRIGHT_TIMEOUT_MS);
+        context.setDefaultNavigationTimeout(PLAYWRIGHT_TIMEOUT_MS);
+        return context;
     }
 
     public static APIRequestContext crearApiRequestContext(Playwright playwright) {
         return playwright.request().newContext(
                 new APIRequest.NewContextOptions()
                         .setBaseURL(BASE_URL)
-                        .setIgnoreHTTPSErrors(true));
+                        .setIgnoreHTTPSErrors(true)
+                        .setTimeout(PLAYWRIGHT_TIMEOUT_MS));
     }
 
     public static APIRequestContext crearApiRequestContextAutenticado(Playwright playwright, String rol) {
@@ -153,6 +163,7 @@ public final class PlaywrightE2ESupport {
                 new APIRequest.NewContextOptions()
                         .setBaseURL(BASE_URL)
                         .setIgnoreHTTPSErrors(true)
+                        .setTimeout(PLAYWRIGHT_TIMEOUT_MS)
                         .setExtraHTTPHeaders(Map.of("Authorization", "Bearer " + obtenerTokenRol(rol))));
     }
 
