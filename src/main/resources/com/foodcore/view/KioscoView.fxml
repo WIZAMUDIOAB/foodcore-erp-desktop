@@ -47,8 +47,8 @@
     <center>
         <GridPane hgap="16.0" style="-fx-padding: 16;">
             <columnConstraints>
-                <ColumnConstraints hgrow="ALWAYS" percentWidth="64.0" />
-                <ColumnConstraints hgrow="ALWAYS" percentWidth="36.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="58.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="42.0" />
             </columnConstraints>
             <rowConstraints>
                 <RowConstraints vgrow="ALWAYS" />
@@ -79,11 +79,14 @@
                     <!-- Lista de Ítems en Carrito -->
                     <TableView fx:id="tblCarrito" VBox.vgrow="ALWAYS">
                         <columns>
-                            <TableColumn fx:id="colProducto" prefWidth="170.0" text="PRODUCTO" />
-                            <TableColumn fx:id="colCantidad" prefWidth="70.0" text="CANT." />
-                            <TableColumn fx:id="colSubtotal" prefWidth="80.0" text="TOTAL" />
-                            <TableColumn fx:id="colAccion" prefWidth="80.0" text="AJUSTE" />
+                            <TableColumn fx:id="colProducto" prefWidth="120.0" text="PRODUCTO" />
+                            <TableColumn fx:id="colCantidad" prefWidth="65.0" text="CANT." />
+                            <TableColumn fx:id="colSubtotal" prefWidth="75.0" text="TOTAL" />
+                            <TableColumn fx:id="colAccion" minWidth="105.0" prefWidth="115.0" text="AJUSTE" />
                         </columns>
+                        <columnResizePolicy>
+                            <TableView fx:constant="CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN" />
+                        </columnResizePolicy>
                     </TableView>
 
                     <Separator />

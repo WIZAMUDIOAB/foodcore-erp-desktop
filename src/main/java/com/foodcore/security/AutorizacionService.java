@@ -21,9 +21,20 @@ public class AutorizacionService {
     static {
         Set<Permiso> permisosAdmin = Collections.unmodifiableSet(EnumSet.allOf(Permiso.class));
 
-        Set<Permiso> permisosCajero = Collections.unmodifiableSet(EnumSet.of(
+        Set<Permiso> permisosSupervisor = Collections.unmodifiableSet(EnumSet.of(
             Permiso.VENTA_COBRAR,
             Permiso.VENTA_ANULAR,
+            Permiso.VENTA_DESCUENTO,
+            Permiso.CAJA_APERTURA,
+            Permiso.CAJA_CIERRE,
+            Permiso.CAJA_MOVIMIENTO_MANUAL,
+            Permiso.TICKET_REIMPRIMIR,
+            Permiso.PEDIDO_CREAR,
+            Permiso.PEDIDO_ADICIONAR
+        ));
+
+        Set<Permiso> permisosCajero = Collections.unmodifiableSet(EnumSet.of(
+            Permiso.VENTA_COBRAR,
             Permiso.CAJA_APERTURA,
             Permiso.CAJA_CIERRE,
             Permiso.CAJA_MOVIMIENTO_MANUAL,
@@ -49,6 +60,7 @@ public class AutorizacionService {
         MATRIZ_RBAC = Map.of(
             "ADMIN", permisosAdmin,
             "ADMINISTRADOR", permisosAdmin,
+            "SUPERVISOR", permisosSupervisor,
             "CAJERO", permisosCajero,
             "MOZO", permisosMozo,
             "MESERO", permisosMozo,
@@ -95,6 +107,10 @@ public class AutorizacionService {
     public SesionUsuario crearSesion(long idUsuario, String nombreCompleto, String codigoRol, String idTerminal) {
         Set<Permiso> permisos = obtenerPermisosPorRol(codigoRol);
         return new SesionUsuario(idUsuario, nombreCompleto, codigoRol, permisos, idTerminal, LocalDateTime.now());
+    }
+
+    public boolean tienePermiso(SesionUsuario sesion, Permiso permiso) {
+        return sesion != null && permiso != null && sesion.tienePermiso(permiso);
     }
 
     public void exigirPermiso(SesionUsuario sesion, Permiso permisoRequerido) throws NegocioException {

@@ -121,7 +121,7 @@
                                 <VBox prefWidth="420.0" spacing="8.0" styleClass="stat-card">
                                     <children>
                                         <Label styleClass="text-h3" text="Distribución Gráfica" />
-                                        <PieChart fx:id="pieChartDistribucion" animated="false" labelsVisible="false" legendSide="RIGHT" VBox.vgrow="ALWAYS" />
+                                        <PieChart fx:id="pieChartDistribucion" animated="false" labelsVisible="false" legendSide="BOTTOM" VBox.vgrow="ALWAYS" />
                                     </children>
                                 </VBox>
                             </children>

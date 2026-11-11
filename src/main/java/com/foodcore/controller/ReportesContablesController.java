@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -19,7 +20,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.stage.FileChooser;
+import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.sql.Connection;
@@ -28,7 +29,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.List;
 
 public class ReportesContablesController {
@@ -43,6 +43,10 @@ public class ReportesContablesController {
     @FXML private Button btnExportarComprasSunat;
     @FXML private Button btnExportarResumenCaja;
     @FXML private Label lblEstadoExportacion;
+    @FXML private VBox cardKpiVentas;
+    @FXML private VBox cardKpiBase;
+    @FXML private VBox cardKpiIgv;
+    @FXML private VBox cardKpiCompras;
     @FXML private Label lblTotalVentas;
     @FXML private Label lblBaseImponible;
     @FXML private Label lblTotalIgv;
@@ -74,9 +78,9 @@ public class ReportesContablesController {
         colFecha.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().fechaEmision));
         colComprobante.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().serie + "-" + String.format("%08d", d.getValue().idVenta)));
         colCliente.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().nombreCliente));
-        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format("S/ %.2f", d.getValue().subtotal)));
-        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format("S/ %.2f", d.getValue().igv)));
-        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format("S/ %.2f", d.getValue().total)));
+        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().subtotal)));
+        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().igv)));
+        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().total)));
         colMedioPago.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().medioPago));
         colEstado.setCellValueFactory(d -> new SimpleStringProperty("1".equals(d.getValue().estado) ? "VÁLIDO" : "ANULADO"));
         tblVentasSunat.setItems(listaVentas);
@@ -163,10 +167,10 @@ public class ReportesContablesController {
             LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
         }
 
-        lblTotalVentas.setText(String.format("S/ %.2f", sumTotal));
-        lblBaseImponible.setText(String.format("S/ %.2f", sumBase));
-        lblTotalIgv.setText(String.format("S/ %.2f", sumIgv));
-        lblTotalCompras.setText(String.format("S/ %.2f", sumCompras));
+        lblTotalVentas.setText(String.format(Locale.US, "S/ %,.2f", sumTotal));
+        lblBaseImponible.setText(String.format(Locale.US, "S/ %,.2f", sumBase));
+        lblTotalIgv.setText(String.format(Locale.US, "S/ %,.2f", sumIgv));
+        lblTotalCompras.setText(String.format(Locale.US, "S/ %,.2f", sumCompras));
         lblContadorFilas.setText(listaVentas.size() + " Comprobantes");
         lblEstadoExportacion.setText("Período cargado: " + ini + " al " + fin);
     }
@@ -211,5 +215,37 @@ public class ReportesContablesController {
         } catch (Exception ex) {
             lblEstadoExportacion.setText("Error al exportar resumen caja: " + ex.getMessage());
         }
+    }
+
+    public VBox getCardKpiVentas() {
+        return cardKpiVentas;
+    }
+
+    public VBox getCardKpiBase() {
+        return cardKpiBase;
+    }
+
+    public VBox getCardKpiIgv() {
+        return cardKpiIgv;
+    }
+
+    public VBox getCardKpiCompras() {
+        return cardKpiCompras;
+    }
+
+    public Label getLblTotalVentas() {
+        return lblTotalVentas;
+    }
+
+    public Label getLblBaseImponible() {
+        return lblBaseImponible;
+    }
+
+    public Label getLblTotalIgv() {
+        return lblTotalIgv;
+    }
+
+    public Label getLblTotalCompras() {
+        return lblTotalCompras;
     }
 }

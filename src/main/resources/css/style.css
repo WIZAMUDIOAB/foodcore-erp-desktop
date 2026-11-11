@@ -594,6 +594,31 @@
     -fx-border-color: #9CA3AF;
 }
 
+.btn-kiosco-ajuste {
+    -fx-min-width: 32px;
+    -fx-pref-width: 32px;
+    -fx-max-width: 32px;
+    -fx-min-height: 32px;
+    -fx-pref-height: 32px;
+    -fx-max-height: 32px;
+    -fx-padding: 0;
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #374151;
+    -fx-border-color: #D1D5DB;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER;
+}
+
+.btn-kiosco-ajuste:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #111827;
+    -fx-border-color: #9CA3AF;
+}
+
 /* Botón Éxito / Confirmación */
 .btn-emerald, .btn-success {
     -fx-background-color: #10B981;
@@ -1175,8 +1200,8 @@
 
 .table-view .table-cell {
     -fx-border-color: transparent;
-    -fx-padding: 10px 14px;
-    -fx-font-size: 14px;
+    -fx-padding: 10 14 10 14;
+    -fx-font-size: 13px;
     -fx-font-weight: 500;
     -fx-text-fill: -fc-text-primary;
     -fx-alignment: CENTER_LEFT;
@@ -1227,6 +1252,24 @@
 /* Ejes limpios */
 .axis { -fx-tick-label-fill: #6B7280; -fx-font-size: 11px; -fx-font-family: "Inter"; }
 .axis-tick-mark, .axis-minor-tick-mark { -fx-stroke: #E5E7EB; }
+
+/* Leyenda de gráficos Donut / PieChart (11px, compacta y legible en la parte inferior) */
+.chart-legend {
+    -fx-font-size: 11px;
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-background-color: transparent;
+    -fx-padding: 8px 4px 4px 4px;
+}
+
+.chart-legend-item {
+    -fx-font-size: 11px;
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-text-fill: #4B5563;
+}
+
+.chart-legend-item-symbol {
+    -fx-background-radius: 4px;
+}
 
 /* --------------------------------------------------------------------------
    12. Toast Notification y Scrollbars Limpias

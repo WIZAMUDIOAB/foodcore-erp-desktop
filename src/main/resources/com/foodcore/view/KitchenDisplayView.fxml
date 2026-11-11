@@ -12,7 +12,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane prefHeight="720.0" prefWidth="1120.0" styleClass="kds-viewport" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.KitchenDisplayController">
+<BorderPane prefHeight="720.0" prefWidth="1180.0" styleClass="kds-viewport" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.KitchenDisplayController">
 
     <!-- Encabezado de Cocina KDS (§7) -->
     <top>
@@ -34,13 +34,14 @@
         </HBox>
     </top>
 
-    <!-- Tablero Kanban 3 Columnas: Pendiente -> En preparación -> Listo (§7) -->
+    <!-- Tablero Kanban 4 Columnas: Pendiente -> En preparación -> Listo -> Historial (§7 & v4.4) -->
     <center>
-        <GridPane hgap="16.0" styleClass="kds-board-grid">
+        <GridPane hgap="14.0" styleClass="kds-board-grid">
             <columnConstraints>
-                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
-                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
-                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.34" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="25.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="25.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="25.0" />
+                <ColumnConstraints hgrow="ALWAYS" percentWidth="25.0" />
             </columnConstraints>
             <rowConstraints>
                 <RowConstraints vgrow="ALWAYS" />
@@ -96,6 +97,24 @@
                         <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
                             <content>
                                 <VBox fx:id="vboxColListo" spacing="12.0" />
+                            </content>
+                        </ScrollPane>
+                    </children>
+                </VBox>
+
+                <!-- Columna 4: HISTORIAL (ENTREGADO) -->
+                <VBox spacing="12.0" styleClass="kds-kanban-column" GridPane.columnIndex="3">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <children>
+                                <Label styleClass="kds-column-overline" text="HISTORIAL" />
+                                <Region HBox.hgrow="ALWAYS" />
+                                <Label fx:id="lblCountHistorial" styleClass="kds-column-counter" text="0" />
+                            </children>
+                        </HBox>
+                        <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox fx:id="vboxColHistorial" spacing="12.0" />
                             </content>
                         </ScrollPane>
                     </children>

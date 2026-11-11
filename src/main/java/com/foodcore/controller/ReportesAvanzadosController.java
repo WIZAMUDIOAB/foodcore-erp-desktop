@@ -71,7 +71,7 @@ public class ReportesAvanzadosController {
         if (pieChartDistribucion != null) {
             pieChartDistribucion.setAnimated(false);
             pieChartDistribucion.setLabelsVisible(false);
-            pieChartDistribucion.setLegendSide(Side.RIGHT);
+            pieChartDistribucion.setLegendSide(Side.BOTTOM);
             pieChartDistribucion.needsLayoutProperty().addListener((obs, oldVal, needsLayout) -> {
                 if (!needsLayout) {
                     aplicarEstilosDonut();

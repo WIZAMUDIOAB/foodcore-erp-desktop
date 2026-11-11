@@ -85,14 +85,24 @@ public class KioscoController {
         colAccion.setCellFactory(col -> new TableCell<>() {
             private final Button btnMenos = new Button("-");
             private final Button btnMas = new Button("+");
-            private final HBox box = new HBox(4.0, btnMenos, btnMas);
+            private final HBox box = new HBox(8.0, btnMenos, btnMas);
 
             {
                 box.setAlignment(Pos.CENTER);
-                btnMenos.getStyleClass().add("btn-secondary");
-                btnMas.getStyleClass().add("btn-secondary");
-                btnMenos.setPrefWidth(26);
-                btnMas.setPrefWidth(26);
+                btnMenos.getStyleClass().add("btn-kiosco-ajuste");
+                btnMas.getStyleClass().add("btn-kiosco-ajuste");
+                String btnCartStyle = "-fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px; "
+                        + "-fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px; "
+                        + "-fx-padding: 0; -fx-font-size: 16px; -fx-font-weight: 700; "
+                        + "-fx-background-color: #FFFFFF; -fx-text-fill: #374151; "
+                        + "-fx-border-color: #D1D5DB; -fx-border-radius: 6px; -fx-background-radius: 6px; "
+                        + "-fx-cursor: hand; -fx-alignment: center;";
+                btnMenos.setStyle(btnCartStyle);
+                btnMas.setStyle(btnCartStyle);
+                btnMenos.setMinWidth(32);
+                btnMenos.setPrefWidth(32);
+                btnMas.setMinWidth(32);
+                btnMas.setPrefWidth(32);
                 AnimationUtils.attachTactileFeedback(btnMenos);
                 AnimationUtils.attachTactileFeedback(btnMas);
             }
@@ -107,10 +117,13 @@ public class KioscoController {
                     btnMenos.setOnAction(e -> decrementarItem(det));
                     btnMas.setOnAction(e -> incrementarItem(det));
                     setGraphic(box);
+                    setAlignment(Pos.CENTER);
+                    setStyle("-fx-padding: 0 4 0 4; -fx-alignment: CENTER;");
                 }
             }
         });
 
+        tblCarrito.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         tblCarrito.setItems(carritoItems);
     }
 
@@ -206,6 +219,9 @@ public class KioscoController {
         flowProductosKiosco.getChildren().clear();
 
         for (Producto p : todosLosProductos) {
+            if (!p.isDisponible()) {
+                continue;
+            }
             if (categoriaSeleccionada != 0 && p.getIdCategoria() != categoriaSeleccionada) {
                 continue;
             }
@@ -244,6 +260,9 @@ public class KioscoController {
     }
 
     public void agregarAlCarrito(Producto p) {
+        if (p == null || !p.isDisponible()) {
+            return;
+        }
         for (DetallePedido item : carritoItems) {
             if (item.getIdProducto() == p.getIdProducto()) {
                 item.setCantidad(item.getCantidad() + 1);
@@ -360,6 +379,14 @@ public class KioscoController {
 
     public ObservableList<DetallePedido> getCarritoItems() {
         return carritoItems;
+    }
+
+    public List<Producto> getTodosLosProductos() {
+        return todosLosProductos;
+    }
+
+    public FlowPane getFlowProductosKiosco() {
+        return flowProductosKiosco;
     }
 
     public int getTurnoActual() {

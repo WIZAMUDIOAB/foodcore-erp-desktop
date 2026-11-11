@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Suite de integración de migraciones versionadas Flyway desde cero y con datos previos
- * según SPEC-FOODCORE-v1.0 (§14, §15.2, §19.3; REMEDIATION R-02.8, R-05) y SPEC-FOODCORE-v1.2 (§7).
+ * según SPEC-FOODCORE-v1.0 (§14, §15.2, §19.3; REMEDIATION R-02.8, R-05), SPEC-FOODCORE-v1.2 (§7) y v4.4.0.
  */
 class FlywayMigrationTest {
 
@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V9 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V13 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(12, result.migrationsExecuted);
-        assertEquals("12", result.targetSchemaVersion);
+        assertEquals(13, result.migrationsExecuted);
+        assertEquals("13", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -43,7 +43,7 @@ class FlywayMigrationTest {
                 versiones.add(rs.getString("version"));
                 assertTrue(rs.getBoolean("success"), "Toda migración debe tener success=1");
             }
-            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12")));
+            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13")));
         }
     }
 

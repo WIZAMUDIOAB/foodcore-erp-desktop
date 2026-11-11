@@ -64,39 +64,63 @@
                         </VBox>
                     </top>
 
-                    <!-- Centro: Tarjetas de Resumen y Tabla PLE con 24px de padding -->
+                    <!-- Centro: Tarjetas KPI con Tintes Pastel (v4.4.0 §3) y Tabla PLE -->
                     <center>
                         <VBox spacing="16.0" styleClass="view-content" BorderPane.alignment="CENTER">
                             <children>
-                                <!-- Tarjetas de KPIs Financieros -->
-                                <HBox spacing="12.0">
+                                <!-- Tarjetas de KPIs Financieros (.kpi-card con tintes pastel e iconos) -->
+                                <HBox spacing="14.0">
                                     <children>
-                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                        <VBox fx:id="cardKpiVentas" spacing="6.0" styleClass="kpi-card, kpi-card-sales" HBox.hgrow="ALWAYS">
                                             <children>
-                                                <Label styleClass="stat-card-title" text="VENTAS TOTALES PERÍODO" />
-                                                <Label fx:id="lblTotalVentas" styleClass="stat-card-value" text="S/ 0.00" />
-                                                <Label styleClass="stat-card-subtitle" text="Facturación bruta acumulada" />
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="kpi-card-title" text="VENTAS TOTALES PERÍODO" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="kpi-icon-badge-sales" text="💰" />
+                                                    </children>
+                                                </HBox>
+                                                <Label fx:id="lblTotalVentas" styleClass="kpi-card-value" text="S/ 0.00" />
+                                                <Label styleClass="kpi-card-subtitle" text="Facturación bruta acumulada" />
                                             </children>
                                         </VBox>
-                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                        <VBox fx:id="cardKpiBase" spacing="6.0" styleClass="kpi-card, kpi-card-taxable" HBox.hgrow="ALWAYS">
                                             <children>
-                                                <Label styleClass="stat-card-title" text="BASE IMPONIBLE (VENTAS)" />
-                                                <Label fx:id="lblBaseImponible" styleClass="stat-card-value" text="S/ 0.00" />
-                                                <Label styleClass="stat-card-subtitle" text="Ventas netas sin IGV" />
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="kpi-card-title" text="BASE IMPONIBLE (VENTAS)" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="kpi-icon-badge-taxable" text="📊" />
+                                                    </children>
+                                                </HBox>
+                                                <Label fx:id="lblBaseImponible" styleClass="kpi-card-value" text="S/ 0.00" />
+                                                <Label styleClass="kpi-card-subtitle" text="Ventas netas sin IGV" />
                                             </children>
                                         </VBox>
-                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                        <VBox fx:id="cardKpiIgv" spacing="6.0" styleClass="kpi-card, kpi-card-igv" HBox.hgrow="ALWAYS">
                                             <children>
-                                                <Label styleClass="stat-card-title" text="IGV TRASLADADO FISCAL (18%)" />
-                                                <Label fx:id="lblTotalIgv" styleClass="stat-card-value" text="S/ 0.00" />
-                                                <Label styleClass="stat-card-subtitle" text="Impuesto general a las ventas" />
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="kpi-card-title" text="IGV TRASLADADO FISCAL (18%)" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="kpi-icon-badge-igv" text="🧾" />
+                                                    </children>
+                                                </HBox>
+                                                <Label fx:id="lblTotalIgv" styleClass="kpi-card-value" text="S/ 0.00" />
+                                                <Label styleClass="kpi-card-subtitle" text="Impuesto general a las ventas" />
                                             </children>
                                         </VBox>
-                                        <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                        <VBox fx:id="cardKpiCompras" spacing="6.0" styleClass="kpi-card, kpi-card-purchases" HBox.hgrow="ALWAYS">
                                             <children>
-                                                <Label styleClass="stat-card-title" text="COMPRAS TOTALES PERÍODO" />
-                                                <Label fx:id="lblTotalCompras" styleClass="stat-card-value" text="S/ 0.00" />
-                                                <Label styleClass="stat-card-subtitle" text="Crédito fiscal adquisiciones" />
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="kpi-card-title" text="COMPRAS TOTALES PERÍODO" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="kpi-icon-badge-purchases" text="📦" />
+                                                    </children>
+                                                </HBox>
+                                                <Label fx:id="lblTotalCompras" styleClass="kpi-card-value" text="S/ 0.00" />
+                                                <Label styleClass="kpi-card-subtitle" text="Crédito fiscal adquisiciones" />
                                             </children>
                                         </VBox>
                                     </children>

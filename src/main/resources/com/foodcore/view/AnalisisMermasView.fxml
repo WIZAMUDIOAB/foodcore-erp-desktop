@@ -111,7 +111,7 @@
                                         <ColumnConstraints percentWidth="50.0" />
                                     </columnConstraints>
                                     <rowConstraints>
-                                        <RowConstraints minHeight="230.0" prefHeight="240.0" vgrow="NEVER" />
+                                        <RowConstraints minHeight="260.0" prefHeight="280.0" vgrow="NEVER" />
                                     </rowConstraints>
                                     <children>
                                         <!-- Gráfico de Área Suavizada: Pérdidas por Mes -->
@@ -139,7 +139,7 @@
                                             </padding>
                                             <children>
                                                 <Label styleClass="text-body-strong" text="Distribución de Mermas por Causa / Motivo" />
-                                                <PieChart fx:id="chartMermasMotivo" animated="false" labelsVisible="false" legendSide="RIGHT" VBox.vgrow="ALWAYS" />
+                                                <PieChart fx:id="chartMermasMotivo" animated="false" labelsVisible="false" legendSide="BOTTOM" VBox.vgrow="ALWAYS" />
                                             </children>
                                         </VBox>
                                     </children>

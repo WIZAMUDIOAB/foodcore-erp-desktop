@@ -534,10 +534,10 @@ const FoodCorePWA = (() => {
       card.className = `dish-card ${disponible ? '' : 'dish-card-agotado'}`.trim();
       const iniciales = obtenerInicialesProducto(p.nombre);
       const imgUrl = (typeof p.imagen_url === 'string') ? p.imagen_url.trim() : '';
-      const tieneImagenValida = imgUrl !== '';
+      const tieneImagenValida = Boolean(imgUrl && imgUrl !== 'null' && imgUrl !== 'undefined');
 
       const mediaHtml = tieneImagenValida
-        ? `<img class="dish-thumb" src="${imgUrl}" alt="${p.nombre}" style="object-fit: cover;" />`
+        ? `<img class="dish-thumb" src="${imgUrl}" alt="${p.nombre}" style="object-fit: cover;" onerror="const d=document.createElement('div'); d.className='dish-thumb-fallback'; d.setAttribute('aria-label', '${(p.nombre || '').replace(/'/g, "\\'")}'); d.textContent='${iniciales}'; this.replaceWith(d);" />`
         : `<div class="dish-thumb-fallback" aria-label="${p.nombre}">${iniciales}</div>`;
 
       const badgeMenuDia = esMenuDia ? `<span class="dish-badge-menu-dia">⭐ Menú del Día</span>` : '';
@@ -564,6 +564,19 @@ const FoodCorePWA = (() => {
 
       const imgEl = card.querySelector('img.dish-thumb');
       if (imgEl) {
+        const replaceWithFallback = () => {
+          const fallbackDiv = document.createElement('div');
+          fallbackDiv.className = 'dish-thumb-fallback';
+          fallbackDiv.setAttribute('aria-label', p.nombre);
+          fallbackDiv.textContent = iniciales;
+          if (imgEl.parentNode) {
+            imgEl.replaceWith(fallbackDiv);
+          }
+        };
+        imgEl.addEventListener('error', replaceWithFallback);
+        if (imgEl.complete && imgEl.naturalWidth === 0) {
+          replaceWithFallback();
+        }
         imgEl.addEventListener('error', () => {
           const fallbackDiv = document.createElement('div');
           fallbackDiv.className = 'dish-thumb-fallback';

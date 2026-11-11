@@ -3,11 +3,14 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -24,8 +27,9 @@
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
                     <Label styleClass="view-heading" text="Terminal Punto de Venta (POS)" />
                     <Label styleClass="badge-pill-success" text="CAJA ACTIVA" />
+                    <Label fx:id="lblAutoRefreshStatus" styleClass="badge-pill-neutral" text="AUTO-SYNC 5s" />
                 </HBox>
-                <Label styleClass="view-subheading" text="Facturación rápida, envío a cocina, división de cuentas y cobro multimedio" />
+                <Label styleClass="view-subheading" text="Facturación multicanal (Salón 12 Mesas, Kiosco, Delivery), envío a cocina y cobro multimedio" />
             </VBox>
             <Region HBox.hgrow="ALWAYS" />
             <HBox alignment="CENTER_RIGHT" spacing="10.0">
@@ -38,7 +42,7 @@
         </HBox>
     </top>
 
-    <!-- Centro: Split 35% Orden (Izquierda) / 65% Catálogo (Derecha) (§6) -->
+    <!-- Centro: Split 35% Orden (Izquierda) / 65% Catálogo & Mesas Multicanal (Derecha) (§6 & v4.4.0 §2) -->
     <center>
         <GridPane fx:id="posSplitGrid">
             <columnConstraints>
@@ -50,23 +54,36 @@
             </rowConstraints>
             <children>
 
-                <!-- PANEL IZQUIERDO (35% ORDEN): Header con mesa y mozo, lista de ítems, totales mono, botones 56px, chips de atajo -->
-                <VBox spacing="12.0" styleClass="pos-order-panel" GridPane.columnIndex="0">
+                <!-- PANEL IZQUIERDO (35% ORDEN): Header con mesa/canal y mozo, pedidos activos rápidos, lista de ítems, totales mono, botones 56px -->
+                <VBox spacing="10.0" styleClass="pos-order-panel" GridPane.columnIndex="0">
                     <children>
-                        <!-- Header Orden: Mesa y Mozo -->
-                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                        <!-- Header Orden: Mesa, Badge Canal y Mozo -->
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
                             <children>
-                                <VBox spacing="2.0">
+                                <VBox spacing="3.0">
                                     <children>
-                                        <Label fx:id="lblOrdenHeader" styleClass="text-h2" text="Mesa 01 · Salón Principal" />
-                                        <Label fx:id="lblMozoHeader" styleClass="text-caption" text="Mozo: Carlos Mendoza · Pedido #ORD-104" />
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label fx:id="lblOrdenHeader" styleClass="text-h2" text="Mesa 01 · Salón" />
+                                                <Label fx:id="lblCanalBadge" styleClass="badge-canal-mesa" text="[MESA 01]" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblMozoHeader" styleClass="text-caption" text="Mozo: Carlos Mendoza · Terminal POS-01" />
                                     </children>
                                 </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnVerMesasPos" mnemonicParsing="false" onAction="#handleMostrarTabMesas" styleClass="category-chip" text="🪑 Mesas" />
                                 <Button fx:id="btnNotaItem" mnemonicParsing="false" onAction="#handleNotaItem" styleClass="category-chip" text="+ Nota" />
                                 <Button fx:id="btnQuitarItem" mnemonicParsing="false" onAction="#handleEliminarItem" styleClass="btn-secondary" text="Quitar" />
                             </children>
                         </HBox>
+
+                        <!-- Barra rápida de pedidos activos entrantes (Salón / Kiosco / Delivery) -->
+                        <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" prefHeight="38.0" vbarPolicy="NEVER">
+                            <content>
+                                <HBox fx:id="boxOrdenesEntrantes" alignment="CENTER_LEFT" spacing="6.0" />
+                            </content>
+                        </ScrollPane>
 
                         <!-- Lista de ítems de la orden -->
                         <TableView fx:id="tblDetalle" VBox.vgrow="ALWAYS">
@@ -82,7 +99,7 @@
                         </TableView>
 
                         <!-- Totales fijos al fondo (Subtotal, IGV, Descuento, Total en Monoespaciado §2.2, §6, §3.2) -->
-                        <VBox spacing="8.0" styleClass="pos-totals-card">
+                        <VBox spacing="6.0" styleClass="pos-totals-card">
                             <children>
                                 <HBox alignment="CENTER_LEFT">
                                     <children>
@@ -145,31 +162,77 @@
                     </children>
                 </VBox>
 
-                <!-- PANEL DERECHO (65% CATÁLOGO): Categorías tipo pill (36px) + Grid de tiles 4x4 mínimo 96px (§6) -->
-                <VBox spacing="16.0" styleClass="pos-catalog-panel" GridPane.columnIndex="1">
-                    <children>
-                        <VBox spacing="12.0">
-                            <children>
-                                <HBox alignment="CENTER_LEFT" spacing="12.0">
-                                    <children>
-                                        <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código SKU..." styleClass="input-field" HBox.hgrow="ALWAYS" />
-                                    </children>
-                                </HBox>
-                                <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="NEVER">
-                                    <content>
-                                        <HBox fx:id="boxCategorias" alignment="CENTER_LEFT" spacing="8.0" />
-                                    </content>
-                                </ScrollPane>
-                            </children>
-                        </VBox>
-
-                        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                <!-- PANEL DERECHO (65%): TabPane con Catálogo de Platillos + Grid de 12 Mesas y Pedidos Multicanal -->
+                <TabPane fx:id="tabPanePosCatalogo" tabClosingPolicy="UNAVAILABLE" GridPane.columnIndex="1">
+                    <tabs>
+                        <!-- Pestaña 1: Catálogo de Platillos -->
+                        <Tab fx:id="tabCatalogo" text="🛒 Catálogo de Platillos">
                             <content>
-                                <TilePane fx:id="tileProductos" hgap="12.0" prefColumns="4" vgap="12.0" />
+                                <VBox spacing="16.0" styleClass="pos-catalog-panel">
+                                    <children>
+                                        <VBox spacing="12.0">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                                    <children>
+                                                        <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código SKU..." styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                    </children>
+                                                </HBox>
+                                                <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="NEVER">
+                                                    <content>
+                                                        <HBox fx:id="boxCategorias" alignment="CENTER_LEFT" spacing="8.0" />
+                                                    </content>
+                                                </ScrollPane>
+                                            </children>
+                                        </VBox>
+
+                                        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                                            <content>
+                                                <TilePane fx:id="tileProductos" hgap="12.0" prefColumns="4" vgap="12.0" />
+                                            </content>
+                                        </ScrollPane>
+                                    </children>
+                                </VBox>
                             </content>
-                        </ScrollPane>
-                    </children>
-                </VBox>
+                        </Tab>
+
+                        <!-- Pestaña 2: Vista de 12 Mesas y Pedidos Multicanal (v4.4.0 §2) -->
+                        <Tab fx:id="tabMesas" text="🪑 Mesas (12) y Pedidos Multicanal">
+                            <content>
+                                <VBox spacing="14.0" styleClass="pos-catalog-panel">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h3" text="Salón Principal (12 Mesas) y Pedidos Multicanal" />
+                                                <Label fx:id="lblResumenMesasPos" styleClass="badge-pill-accent" text="0 Ocupadas · 12 Libres" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnRefrescarMesasPos" mnemonicParsing="false" onAction="#handleRefrescarMesasPos" styleClass="btn-secondary" text="🔄 Actualizar" />
+                                            </children>
+                                        </HBox>
+
+                                        <!-- Bandeja de pedidos activos KIOSCO y DELIVERY -->
+                                        <VBox spacing="6.0" styleClass="stat-card">
+                                            <children>
+                                                <Label styleClass="stat-card-title" text="PEDIDOS KIOSCO Y DELIVERY ENTRANTES" />
+                                                <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" prefHeight="68.0" vbarPolicy="NEVER">
+                                                    <content>
+                                                        <FlowPane fx:id="flowPedidosMulticanal" hgap="8.0" vgap="8.0" />
+                                                    </content>
+                                                </ScrollPane>
+                                            </children>
+                                        </VBox>
+
+                                        <!-- Grid de 12 Mesas -->
+                                        <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
+                                            <content>
+                                                <TilePane fx:id="tileMesasPos" hgap="12.0" prefColumns="4" vgap="12.0" />
+                                            </content>
+                                        </ScrollPane>
+                                    </children>
+                                </VBox>
+                            </content>
+                        </Tab>
+                    </tabs>
+                </TabPane>
 
             </children>
         </GridPane>

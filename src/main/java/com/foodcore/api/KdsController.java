@@ -18,7 +18,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador Javalin para el KDS (Kitchen Display System) de Cocina y Bar (v4.3.0 §1.3).
+ * Controlador Javalin para el KDS (Kitchen Display System) de Cocina y Bar (v4.3.0 §1.3 & v4.4.0 §1).
  */
 public class KdsController {
 
@@ -204,6 +204,46 @@ public class KdsController {
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al actualizar estado de ítem KDS", e);
             state.responderError(ctx, 500, "Error interno: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Marca únicamente el pedido indicado como ENTREGADO sin afectar ni limpiar otros pedidos en cocina (v4.4.0 §1).
+     */
+    public boolean marcarEntregado(int idPedido) {
+        if (idPedido <= 0) {
+            return false;
+        }
+        try (Connection conn = ConexionBD.getConnection()) {
+            if (conn != null) {
+                List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, idPedido);
+                for (DetallePedido dp : detalles) {
+                    pedidoDAO.actualizarEstadoDetalleCocina(conn, dp.getIdDetallePedido(), "ENTREGADO");
+                }
+                pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                return true;
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error al marcar pedido #" + idPedido + " como ENTREGADO en KDS", e);
+        }
+        return false;
+    }
+
+    public void handleMarcarPedidoEntregado(Context ctx) {
+        try {
+            int idPedido = Integer.parseInt(ctx.pathParam("id"));
+            boolean ok = marcarEntregado(idPedido);
+            if (!ok) {
+                state.responderError(ctx, 400, "No se pudo marcar como entregado el pedido #" + idPedido);
+                return;
+            }
+            ObjectNode resp = state.mapper.createObjectNode();
+            resp.put("status", "OK");
+            resp.put("id_pedido", idPedido);
+            resp.put("estado", "ENTREGADO");
+            ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
+        } catch (NumberFormatException e) {
+            state.responderError(ctx, 400, "ID de pedido inválido.");
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.foodcore.model;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -20,7 +21,7 @@ public class Usuario {
     private String nombreRol;
     private String nombreEmpleado;
 
-    // Campos RRHH (SPEC Sub-Fase 4B)
+    // Campos RRHH (SPEC Sub-Fase 4B & v4.4.0)
     private String dni;
     private String pin;
     private String pinHash;
@@ -28,6 +29,8 @@ public class Usuario {
     private String horarioLaboral = "08:00-16:00";
     private LocalTime horaEntradaProgramada = LocalTime.of(8, 0);
     private LocalTime horaSalidaProgramada = LocalTime.of(16, 0);
+    private LocalDate fechaVencimientoContrato;
+    private LocalDate fechaVencimientoCarnetSanidad;
 
     public Usuario() {
     }
@@ -176,6 +179,14 @@ public class Usuario {
     public LocalTime getHoraSalidaProgramada() { return horaSalidaProgramada; }
 
     public void setHoraSalidaProgramada(LocalTime horaSalidaProgramada) { this.horaSalidaProgramada = horaSalidaProgramada; }
+
+    public LocalDate getFechaVencimientoContrato() { return fechaVencimientoContrato; }
+
+    public void setFechaVencimientoContrato(LocalDate fechaVencimientoContrato) { this.fechaVencimientoContrato = fechaVencimientoContrato; }
+
+    public LocalDate getFechaVencimientoCarnetSanidad() { return fechaVencimientoCarnetSanidad; }
+
+    public void setFechaVencimientoCarnetSanidad(LocalDate fechaVencimientoCarnetSanidad) { this.fechaVencimientoCarnetSanidad = fechaVencimientoCarnetSanidad; }
 
     @Override
     public String toString() {

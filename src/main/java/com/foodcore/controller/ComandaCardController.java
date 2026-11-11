@@ -113,6 +113,9 @@ public class ComandaCardController {
         } else if (mesa != null && (mesa.toUpperCase().contains("LLEVAR") || mesa.toUpperCase().contains("TK-"))) {
             lblNumeroMesa.setText("PARA LLEVAR " + mesa);
             lblNumeroMesa.getStyleClass().add("badge-pill-accent");
+        } else if (mesa != null && (mesa.toUpperCase().contains("T-") || mesa.toUpperCase().contains("KIOSCO"))) {
+            lblNumeroMesa.setText("KIOSCO " + mesa);
+            lblNumeroMesa.getStyleClass().add("badge-pill-accent");
         } else {
             lblNumeroMesa.setText("MESA " + mesa);
         }
@@ -120,7 +123,7 @@ public class ComandaCardController {
         aplicarEstadoVisual(estado != null ? estado : "PENDIENTE");
     }
 
-    private void aplicarEstadoVisual(String estado) {
+    public void aplicarEstadoVisual(String estado) {
         this.estadoActual = estado;
         lblEstado.setText("Estado: " + estado);
         if ("EN_PREPARACION".equalsIgnoreCase(estado)) {
@@ -278,7 +281,7 @@ public class ComandaCardController {
                     if (idDetallePedido > 0) {
                         pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
                     }
-                    if (idPedido > 0) {
+                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
                         pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
                     }
 
@@ -312,7 +315,7 @@ public class ComandaCardController {
                     if (idDetallePedido > 0) {
                         pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
                     }
-                    if (idPedido > 0) {
+                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
                         pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
                     }
                 } catch (Exception ex) {

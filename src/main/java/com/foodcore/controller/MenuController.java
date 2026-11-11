@@ -1,5 +1,7 @@
 package com.foodcore.controller;
 
+import com.foodcore.dao.CategoriaDAO;
+import com.foodcore.dao.CategoriaDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
@@ -74,6 +76,7 @@ public class MenuController {
     @FXML private Button btnLimpiarForm;
 
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
+    private final CategoriaDAO categoriaDAO = new CategoriaDAOImpl();
     private final ObservableList<Producto> listaProductos = FXCollections.observableArrayList();
     private final ObservableList<Categoria> listaCategorias = FXCollections.observableArrayList();
     private Producto productoEnEdicion;
@@ -213,6 +216,24 @@ public class MenuController {
 
         tblMenu.setItems(listaProductos);
         cmbCategoria.setItems(listaCategorias);
+        cmbCategoria.setEditable(true);
+        cmbCategoria.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(Categoria c) {
+                return c != null ? c.getNombre() : "";
+            }
+
+            @Override
+            public Categoria fromString(String string) {
+                if (string == null || string.isBlank()) return null;
+                for (Categoria c : listaCategorias) {
+                    if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(string.trim())) {
+                        return c;
+                    }
+                }
+                return new Categoria(0, string.trim(), "Categoría autogenerada", true);
+            }
+        });
     }
 
     public void cargarDatosMenu() {
@@ -374,14 +395,61 @@ public class MenuController {
         if (chkMenuDelDia != null) {
             chkMenuDelDia.setSelected(false);
         }
+        if (cmbCategoria.getEditor() != null) {
+            cmbCategoria.getEditor().clear();
+        }
+        if (!listaCategorias.isEmpty()) {
+            cmbCategoria.getSelectionModel().selectFirst();
+        }
         actualizarVistaPreviaImagen(null);
     }
 
     @FXML
     public void handleGuardarPlatillo(ActionEvent event) {
         try {
-            Categoria cat = cmbCategoria.getValue();
-            int idCat = cat != null ? cat.getIdCategoria() : 1;
+            String textoCat = null;
+            if (cmbCategoria.getEditor() != null && cmbCategoria.getEditor().getText() != null) {
+                textoCat = cmbCategoria.getEditor().getText().trim();
+            }
+            if ((textoCat == null || textoCat.isBlank()) && cmbCategoria.getValue() != null) {
+                textoCat = cmbCategoria.getValue().getNombre();
+            }
+            if (textoCat == null || textoCat.isBlank()) {
+                textoCat = "General";
+            }
+
+            int idCat = 1;
+            Categoria catExistente = null;
+            for (Categoria c : listaCategorias) {
+                if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(textoCat)) {
+                    catExistente = c;
+                    break;
+                }
+            }
+
+            if (catExistente != null && catExistente.getIdCategoria() > 0) {
+                idCat = catExistente.getIdCategoria();
+            } else {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    List<Categoria> enBD = categoriaDAO.listarTodas(conn);
+                    for (Categoria c : enBD) {
+                        if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(textoCat)) {
+                            catExistente = c;
+                            break;
+                        }
+                    }
+                    if (catExistente != null && catExistente.getIdCategoria() > 0) {
+                        idCat = catExistente.getIdCategoria();
+                    } else {
+                        Categoria nuevaCat = new Categoria(0, textoCat, "Categoría creada dinámicamente", true);
+                        idCat = categoriaDAO.crear(conn, nuevaCat);
+                        final Categoria catParaLista = nuevaCat;
+                        listaCategorias.add(catParaLista);
+                        cmbCategoria.setValue(catParaLista);
+                    }
+                }
+            }
+
             String cod = txtCodigo.getText() != null ? txtCodigo.getText().trim() : ("PLT-" + (System.currentTimeMillis() % 10000));
             String nom = txtNombre.getText() != null ? txtNombre.getText().trim() : "";
             if (nom.isEmpty()) {

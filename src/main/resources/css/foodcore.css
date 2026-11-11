@@ -594,6 +594,31 @@
     -fx-border-color: #9CA3AF;
 }
 
+.btn-kiosco-ajuste {
+    -fx-min-width: 32px;
+    -fx-pref-width: 32px;
+    -fx-max-width: 32px;
+    -fx-min-height: 32px;
+    -fx-pref-height: 32px;
+    -fx-max-height: 32px;
+    -fx-padding: 0;
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #374151;
+    -fx-border-color: #D1D5DB;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER;
+}
+
+.btn-kiosco-ajuste:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #111827;
+    -fx-border-color: #9CA3AF;
+}
+
 /* Botón Éxito / Confirmación */
 .btn-emerald, .btn-success {
     -fx-background-color: #10B981;
@@ -1175,8 +1200,8 @@
 
 .table-view .table-cell {
     -fx-border-color: transparent;
-    -fx-padding: 10px 14px;
-    -fx-font-size: 14px;
+    -fx-padding: 10 14 10 14;
+    -fx-font-size: 13px;
     -fx-font-weight: 500;
     -fx-text-fill: -fc-text-primary;
     -fx-alignment: CENTER_LEFT;
@@ -1228,6 +1253,24 @@
 .axis { -fx-tick-label-fill: #6B7280; -fx-font-size: 11px; -fx-font-family: "Inter"; }
 .axis-tick-mark, .axis-minor-tick-mark { -fx-stroke: #E5E7EB; }
 
+/* Leyenda de gráficos Donut / PieChart (11px, compacta y legible en la parte inferior) */
+.chart-legend {
+    -fx-font-size: 11px;
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-background-color: transparent;
+    -fx-padding: 8px 4px 4px 4px;
+}
+
+.chart-legend-item {
+    -fx-font-size: 11px;
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-text-fill: #4B5563;
+}
+
+.chart-legend-item-symbol {
+    -fx-background-radius: 4px;
+}
+
 /* --------------------------------------------------------------------------
    12. Toast Notification y Scrollbars Limpias
    -------------------------------------------------------------------------- */
@@ -1261,3 +1304,195 @@
 .scroll-bar:vertical .thumb:hover, .scroll-bar:horizontal .thumb:hover {
     -fx-background-color: #9CA3AF;
 }
+
+/* --------------------------------------------------------------------------
+   13. FoodCore v4.4.0 — KPI Cards Pastel, Badges Multicanal POS y Alertas RRHH
+   -------------------------------------------------------------------------- */
+.kpi-card {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1.5px;
+    -fx-padding: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.03), 10, 0, 0, 2);
+}
+
+.kpi-card-sales {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #BBF7D0;
+}
+.kpi-card-sales .kpi-card-title {
+    -fx-text-fill: #166534;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.kpi-card-sales .kpi-card-value {
+    -fx-text-fill: #166534;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+.kpi-card-sales .kpi-card-subtitle {
+    -fx-text-fill: #15803D;
+    -fx-font-size: 12px;
+}
+
+.kpi-card-taxable {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #BFDBFE;
+}
+.kpi-card-taxable .kpi-card-title {
+    -fx-text-fill: #1E40AF;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.kpi-card-taxable .kpi-card-value {
+    -fx-text-fill: #1E40AF;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+.kpi-card-taxable .kpi-card-subtitle {
+    -fx-text-fill: #1D4ED8;
+    -fx-font-size: 12px;
+}
+
+.kpi-card-igv {
+    -fx-background-color: #FFF7ED;
+    -fx-border-color: #FED7AA;
+}
+.kpi-card-igv .kpi-card-title {
+    -fx-text-fill: #9A3412;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.kpi-card-igv .kpi-card-value {
+    -fx-text-fill: #9A3412;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+.kpi-card-igv .kpi-card-subtitle {
+    -fx-text-fill: #C2410C;
+    -fx-font-size: 12px;
+}
+
+.kpi-card-purchases {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #FECACA;
+}
+.kpi-card-purchases .kpi-card-title {
+    -fx-text-fill: #991B1B;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.kpi-card-purchases .kpi-card-value {
+    -fx-text-fill: #991B1B;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+}
+.kpi-card-purchases .kpi-card-subtitle {
+    -fx-text-fill: #B91C1C;
+    -fx-font-size: 12px;
+}
+
+.kpi-icon-badge-sales, .kpi-icon-badge-taxable, .kpi-icon-badge-igv, .kpi-icon-badge-purchases {
+    -fx-background-radius: 8px;
+    -fx-padding: 4px 8px;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+.kpi-icon-badge-sales {
+    -fx-background-color: #DCFCE7;
+    -fx-text-fill: #166534;
+}
+.kpi-icon-badge-taxable {
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #1E40AF;
+}
+.kpi-icon-badge-igv {
+    -fx-background-color: #FFEDD5;
+    -fx-text-fill: #9A3412;
+}
+.kpi-icon-badge-purchases {
+    -fx-background-color: #FEE2E2;
+    -fx-text-fill: #991B1B;
+}
+
+/* Badges Multicanal POS */
+.badge-canal-mesa {
+    -fx-background-color: #E0F2FE;
+    -fx-text-fill: #0369A1;
+    -fx-border-color: #BAE6FD;
+    -fx-border-radius: 20px;
+    -fx-background-radius: 20px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 4px 10px;
+}
+
+.badge-canal-kiosco {
+    -fx-background-color: #F3E8FF;
+    -fx-text-fill: #6B21A8;
+    -fx-border-color: #E9D5FF;
+    -fx-border-radius: 20px;
+    -fx-background-radius: 20px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 4px 10px;
+}
+
+.badge-canal-delivery {
+    -fx-background-color: #FFEDD5;
+    -fx-text-fill: #9A3412;
+    -fx-border-color: #FED7AA;
+    -fx-border-radius: 20px;
+    -fx-background-radius: 20px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-padding: 4px 10px;
+}
+
+.pos-mesa-card-libre {
+    -fx-background-color: #F0FDF4;
+    -fx-border-color: #BBF7D0;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 12px;
+    -fx-cursor: hand;
+}
+.pos-mesa-card-libre:hover {
+    -fx-border-color: #22C55E;
+}
+
+.pos-mesa-card-ocupada {
+    -fx-background-color: #FFF7ED;
+    -fx-border-color: #F97316;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 12px;
+    -fx-cursor: hand;
+}
+.pos-mesa-card-ocupada:hover {
+    -fx-border-color: #EA580C;
+}
+
+/* Alertas de Vencimiento RRHH */
+.alert-expiry-urgent {
+    -fx-background-color: #FEF2F2;
+    -fx-border-color: #FECACA;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10px 14px;
+}
+
+.alert-expiry-soon {
+    -fx-background-color: #FFF7ED;
+    -fx-border-color: #FED7AA;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10px 14px;
+}
+

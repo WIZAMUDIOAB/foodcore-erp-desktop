@@ -195,6 +195,7 @@ public class ApiServer {
         app.get("/api/kds/pendientes", kdsController::handleKdsItems);
         app.patch("/api/kds/items/{id}/estado", kdsController::handleActualizarEstadoItemKds);
         app.patch("/api/kds/{id}/estado", kdsController::handleActualizarEstadoItemKds);
+        app.patch("/api/kds/pedidos/{id}/entregar", kdsController::handleMarcarPedidoEntregado);
 
         // 4. ReportesController (Dashboard Ejecutivo)
         app.get("/api/dashboard/kpis", reportesController::handleDashboardKpis);
@@ -225,7 +226,7 @@ public class ApiServer {
                     return;
                 }
             }
-            ctx.json(Map.of("service", "FoodCore ERP API v4.3.0", "status", "ONLINE"));
+            ctx.json(Map.of("service", "FoodCore ERP API v4.4.0", "status", "ONLINE"));
         });
 
         app.start();
@@ -339,7 +340,7 @@ public class ApiServer {
     private void handleHealth(Context ctx) {
         ObjectNode node = state.mapper.createObjectNode();
         node.put("status", "UP");
-        node.put("version", "4.3.0");
+        node.put("version", "4.4.0");
         node.put("port", puertoActual);
         ctx.status(200).contentType("application/json; charset=UTF-8").result(node.toString());
     }

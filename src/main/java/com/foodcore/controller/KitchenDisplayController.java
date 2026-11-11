@@ -37,9 +37,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador KDS con tablero Kanban de 3 columnas (Pendiente -> En preparación -> Listo),
+ * Controlador KDS con tablero Kanban de 4 columnas (Pendiente -> En preparación -> Listo -> Historial),
  * 1 tarjeta por ítem con cronómetro y color SLA independiente (detalle_pedido.enviado_en)
- * en zona horaria America/Lima según UI-REDESIGN-SPEC-FOODCORE-v1.1 (§7) y SPEC-FOODCORE-v1.0 (§8.5).
+ * en zona horaria America/Lima según UI-REDESIGN-SPEC-FOODCORE-v1.1 (§7), SPEC-FOODCORE-v1.0 (§8.5) y v4.4.0.
  */
 public class KitchenDisplayController {
 
@@ -49,9 +49,11 @@ public class KitchenDisplayController {
     @FXML private VBox vboxColPendiente;
     @FXML private VBox vboxColEnPreparacion;
     @FXML private VBox vboxColListo;
+    @FXML private VBox vboxColHistorial;
     @FXML private Label lblCountPendiente;
     @FXML private Label lblCountEnPreparacion;
     @FXML private Label lblCountListo;
+    @FXML private Label lblCountHistorial;
     @FXML private FlowPane flowComandas;
     @FXML private Label lblSocketStatus;
     @FXML private Label lblContadorActivas;
@@ -59,6 +61,7 @@ public class KitchenDisplayController {
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
     private final Set<Integer> itemsDespachadosLocal = Collections.synchronizedSet(new HashSet<>());
+    private final Set<Integer> itemsSimuladosLocal = Collections.synchronizedSet(new HashSet<>());
     private Timeline autoSyncTimer;
 
     @FXML
@@ -83,6 +86,7 @@ public class KitchenDisplayController {
     @FXML
     public void handleRefrescar(ActionEvent event) {
         itemsDespachadosLocal.clear();
+        itemsSimuladosLocal.clear();
         cargarComandasDesdeBD();
     }
 
@@ -105,10 +109,17 @@ public class KitchenDisplayController {
      * calculando su tiempo desde {@code enviado_en} sin reiniciar cronómetros de otros ítems (§7).
      */
     public void renderizarItemsKds(List<DetallePedido> items, LocalDateTime referenciaLima) {
+        renderizarItemsKds(items, referenciaLima, false);
+    }
+
+    private void renderizarItemsKds(List<DetallePedido> items, LocalDateTime referenciaLima, boolean sonSimulados) {
         for (ComandaCardController c : tarjetasActivas.values()) {
             c.stopTimer();
         }
         tarjetasActivas.clear();
+        if (!sonSimulados) {
+            itemsSimuladosLocal.clear();
+        }
         limpiarContenedores();
 
         LocalDateTime ref = referenciaLima != null ? referenciaLima : LocalDateTime.now(ZONA_LIMA);
@@ -116,6 +127,9 @@ public class KitchenDisplayController {
             int key = obtenerClaveItem(item);
             if (key > 0 && itemsDespachadosLocal.contains(key)) {
                 continue;
+            }
+            if (sonSimulados && key != 0) {
+                itemsSimuladosLocal.add(key);
             }
             int segundos = item.calcularSegundosDesdeEnvio(ref);
             String comandaCode = String.format("COM-%04d-IT%02d", item.getIdPedido(), item.getIdDetallePedido());
@@ -135,6 +149,9 @@ public class KitchenDisplayController {
         }
         if (vboxColListo != null) {
             vboxColListo.getChildren().clear();
+        }
+        if (vboxColHistorial != null) {
+            vboxColHistorial.getChildren().clear();
         }
         if (flowComandas != null) {
             flowComandas.getChildren().clear();
@@ -168,8 +185,13 @@ public class KitchenDisplayController {
                 }
 
                 List<Integer> idsAEliminar = new ArrayList<>();
-                for (Integer id : tarjetasActivas.keySet()) {
-                    if (id > 0 && !idsPendientesEnBD.contains(id)) {
+                for (Map.Entry<Integer, ComandaCardController> entry : tarjetasActivas.entrySet()) {
+                    Integer id = entry.getKey();
+                    ComandaCardController ctrl = entry.getValue();
+                    if (id > 0
+                            && !idsPendientesEnBD.contains(id)
+                            && !itemsSimuladosLocal.contains(id)
+                            && !"ENTREGADO".equalsIgnoreCase(ctrl.getEstadoActual())) {
                         idsAEliminar.add(id);
                     }
                 }
@@ -265,14 +287,7 @@ public class KitchenDisplayController {
             });
 
             cardCtrl.setOnDespachadoListener(c -> {
-                if (keyMapa != 0) {
-                    tarjetasActivas.remove(keyMapa);
-                    if (keyMapa > 0) {
-                        itemsDespachadosLocal.add(keyMapa);
-                    }
-                }
-                removerDeColumnas(c.getCardContainer());
-                recalcularContadoresKanban();
+                moverTarjetaAHistorialSinRecargar(keyMapa, c);
             });
 
             if (keyMapa != 0) {
@@ -287,10 +302,97 @@ public class KitchenDisplayController {
         }
     }
 
+    /**
+     * Marca un pedido completo como ENTREGADO de forma NO destructiva (v4.4.0 §1):
+     * NO llama a {@link #cargarComandasDesdeBD()}, sino que busca la(s) tarjeta(s) del pedido,
+     * las elimina únicamente de la columna LISTO, las mueve a la 4ta columna HISTORIAL
+     * y actualiza los contadores numéricos de todas las columnas.
+     */
+    public void marcarEntregado(int idPedido) {
+        List<Map.Entry<Integer, ComandaCardController>> coincidentes = new ArrayList<>();
+        for (Map.Entry<Integer, ComandaCardController> entry : tarjetasActivas.entrySet()) {
+            if (entry.getValue().getIdPedido() == idPedido) {
+                coincidentes.add(entry);
+            }
+        }
+
+        if (idPedido > 0) {
+            new Thread(() -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    if (conn != null) {
+                        for (Map.Entry<Integer, ComandaCardController> e : coincidentes) {
+                            int idDet = e.getValue().getIdDetallePedido();
+                            if (idDet > 0) {
+                                pedidoDAO.actualizarEstadoDetalleCocina(conn, idDet, "ENTREGADO");
+                            }
+                        }
+                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                    }
+                } catch (Exception ex) {
+                    LOGGER.log(Level.FINE, "Aviso marcando pedido entregado en BD", ex);
+                }
+            }).start();
+        }
+
+        Runnable uiTask = () -> {
+            for (Map.Entry<Integer, ComandaCardController> entry : coincidentes) {
+                ComandaCardController ctrl = entry.getValue();
+                ctrl.stopTimer();
+                ctrl.aplicarEstadoVisual("ENTREGADO");
+                moverTarjetaAHistorialSinRecargar(entry.getKey(), ctrl);
+            }
+            recalcularContadoresKanban();
+        };
+
+        if (Platform.isFxApplicationThread()) {
+            uiTask.run();
+        } else {
+            Platform.runLater(uiTask);
+        }
+    }
+
+    /**
+     * Marca un ítem individual como ENTREGADO moviéndolo únicamente de LISTO a HISTORIAL sin recargar el tablero.
+     */
+    public void marcarEntregadoItem(int idDetallePedido) {
+        ComandaCardController ctrl = tarjetasActivas.get(idDetallePedido);
+        if (ctrl == null) {
+            for (ComandaCardController c : tarjetasActivas.values()) {
+                if (c.getIdDetallePedido() == idDetallePedido) {
+                    ctrl = c;
+                    break;
+                }
+            }
+        }
+        if (ctrl != null) {
+            ctrl.handleEntregado(null);
+        }
+    }
+
+    private void moverTarjetaAHistorialSinRecargar(int keyMapa, ComandaCardController c) {
+        if (keyMapa > 0) {
+            itemsDespachadosLocal.add(keyMapa);
+        }
+        if (c == null || c.getCardContainer() == null) {
+            return;
+        }
+        removerDeColumnas(c.getCardContainer());
+        if (vboxColHistorial != null) {
+            if (!vboxColHistorial.getChildren().contains(c.getCardContainer())) {
+                vboxColHistorial.getChildren().add(c.getCardContainer());
+            }
+        } else if (keyMapa != 0) {
+            tarjetasActivas.remove(keyMapa);
+        }
+        recalcularContadoresKanban();
+    }
+
     private void ubicarEnColumnaKanban(Parent cardNode, String estado) {
         removerDeColumnas(cardNode);
         String est = estado != null ? estado.toUpperCase() : "PENDIENTE";
-        if ("EN_PREPARACION".equals(est) && vboxColEnPreparacion != null) {
+        if ("ENTREGADO".equals(est) && vboxColHistorial != null) {
+            vboxColHistorial.getChildren().add(cardNode);
+        } else if ("EN_PREPARACION".equals(est) && vboxColEnPreparacion != null) {
             vboxColEnPreparacion.getChildren().add(cardNode);
         } else if ("LISTO".equals(est) && vboxColListo != null) {
             vboxColListo.getChildren().add(cardNode);
@@ -311,16 +413,20 @@ public class KitchenDisplayController {
         if (vboxColListo != null) {
             vboxColListo.getChildren().remove(cardNode);
         }
+        if (vboxColHistorial != null) {
+            vboxColHistorial.getChildren().remove(cardNode);
+        }
         if (flowComandas != null) {
             flowComandas.getChildren().remove(cardNode);
         }
     }
 
-    private void recalcularContadoresKanban() {
+    public void recalcularContadoresKanban() {
         int cPend = vboxColPendiente != null ? vboxColPendiente.getChildren().size() : 0;
         int cPrep = vboxColEnPreparacion != null ? vboxColEnPreparacion.getChildren().size() : 0;
         int cListo = vboxColListo != null ? vboxColListo.getChildren().size() : 0;
-        int total = cPend + cPrep + cListo;
+        int cHist = vboxColHistorial != null ? vboxColHistorial.getChildren().size() : 0;
+        int totalActivas = cPend + cPrep + cListo;
 
         if (lblCountPendiente != null) {
             lblCountPendiente.setText(String.valueOf(cPend));
@@ -331,8 +437,11 @@ public class KitchenDisplayController {
         if (lblCountListo != null) {
             lblCountListo.setText(String.valueOf(cListo));
         }
+        if (lblCountHistorial != null) {
+            lblCountHistorial.setText(String.valueOf(cHist));
+        }
         if (lblContadorActivas != null) {
-            lblContadorActivas.setText("Ítems en Cocina: " + total);
+            lblContadorActivas.setText("Ítems en Cocina: " + totalActivas);
         }
     }
 
@@ -365,7 +474,7 @@ public class KitchenDisplayController {
         itListo.setEnviadoEn(ahora.minusMinutes(4).minusSeconds(10));
         demoItems.add(itListo);
 
-        renderizarItemsKds(demoItems, ahora);
+        renderizarItemsKds(demoItems, ahora, true);
     }
 
     private void emitirBeepSonoro() {
@@ -382,5 +491,46 @@ public class KitchenDisplayController {
 
     public FlowPane getFlowComandas() {
         return flowComandas;
+    }
+
+    public VBox getVboxColPendiente() {
+        return vboxColPendiente;
+    }
+
+    public VBox getVboxColEnPreparacion() {
+        return vboxColEnPreparacion;
+    }
+
+    public VBox getVboxColListo() {
+        return vboxColListo;
+    }
+
+    public VBox getVboxColHistorial() {
+        return vboxColHistorial;
+    }
+
+    public Label getLblCountPendiente() {
+        return lblCountPendiente;
+    }
+
+    public Label getLblCountEnPreparacion() {
+        return lblCountEnPreparacion;
+    }
+
+    public Label getLblCountListo() {
+        return lblCountListo;
+    }
+
+    public void stopTimers() {
+        if (autoSyncTimer != null) {
+            autoSyncTimer.stop();
+        }
+        for (ComandaCardController c : tarjetasActivas.values()) {
+            c.stopTimer();
+        }
+    }
+
+    public Label getLblCountHistorial() {
+        return lblCountHistorial;
     }
 }

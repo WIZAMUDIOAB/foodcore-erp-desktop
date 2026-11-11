@@ -19,6 +19,7 @@ public interface PedidoDAO {
     List<Pedido> listarPedidosPendientesCocina(Connection conn) throws SQLException;
     List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException;
     List<DetallePedido> listarItemsPendientesCocina(Connection conn) throws SQLException;
+    boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException;
     void actualizarEstadoPedido(Connection conn, int idPedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoDetalleCocina(Connection conn, int idDetallePedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoComanda(Connection conn, int idComanda, String nuevoEstado) throws SQLException;

@@ -97,7 +97,7 @@
                                 <VBox spacing="4.0">
                                     <children>
                                         <Label styleClass="text-body-strong" text="Categoría" />
-                                        <ComboBox fx:id="cmbCategoria" maxWidth="1.7976931348623157E308" />
+                                        <ComboBox fx:id="cmbCategoria" editable="true" maxWidth="1.7976931348623157E308" promptText="Seleccione o escriba categoría..." />
                                     </children>
                                 </VBox>
 

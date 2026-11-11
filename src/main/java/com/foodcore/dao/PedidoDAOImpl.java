@@ -184,7 +184,7 @@ public class PedidoDAOImpl implements PedidoDAO {
     @Override
     public List<Pedido> listarPedidosPendientesCocina(Connection conn) throws SQLException {
         List<Pedido> lista = new ArrayList<>();
-        String sql = "SELECT * FROM pedido WHERE estado IN ('ABIERTO', 'REGISTRADO', 'EN_PREPARACION') ORDER BY id_pedido ASC";
+        String sql = "SELECT * FROM pedido WHERE estado IN ('ABIERTO', 'REGISTRADO', 'EN_PREPARACION', 'LISTO') ORDER BY id_pedido ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -213,8 +213,8 @@ public class PedidoDAOImpl implements PedidoDAO {
     }
 
     /**
-     * Lista los ítems pendientes de cocina ({@code PENDIENTE} o {@code EN_PREPARACION})
-     * con su marca temporal individual {@code enviado_en} (SPEC-FOODCORE-v1.0 §8.5; REMEDIATION R-08).
+     * Lista los ítems activos de cocina ({@code PENDIENTE}, {@code EN_PREPARACION} o {@code LISTO})
+     * con su marca temporal individual {@code enviado_en} (SPEC-FOODCORE-v1.0 §8.5; REMEDIATION R-08; v4.4.0).
      */
     @Override
     public List<DetallePedido> listarItemsPendientesCocina(Connection conn) throws SQLException {
@@ -223,8 +223,8 @@ public class PedidoDAOImpl implements PedidoDAO {
                      "FROM detalle_pedido dp " +
                      "JOIN producto p ON dp.id_producto = p.id_producto " +
                      "JOIN pedido ped ON dp.id_pedido = ped.id_pedido " +
-                     "WHERE dp.estado_cocina IN ('PENDIENTE', 'EN_PREPARACION') " +
-                     "AND ped.estado IN ('ABIERTO', 'REGISTRADO', 'EN_PREPARACION') " +
+                     "WHERE dp.estado_cocina IN ('PENDIENTE', 'EN_PREPARACION', 'LISTO') " +
+                     "AND ped.estado IN ('ABIERTO', 'REGISTRADO', 'EN_PREPARACION', 'LISTO') " +
                      "ORDER BY dp.id_detalle_pedido ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -233,6 +233,20 @@ public class PedidoDAOImpl implements PedidoDAO {
             }
         }
         return lista;
+    }
+
+    @Override
+    public boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM detalle_pedido WHERE id_pedido = ? AND estado_cocina NOT IN ('ENTREGADO', 'CANCELADO')";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idPedido);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
     }
 
     private DetallePedido mapearDetallePedido(ResultSet rs) throws SQLException {

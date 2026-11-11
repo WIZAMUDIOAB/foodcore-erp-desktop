@@ -13,6 +13,8 @@ public class Empleado {
     private BigDecimal sueldoBase;
     private LocalDate fechaIngreso;
     private boolean estado;
+    private LocalDate fechaVencimientoContrato;
+    private LocalDate fechaVencimientoCarnetSanidad;
 
     public Empleado() {}
 
@@ -54,6 +56,12 @@ public class Empleado {
 
     public boolean isEstado() { return estado; }
     public void setEstado(boolean estado) { this.estado = estado; }
+
+    public LocalDate getFechaVencimientoContrato() { return fechaVencimientoContrato; }
+    public void setFechaVencimientoContrato(LocalDate fechaVencimientoContrato) { this.fechaVencimientoContrato = fechaVencimientoContrato; }
+
+    public LocalDate getFechaVencimientoCarnetSanidad() { return fechaVencimientoCarnetSanidad; }
+    public void setFechaVencimientoCarnetSanidad(LocalDate fechaVencimientoCarnetSanidad) { this.fechaVencimientoCarnetSanidad = fechaVencimientoCarnetSanidad; }
 
     public String getNombreCompleto() {
         return nombres + " " + apellidos;

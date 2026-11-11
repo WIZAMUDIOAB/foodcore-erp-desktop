@@ -30,9 +30,9 @@ import java.util.logging.Logger;
  * Sidebar lateral colapsable y control de acceso basado en roles (RBAC):
  * <ul>
  *   <li>{@code ADMIN}: Acceso total (Dashboard Gerencial como vista inicial, POS, KDS, Salón, Caja y Backoffice).</li>
- *   <li>{@code CAJERO}: POS, Salón y Caja (sin acceso a Inventario/Recetas/Backoffice).</li>
- *   <li>{@code MOZO}: Salón y POS (solo toma de pedidos).</li>
- *   <li>{@code COCINERO}: KDS exclusivamente.</li>
+ *   <li>{@code CAJERO}: POS, Salón, Caja, Mi Portal y Solicitudes (sin acceso a Inventario/Recetas/Backoffice).</li>
+ *   <li>{@code MOZO}: Salón, POS, Mi Portal y Solicitudes (solo toma de pedidos).</li>
+ *   <li>{@code COCINERO}: KDS, Mi Portal y Solicitudes.</li>
  * </ul>
  */
 public class MainDashboardController {
@@ -57,7 +57,7 @@ public class MainDashboardController {
     @FXML private Label lblSecSistema;
 
     @FXML private Button btnNavDashboard;
-        @FXML private Button btnNavPromociones;
+    @FXML private Button btnNavPromociones;
     @FXML private Button btnNavKiosco;
     @FXML private Button btnNavMenuQr;
     @FXML private Button btnNavSalon;
@@ -77,6 +77,7 @@ public class MainDashboardController {
     @FXML private Button btnNavReloj;
     @FXML private Button btnNavHorarios;
     @FXML private Button btnNavMiHorario;
+    @FXML private Button btnNavSolicitudes;
 
     @FXML private Button btnNavInventario;
     @FXML private Button btnNavMenu;
@@ -97,12 +98,14 @@ public class MainDashboardController {
 
     private Parent dialogoPasswordActivo;
     private boolean sidebarColapsado = false;
+    private Object controladorActivo;
 
     @FXML
     public void initialize() {
         Button[] buttons = {
             btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
             btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
             btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento,
             btnCambiarPasswordMenu, btnCerrarSesion
@@ -124,36 +127,36 @@ public class MainDashboardController {
 
     private void configurarSyncWorkerListener() {
         SyncWorker syncWorker = SyncWorker.getInstancia();
-        syncWorker.addListener((online, pendientes, alerta) -> {
-            Platform.runLater(() -> {
-                if (lblNetworkStatus == null || dotNetworkStatus == null) return;
-                if (online) {
-                    dotNetworkStatus.getStyleClass().removeAll("status-dot-danger", "status-dot-warning");
-                    if (!dotNetworkStatus.getStyleClass().contains("status-dot-online")) {
-                        dotNetworkStatus.getStyleClass().add("status-dot-online");
-                    }
-                    lblNetworkStatus.getStyleClass().removeAll("badge-pill-danger", "badge-pill-warning");
-                    if (!lblNetworkStatus.getStyleClass().contains("badge-pill-success")) {
-                        lblNetworkStatus.getStyleClass().add("badge-pill-success");
-                    }
-                    lblNetworkStatus.setText(pendientes > 0 ? "ONLINE (" + pendientes + ")" : "ONLINE");
-                } else {
-                    dotNetworkStatus.getStyleClass().removeAll("status-dot-online", "status-dot-warning");
-                    if (!dotNetworkStatus.getStyleClass().contains("status-dot-danger")) {
-                        dotNetworkStatus.getStyleClass().add("status-dot-danger");
-                    }
-                    lblNetworkStatus.getStyleClass().removeAll("badge-pill-success", "badge-pill-warning");
-                    if (!lblNetworkStatus.getStyleClass().contains("badge-pill-danger")) {
-                        lblNetworkStatus.getStyleClass().add("badge-pill-danger");
-                    }
-                    lblNetworkStatus.setText(pendientes > 0 ? "OFFLINE (" + pendientes + " pend)" : "OFFLINE");
+        syncWorker.addListener((online, pendientes, alerta) -> Platform.runLater(() -> {
+            if (lblNetworkStatus == null || dotNetworkStatus == null) {
+                return;
+            }
+            if (online) {
+                dotNetworkStatus.getStyleClass().removeAll("status-dot-danger", "status-dot-warning");
+                if (!dotNetworkStatus.getStyleClass().contains("status-dot-online")) {
+                    dotNetworkStatus.getStyleClass().add("status-dot-online");
                 }
-            });
-        });
+                lblNetworkStatus.getStyleClass().removeAll("badge-pill-danger", "badge-pill-warning");
+                if (!lblNetworkStatus.getStyleClass().contains("badge-pill-success")) {
+                    lblNetworkStatus.getStyleClass().add("badge-pill-success");
+                }
+                lblNetworkStatus.setText(pendientes > 0 ? "ONLINE (" + pendientes + ")" : "ONLINE");
+            } else {
+                dotNetworkStatus.getStyleClass().removeAll("status-dot-online", "status-dot-warning");
+                if (!dotNetworkStatus.getStyleClass().contains("status-dot-danger")) {
+                    dotNetworkStatus.getStyleClass().add("status-dot-danger");
+                }
+                lblNetworkStatus.getStyleClass().removeAll("badge-pill-success", "badge-pill-warning");
+                if (!lblNetworkStatus.getStyleClass().contains("badge-pill-danger")) {
+                    lblNetworkStatus.getStyleClass().add("badge-pill-danger");
+                }
+                lblNetworkStatus.setText(pendientes > 0 ? "OFFLINE (" + pendientes + " pend)" : "OFFLINE");
+            }
+        }));
     }
 
     /**
-     * Aplica las reglas RBAC del Sidebar según SPEC-FOODCORE-v1.2 y v1.3 (§5).
+     * Aplica las reglas RBAC del Sidebar según SPEC-FOODCORE-v1.2, v1.3 (§5) y v4.4.0.
      */
     public void aplicarControlAcceso(Usuario user) {
         mostrarTodosLosNodos();
@@ -166,14 +169,12 @@ public class MainDashboardController {
         String rol = user.getNombreRol().toUpperCase();
 
         if (rol.contains("MOZO") || rol.contains("MESERO")) {
-            // MOZO: Salón, Delivery, POS (solo toma de pedidos). Sin acceso a Caja, KDS ni Backoffice
             ocultarNodo(btnNavDashboard);
             ocultarNodo(btnNavKDS);
             ocultarNodo(btnNavCaja);
             ocultarSeccionBackofficeCompleta();
             cargarVista("/com/foodcore/view/SalonMesasView.fxml", btnNavSalon);
         } else if (rol.contains("COCIN")) {
-            // COCINERO: KDS exclusivamente
             ocultarNodo(btnNavDashboard);
             ocultarNodo(btnNavSalon);
             ocultarNodo(btnNavDelivery);
@@ -182,20 +183,17 @@ public class MainDashboardController {
             ocultarSeccionBackofficeCompleta();
             cargarVista("/com/foodcore/view/KitchenDisplayView.fxml", btnNavKDS);
         } else if (rol.contains("CAJERO")) {
-            // CAJERO: POS, Salón, Delivery, Caja (Sin acceso a Inventario/Recetas/Backoffice)
             ocultarNodo(btnNavDashboard);
             ocultarNodo(btnNavKDS);
             ocultarSeccionBackofficeCompleta();
             cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
         } else {
-            // ADMIN / GERENTE: Acceso total; vista inicial = DashboardView.fxml (§4.1 & §5)
             cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
         }
     }
 
     private void ocultarSeccionBackofficeCompleta() {
         ocultarNodo(lblSecFinanzas);
-        ocultarNodo(lblSecRrhh);
         ocultarNodo(lblSecBackoffice);
         ocultarNodo(lblSecSistema);
         ocultarNodo(btnNavReportesContables);
@@ -209,6 +207,7 @@ public class MainDashboardController {
         ocultarNodo(btnNavMenu);
         ocultarNodo(btnNavRecetas);
         ocultarNodo(btnNavMermas);
+        ocultarNodo(btnNavAnalisisMermas);
         ocultarNodo(btnNavKardex);
         ocultarNodo(btnNavAuditoria);
         ocultarNodo(btnNavUsuarios);
@@ -221,10 +220,10 @@ public class MainDashboardController {
     private void mostrarTodosLosNodos() {
         Node[] nodes = {
             lblSecOperaciones, lblSecFinanzas, lblSecRrhh, lblSecBackoffice, lblSecSistema,
-            btnNavDashboard, btnNavSalon, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
+            btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario,
-            btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
+            btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
             btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion
         };
         for (Node n : nodes) {
@@ -385,6 +384,11 @@ public class MainDashboardController {
     }
 
     @FXML
+    public void handleNavSolicitudes(ActionEvent event) {
+        cargarVista("/com/foodcore/view/SolicitudesView.fxml", btnNavSolicitudes);
+    }
+
+    @FXML
     public void handleNavReportes(ActionEvent event) {
         cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
     }
@@ -432,18 +436,24 @@ public class MainDashboardController {
         }
     }
 
-    private Object controladorActivo;
-
     public Object getControladorActivo() {
         return controladorActivo;
     }
 
+    private void detenerControladorActivo() {
+        if (controladorActivo instanceof RelojAsistenciaController rac) {
+            rac.stopTimeline();
+        } else if (controladorActivo instanceof VentaController vc) {
+            vc.stopTimeline();
+        } else if (controladorActivo instanceof KitchenDisplayController kdc) {
+            kdc.stopTimers();
+        }
+        controladorActivo = null;
+    }
+
     private void cargarVista(String fxmlPath, Button navBtnActivo) {
         try {
-            if (controladorActivo instanceof RelojAsistenciaController rac) {
-                rac.stopTimeline();
-            }
-            controladorActivo = null;
+            detenerControladorActivo();
 
             if (contentArea != null) {
                 contentArea.getChildren().clear();
@@ -471,7 +481,7 @@ public class MainDashboardController {
             btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavPromociones, btnNavKiosco, btnNavMenuQr,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
             btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
             btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento
         };
@@ -487,6 +497,7 @@ public class MainDashboardController {
 
     @FXML
     public void handleCerrarSesion(ActionEvent event) {
+        detenerControladorActivo();
         AuthService.logout();
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
@@ -525,6 +536,14 @@ public class MainDashboardController {
         return btnNavDashboard;
     }
 
+    public Button getBtnNavSolicitudes() {
+        return btnNavSolicitudes;
+    }
+
+    public Button getBtnNavMiHorario() {
+        return btnNavMiHorario;
+    }
+
     public boolean isSidebarColapsado() {
         return sidebarColapsado;
     }
@@ -549,38 +568,8 @@ public class MainDashboardController {
         cargarVista("/com/foodcore/view/KioscoView.fxml", btnNavKiosco);
     }
 
-    private void abrirModoKioscoAislado(String fxmlPath, String titulo, Button navBtn) {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
-            Parent root = loader.load();
-            Scene scene = new Scene(root);
-            App.applyStylesheets(scene);
-
-            Stage kioskStage = new Stage();
-            kioskStage.setTitle(titulo);
-            kioskStage.initStyle(StageStyle.UNDECORATED);
-            kioskStage.setMaximized(true);
-            kioskStage.setScene(scene);
-
-            Stage mainStage = rootDashboardStack != null && rootDashboardStack.getScene() != null
-                    ? (Stage) rootDashboardStack.getScene().getWindow() : null;
-
-            if (mainStage != null) {
-                kioskStage.initOwner(mainStage);
-                kioskStage.setOnHidden(e -> mainStage.toFront());
-            }
-
-            actualizarEstilosNav(navBtn);
-            kioskStage.show();
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error abriendo modo kiosco aislado: " + fxmlPath, e);
-            cargarVista(fxmlPath, navBtn);
-        }
-    }
-
     @FXML
     public void handleNavMenuQr(ActionEvent event) {
         cargarVista("/com/foodcore/view/MenuQrModalView.fxml", btnNavMenuQr);
     }
-
 }

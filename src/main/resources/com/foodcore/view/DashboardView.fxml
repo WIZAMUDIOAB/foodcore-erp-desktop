@@ -34,7 +34,7 @@
                                                 <Label styleClass="badge-pill-accent" text="EN TIEMPO REAL" />
                                             </children>
                                         </HBox>
-                                        <Label styleClass="view-subheading" text="Indicadores clave del día (KPIs), evolución de ventas por hora, rentabilidad de carta y productividad por operador" />
+                                        <Label styleClass="view-subheading" text="Indicadores clave del día (KPIs), evolución de ventas por hora, rentabilidad de carta y alertas de personal" />
                                     </children>
                                 </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
@@ -228,6 +228,20 @@
                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                     </columnResizePolicy>
                                 </TableView>
+                            </children>
+                        </VBox>
+
+                        <!-- Alertas de Vencimiento de Personal (Próximos 30 días) (v4.4.0 §4) -->
+                        <VBox spacing="10.0" styleClass="surface-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="text-h2" text="Alertas de Vencimiento de Personal (Próximos 30 días)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblCountAlertasPersonal" styleClass="badge-pill-warning" text="0 alertas" />
+                                    </children>
+                                </HBox>
+                                <VBox fx:id="vboxAlertasVencimiento" spacing="8.0" />
                             </children>
                         </VBox>
 

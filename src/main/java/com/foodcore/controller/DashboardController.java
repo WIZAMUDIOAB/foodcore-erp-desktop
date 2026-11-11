@@ -10,6 +10,7 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -22,7 +23,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
@@ -41,28 +46,41 @@ import javafx.stage.StageStyle;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador del Dashboard Gerencial y Reportes ejecutivos según SPEC-FOODCORE-v3.0.3:
- * KPIs del día, Smooth Area Chart con curva Bézier (CubicCurveTo) y gradiente naranja sin cuadrícula,
- * botón Pop-Out de expansión de ventana, reporte de rentabilidad por receta y reporte por mozo/turno.
+ * Controlador del Dashboard Gerencial y Reportes ejecutivos según SPEC-FOODCORE-v3.0.3 y v4.4.0:
+ * KPIs del día, Smooth Area Chart con curva Bézier (CubicCurveTo), rentabilidad por receta,
+ * reporte por mozo/turno y widget de alertas de vencimiento de personal (próximos 30 días).
  */
 public class DashboardController {
 
     private static final Logger LOGGER = Logger.getLogger(DashboardController.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private static final DateTimeFormatter FMT_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public record FilaRentabilidad(String platillo, String costoReceta, String precioVenta, String margenPorcentaje, BigDecimal margenNum) {
     }
 
     public record FilaVentasMozo(String usuario, String ventasTotales, String nroPedidos, String ticketPromedio) {
+    }
+
+    public record AlertaVencimiento(String colaborador, String cargo, String documento, LocalDate fechaVencimiento, long diasRestantes) {
     }
 
     @FXML private StackPane rootGerencialStack;
@@ -89,8 +107,12 @@ public class DashboardController {
     @FXML private TableColumn<FilaRentabilidad, String> colRentPrecio;
     @FXML private TableColumn<FilaRentabilidad, String> colRentMargen;
 
+    @FXML private VBox vboxAlertasVencimiento;
+    @FXML private Label lblCountAlertasPersonal;
+
     private final ObservableList<FilaRentabilidad> itemsRentabilidad = FXCollections.observableArrayList();
     private final ObservableList<FilaVentasMozo> itemsVentasMozo = FXCollections.observableArrayList();
+    private final List<AlertaVencimiento> alertasVencimientoActuales = new ArrayList<>();
 
     @FXML
     public void initialize() {
@@ -321,10 +343,10 @@ public class DashboardController {
         Map<String, BigDecimal> ventasPorHora = new TreeMap<>();
         List<FilaVentasMozo> filasMozo = new ArrayList<>();
         List<FilaRentabilidad> filasRent = new ArrayList<>();
+        List<AlertaVencimiento> alertasPersonal = new ArrayList<>();
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
-                // 1. KPIs del día (§4.1)
                 String sqlKpi = "SELECT COALESCE(SUM(total), 0.00) AS suma, COUNT(*) AS tx, COALESCE(AVG(total), 0.00) AS prom "
                     + "FROM venta WHERE estado = 'COMPLETADA'";
                 try (PreparedStatement ps = conn.prepareStatement(sqlKpi);
@@ -342,7 +364,6 @@ public class DashboardController {
                     }
                 }
 
-                // Plato más vendido
                 String sqlTop = "SELECT p.nombre, COALESCE(SUM(dv.cantidad), 0) AS unidades "
                     + "FROM detalle_venta dv JOIN producto p ON dv.id_producto = p.id_producto "
                     + "JOIN venta v ON dv.id_venta = v.id_venta WHERE v.estado = 'COMPLETADA' "
@@ -355,7 +376,6 @@ public class DashboardController {
                     }
                 }
 
-                // 2. Ventas por hora (§4.1)
                 String sqlHora = "SELECT DATE_FORMAT(fecha_hora, '%H:00') AS hora, COALESCE(SUM(total), 0.00) AS monto "
                     + "FROM venta WHERE estado = 'COMPLETADA' GROUP BY DATE_FORMAT(fecha_hora, '%H:00') ORDER BY hora ASC";
                 try (PreparedStatement ps = conn.prepareStatement(sqlHora);
@@ -365,7 +385,6 @@ public class DashboardController {
                     }
                 }
 
-                // 3. Reporte de Ventas por Mozo / Turno (§4.3)
                 String sqlMozo = "SELECT COALESCE(u.username, 'admin') AS usr, COALESCE(u.codigo_rol, 'CAJERO') AS rol, "
                     + "COUNT(v.id_venta) AS pedidos, COALESCE(SUM(v.total), 0.00) AS total_ventas, "
                     + "COALESCE(AVG(v.total), 0.00) AS prom "
@@ -382,7 +401,6 @@ public class DashboardController {
                     }
                 }
 
-                // 4. Reporte de Rentabilidad por Platillo (§4.2)
                 String sqlRent = "SELECT p.nombre, p.precio_venta, p.costo_estimado, "
                     + "COALESCE(SUM(r.cantidad_necesaria * i.costo_unitario), 0.00) AS costo_receta "
                     + "FROM producto p "
@@ -414,6 +432,8 @@ public class DashboardController {
                         ));
                     }
                 }
+
+                alertasPersonal = obtenerAlertasVencimiento30Dias(conn);
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Cargando métricas demostrativas del Dashboard", e);
@@ -448,6 +468,7 @@ public class DashboardController {
         final Map<String, BigDecimal> horaFinal = ventasPorHora;
         final List<FilaVentasMozo> mozoFinal = filasMozo;
         final List<FilaRentabilidad> rentFinal = filasRent;
+        final List<AlertaVencimiento> alertasFinal = alertasPersonal;
 
         Runnable updateUI = () -> {
             lblKpiVentasDia.setText("S/ " + vDiaFinal);
@@ -471,12 +492,126 @@ public class DashboardController {
 
             itemsVentasMozo.setAll(mozoFinal);
             itemsRentabilidad.setAll(rentFinal);
+            renderizarAlertasVencimiento(alertasFinal);
         };
 
         if (Platform.isFxApplicationThread()) {
             updateUI.run();
         } else {
             Platform.runLater(updateUI);
+        }
+    }
+
+    /**
+     * Consulta colaboradores activos cuyo contrato o carné de sanidad venza en los próximos 30 días (v4.4.0 §4).
+     */
+    public List<AlertaVencimiento> obtenerAlertasVencimiento30Dias(Connection conn) {
+        Map<String, AlertaVencimiento> alertasPorClave = new LinkedHashMap<>();
+        if (conn == null) {
+            return List.of();
+        }
+        LocalDate hoy = LocalDate.now(ZONA_LIMA);
+
+        String sqlUsuario = "SELECT COALESCE(NULLIF(nombre_completo, ''), username) AS nombre, "
+                + "COALESCE(codigo_rol, 'PERSONAL') AS rol, fecha_vencimiento_contrato, fecha_vencimiento_carnet_sanidad "
+                + "FROM usuario WHERE activo = 1";
+        try (PreparedStatement ps = conn.prepareStatement(sqlUsuario);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String nombre = rs.getString("nombre");
+                String cargo = rs.getString("rol");
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        "Contrato Laboral", rs.getDate("fecha_vencimiento_contrato"), hoy);
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        "Carné de Sanidad", rs.getDate("fecha_vencimiento_carnet_sanidad"), hoy);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en usuario", e);
+        }
+
+        String sqlEmp = "SELECT CONCAT(nombres, ' ', apellidos) AS nombre, cargo, "
+                + "fecha_vencimiento_contrato, fecha_vencimiento_carnet_sanidad "
+                + "FROM empleado WHERE estado = 1";
+        try (PreparedStatement ps = conn.prepareStatement(sqlEmp);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String nombre = rs.getString("nombre");
+                String cargo = rs.getString("cargo");
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        "Contrato Laboral", rs.getDate("fecha_vencimiento_contrato"), hoy);
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        "Carné de Sanidad", rs.getDate("fecha_vencimiento_carnet_sanidad"), hoy);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en empleado", e);
+        }
+
+        List<AlertaVencimiento> resultado = new ArrayList<>(alertasPorClave.values());
+        resultado.sort(Comparator.comparingLong(AlertaVencimiento::diasRestantes));
+        return resultado;
+    }
+
+    private void registrarSiVenceEn30Dias(Map<String, AlertaVencimiento> mapa,
+                                          String nombre,
+                                          String cargo,
+                                          String documento,
+                                          Date fechaSql,
+                                          LocalDate hoy) {
+        if (fechaSql == null || nombre == null) {
+            return;
+        }
+        LocalDate fecha = fechaSql.toLocalDate();
+        long diasRestantes = ChronoUnit.DAYS.between(hoy, fecha);
+        if (diasRestantes >= 0 && diasRestantes <= 30) {
+            String key = nombre.trim().toUpperCase(Locale.ROOT) + "|" + documento;
+            mapa.putIfAbsent(key, new AlertaVencimiento(nombre.trim(), cargo, documento, fecha, diasRestantes));
+        }
+    }
+
+    private void renderizarAlertasVencimiento(List<AlertaVencimiento> alertas) {
+        alertasVencimientoActuales.clear();
+        if (alertas != null) {
+            alertasVencimientoActuales.addAll(alertas);
+        }
+        if (lblCountAlertasPersonal != null) {
+            lblCountAlertasPersonal.setText(alertasVencimientoActuales.size() + " alertas");
+        }
+        if (vboxAlertasVencimiento == null) {
+            return;
+        }
+        vboxAlertasVencimiento.getChildren().clear();
+
+        if (alertasVencimientoActuales.isEmpty()) {
+            Label lblOk = new Label("✓ Todo el personal tiene contratos y carnés de sanidad vigentes (> 30 días).");
+            lblOk.getStyleClass().add("text-caption");
+            vboxAlertasVencimiento.getChildren().add(lblOk);
+            return;
+        }
+
+        for (AlertaVencimiento a : alertasVencimientoActuales) {
+            HBox fila = new HBox(12.0);
+            fila.setAlignment(Pos.CENTER_LEFT);
+            boolean urgente = a.diasRestantes() <= 15;
+            fila.getStyleClass().add(urgente ? "alert-expiry-urgent" : "alert-expiry-soon");
+
+            Label lblDoc = new Label(a.documento());
+            lblDoc.getStyleClass().add(urgente ? "badge-pill-danger" : "badge-pill-warning");
+
+            VBox datos = new VBox(2.0);
+            Label lblColab = new Label(a.colaborador() + " · " + a.cargo());
+            lblColab.getStyleClass().add("text-body-strong");
+            Label lblFecha = new Label("Vence el " + a.fechaVencimiento().format(FMT_FECHA));
+            lblFecha.getStyleClass().add("text-caption");
+            datos.getChildren().addAll(lblColab, lblFecha);
+
+            Region sp = new Region();
+            HBox.setHgrow(sp, Priority.ALWAYS);
+
+            Label lblDias = new Label(a.diasRestantes() == 0 ? "Vence HOY" : "En " + a.diasRestantes() + " días");
+            lblDias.getStyleClass().add("text-mono-sm");
+
+            fila.getChildren().addAll(lblDoc, datos, sp, lblDias);
+            vboxAlertasVencimiento.getChildren().add(fila);
         }
     }
 
@@ -494,5 +629,17 @@ public class DashboardController {
 
     public ObservableList<FilaVentasMozo> getItemsVentasMozo() {
         return itemsVentasMozo;
+    }
+
+    public VBox getVboxAlertasVencimiento() {
+        return vboxAlertasVencimiento;
+    }
+
+    public Label getLblCountAlertasPersonal() {
+        return lblCountAlertasPersonal;
+    }
+
+    public List<AlertaVencimiento> getAlertasVencimientoActuales() {
+        return alertasVencimientoActuales;
     }
 }
