@@ -2,6 +2,7 @@ package com.foodcore.api;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.service.MenuQrService;
 import com.foodcore.util.ConexionBD;
 import io.javalin.http.Context;
 
@@ -25,9 +26,15 @@ public class ReportesController {
     private static final Logger LOGGER = Logger.getLogger(ReportesController.class.getName());
 
     private final ApiState state;
+    private final MenuQrService menuQrService;
 
     public ReportesController(ApiState state) {
+        this(state, new MenuQrService());
+    }
+
+    public ReportesController(ApiState state, MenuQrService menuQrService) {
         this.state = state;
+        this.menuQrService = menuQrService != null ? menuQrService : new MenuQrService();
     }
 
     public void handleDashboardKpis(Context ctx) {
@@ -247,22 +254,19 @@ public class ReportesController {
     }
 
     /**
-     * Endpoint GET /api/menu-digital/view: sirve el HTML del Menú Digital para smartphones (v4.3.2).
+     * Endpoint GET /api/public/menu-digital (y /api/menu-digital/view):
+     * consulta MySQL en vivo y sirve el HTML dinámico del Menú Digital sin caché estático (v4.6.0 Fase 2).
      */
     public void handleMenuDigitalView(Context ctx) {
         try {
-            java.io.File archivoHtml = new java.io.File("uploads/qr/menu_digital.html");
-            if (!archivoHtml.exists()) {
-                new com.foodcore.service.MenuQrService().generarMenuDigitalHtml(archivoHtml);
-            }
-            if (archivoHtml.exists()) {
-                ctx.contentType("text/html; charset=utf-8");
-                ctx.result(new String(java.nio.file.Files.readAllBytes(archivoHtml.toPath()), java.nio.charset.StandardCharsets.UTF_8));
-                return;
-            }
-            ctx.status(404).result("Menú digital no encontrado");
+            String htmlDinamico = menuQrService.construirMenuDigitalHtmlDinamico();
+            ctx.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+            ctx.header("Pragma", "no-cache");
+            ctx.header("Expires", "0");
+            ctx.contentType("text/html; charset=utf-8");
+            ctx.status(200).result(htmlDinamico);
         } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al servir menú digital: " + e.getMessage(), e);
+            LOGGER.log(Level.WARNING, "Error al servir menú digital dinámico: " + e.getMessage(), e);
             ctx.status(500).result("Error interno al cargar menú digital");
         }
     }

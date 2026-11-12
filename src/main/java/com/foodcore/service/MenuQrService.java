@@ -67,6 +67,10 @@ public class MenuQrService {
      * Construye la URL de red oficial para acceder al Menú Digital desde smartphones (v4.3.2).
      */
     public static String construirUrlMenuDigital(int puertoHttps) {
+        String urlTunel = TunnelService.construirUrlPublicaEndpoint("/api/public/menu-digital");
+        if (!urlTunel.isBlank()) {
+            return urlTunel;
+        }
         String ip = obtenerIpServidor();
         return "https://" + ip + ":" + puertoHttps + "/api/public/menu-digital";
     }
@@ -106,9 +110,11 @@ public class MenuQrService {
     }
 
     /**
-     * Genera la página web estática responsive del menú digital en HTML.
+     * Construye el HTML responsive del menú digital consultando MySQL en vivo (v4.6.0 Fase 2 — cero caché estático).
+     *
+     * @return documento HTML completo con precios y disponibilidad actualizados en tiempo real.
      */
-    public File generarMenuDigitalHtml(File destinoHtml) throws IOException {
+    public String construirMenuDigitalHtmlDinamico() {
         List<Producto> productos = new ArrayList<>();
         
         try (Connection conn = ConexionBD.getConnection()) {
@@ -180,13 +186,20 @@ public class MenuQrService {
             .append("</body>\n")
             .append("</html>\n");
 
+        return html.toString();
+    }
+
+    /**
+     * Exporta a archivo el HTML responsive del menú digital generado en vivo desde MySQL.
+     */
+    public File generarMenuDigitalHtml(File destinoHtml) throws IOException {
         if (destinoHtml.getParentFile() != null && !destinoHtml.getParentFile().exists()) {
             boolean created = destinoHtml.getParentFile().mkdirs();
             if (!created) {
                 LOGGER.log(Level.FINE, "Directorio para menu digital ya existia o fue creado.");
             }
         }
-        Files.writeString(destinoHtml.toPath(), html.toString(), StandardCharsets.UTF_8);
+        Files.writeString(destinoHtml.toPath(), construirMenuDigitalHtmlDinamico(), StandardCharsets.UTF_8);
         return destinoHtml;
     }
 

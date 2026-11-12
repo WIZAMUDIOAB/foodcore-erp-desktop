@@ -59,7 +59,10 @@ public class App extends Application {
                 FlywayMigrator.migrateOnBootstrap();
             },
             () -> ServidorSockets.getInstance().iniciar(),
-            () -> ApiServer.getInstance().iniciar()
+            () -> {
+                ApiServer.getInstance().iniciar();
+                com.foodcore.service.TunnelService.iniciarEnSegundoPlano();
+            }
         );
         splash.statusLabel().textProperty().bind(bootstrapTask.messageProperty());
 
@@ -225,6 +228,12 @@ public class App extends Application {
 
     public static Stage getPrimaryStage() {
         return primaryStage;
+    }
+
+    @Override
+    public void stop() throws Exception {
+        com.foodcore.service.TunnelService.detener();
+        super.stop();
     }
 
     public static void main(String[] args) {
