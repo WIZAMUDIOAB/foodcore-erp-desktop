@@ -123,6 +123,15 @@ public class ExportFileChooserHelper {
                         FormatoExportacion.CSV));
     }
 
+    public static Optional<File> elegirPdfApertura(
+            Node ownerNode, String titulo) {
+        return DEFAULT_INSTANCE.seleccionarArchivoAbrir(
+                resolverVentana(ownerNode),
+                titulo,
+                PREF_KEY_ULTIMA_CARPETA_IMPORT,
+                List.of(FormatoExportacion.PDF));
+    }
+
     public static Window resolverVentana(Node ownerNode) {
         if (ownerNode != null) {
             Scene scene = ownerNode.getScene();

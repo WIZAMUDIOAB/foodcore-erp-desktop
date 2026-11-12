@@ -545,6 +545,32 @@ public class DashboardController {
             LOGGER.log(Level.FINE, "Aviso consultando vencimientos en empleado", e);
         }
 
+        String sqlDocs = "SELECT COALESCE(NULLIF(TRIM(u.nombre_completo), ''), "
+                + "NULLIF(TRIM(CONCAT(COALESCE(e.nombres, ''), ' ', COALESCE(e.apellidos, ''))), ''), "
+                + "u.username) AS nombre, "
+                + "COALESCE(NULLIF(TRIM(u.cargo), ''), r.nombre, u.codigo_rol, 'PERSONAL') AS cargo, "
+                + "d.tipo_documento, d.nombre_archivo, d.fecha_vencimiento "
+                + "FROM documento_empleado d "
+                + "JOIN usuario u ON d.id_usuario = u.id_usuario "
+                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.activo = 1 AND d.fecha_vencimiento IS NOT NULL";
+        try (PreparedStatement ps = conn.prepareStatement(sqlDocs);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String nombre = rs.getString("nombre");
+                String cargo = rs.getString("cargo");
+                String tipoDoc = rs.getString("tipo_documento");
+                String nombreArchivo = rs.getString("nombre_archivo");
+                String etiquetaDoc = (tipoDoc != null ? tipoDoc.replace('_', ' ') : "Documento")
+                        + (nombreArchivo != null && !nombreArchivo.isBlank() ? " (" + nombreArchivo + ")" : "");
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        etiquetaDoc, rs.getDate("fecha_vencimiento"), hoy);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en documento_empleado", e);
+        }
+
         List<AlertaVencimiento> resultado = new ArrayList<>(alertasPorClave.values());
         resultado.sort(Comparator.comparingLong(AlertaVencimiento::diasRestantes));
         return resultado;

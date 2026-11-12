@@ -71,6 +71,7 @@
                                     <Button fx:id="btnNavHorarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHorarios" styleClass="sidebar-nav-button" text="🗓️ Turnos y Horarios" />
                                     <Button fx:id="btnNavMiHorario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMiHorario" styleClass="sidebar-nav-button" text="👤 Mi Portal y Horario" />
                                     <Button fx:id="btnNavSolicitudes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavSolicitudes" styleClass="sidebar-nav-button" text="📝 Solicitudes y Ausencias" />
+                                    <Button fx:id="btnNavExpedientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavExpedientes" styleClass="sidebar-nav-button" text="🗂️ Expedientes y Legajos" />
 
                                     <!-- Sección BACKOFFICE -->
                                     <Label fx:id="lblSecBackoffice" styleClass="sidebar-section-header" text="BACKOFFICE" />

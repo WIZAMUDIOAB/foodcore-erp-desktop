@@ -78,6 +78,7 @@ public class MainDashboardController {
     @FXML private Button btnNavHorarios;
     @FXML private Button btnNavMiHorario;
     @FXML private Button btnNavSolicitudes;
+    @FXML private Button btnNavExpedientes;
 
     @FXML private Button btnNavInventario;
     @FXML private Button btnNavMenu;
@@ -105,7 +106,7 @@ public class MainDashboardController {
         Button[] buttons = {
             btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes,
             btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
             btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento,
             btnCambiarPasswordMenu, btnCerrarSesion
@@ -203,6 +204,7 @@ public class MainDashboardController {
         ocultarNodo(btnNavReportesAvanzados);
         ocultarNodo(btnNavAsistencia);
         ocultarNodo(btnNavHorarios);
+        ocultarNodo(btnNavExpedientes);
         ocultarNodo(btnNavInventario);
         ocultarNodo(btnNavMenu);
         ocultarNodo(btnNavRecetas);
@@ -222,7 +224,7 @@ public class MainDashboardController {
             lblSecOperaciones, lblSecFinanzas, lblSecRrhh, lblSecBackoffice, lblSecSistema,
             btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes,
             btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
             btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion
         };
@@ -389,6 +391,11 @@ public class MainDashboardController {
     }
 
     @FXML
+    public void handleNavExpedientes(ActionEvent event) {
+        cargarVista("/com/foodcore/view/ExpedienteEmpleadoView.fxml", btnNavExpedientes);
+    }
+
+    @FXML
     public void handleNavReportes(ActionEvent event) {
         cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
     }
@@ -481,7 +488,7 @@ public class MainDashboardController {
             btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja,
             btnNavPromociones, btnNavKiosco, btnNavMenuQr,
             btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
+            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes,
             btnNavInventario, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
             btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento
         };
@@ -538,6 +545,10 @@ public class MainDashboardController {
 
     public Button getBtnNavSolicitudes() {
         return btnNavSolicitudes;
+    }
+
+    public Button getBtnNavExpedientes() {
+        return btnNavExpedientes;
     }
 
     public Button getBtnNavMiHorario() {
