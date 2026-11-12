@@ -22,6 +22,7 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
+import com.foodcore.service.PedidoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaService;
 import com.foodcore.util.AnimationUtils;
@@ -76,6 +77,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -147,6 +149,7 @@ public class VentaController {
 
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final PedidoService pedidoService = new PedidoService();
     private final VentaService ventaService = new VentaService();
     private final PromocionService promocionService = new PromocionService();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
@@ -544,6 +547,9 @@ public class VentaController {
         }
         descuentoActivo = BigDecimal.ZERO;
         descuentoManualFijado = false;
+        if (tblDetalle != null) {
+            tblDetalle.refresh();
+        }
         recalcularTotales();
     }
 
@@ -844,11 +850,48 @@ public class VentaController {
         if (p == null || !p.isDisponible()) {
             return;
         }
+        if (this.pedidoActivoId != null && this.pedidoActivoId > 0) {
+            agregarProductoAPedidoExistente(p, this.pedidoActivoId);
+            return;
+        }
+        agregarProductoEnCarritoLocal(p);
+    }
+
+    private void agregarProductoAPedidoExistente(Producto p, int idPedido) {
+        BigDecimal precio = p.getPrecioVenta() != null
+                ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        DetallePedido nuevoItem = new DetallePedido(0, idPedido, p.getIdProducto(), 1, precio, precio, "");
+        nuevoItem.setNombreProducto(p.getNombre());
+
+        try {
+            Pedido actualizado = pedidoService.agregarItemsAPedido(idPedido, List.of(nuevoItem));
+            BigDecimal totalPedido = pedidoService.calcularTotal(idPedido);
+            actualizado.setTotal(totalPedido);
+
+            List<DetallePedido> detallesCompletos = actualizado.getDetalles() != null
+                    ? actualizado.getDetalles()
+                    : pedidoService.listarDetallesPorPedido(idPedido);
+
+            aplicarDetallesPedidoEnPOS(detallesCompletos);
+            if (lblTotal != null && (descuentoActivo == null || descuentoActivo.compareTo(BigDecimal.ZERO) <= 0)) {
+                lblTotal.setText("S/ " + totalPedido.setScale(2, RoundingMode.HALF_UP));
+            }
+            actualizarCachePedidoActivo(idPedido, totalPedido, detallesCompletos);
+        } catch (NegocioException | SQLException ex) {
+            LOGGER.log(Level.FINE, "Fallback en memoria al agregar ítem al pedido #" + idPedido, ex);
+            agregarProductoEnCarritoLocal(p);
+        }
+    }
+
+    private void agregarProductoEnCarritoLocal(Producto p) {
         for (DetalleVenta dv : itemsVenta) {
             if (dv.getIdProducto() == p.getIdProducto()) {
                 dv.setCantidad(dv.getCantidad() + 1);
                 dv.setSubtotal(dv.getPrecioUnitario().multiply(BigDecimal.valueOf(dv.getCantidad())));
-                tblDetalle.refresh();
+                if (tblDetalle != null) {
+                    tblDetalle.refresh();
+                }
                 recalcularTotales();
                 return;
             }
@@ -856,7 +899,27 @@ public class VentaController {
         DetalleVenta nuevo = new DetalleVenta(0, 0, p.getIdProducto(), 1, p.getPrecioVenta(), p.getPrecioVenta());
         nuevo.setNombreProducto(p.getNombre());
         itemsVenta.add(nuevo);
+        if (tblDetalle != null) {
+            tblDetalle.refresh();
+        }
         recalcularTotales();
+    }
+
+    private void actualizarCachePedidoActivo(int idPedido, BigDecimal totalPedido, List<DetallePedido> detalles) {
+        for (Pedido cached : pedidosActivosMulticanal) {
+            if (cached.getIdPedido() == idPedido) {
+                cached.setTotal(totalPedido);
+                cached.setDetalles(detalles);
+            }
+        }
+        for (Pedido cachedMesa : pedidosPorMesa.values()) {
+            if (cachedMesa.getIdPedido() == idPedido) {
+                cachedMesa.setTotal(totalPedido);
+                cachedMesa.setDetalles(detalles);
+            }
+        }
+        renderizarGridMesasPos();
+        renderizarBarraRapidaOrdenes(pedidosActivosMulticanal);
     }
 
     @FXML
@@ -1251,6 +1314,14 @@ public class VentaController {
 
     public Button getBtnEfectivo() {
         return btnEfectivo;
+    }
+
+    public Label getLblTotal() {
+        return lblTotal;
+    }
+
+    public TableView<DetalleVenta> getTblDetalle() {
+        return tblDetalle;
     }
 
     public Button getBtnDescuento() {

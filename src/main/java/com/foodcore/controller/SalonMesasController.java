@@ -32,6 +32,8 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -164,7 +166,10 @@ public class SalonMesasController {
 
                 long minOcupacion = calcularMinutosOcupacion(pedidoActivo, ahoraLima);
                 lblTiempoOcupacion.setText("Ocupación: " + minOcupacion + " min");
-                lblImporte.setText("S/ " + pedidoActivo.getTotal());
+                BigDecimal totalCard = pedidoActivo.getTotal() != null
+                        ? pedidoActivo.getTotal().setScale(2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                lblImporte.setText("S/ " + totalCard);
 
                 box.getChildren().addAll(lblBadge, lblMesaNum, lblTiempoOcupacion, lblImporte);
                 btnMesa.setOnAction(e -> gestionarMesaOcupada(numMesa, pedidoActivo));
@@ -216,12 +221,19 @@ public class SalonMesasController {
     }
 
     private void abrirTomaPedido(String mesa) {
+        abrirTomaPedido(mesa, null);
+    }
+
+    private void abrirTomaPedido(String mesa, Pedido pedidoExistente) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
             Parent root = loader.load();
 
             MozoOrderController controller = loader.getController();
             controller.setNumeroMesa(mesa);
+            if (pedidoExistente != null && pedidoExistente.getIdPedido() > 0) {
+                controller.cargarPedidoExistente(pedidoExistente);
+            }
 
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
@@ -266,7 +278,7 @@ public class SalonMesasController {
         if (result.isPresent()) {
             ButtonType sel = result.get();
             if (sel == btnAgregarMas) {
-                abrirTomaPedido(mesa);
+                abrirTomaPedido(mesa, pedido);
             } else if (sel == btnTransferir) {
                 ejecutarTransferenciaDesde(mesa);
             } else if (sel == btnUnir) {

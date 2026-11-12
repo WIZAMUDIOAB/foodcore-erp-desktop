@@ -33,8 +33,11 @@ import javafx.stage.Stage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Controlador de Comanda de Salón (Mozo) rediseñado según SPEC-FOODCORE-v3.0.3 (§4):
@@ -57,7 +60,10 @@ public class MozoOrderController {
     @FXML private Label lblTotal;
     @FXML private Button btnEnviarCocina;
 
+    private static final Logger LOGGER = Logger.getLogger(MozoOrderController.class.getName());
+
     private String mesa = "01";
+    private Integer idPedidoExistente = null;
     private String tipoPedido = "MESA";
     private String clienteNombre;
     private String clienteTelefono;
@@ -72,6 +78,47 @@ public class MozoOrderController {
         this.mesa = mesa;
         this.tipoPedido = "MESA";
         lblTituloMesa.setText("Comanda de Salón · Mesa " + mesa);
+    }
+
+    /**
+     * Precarga una orden activa existente en el modal de Mozo para agregar ítems adicionales
+     * mostrando todos los ítems previos y el total acumulado de BD (SPEC-FOODCORE-v4.6.0 §1.1).
+     */
+    public void cargarPedidoExistente(Pedido pedido) {
+        if (pedido == null || pedido.getIdPedido() <= 0) {
+            return;
+        }
+        this.idPedidoExistente = pedido.getIdPedido();
+        if (pedido.getNumeroMesa() != null && !pedido.getNumeroMesa().isBlank()) {
+            this.mesa = pedido.getNumeroMesa();
+        }
+        if (lblTituloMesa != null) {
+            lblTituloMesa.setText("Comanda #" + this.idPedidoExistente + " · Mesa " + this.mesa);
+        }
+
+        List<DetallePedido> detalles = List.of();
+        try {
+            detalles = pedidoService.listarDetallesPorPedido(this.idPedidoExistente);
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "Fallback a detalles en memoria al abrir pedido #" + this.idPedidoExistente, ex);
+        }
+        if ((detalles == null || detalles.isEmpty()) && pedido.getDetalles() != null) {
+            detalles = pedido.getDetalles();
+        }
+        items.setAll(detalles != null ? detalles : List.of());
+        if (tblItems != null) {
+            tblItems.refresh();
+        }
+
+        try {
+            BigDecimal totalActual = pedidoService.calcularTotal(this.idPedidoExistente);
+            if (lblTotal != null) {
+                lblTotal.setText("Total: S/ " + totalActual.setScale(2, RoundingMode.HALF_UP));
+            }
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "Fallback a cálculo local al cargar pedido #" + this.idPedidoExistente, ex);
+            calcularTotal();
+        }
     }
 
     public void configurarParaLlevar(String correlativo) {
@@ -209,25 +256,34 @@ public class MozoOrderController {
     }
 
     public void agregarPlato(Producto p) {
+        if (p == null) {
+            return;
+        }
         for (DetallePedido dp : items) {
-            if (dp.getIdProducto() == p.getIdProducto()) {
+            if (dp.getIdDetallePedido() <= 0 && dp.getIdProducto() == p.getIdProducto()) {
                 dp.setCantidad(dp.getCantidad() + 1);
                 dp.setSubtotal(dp.getPrecioUnitario().multiply(BigDecimal.valueOf(dp.getCantidad())));
-                tblItems.refresh();
+                if (tblItems != null) {
+                    tblItems.refresh();
+                }
                 calcularTotal();
                 return;
             }
         }
-        DetallePedido nuevo = new DetallePedido(0, 0, p.getIdProducto(), 1, p.getPrecioVenta(), p.getPrecioVenta(), "");
+        int idPedidoObjetivo = idPedidoExistente != null ? idPedidoExistente : 0;
+        DetallePedido nuevo = new DetallePedido(0, idPedidoObjetivo, p.getIdProducto(), 1, p.getPrecioVenta(), p.getPrecioVenta(), "");
         nuevo.setNombreProducto(p.getNombre());
         items.add(nuevo);
+        if (tblItems != null) {
+            tblItems.refresh();
+        }
         calcularTotal();
     }
 
     @FXML
     public void handleAumentarCantidad() {
         DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
-        if (sel != null) {
+        if (sel != null && sel.getIdDetallePedido() <= 0) {
             sel.setCantidad(sel.getCantidad() + 1);
             sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
             tblItems.refresh();
@@ -238,7 +294,7 @@ public class MozoOrderController {
     @FXML
     public void handleDisminuirCantidad() {
         DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
-        if (sel != null) {
+        if (sel != null && sel.getIdDetallePedido() <= 0) {
             if (sel.getCantidad() > 1) {
                 sel.setCantidad(sel.getCantidad() - 1);
                 sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
@@ -253,7 +309,7 @@ public class MozoOrderController {
     @FXML
     public void handleQuitarPlato() {
         DetallePedido sel = tblItems.getSelectionModel().getSelectedItem();
-        if (sel != null) {
+        if (sel != null && sel.getIdDetallePedido() <= 0) {
             items.remove(sel);
             calcularTotal();
         }
@@ -298,10 +354,75 @@ public class MozoOrderController {
         return items;
     }
 
+    public Label getLblTotal() {
+        return lblTotal;
+    }
+
+    public TableView<DetallePedido> getTblItems() {
+        return tblItems;
+    }
+
+    public Integer getIdPedidoExistente() {
+        return idPedidoExistente;
+    }
+
     @FXML
     public void handleEnviarComanda(ActionEvent event) {
         if (items.isEmpty()) {
             mostrarAlerta("Atención", "Agregue al menos un plato a la comanda.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        if (idPedidoExistente != null && idPedidoExistente > 0) {
+            List<DetallePedido> nuevosItems = items.stream()
+                    .filter(dp -> dp.getIdDetallePedido() <= 0)
+                    .toList();
+            if (nuevosItems.isEmpty()) {
+                mostrarAlerta("Atención", "Agregue al menos un plato nuevo para enviar a cocina.", Alert.AlertType.WARNING);
+                return;
+            }
+            if (btnEnviarCocina != null) {
+                btnEnviarCocina.setDisable(true);
+            }
+            final int idObjetivo = idPedidoExistente;
+            UiAsyncExecutor.ejecutarAsync(
+                () -> {
+                    Pedido actualizado = pedidoService.agregarItemsAPedido(idObjetivo, new ArrayList<>(nuevosItems));
+                    BigDecimal totalConfirmado = pedidoService.calcularTotal(idObjetivo);
+                    actualizado.setTotal(totalConfirmado);
+                    return actualizado;
+                },
+                actualizado -> {
+                    if (btnEnviarCocina != null) {
+                        btnEnviarCocina.setDisable(false);
+                    }
+                    if (actualizado.getDetalles() != null) {
+                        items.setAll(actualizado.getDetalles());
+                    }
+                    if (tblItems != null) {
+                        tblItems.refresh();
+                    }
+                    BigDecimal tot = actualizado.getTotal() != null
+                            ? actualizado.getTotal().setScale(2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    if (lblTotal != null) {
+                        lblTotal.setText("Total: S/ " + tot);
+                    }
+                    mostrarAlerta("Comanda Actualizada",
+                        "Se agregaron los nuevos platos al pedido #" + idObjetivo + " de la Mesa " + mesa + ". Total acumulado: S/ " + tot,
+                        Alert.AlertType.INFORMATION);
+                    if (lblTotal != null && lblTotal.getScene() != null && lblTotal.getScene().getWindow() instanceof Stage s) {
+                        s.close();
+                        s.setScene(null);
+                    }
+                },
+                e -> {
+                    if (btnEnviarCocina != null) {
+                        btnEnviarCocina.setDisable(false);
+                    }
+                    mostrarAlerta("Error al Enviar", e != null ? e.getMessage() : "desconocido", Alert.AlertType.ERROR);
+                }
+            );
             return;
         }
 

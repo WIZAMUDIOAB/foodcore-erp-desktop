@@ -33,11 +33,24 @@ public class MesaDAOImpl implements MesaDAO {
             throw new IllegalArgumentException("Las mesas de origen y destino deben ser distintas");
         }
 
-        // 1. Obtener pedido activo en mesa origen
+        // 1. Obtener pedido activo en mesa origen (por id_mesa o numero_mesa)
+        long idMesaOrigen = 0;
+        try (PreparedStatement psOri = conn.prepareStatement("SELECT id_mesa FROM mesa WHERE numero = ?")) {
+            psOri.setString(1, numeroOrigen);
+            try (ResultSet rsOri = psOri.executeQuery()) {
+                if (rsOri.next()) {
+                    idMesaOrigen = rsOri.getLong("id_mesa");
+                }
+            }
+        }
+
         int idPedido = 0;
-        String sqlPed = "SELECT id_pedido FROM pedido WHERE numero_mesa = ? AND estado NOT IN ('PAGADO', 'CANCELADO', 'ANULADO') ORDER BY id_pedido DESC LIMIT 1";
+        String sqlPed = "SELECT id_pedido FROM pedido WHERE (numero_mesa = ? OR (? > 0 AND id_mesa = ?)) "
+                + "AND estado NOT IN ('COBRADO', 'CERRADO', 'PAGADO', 'CANCELADO', 'ANULADO') ORDER BY id_pedido DESC LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sqlPed)) {
             ps.setString(1, numeroOrigen);
+            ps.setLong(2, idMesaOrigen);
+            ps.setLong(3, idMesaOrigen);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     idPedido = rs.getInt("id_pedido");

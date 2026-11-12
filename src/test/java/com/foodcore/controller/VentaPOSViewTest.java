@@ -2,8 +2,11 @@ package com.foodcore.controller;
 
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.InsumoDAOImpl;
+import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Insumo;
+import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.service.PedidoService;
 import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
@@ -24,6 +27,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -179,6 +183,121 @@ class VentaPOSViewTest {
                 scene.getRoot().fireEvent(escEvent);
 
                 assertTrue(controller.getItemsVenta().isEmpty(), "La tecla Esc debe vaciar el carrito");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("v4.6.0-F1.1a: POS al agregar ítem a mesa ocupada recalcula total acumulado y refresca lista completa")
+    void testAgregarItemsAMesaOcupadaAcumulaTotalYListaCompletaEnPOS() throws Exception {
+        int idSegundoProd;
+        try (Connection conn = ConexionBD.getConnection()) {
+            try (Statement stPromo = conn.createStatement()) {
+                stPromo.executeUpdate("UPDATE promocion SET activo = FALSE");
+            }
+            try (PreparedStatement psProd = conn.prepareStatement(
+                     "INSERT INTO producto (id_categoria, nombre, precio_venta, stock_disponible) "
+                     + "SELECT id_categoria, 'Limonada Frozen', 18.00, 50 FROM categoria LIMIT 1",
+                     Statement.RETURN_GENERATED_KEYS)) {
+                psProd.executeUpdate();
+                try (ResultSet rs = psProd.getGeneratedKeys()) {
+                    assertTrue(rs.next());
+                    idSegundoProd = rs.getInt(1);
+                }
+            }
+        }
+
+        PedidoService pedidoService = new PedidoService();
+        Pedido pedido = new Pedido(0, 1, null, "02", "REGISTRADO", new BigDecimal("25.00"));
+        DetallePedido itemInicial = new DetallePedido(0, 0, idProductoPos, "Combo Pollo Crispy", 1,
+            new BigDecimal("25.00"), new BigDecimal("25.00"), "");
+        Pedido creado = pedidoService.crearPedido(pedido, List.of(itemInicial));
+
+        Producto segundoProducto = new Producto(
+            idSegundoProd, 1, "BEB-01", "Limonada Frozen",
+            "Refrescante", new BigDecimal("18.00"), new BigDecimal("50"), true
+        );
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1100, 720);
+
+                VentaController controller = loader.getController();
+                controller.refrescarMesasYCanalesSincrono();
+                controller.seleccionarMesa("02");
+
+                assertEquals(1, controller.getItemsVenta().size());
+                assertEquals("S/ 25.00", controller.getLblTotal().getText());
+
+                controller.agregarProductoAVenta(segundoProducto);
+                assertEquals(2, controller.getItemsVenta().size(), "La tabla POS debe mostrar los 2 ítems del pedido");
+                assertEquals(2, controller.getTblDetalle().getItems().size());
+                assertEquals("S/ 43.00", controller.getLblTotal().getText(),
+                    "El Label total en POS debe mostrar la suma acumulada (25 + 18 = 43.00)");
+
+                controller.agregarProductoAVenta(crearProductoPrueba());
+                assertEquals(3, controller.getItemsVenta().size(), "Debe incluir también el tercer ítem");
+                assertEquals("S/ 68.00", controller.getLblTotal().getText());
+
+                controller.refrescarMesasYCanalesSincrono();
+                controller.seleccionarMesa("02");
+                assertEquals(3, controller.getItemsVenta().size(), "Al recargar mesa deben permanecer los 3 ítems");
+                assertEquals("S/ 68.00", controller.getLblTotal().getText());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertEquals(0, new BigDecimal("68.00").compareTo(pedidoService.calcularTotal(creado.getIdPedido())));
+    }
+
+    @Test
+    @DisplayName("v4.6.0-F1.1b: MozoOrderController precarga pedido existente y acumula ítems sin perder los previos")
+    void testMozoAgregarPlatosAPedidoExistenteMuestraListaCompletaYTotalAcumulado() throws Exception {
+        int idSegundoProd;
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement psProd = conn.prepareStatement(
+                     "INSERT INTO producto (id_categoria, nombre, precio_venta, stock_disponible) "
+                     + "SELECT id_categoria, 'Papas Supremas', 14.00, 50 FROM categoria LIMIT 1",
+                     Statement.RETURN_GENERATED_KEYS)) {
+            psProd.executeUpdate();
+            try (ResultSet rs = psProd.getGeneratedKeys()) {
+                assertTrue(rs.next());
+                idSegundoProd = rs.getInt(1);
+            }
+        }
+
+        PedidoService pedidoService = new PedidoService();
+        Pedido pedido = new Pedido(0, 1, null, "03", "REGISTRADO", new BigDecimal("25.00"));
+        DetallePedido itemInicial = new DetallePedido(0, 0, idProductoPos, "Combo Pollo Crispy", 1,
+            new BigDecimal("25.00"), new BigDecimal("25.00"), "");
+        Pedido creado = pedidoService.crearPedido(pedido, List.of(itemInicial));
+
+        Producto segundoProducto = new Producto(
+            idSegundoProd, 1, "COM-01", "Papas Supremas",
+            "Crujientes", new BigDecimal("14.00"), new BigDecimal("50"), true
+        );
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1060, 720);
+
+                MozoOrderController controller = loader.getController();
+                controller.cargarPedidoExistente(creado);
+
+                assertEquals(1, controller.getItems().size(), "Debe precargar los ítems previos del pedido");
+                assertEquals("Total: S/ 25.00", controller.getLblTotal().getText());
+
+                controller.agregarPlato(segundoProducto);
+                assertEquals(2, controller.getItems().size(), "Debe mostrar ítem previo + nuevo ítem");
+                assertEquals(2, controller.getTblItems().getItems().size());
+                assertEquals("Total: S/ 39.00", controller.getLblTotal().getText());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
