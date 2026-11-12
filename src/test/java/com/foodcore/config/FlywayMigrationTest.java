@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V15 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V16 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(15, result.migrationsExecuted);
-        assertEquals("15", result.targetSchemaVersion);
+        assertEquals(16, result.migrationsExecuted);
+        assertEquals("16", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -43,7 +43,7 @@ class FlywayMigrationTest {
                 versiones.add(rs.getString("version"));
                 assertTrue(rs.getBoolean("success"), "Toda migración debe tener success=1");
             }
-            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15")));
+            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")));
         }
     }
 

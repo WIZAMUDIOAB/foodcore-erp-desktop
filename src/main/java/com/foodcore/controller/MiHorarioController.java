@@ -1,11 +1,15 @@
 package com.foodcore.controller;
 
 import com.foodcore.model.Asistencia;
+import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.TurnoProgramado;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.Vacaciones;
 import com.foodcore.service.AsistenciaService;
+import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.HorariosService;
+import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
@@ -26,13 +30,16 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -112,10 +119,28 @@ public class MiHorarioController {
     @FXML private Button btnDescargarBoletaPdf;
     @FXML private Label lblEstadoBoleta;
 
+    @FXML private Label lblVacDisponibles;
+    @FXML private Label lblVacEnRevision;
+    @FXML private ComboBox<String> cbVacTipo;
+    @FXML private DatePicker dpVacInicio;
+    @FXML private DatePicker dpVacFin;
+    @FXML private Label lblVacDiasCalculados;
+    @FXML private TextField txtVacMotivo;
+    @FXML private Button btnSolicitarVacaciones;
+    @FXML private Label lblVacEstadoMsg;
+    @FXML private TableView<SolicitudAusencia> tblMisVacaciones;
+    @FXML private TableColumn<SolicitudAusencia, String> colMisVacTipo;
+    @FXML private TableColumn<SolicitudAusencia, String> colMisVacPeriodo;
+    @FXML private TableColumn<SolicitudAusencia, String> colMisVacDias;
+    @FXML private TableColumn<SolicitudAusencia, String> colMisVacMotivo;
+    @FXML private TableColumn<SolicitudAusencia, String> colMisVacEstado;
+
     private final HorariosService horariosService = new HorariosService();
     private final AsistenciaService asistenciaService = new AsistenciaService();
+    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
     private final ObservableList<Asistencia> listaAsistencias = FXCollections.observableArrayList();
     private final ObservableList<BoletaPago> listaBoletas = FXCollections.observableArrayList();
+    private final ObservableList<SolicitudAusencia> listaMisVacaciones = FXCollections.observableArrayList();
 
     private static final String[] DIAS_SEMANA = {"LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"};
 
@@ -126,6 +151,7 @@ public class MiHorarioController {
         }
         configurarTablaAsistencias();
         configurarTablaBoletas();
+        configurarVacacionesPortal();
         cargarDatosEmpleado();
     }
 
@@ -287,6 +313,7 @@ public class MiHorarioController {
         }
 
         cargarBoletasMensuales(sueldo, horasExtrasMes);
+        cargarSaldoYSolicitudesVacaciones(idUser);
     }
 
     private void cargarBoletasMensuales(double sueldoBaseDouble, double horasExtrasMes) {
@@ -478,6 +505,97 @@ public class MiHorarioController {
         }
     }
 
+    private void configurarVacacionesPortal() {
+        if (cbVacTipo != null) {
+            cbVacTipo.setItems(FXCollections.observableArrayList(
+                    "VACACIONES", "PERMISO_MEDICO", "ASUNTO_PERSONAL", "LICENCIA"));
+            cbVacTipo.getSelectionModel().select("VACACIONES");
+        }
+        if (dpVacInicio != null) {
+            dpVacInicio.setValue(LocalDate.now().plusDays(1));
+            dpVacInicio.valueProperty().addListener((obs, o, n) -> actualizarDiasCalculadosVacaciones());
+        }
+        if (dpVacFin != null) {
+            dpVacFin.setValue(LocalDate.now().plusDays(1));
+            dpVacFin.valueProperty().addListener((obs, o, n) -> actualizarDiasCalculadosVacaciones());
+        }
+        actualizarDiasCalculadosVacaciones();
+
+        if (tblMisVacaciones != null) {
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            colMisVacTipo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getTipo()));
+            colMisVacPeriodo.setCellValueFactory(c -> {
+                String ini = c.getValue().getFechaInicio() != null ? c.getValue().getFechaInicio().format(fmt) : "-";
+                String fin = c.getValue().getFechaFin() != null ? c.getValue().getFechaFin().format(fmt) : "-";
+                return new SimpleStringProperty(ini + " - " + fin);
+            });
+            colMisVacDias.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getDiasSolicitados() + "d"));
+            colMisVacMotivo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getMotivo()));
+            colMisVacEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getEstado()));
+            tblMisVacaciones.setItems(listaMisVacaciones);
+        }
+    }
+
+    private void actualizarDiasCalculadosVacaciones() {
+        if (lblVacDiasCalculados == null || dpVacInicio == null || dpVacFin == null) {
+            return;
+        }
+        LocalDate ini = dpVacInicio.getValue();
+        LocalDate fin = dpVacFin.getValue();
+        if (ini == null || fin == null || fin.isBefore(ini)) {
+            lblVacDiasCalculados.setText("Rango inválido");
+            return;
+        }
+        int dias = ausenciasService.calcularDiasSolicitados(ini, fin);
+        lblVacDiasCalculados.setText(dias + (dias == 1 ? " día" : " días"));
+    }
+
+    public void cargarSaldoYSolicitudesVacaciones(int idUser) {
+        try {
+            Vacaciones saldo = ausenciasService.obtenerSaldoVacaciones(idUser, LocalDate.now().getYear());
+            if (lblVacDisponibles != null) {
+                lblVacDisponibles.setText(String.format(
+                        "Disponibles: %d días (Gozados: %d / %d)",
+                        saldo.getDiasDisponibles(), saldo.getDiasGozados(), saldo.getDiasAsignados()));
+            }
+            if (lblVacEnRevision != null) {
+                lblVacEnRevision.setText("En revisión: " + saldo.getDiasPendientesAprobacion() + " días");
+            }
+            if (tblMisVacaciones != null) {
+                listaMisVacaciones.setAll(ausenciasService.listarPorUsuario(idUser));
+            }
+        } catch (Exception ex) {
+            LOGGER.log(Level.FINE, "Aviso al cargar saldo de vacaciones del portal", ex);
+        }
+    }
+
+    @FXML
+    public void handleSolicitarVacaciones() {
+        Usuario u = AuthService.getUsuarioSesionActual();
+        int idUser = (u != null && u.getIdUsuario() > 0) ? u.getIdUsuario() : 1;
+        String tipo = cbVacTipo != null && cbVacTipo.getValue() != null ? cbVacTipo.getValue() : "VACACIONES";
+        LocalDate ini = dpVacInicio != null ? dpVacInicio.getValue() : null;
+        LocalDate fin = dpVacFin != null ? dpVacFin.getValue() : null;
+        String motivo = txtVacMotivo != null ? txtVacMotivo.getText() : "";
+
+        try {
+            ausenciasService.registrarSolicitud(idUser, tipo, ini, fin, motivo);
+            if (txtVacMotivo != null) {
+                txtVacMotivo.clear();
+            }
+            cargarSaldoYSolicitudesVacaciones(idUser);
+            if (lblVacEstadoMsg != null) {
+                lblVacEstadoMsg.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
+                lblVacEstadoMsg.setText("✅ Solicitud registrada para aprobación gerencial.");
+            }
+        } catch (Exception e) {
+            if (lblVacEstadoMsg != null) {
+                lblVacEstadoMsg.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
+                lblVacEstadoMsg.setText("⚠️ " + e.getMessage());
+            }
+        }
+    }
+
     public TabPane getTabPaneMiPortal() {
         return tabPaneMiPortal;
     }
@@ -488,5 +606,37 @@ public class MiHorarioController {
 
     public TableView<BoletaPago> getTblMisBoletas() {
         return tblMisBoletas;
+    }
+
+    public Label getLblVacDisponibles() {
+        return lblVacDisponibles;
+    }
+
+    public DatePicker getDpVacInicio() {
+        return dpVacInicio;
+    }
+
+    public DatePicker getDpVacFin() {
+        return dpVacFin;
+    }
+
+    public ComboBox<String> getCbVacTipo() {
+        return cbVacTipo;
+    }
+
+    public TextField getTxtVacMotivo() {
+        return txtVacMotivo;
+    }
+
+    public Label getLblVacDiasCalculados() {
+        return lblVacDiasCalculados;
+    }
+
+    public Label getLblVacEstadoMsg() {
+        return lblVacEstadoMsg;
+    }
+
+    public ObservableList<SolicitudAusencia> getListaMisVacaciones() {
+        return listaMisVacaciones;
     }
 }
