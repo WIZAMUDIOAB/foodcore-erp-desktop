@@ -48,7 +48,7 @@ public class PwaOfflineSyncE2ETest {
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
             page.fill("#txtPassword", "Admin#2026!");
-            page.click("button[type='submit']");
+            PlaywrightE2ESupport.submitLoginConReintento429(page, page.locator("button[type='submit']"));
             page.waitForURL("**/mesas.html**");
 
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/catalogo.html?mesa=03");

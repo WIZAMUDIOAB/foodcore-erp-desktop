@@ -83,7 +83,7 @@ public class ResponsiveMobileE2ETest {
 
             page.fill("#txtUsername", "mozo");
             page.fill("#txtPassword", "Admin#2026!");
-            page.click("button[type='submit']");
+            PlaywrightE2ESupport.submitLoginConReintento429(page, page.locator("button[type='submit']"));
             page.waitForURL("**/mesas.html**");
 
             Locator mesa01Card = page.locator(".mesa-card", new Page.LocatorOptions().setHasText("Mesa 01")).first();
@@ -261,7 +261,7 @@ public class ResponsiveMobileE2ETest {
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
             page.fill("#txtPassword", "Admin#2026!");
-            page.click("button[type='submit']");
+            PlaywrightE2ESupport.submitLoginConReintento429(page, page.locator("button[type='submit']"));
             page.waitForURL("**/mesas.html**");
             Locator mesa01Card = page.locator(".mesa-card", new Page.LocatorOptions().setHasText("Mesa 01")).first();
             mesa01Card.waitFor();

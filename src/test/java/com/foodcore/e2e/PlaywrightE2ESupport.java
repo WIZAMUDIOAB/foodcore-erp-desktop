@@ -13,8 +13,10 @@ import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.options.RequestOptions;
 
 import javax.net.ssl.SSLContext;
@@ -152,6 +154,23 @@ public final class PlaywrightE2ESupport {
         if (resp.status() == 429) {
             esperarRetryAfter(resp.headers().get("retry-after"));
             resp = request.post(path, opts);
+        }
+        return resp;
+    }
+
+    /**
+     * Envía el formulario web de login tolerando HTTP 429 ({@code Retry-After}) en el servidor E2E compartido.
+     */
+    public static Response submitLoginConReintento429(Page page, Locator submitBtn) {
+        submitBtn.waitFor();
+        Response resp = page.waitForResponse(
+                r -> r.url().contains("/api/auth/login") && "POST".equalsIgnoreCase(r.request().method()),
+                submitBtn::click);
+        if (resp.status() == 429) {
+            esperarRetryAfter(resp.headerValue("retry-after"));
+            resp = page.waitForResponse(
+                    r -> r.url().contains("/api/auth/login") && "POST".equalsIgnoreCase(r.request().method()),
+                    submitBtn::click);
         }
         return resp;
     }

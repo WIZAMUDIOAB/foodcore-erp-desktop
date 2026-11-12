@@ -41,11 +41,9 @@ public class ApiRestE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContext(playwright);
 
-            // 1. POST /api/auth/login -> validar 200 OK con token JWT
-            APIResponse loginRes = request.post("/api/auth/login",
-                    RequestOptions.create()
-                            .setHeader("Content-Type", "application/json")
-                            .setData(Map.of("username", "mozo", "password", "Admin#2026!")));
+            // 1. POST /api/auth/login -> validar 200 OK con token JWT (tolerante a rate limit 429 en CI compartido)
+            APIResponse loginRes = PlaywrightE2ESupport.postAuthConReintento429(
+                    request, "/api/auth/login", Map.of("username", "mozo", "password", "Admin#2026!"));
             assertEquals(200, loginRes.status(), "POST /api/auth/login debe devolver 200 OK");
 
             JsonNode loginJson = MAPPER.readTree(loginRes.text());
