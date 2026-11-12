@@ -2,6 +2,9 @@ package com.foodcore.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class Producto {
     private int idProducto;
@@ -16,8 +19,10 @@ public class Producto {
     private boolean esMenuDelDia;
     private LocalDate fechaDisponibilidad;
 
-    // Relación descriptiva
+    // Relación descriptiva y opciones configurables (v4.8.0)
     private String nombreCategoria;
+    private List<ProductoVariante> variantes = new ArrayList<>();
+    private List<ProductoModificador> modificadores = new ArrayList<>();
 
     public Producto() {}
 
@@ -78,6 +83,26 @@ public class Producto {
 
     public LocalDate getFechaDisponibilidad() { return fechaDisponibilidad; }
     public void setFechaDisponibilidad(LocalDate fechaDisponibilidad) { this.fechaDisponibilidad = fechaDisponibilidad; }
+
+    public List<ProductoVariante> getVariantes() {
+        return Collections.unmodifiableList(variantes);
+    }
+
+    public void setVariantes(List<ProductoVariante> variantes) {
+        this.variantes = variantes != null ? new ArrayList<>(variantes) : new ArrayList<>();
+    }
+
+    public List<ProductoModificador> getModificadores() {
+        return Collections.unmodifiableList(modificadores);
+    }
+
+    public void setModificadores(List<ProductoModificador> modificadores) {
+        this.modificadores = modificadores != null ? new ArrayList<>(modificadores) : new ArrayList<>();
+    }
+
+    public boolean tieneOpcionesPersonalizacion() {
+        return !variantes.isEmpty() || !modificadores.isEmpty();
+    }
 
     @Override
     public String toString() { return nombre + " (S/ " + precioVenta + ")"; }

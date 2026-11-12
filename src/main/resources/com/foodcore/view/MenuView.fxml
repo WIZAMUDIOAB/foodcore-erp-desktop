@@ -4,7 +4,11 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
@@ -74,72 +78,170 @@
                                 </HBox>
                                 <TableView fx:id="tblMenu" VBox.vgrow="ALWAYS">
                                     <columns>
-                                        <TableColumn fx:id="colImagen" prefWidth="85.0" text="Imagen" />
-                                        <TableColumn fx:id="colNombre" prefWidth="210.0" text="Platillo / Bebida" />
-                                        <TableColumn fx:id="colCategoria" prefWidth="135.0" text="Categoría" />
-                                        <TableColumn fx:id="colPrecio" prefWidth="95.0" text="Precio" />
-                                        <TableColumn fx:id="colEstado" prefWidth="105.0" text="Disponibilidad" />
-                                        <TableColumn fx:id="colMenuDia" prefWidth="90.0" text="Menú Día" />
+                                        <TableColumn fx:id="colImagen" prefWidth="68.0" text="Img" />
+                                        <TableColumn fx:id="colNombre" prefWidth="150.0" text="Platillo / Bebida" />
+                                        <TableColumn fx:id="colCategoria" prefWidth="95.0" text="Categoría" />
+                                        <TableColumn fx:id="colPrecio" prefWidth="72.0" text="Precio" />
+                                        <TableColumn fx:id="colEstado" prefWidth="95.0" text="Estado" />
+                                        <TableColumn fx:id="colMenuDia" prefWidth="74.0" text="Menú Día" />
+                                        <TableColumn fx:id="colOpciones" prefWidth="140.0" text="Opciones" />
                                     </columns>
+                                    <columnResizePolicy>
+                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                    </columnResizePolicy>
                                 </TableView>
                             </children>
                         </VBox>
 
-                        <!-- Formulario CRUD de Platillo y Fotografía (§2.2) -->
-                        <VBox spacing="12.0" styleClass="surface-card" GridPane.columnIndex="1">
+                        <!-- Formulario CRUD de Platillo, Fotografía, Variantes y Modificadores (§2.2 + v4.8.0) -->
+                        <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="1">
                             <children>
-                                <Label fx:id="lblTituloFormulario" styleClass="text-h2" text="Ficha de Platillo" />
-
-                                <VBox spacing="4.0">
+                                <HBox alignment="CENTER_LEFT" spacing="8.0">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="Código SKU" />
-                                        <TextField fx:id="txtCodigo" promptText="Ej. HAM-25" styleClass="input-field" />
+                                        <Label fx:id="lblTituloFormulario" styleClass="text-h2" text="Ficha de Platillo" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblBadgePersonalizacion" styleClass="badge-pill-accent" text="Estándar" />
                                     </children>
-                                </VBox>
+                                </HBox>
 
-                                <VBox spacing="4.0">
-                                    <children>
-                                        <Label styleClass="text-body-strong" text="Nombre del Platillo" />
-                                        <TextField fx:id="txtNombre" promptText="Ej. Burger Angus Trufada" styleClass="input-field" />
-                                    </children>
-                                </VBox>
+                                <TabPane fx:id="tabPaneFichaPlatillo" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+                                    <tabs>
+                                        <!-- Tab 1: Datos Generales -->
+                                        <Tab fx:id="tabDatosGenerales" text="Datos">
+                                            <content>
+                                                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+                                                    <content>
+                                                        <VBox spacing="10.0" style="-fx-padding: 10 4 6 2;">
+                                                            <children>
+                                                                <VBox spacing="4.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Código SKU" />
+                                                                        <TextField fx:id="txtCodigo" promptText="Ej. HAM-25" styleClass="input-field" />
+                                                                    </children>
+                                                                </VBox>
 
-                                <VBox spacing="4.0">
-                                    <children>
-                                        <Label styleClass="text-body-strong" text="Categoría" />
-                                        <ComboBox fx:id="cmbCategoria" editable="true" maxWidth="1.7976931348623157E308" promptText="Seleccione o escriba categoría..." />
-                                    </children>
-                                </VBox>
+                                                                <VBox spacing="4.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Nombre del Platillo" />
+                                                                        <TextField fx:id="txtNombre" promptText="Ej. Burger Angus Trufada" styleClass="input-field" />
+                                                                    </children>
+                                                                </VBox>
 
-                                <VBox spacing="4.0">
-                                    <children>
-                                        <Label styleClass="text-body-strong" text="Precio de Venta (S/)" />
-                                        <TextField fx:id="txtPrecio" promptText="24.50" styleClass="input-field" />
-                                    </children>
-                                </VBox>
+                                                                <VBox spacing="4.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Categoría" />
+                                                                        <ComboBox fx:id="cmbCategoria" editable="true" maxWidth="1.7976931348623157E308" promptText="Seleccione o escriba categoría..." />
+                                                                    </children>
+                                                                </VBox>
 
-                                <VBox spacing="6.0">
-                                    <children>
-                                        <Label styleClass="text-body-strong" text="Fotografía del Platillo (uploads/platillos/)" />
-                                        <HBox alignment="CENTER_LEFT" spacing="12.0">
-                                            <children>
-                                                <ImageView fx:id="imgPreview" fitHeight="56.0" fitWidth="72.0" preserveRatio="true" />
-                                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                                <VBox spacing="4.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Precio de Venta Base (S/)" />
+                                                                        <TextField fx:id="txtPrecio" promptText="24.50" styleClass="input-field" />
+                                                                    </children>
+                                                                </VBox>
+
+                                                                <VBox spacing="6.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Fotografía del Platillo (uploads/platillos/)" />
+                                                                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                                                            <children>
+                                                                                <ImageView fx:id="imgPreview" fitHeight="52.0" fitWidth="68.0" preserveRatio="true" />
+                                                                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                                                    <children>
+                                                                                        <Button fx:id="btnSeleccionarFoto" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleSeleccionarFoto" styleClass="btn-secondary" text="Subir Foto (JPG/PNG)" />
+                                                                                        <Label fx:id="lblRutaImagen" styleClass="text-caption-muted" text="Sin imagen seleccionada" />
+                                                                                    </children>
+                                                                                </VBox>
+                                                                            </children>
+                                                                        </HBox>
+                                                                    </children>
+                                                                </VBox>
+
+                                                                <CheckBox fx:id="chkActivo" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Platillo Activo en Carta POS" />
+                                                                <CheckBox fx:id="chkDisponible" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Disponible (En Stock para Comandas)" />
+                                                                <CheckBox fx:id="chkMenuDelDia" mnemonicParsing="false" selected="false" styleClass="text-body-strong" text="⭐ Incluir en Menú del Día" />
+                                                            </children>
+                                                        </VBox>
+                                                    </content>
+                                                </ScrollPane>
+                                            </content>
+                                        </Tab>
+
+                                        <!-- Tab 2: Variantes / Tamaños (v4.8.0 Módulo 1) -->
+                                        <Tab fx:id="tabVariantes" text="Tamaños">
+                                            <content>
+                                                <VBox spacing="10.0" style="-fx-padding: 10 2 6 2;">
                                                     <children>
-                                                        <Button fx:id="btnSeleccionarFoto" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleSeleccionarFoto" styleClass="btn-secondary" text="Subir Foto (JPG/PNG)" />
-                                                        <Label fx:id="lblRutaImagen" styleClass="text-caption-muted" text="Sin imagen seleccionada" />
+                                                        <Label styleClass="text-caption-muted" text="Configure tamaños opcionales (ej. Mediana: S/ 25.00, Familiar: S/ 40.00)." wrapText="true" />
+                                                        <VBox spacing="6.0" styleClass="client-section-box">
+                                                            <children>
+                                                                <TextField fx:id="txtNombreVariante" promptText="Nombre del tamaño (ej. Mediana, Familiar)" styleClass="input-field" />
+                                                                <HBox spacing="6.0" alignment="CENTER_LEFT">
+                                                                    <children>
+                                                                        <ComboBox fx:id="cmbModoVariante" prefWidth="140.0" />
+                                                                        <TextField fx:id="txtMontoVariante" promptText="25.00" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                                    </children>
+                                                                </HBox>
+                                                                <HBox spacing="8.0">
+                                                                    <children>
+                                                                        <Button fx:id="btnAgregarVariante" mnemonicParsing="false" onAction="#handleAgregarVariante" styleClass="btn-secondary" text="+ Agregar Tamaño" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                                                                        <Button fx:id="btnQuitarVariante" mnemonicParsing="false" onAction="#handleQuitarVariante" styleClass="btn-secondary" text="Quitar" />
+                                                                    </children>
+                                                                </HBox>
+                                                            </children>
+                                                        </VBox>
+                                                        <TableView fx:id="tblVariantes" prefHeight="220.0" VBox.vgrow="ALWAYS">
+                                                            <columns>
+                                                                <TableColumn fx:id="colVarNombre" prefWidth="145.0" text="Tamaño" />
+                                                                <TableColumn fx:id="colVarModo" prefWidth="95.0" text="Tipo" />
+                                                                <TableColumn fx:id="colVarPrecio" prefWidth="95.0" text="Monto" />
+                                                            </columns>
+                                                            <columnResizePolicy>
+                                                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                            </columnResizePolicy>
+                                                        </TableView>
                                                     </children>
                                                 </VBox>
-                                            </children>
-                                        </HBox>
-                                    </children>
-                                </VBox>
+                                            </content>
+                                        </Tab>
 
-                                <CheckBox fx:id="chkActivo" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Platillo Activo en Carta POS" />
-                                <CheckBox fx:id="chkDisponible" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Disponible (En Stock para Comandas)" />
-                                <CheckBox fx:id="chkMenuDelDia" mnemonicParsing="false" selected="false" styleClass="text-body-strong" text="⭐ Incluir en Menú del Día" />
+                                        <!-- Tab 3: Modificadores / Extras Globales y Asociación (v4.8.0 Módulo 2) -->
+                                        <Tab fx:id="tabModificadores" text="Extras">
+                                            <content>
+                                                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+                                                    <content>
+                                                        <VBox spacing="10.0" style="-fx-padding: 10 4 6 2;">
+                                                            <children>
+                                                                <Label styleClass="text-body-strong" text="Extras permitidos en este platillo:" />
+                                                                <VBox fx:id="vboxCheckboxesModificadores" spacing="6.0" styleClass="client-section-box" />
 
-                                <Region VBox.vgrow="ALWAYS" />
+                                                                <VBox spacing="6.0" styleClass="client-section-box">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Catálogo Global de Extras" />
+                                                                        <HBox spacing="6.0" alignment="CENTER_LEFT">
+                                                                            <children>
+                                                                                <TextField fx:id="txtNuevoModNombre" promptText="Ej. Extra Queso" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                                                <TextField fx:id="txtNuevoModPrecio" prefWidth="82.0" promptText="3.00" styleClass="input-field" />
+                                                                            </children>
+                                                                        </HBox>
+                                                                        <HBox spacing="8.0">
+                                                                            <children>
+                                                                                <Button fx:id="btnCrearModificadorGlobal" mnemonicParsing="false" onAction="#handleCrearModificadorGlobal" styleClass="btn-secondary" text="+ Crear Extra Global" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                                                                                <Button fx:id="btnEliminarModificadorGlobal" mnemonicParsing="false" onAction="#handleEliminarModificadorGlobal" styleClass="btn-secondary" text="Eliminar" />
+                                                                            </children>
+                                                                        </HBox>
+                                                                        <ListView fx:id="lstModificadoresGlobales" prefHeight="120.0" />
+                                                                    </children>
+                                                                </VBox>
+                                                            </children>
+                                                        </VBox>
+                                                    </content>
+                                                </ScrollPane>
+                                            </content>
+                                        </Tab>
+                                    </tabs>
+                                </TabPane>
 
                                 <Button fx:id="btnGuardarPlatillo" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleGuardarPlatillo" styleClass="btn-primary" text="Guardar Platillo" />
                             </children>

@@ -82,11 +82,7 @@ public class ComandaCardController {
         String mesa = item.getNumeroMesa() != null ? item.getNumeroMesa() : "01";
         String estado = item.getEstadoCocina() != null ? item.getEstadoCocina() : "PENDIENTE";
         initData(mesa, "PED-" + item.getIdPedido() + " · ITEM-" + item.getIdDetallePedido(), estado);
-        agregarPlato(
-            item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto(),
-            item.getCantidad(),
-            item.getNotasPreparacion()
-        );
+        agregarPlatoDetalle(item);
         long seg = item.calcularSegundosDesdeEnvio(LocalDateTime.now(ZONA_LIMA));
         setSegundosTranscurridos((int) seg);
 
@@ -188,6 +184,14 @@ public class ComandaCardController {
             timer.stop();
         }
         AnimationUtils.setSoftPulse(cardContainer, false);
+    }
+
+    public void agregarPlatoDetalle(DetallePedido item) {
+        if (item == null) {
+            return;
+        }
+        String tituloCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+        agregarPlato(tituloCocina, item.getCantidad(), item.getNotasPreparacion());
     }
 
     public void agregarPlato(String producto, int cantidad, String notas) {

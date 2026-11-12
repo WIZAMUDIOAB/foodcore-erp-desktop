@@ -289,7 +289,16 @@ public class PedidoService {
                 JsonArray items = new JsonArray();
                 for (DetallePedido d : detalles) {
                     JsonObject item = new JsonObject();
+                    item.addProperty("idDetallePedido", d.getIdDetallePedido());
                     item.addProperty("producto", d.getNombreProducto());
+                    if (d.getNombreVariante() != null && !d.getNombreVariante().isBlank()) {
+                        item.addProperty("variante", d.getNombreVariante());
+                    }
+                    String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                            d.getModificadoresSeleccionados(), d.getModificadoresTexto());
+                    if (!mods.isEmpty()) {
+                        item.addProperty("modificadores", mods);
+                    }
                     item.addProperty("cantidad", d.getCantidad());
                     item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
                     items.add(item);
@@ -301,7 +310,7 @@ public class PedidoService {
                          new java.io.OutputStreamWriter(client.getOutputStream(), java.nio.charset.StandardCharsets.UTF_8), true)) {
                     out.println(json.toString());
                 }
-            } catch (Exception e) {
+            } catch (java.io.IOException | RuntimeException e) {
                 LOGGER.fine("Servidor KDS no activo al emitir notificación socket: " + e.getMessage());
             }
         }).start();

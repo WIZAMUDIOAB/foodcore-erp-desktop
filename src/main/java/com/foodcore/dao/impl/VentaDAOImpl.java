@@ -87,13 +87,31 @@ public class VentaDAOImpl implements VentaDAO {
                 || detalle.getPrecioUnitario() == null || detalle.getSubtotal() == null) {
             throw new SQLException("Detalle de venta inválido: cantidad, producto y montos deben ser válidos.");
         }
-        String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal, "
+                + "id_variante, nombre_variante, modificadores_texto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, detalle.getIdVenta());
             ps.setInt(2, detalle.getIdProducto());
             ps.setInt(3, detalle.getCantidad());
             ps.setBigDecimal(4, detalle.getPrecioUnitario());
             ps.setBigDecimal(5, detalle.getSubtotal());
+            if (detalle.getIdVariante() != null && detalle.getIdVariante() > 0) {
+                ps.setInt(6, detalle.getIdVariante());
+            } else {
+                ps.setNull(6, java.sql.Types.INTEGER);
+            }
+            if (detalle.getNombreVariante() != null && !detalle.getNombreVariante().isBlank()) {
+                ps.setString(7, detalle.getNombreVariante().trim());
+            } else {
+                ps.setNull(7, java.sql.Types.VARCHAR);
+            }
+            String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                    detalle.getModificadoresSeleccionados(), detalle.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                ps.setString(8, mods);
+            } else {
+                ps.setNull(8, java.sql.Types.VARCHAR);
+            }
             ps.executeUpdate();
         }
     }

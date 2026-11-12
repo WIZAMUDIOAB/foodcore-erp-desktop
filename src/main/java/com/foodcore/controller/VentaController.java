@@ -15,6 +15,8 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.model.ProductoModificador;
+import com.foodcore.model.ProductoVariante;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
 import com.foodcore.model.enums.Permiso;
@@ -23,10 +25,13 @@ import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.KeyFrame;
@@ -152,6 +157,7 @@ public class VentaController {
     private final PedidoService pedidoService = new PedidoService();
     private final VentaService ventaService = new VentaService();
     private final PromocionService promocionService = new PromocionService();
+    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
     private final AutorizacionService autorizacionService = new AutorizacionService();
 
@@ -180,9 +186,9 @@ public class VentaController {
         }
 
         colProducto.setCellValueFactory(c -> {
-            String nom = c.getValue().getNombreProducto();
+            String nom = FormatoPersonalizacionUtil.formatearDescripcionItem(c.getValue());
             if (c.getValue().getNotasPreparacion() != null && !c.getValue().getNotasPreparacion().isBlank()) {
-                nom += " (" + c.getValue().getNotasPreparacion() + ")";
+                nom += " [Nota: " + c.getValue().getNotasPreparacion().trim() + "]";
             }
             return new SimpleStringProperty(nom);
         });
@@ -542,6 +548,10 @@ public class VentaController {
                 DetalleVenta dv = new DetalleVenta(0, 0, dp.getIdProducto(), cant, precioUnit, subtotal);
                 dv.setNombreProducto(dp.getNombreProducto() != null ? dp.getNombreProducto() : ("Plato #" + dp.getIdProducto()));
                 dv.setNotasPreparacion(dp.getNotasPreparacion());
+                dv.setIdVariante(dp.getIdVariante());
+                dv.setNombreVariante(dp.getNombreVariante());
+                dv.setModificadoresTexto(dp.getModificadoresTexto());
+                dv.setModificadoresSeleccionados(dp.getModificadoresSeleccionados());
                 itemsVenta.add(dv);
             }
         }
@@ -731,7 +741,9 @@ public class VentaController {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
                 try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarProductosDisponibles(conn);
+                    return conn != null
+                            ? personalizacionService.listarProductosDisponiblesConOpciones(conn)
+                            : java.util.Collections.<Producto>emptyList();
                 }
             },
             productos -> {
@@ -784,14 +796,14 @@ public class VentaController {
             if (coincideCategoria && coincideTexto) {
                 Button btn = new Button();
                 btn.setId("btnProd_" + p.getIdProducto());
-                btn.setPrefSize(156, 102);
-                btn.setMinHeight(96);
+                btn.setPrefSize(162, 114);
+                btn.setMinHeight(112);
                 btn.getStyleClass().add("pos-menu-tile");
 
-                VBox content = new VBox(4.0);
+                VBox content = new VBox(3.0);
                 content.setAlignment(Pos.TOP_LEFT);
-                content.setPrefWidth(128);
-                content.setMinHeight(72);
+                content.setPrefWidth(134);
+                content.setMinHeight(86);
 
                 Label lblNombre = new Label(p.getNombre());
                 lblNombre.setWrapText(true);
@@ -805,6 +817,14 @@ public class VentaController {
                     Label lblCodigo = new Label(p.getCodigo() != null ? p.getCodigo() : "SKU");
                     lblCodigo.getStyleClass().add("text-caption-muted");
                     content.getChildren().addAll(lblNombre, lblCodigo);
+                }
+
+                if (p.tieneOpcionesPersonalizacion()) {
+                    Label lblOpciones = new Label(FormatoPersonalizacionUtil.construirResumenOpciones(p));
+                    lblOpciones.setStyle("-fx-background-color: #FFF4EC; -fx-text-fill: #C2410C; "
+                            + "-fx-font-size: 10px; -fx-font-weight: 700; -fx-padding: 2 6; "
+                            + "-fx-background-radius: 6; -fx-border-color: #FDBA74; -fx-border-radius: 6;");
+                    content.getChildren().add(lblOpciones);
                 }
 
                 Region spacer = new Region();
@@ -850,19 +870,73 @@ public class VentaController {
         if (p == null || !p.isDisponible()) {
             return;
         }
-        if (this.pedidoActivoId != null && this.pedidoActivoId > 0) {
-            agregarProductoAPedidoExistente(p, this.pedidoActivoId);
+        Producto productoResuelto = personalizacionService.resolverOpcionesProducto(p);
+        if (productoResuelto.tieneOpcionesPersonalizacion()) {
+            javafx.stage.Window owner = tblDetalle != null && tblDetalle.getScene() != null
+                    ? tblDetalle.getScene().getWindow()
+                    : null;
+            Optional<PersonalizacionProductoController.ResultadoPersonalizacion> seleccion =
+                    PersonalizacionProductoController.mostrarModal(
+                            owner,
+                            productoResuelto,
+                            productoResuelto.getVariantes(),
+                            productoResuelto.getModificadores()
+                    );
+            seleccion.ifPresent(res -> agregarProductoPersonalizadoAVenta(
+                    res.producto(), res.variante(), res.modificadores(), res.cantidad(), res.notaEspecial()
+            ));
             return;
         }
-        agregarProductoEnCarritoLocal(p);
+        agregarProductoPersonalizadoAVenta(productoResuelto, null, List.of(), 1, "");
     }
 
-    private void agregarProductoAPedidoExistente(Producto p, int idPedido) {
-        BigDecimal precio = p.getPrecioVenta() != null
-                ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        DetallePedido nuevoItem = new DetallePedido(0, idPedido, p.getIdProducto(), 1, precio, precio, "");
+    /**
+     * Agrega directamente una selección ya configurada de producto + variante + extras al pedido activo o carrito.
+     */
+    public void agregarProductoPersonalizadoAVenta(Producto p,
+                                                   ProductoVariante variante,
+                                                   List<ProductoModificador> modificadores,
+                                                   int cantidad,
+                                                   String notaEspecial) {
+        if (p == null || !p.isDisponible()) {
+            return;
+        }
+        int qty = Math.max(1, cantidad);
+        List<ProductoModificador> mods = modificadores != null ? List.copyOf(modificadores) : List.of();
+        Integer idVariante = variante != null && variante.getIdVariante() > 0 ? variante.getIdVariante() : null;
+        String nombreVariante = variante != null ? variante.getNombreVariante() : null;
+        String modsTexto = FormatoPersonalizacionUtil.formatearTextoModificadores(mods);
+        String nota = notaEspecial != null ? notaEspecial.trim() : "";
+        BigDecimal precioUnitario = FormatoPersonalizacionUtil.calcularPrecioUnitario(p, variante, mods);
+        BigDecimal subtotal = precioUnitario.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+
+        if (this.pedidoActivoId != null && this.pedidoActivoId > 0) {
+            agregarProductoAPedidoExistente(
+                    p, this.pedidoActivoId, idVariante, nombreVariante, mods, modsTexto, qty, nota, precioUnitario, subtotal
+            );
+            return;
+        }
+        agregarProductoEnCarritoLocal(
+                p, idVariante, nombreVariante, mods, modsTexto, qty, nota, precioUnitario, subtotal
+        );
+    }
+
+    private void agregarProductoAPedidoExistente(Producto p,
+                                                 int idPedido,
+                                                 Integer idVariante,
+                                                 String nombreVariante,
+                                                 List<ProductoModificador> mods,
+                                                 String modsTexto,
+                                                 int qty,
+                                                 String nota,
+                                                 BigDecimal precioUnitario,
+                                                 BigDecimal subtotal) {
+        DetallePedido nuevoItem = new DetallePedido(0, idPedido, p.getIdProducto(), qty, precioUnitario, subtotal, nota);
         nuevoItem.setNombreProducto(p.getNombre());
+        nuevoItem.setIdVariante(idVariante);
+        nuevoItem.setNombreVariante(nombreVariante);
+        nuevoItem.setModificadoresTexto(modsTexto);
+        nuevoItem.setModificadoresSeleccionados(mods);
 
         try {
             Pedido actualizado = pedidoService.agregarItemsAPedido(idPedido, List.of(nuevoItem));
@@ -880,15 +954,30 @@ public class VentaController {
             actualizarCachePedidoActivo(idPedido, totalPedido, detallesCompletos);
         } catch (NegocioException | SQLException ex) {
             LOGGER.log(Level.FINE, "Fallback en memoria al agregar ítem al pedido #" + idPedido, ex);
-            agregarProductoEnCarritoLocal(p);
+            agregarProductoEnCarritoLocal(
+                    p, idVariante, nombreVariante, mods, modsTexto, qty, nota, precioUnitario, subtotal
+            );
         }
     }
 
-    private void agregarProductoEnCarritoLocal(Producto p) {
+    private void agregarProductoEnCarritoLocal(Producto p,
+                                               Integer idVariante,
+                                               String nombreVariante,
+                                               List<ProductoModificador> mods,
+                                               String modsTexto,
+                                               int qty,
+                                               String nota,
+                                               BigDecimal precioUnitario,
+                                               BigDecimal subtotal) {
         for (DetalleVenta dv : itemsVenta) {
-            if (dv.getIdProducto() == p.getIdProducto()) {
-                dv.setCantidad(dv.getCantidad() + 1);
-                dv.setSubtotal(dv.getPrecioUnitario().multiply(BigDecimal.valueOf(dv.getCantidad())));
+            String modsExistentes = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                    dv.getModificadoresSeleccionados(), dv.getModificadoresTexto());
+            if (FormatoPersonalizacionUtil.mismaPersonalizacion(
+                    dv.getIdProducto(), dv.getIdVariante(), modsExistentes, dv.getNotasPreparacion(),
+                    p.getIdProducto(), idVariante, modsTexto, nota)) {
+                dv.setCantidad(dv.getCantidad() + qty);
+                BigDecimal unit = dv.getPrecioUnitario() != null ? dv.getPrecioUnitario() : precioUnitario;
+                dv.setSubtotal(unit.multiply(BigDecimal.valueOf(dv.getCantidad())).setScale(2, RoundingMode.HALF_UP));
                 if (tblDetalle != null) {
                     tblDetalle.refresh();
                 }
@@ -896,8 +985,13 @@ public class VentaController {
                 return;
             }
         }
-        DetalleVenta nuevo = new DetalleVenta(0, 0, p.getIdProducto(), 1, p.getPrecioVenta(), p.getPrecioVenta());
+        DetalleVenta nuevo = new DetalleVenta(0, 0, p.getIdProducto(), qty, precioUnitario, subtotal);
         nuevo.setNombreProducto(p.getNombre());
+        nuevo.setIdVariante(idVariante);
+        nuevo.setNombreVariante(nombreVariante);
+        nuevo.setModificadoresTexto(modsTexto);
+        nuevo.setModificadoresSeleccionados(mods);
+        nuevo.setNotasPreparacion(nota);
         itemsVenta.add(nuevo);
         if (tblDetalle != null) {
             tblDetalle.refresh();
@@ -943,6 +1037,38 @@ public class VentaController {
             mostrarAlerta("Atención", "Agregue al menos un ítem para enviar a cocina.", Alert.AlertType.WARNING);
             return;
         }
+        int idObjetivo = pedidoActivoId != null ? pedidoActivoId : 0;
+        List<DetallePedido> detallesCocina = new ArrayList<>();
+        for (DetalleVenta dv : itemsVenta) {
+            detallesCocina.add(convertirDetalleVentaAPedido(dv, idObjetivo));
+        }
+
+        Pedido pedido = new Pedido();
+        pedido.setIdPedido(idObjetivo);
+        pedido.setIdUsuario(AuthService.getUsuarioSesionActual() != null
+                ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1);
+        pedido.setNumeroMesa(mesaSeleccionadaActual != null ? mesaSeleccionadaActual : "01");
+        pedido.setTipoPedido(canalSeleccionadoActual != null ? canalSeleccionadoActual : "MESA");
+        pedido.setEstado("REGISTRADO");
+        pedido.setTotal(obtenerTotalNetoActual());
+
+        if (idObjetivo <= 0) {
+            try {
+                Pedido registrado = pedidoService.registrarPedidoYEnviarComanda(pedido, detallesCocina);
+                this.pedidoActivoId = registrado.getIdPedido();
+                if (registrado.getDetalles() != null && !registrado.getDetalles().isEmpty()) {
+                    aplicarDetallesPedidoEnPOS(registrado.getDetalles());
+                }
+                new ImpresoraTermicaService().imprimirComandaCocina(registrado, detallesCocina, null);
+                mostrarAlerta("Comanda Enviada",
+                        "Orden #" + registrado.getIdPedido() + " enviada a Línea de Cocina (KDS) correctamente.",
+                        Alert.AlertType.INFORMATION);
+                return;
+            } catch (NegocioException | SQLException | RuntimeException ex) {
+                LOGGER.log(Level.FINE, "Envío KDS POS usando respaldo local/offline", ex);
+            }
+        }
+        new ImpresoraTermicaService().imprimirComandaCocina(pedido, detallesCocina, null);
         mostrarAlerta("Comanda Enviada", "Orden enviada a Línea de Cocina (KDS) correctamente.", Alert.AlertType.INFORMATION);
     }
 
@@ -1384,14 +1510,7 @@ public class VentaController {
 
             List<DetallePedido> detalles = new ArrayList<>();
             for (DetalleVenta dv : itemsVenta) {
-                DetallePedido dp = new DetallePedido();
-                dp.setIdProducto(dv.getIdProducto());
-                dp.setNombreProducto(dv.getNombreProducto());
-                dp.setCantidad(dv.getCantidad());
-                dp.setPrecioUnitario(dv.getPrecioUnitario());
-                dp.setSubtotal(dv.getSubtotal());
-                dp.setNotasPreparacion(dv.getNotasPreparacion());
-                detalles.add(dp);
+                detalles.add(convertirDetalleVentaAPedido(dv, p.getIdPedido()));
             }
 
             ImpresoraTermicaService imp = new ImpresoraTermicaService();
@@ -1401,6 +1520,22 @@ public class VentaController {
             LOGGER.log(Level.WARNING, "Error al imprimir pre-cuenta", ex);
             mostrarAlerta("Error", "Error al emitir pre-cuenta: " + ex.getMessage(), Alert.AlertType.ERROR);
         }
+    }
+
+    private DetallePedido convertirDetalleVentaAPedido(DetalleVenta dv, int idPedido) {
+        DetallePedido dp = new DetallePedido();
+        dp.setIdPedido(idPedido);
+        dp.setIdProducto(dv.getIdProducto());
+        dp.setNombreProducto(dv.getNombreProducto());
+        dp.setCantidad(dv.getCantidad());
+        dp.setPrecioUnitario(dv.getPrecioUnitario());
+        dp.setSubtotal(dv.getSubtotal());
+        dp.setNotasPreparacion(dv.getNotasPreparacion());
+        dp.setIdVariante(dv.getIdVariante());
+        dp.setNombreVariante(dv.getNombreVariante());
+        dp.setModificadoresTexto(dv.getModificadoresTexto());
+        dp.setModificadoresSeleccionados(dv.getModificadoresSeleccionados());
+        return dp;
     }
 
     @FXML

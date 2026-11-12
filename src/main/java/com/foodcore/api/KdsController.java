@@ -55,7 +55,16 @@ public class KdsController {
                         ObjectNode itemNode = itemsArr.addObject();
                         itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
                         itemNode.put("id_producto", dp.getIdProducto());
-                        itemNode.put("nombre", dp.getNombreProducto() != null ? dp.getNombreProducto() : ("Plato #" + dp.getIdProducto()));
+                        String nombreCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp);
+                        itemNode.put("nombre", nombreCocina);
+                        if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
+                            itemNode.put("variante", dp.getNombreVariante());
+                        }
+                        String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                                dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
+                        if (!mods.isEmpty()) {
+                            itemNode.put("modificadores", mods);
+                        }
                         itemNode.put("cantidad", dp.getCantidad());
                         itemNode.put("precio_unitario", dp.getPrecioUnitario() != null ? dp.getPrecioUnitario().doubleValue() : 0.0);
                         itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
@@ -119,7 +128,15 @@ public class KdsController {
                     itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
                     itemNode.put("id_pedido", dp.getIdPedido());
                     itemNode.put("id_producto", dp.getIdProducto());
-                    itemNode.put("nombre", dp.getNombreProducto() != null ? dp.getNombreProducto() : ("Plato #" + dp.getIdProducto()));
+                    itemNode.put("nombre", com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp));
+                    if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
+                        itemNode.put("variante", dp.getNombreVariante());
+                    }
+                    String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                            dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
+                    if (!mods.isEmpty()) {
+                        itemNode.put("modificadores", mods);
+                    }
                     itemNode.put("cantidad", dp.getCantidad());
                     itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
                     itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");
@@ -127,7 +144,7 @@ public class KdsController {
                     itemNode.put("numero_mesa", dp.getNumeroMesa() != null ? dp.getNumeroMesa() : "01");
                 }
             }
-        } catch (Exception e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso listando ítems de cocina en BD, usando datos en memoria", e);
         }
 

@@ -118,8 +118,12 @@ public class MenuQrService {
         List<Producto> productos = new ArrayList<>();
         
         try (Connection conn = ConexionBD.getConnection()) {
-            productos = productoDAO.listarProductosDisponibles(conn);
-                    } catch (SQLException e) {
+            productos = new com.foodcore.service.impl.PersonalizacionProductoServiceImpl(
+                new com.foodcore.tx.impl.JdbcTransactionManager(),
+                productoDAO,
+                new com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl()
+            ).listarProductosDisponiblesConOpciones(conn);
+        } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Error al consultar BD para menu digital, generando con datos demo: " + e.getMessage());
         }
 
@@ -168,10 +172,23 @@ public class MenuQrService {
             .append("    <div class=\"grid\">\n");
 
         for (Producto p : productos) {
+            StringBuilder opcionesHtml = new StringBuilder();
+            if (!p.getVariantes().isEmpty()) {
+                List<String> vars = new ArrayList<>();
+                for (com.foodcore.model.ProductoVariante v : p.getVariantes()) {
+                    vars.add(v.getNombreVariante() + " S/ " + v.calcularPrecioEfectivo(p.getPrecioVenta()));
+                }
+                opcionesHtml.append(" · Tamaños: ").append(String.join(" | ", vars));
+            }
+            if (!p.getModificadores().isEmpty()) {
+                opcionesHtml.append(" · +Extras configurables");
+            }
             html.append("      <div class=\"card\">\n")
                 .append("        <div>\n")
                 .append("          <div class=\"card-title\">").append(escapeHtml(p.getNombre())).append("</div>\n")
-                .append("          <div class=\"card-desc\">").append(escapeHtml(p.getDescripcion() != null ? p.getDescripcion() : "Plato elaborado con ingredientes frescos")).append("</div>\n")
+                .append("          <div class=\"card-desc\">")
+                .append(escapeHtml((p.getDescripcion() != null ? p.getDescripcion() : "Plato elaborado con ingredientes frescos") + opcionesHtml))
+                .append("</div>\n")
                 .append("        </div>\n")
                 .append("        <div class=\"card-footer\">\n")
                 .append("          <span class=\"price\">S/ ").append(p.getPrecioVenta()).append("</span>\n")

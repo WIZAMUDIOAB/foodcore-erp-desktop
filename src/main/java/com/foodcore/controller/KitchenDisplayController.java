@@ -251,6 +251,12 @@ public class KitchenDisplayController {
                     dp.setIdDetallePedido(Math.max(0, idDet));
                     dp.setNumeroMesa(mesa);
                     dp.setNombreProducto(obj.get("producto").getAsString());
+                    if (obj.has("variante") && !obj.get("variante").isJsonNull()) {
+                        dp.setNombreVariante(obj.get("variante").getAsString());
+                    }
+                    if (obj.has("modificadores") && !obj.get("modificadores").isJsonNull()) {
+                        dp.setModificadoresTexto(obj.get("modificadores").getAsString());
+                    }
                     dp.setCantidad(obj.get("cantidad").getAsInt());
                     dp.setNotasPreparacion(obj.has("notas") ? obj.get("notas").getAsString() : "");
                     dp.setEnviadoEn(LocalDateTime.now(ZONA_LIMA));
@@ -279,7 +285,7 @@ public class KitchenDisplayController {
             cardCtrl.setIdPedido(idPedido);
             cardCtrl.setIdDetallePedido(idDetallePedido);
             cardCtrl.setSegundosTranscurridos(segundos);
-            cardCtrl.agregarPlato(item.getNombreProducto(), item.getCantidad(), item.getNotasPreparacion());
+            cardCtrl.agregarPlatoDetalle(item);
 
             cardCtrl.setOnEstadoCambiadoListener((ctrl, nuevoEstado) -> {
                 ubicarEnColumnaKanban(ctrl.getCardContainer(), nuevoEstado);
