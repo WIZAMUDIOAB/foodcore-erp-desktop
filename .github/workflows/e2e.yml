@@ -134,12 +134,15 @@ jobs:
             -ext "SAN=DNS:localhost,IP:127.0.0.1"
           keytool -exportcert -noprompt \
             -alias foodcore -keystore "$KS_PATH" -storepass "$KS_PASS" -file "$CERT_PATH"
+          if [ ! -f target/foodcore-erp.jar ]; then
+            mvn -B package -DskipTests
+          fi
           FOODCORE_OFFLINE_DB_KEY="$OFFLINE_KEY" FOODCORE_JWT_SECRET="$JWT_KEY" \
             FOODCORE_KEYSTORE_PASS="$KS_PASS" FOODCORE_KEYSTORE_PATH="$KS_PATH" FOODCORE_CERT_PATH="$CERT_PATH" \
             SPRING_PROFILES_ACTIVE="e2e-test" \
-            nohup java -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
+            nohup java -Dspring.profiles.active=e2e-test -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          npx --yes wait-on http://localhost:8080/health --timeout 60000
+          npx --yes wait-on http://127.0.0.1:8080/health --timeout 60000
 
       - name: Run E2E Tests (Playwright)
         timeout-minutes: 10
@@ -150,6 +153,15 @@ jobs:
         run: |
           if [ -n "${SERVER_PID:-}" ]; then
             kill "$SERVER_PID" || true
+          fi
+
+      - name: Show Server Log on Failure
+        if: failure()
+        run: |
+          if [ -f target/foodcore-server.log ]; then
+            cat target/foodcore-server.log
+          else
+            echo "target/foodcore-server.log no existe."
           fi
 
       - name: Upload Playwright Report & Screenshots
