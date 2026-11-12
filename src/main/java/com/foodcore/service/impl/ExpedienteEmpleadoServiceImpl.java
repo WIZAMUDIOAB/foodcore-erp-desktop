@@ -254,7 +254,8 @@ public class ExpedienteEmpleadoServiceImpl implements ExpedienteEmpleadoService 
     }
 
     private String sanitizarNombreArchivo(String nombre) {
-        String base = Paths.get(nombre).getFileName().toString();
+        Path p = Paths.get(nombre).getFileName();
+        String base = (p != null) ? p.toString() : nombre;
         String limpio = base.replaceAll("[^a-zA-Z0-9._-]", "_");
         if (limpio.isBlank()) {
             return "documento.pdf";
