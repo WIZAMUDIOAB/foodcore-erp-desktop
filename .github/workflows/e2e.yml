@@ -117,6 +117,14 @@ jobs:
         timeout-minutes: 5
         run: mvn jacoco:check@jacoco-check
 
+      - name: Reset Database with Flyway for Standalone E2E Server
+        run: |
+          mvn -B flyway:clean flyway:migrate \
+            -Dflyway.cleanDisabled=false \
+            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
+            -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
+            -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
+
       - name: Start FoodCore Server (Javalin)
         run: |
           OFFLINE_KEY="$(openssl rand -hex 32)"

@@ -9,11 +9,13 @@ import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.microsoft.playwright.APIRequest;
 import com.microsoft.playwright.APIRequestContext;
+import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.RequestOptions;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -105,7 +107,54 @@ public final class PlaywrightE2ESupport {
                 .setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")));
     }
 
-    private static final double PLAYWRIGHT_TIMEOUT_MS = 30_000d;
+    private static final double PLAYWRIGHT_TIMEOUT_MS = 45_000d;
+    private static final long RETRY_AFTER_MAX_SEGUNDOS = 61L;
+
+    /**
+     * Respeta la ventana {@code Retry-After} si el servidor E2E compartido devuelve HTTP 429 en {@code /api/auth/*}.
+     */
+    public static void esperarRetryAfter(String retryAfterHeader) {
+        long segundos = RETRY_AFTER_MAX_SEGUNDOS;
+        if (retryAfterHeader != null && !retryAfterHeader.isBlank()) {
+            try {
+                segundos = Math.min(RETRY_AFTER_MAX_SEGUNDOS, Math.max(1L, Long.parseLong(retryAfterHeader.trim()) + 1L));
+            } catch (NumberFormatException ignored) {
+                segundos = RETRY_AFTER_MAX_SEGUNDOS;
+            }
+        }
+        try {
+            Thread.sleep(segundos * 1000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Espera de Retry-After interrumpida", e);
+        }
+    }
+
+    /**
+     * Ejecuta un POST a {@code /api/auth/*} reintentando una vez si recibe HTTP 429.
+     */
+    public static APIResponse postAuthConReintento429(APIRequestContext request, String path, Object body) {
+        return postAuthConReintento429(request, path, null, body);
+    }
+
+    /**
+     * Ejecuta un POST opcionalmente autenticado a {@code /api/auth/*} reintentando una vez si recibe HTTP 429.
+     */
+    public static APIResponse postAuthConReintento429(
+            APIRequestContext request, String path, String bearerToken, Object body) {
+        RequestOptions opts = RequestOptions.create()
+                .setHeader("Content-Type", "application/json")
+                .setData(body);
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            opts.setHeader("Authorization", "Bearer " + bearerToken);
+        }
+        APIResponse resp = request.post(path, opts);
+        if (resp.status() == 429) {
+            esperarRetryAfter(resp.headers().get("retry-after"));
+            resp = request.post(path, opts);
+        }
+        return resp;
+    }
 
     public static Browser lanzarNavegador(Playwright playwright) {
         List<String> browserArgs = List.of(
@@ -217,6 +266,10 @@ public final class PlaywrightE2ESupport {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() == 429) {
+                esperarRetryAfter(resp.headers().firstValue("retry-after").orElse(null));
+                resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            }
             if (resp.statusCode() != 200) {
                 throw new IllegalStateException("Login fallido para rol " + rolNormalizado + ": HTTP " + resp.statusCode());
             }

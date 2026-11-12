@@ -76,10 +76,8 @@ public class SubFaseC1AuditoriaE2ETest {
             assertTrue(bodyOk.path("tiene_pin").asBoolean());
 
             // 4. Probar login con el nuevo PIN '5678'
-            APIResponse respNuevoPinLogin = request.post("/api/auth/pin-login",
-                    RequestOptions.create()
-                            .setHeader("Content-Type", "application/json")
-                            .setData(Map.of("pin", "5678", "username", "mozo")));
+            APIResponse respNuevoPinLogin = PlaywrightE2ESupport.postAuthConReintento429(
+                    request, "/api/auth/pin-login", Map.of("pin", "5678", "username", "mozo"));
             assertEquals(200, respNuevoPinLogin.status(), "El nuevo PIN 5678 debe autenticar al mozo");
 
             // 5. Restaurar PIN original '1234' para estabilidad de la suite
