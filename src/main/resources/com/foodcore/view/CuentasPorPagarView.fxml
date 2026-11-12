@@ -66,6 +66,9 @@
                                     <children>
                                         <Label styleClass="text-h3" text="Registro de Obligaciones Pendientes" />
                                         <Region HBox.hgrow="ALWAYS" />
+                                        <Button fx:id="btnExportarPdf" mnemonicParsing="false" onAction="#handleExportarPdf" styleClass="btn-secondary" text="Exportar PDF" />
+                                        <Button fx:id="btnExportarExcel" mnemonicParsing="false" onAction="#handleExportarExcel" styleClass="btn-secondary" text="Exportar Excel" />
+                                        <Button fx:id="btnExportarCsv" mnemonicParsing="false" onAction="#handleExportarCsv" styleClass="btn-secondary" text="Exportar CSV" />
                                         <Label fx:id="lblContadorCxp" styleClass="badge-pill-success" text="0 Facturas" />
                                     </children>
                                 </HBox>

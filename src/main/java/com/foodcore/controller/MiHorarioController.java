@@ -7,6 +7,8 @@ import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.HorariosService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
@@ -42,7 +44,6 @@ import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -50,6 +51,7 @@ import java.time.format.TextStyle;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -327,9 +329,21 @@ public class MiHorarioController {
             Usuario usr = AuthService.getUsuarioSesionActual();
             String username = usr != null && usr.getUsername() != null ? usr.getUsername() : "colaborador";
             String slugPeriodo = boleta.periodo().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
-            Path outDir = Path.of("dist", "boletas");
-            Files.createDirectories(outDir);
-            File pdfFile = outDir.resolve("boleta_" + username + "_" + slugPeriodo + ".pdf").toFile();
+            Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                    btnDescargarBoletaPdf != null ? btnDescargarBoletaPdf : rootMiHorarioStack,
+                    "Guardar Boleta de Pago en PDF",
+                    "boleta_" + username + "_" + slugPeriodo + ".pdf",
+                    FormatoExportacion.PDF);
+            if (elegidoOpt.isEmpty()) {
+                if (lblEstadoBoleta != null) {
+                    lblEstadoBoleta.setText("Exportación de boleta cancelada.");
+                }
+                return;
+            }
+            File pdfFile = elegidoOpt.get();
+            if (pdfFile.getParentFile() != null) {
+                Files.createDirectories(pdfFile.getParentFile().toPath());
+            }
 
             generarBoletaPdf(boleta, usr, pdfFile);
             if (lblEstadoBoleta != null) {

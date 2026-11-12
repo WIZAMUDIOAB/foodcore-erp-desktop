@@ -5,6 +5,8 @@ import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.model.Cliente;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -21,8 +23,10 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -312,23 +316,34 @@ public class ClientesController {
         if (clienteSeleccionado == null) return;
         final int idCli = clienteSeleccionado.getIdCliente();
         final String numDoc = clienteSeleccionado.getNumeroDocumento();
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                btnEstadoCuentaPdf != null ? btnEstadoCuentaPdf : lblDetalleComprobantes,
+                "Guardar Estado de Cuenta en PDF",
+                "ESTADO_CUENTA_" + numDoc + ".pdf",
+                FormatoExportacion.PDF);
+        if (elegidoOpt.isEmpty()) {
+            if (lblDetalleComprobantes != null) {
+                lblDetalleComprobantes.setText("Exportación de estado de cuenta cancelada.");
+            }
+            return;
+        }
+        final File doc = elegidoOpt.get();
         if (btnEstadoCuentaPdf != null) {
             btnEstadoCuentaPdf.setDisable(true);
         }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                File doc = new File("dist/ESTADO_CUENTA_" + numDoc + ".pdf");
                 if (doc.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                    Files.createDirectories(doc.getParentFile().toPath());
                 }
                 finanzasService.generarEstadoCuentaClientePdf(idCli, doc);
                 return doc;
             },
-            doc -> {
+            archivo -> {
                 if (btnEstadoCuentaPdf != null) {
                     btnEstadoCuentaPdf.setDisable(false);
                 }
-                lblDetalleComprobantes.setText("✓ Estado de cuenta generado: " + doc.getName());
+                lblDetalleComprobantes.setText("✓ Estado de cuenta generado: " + archivo.getName());
             },
             ex -> {
                 if (btnEstadoCuentaPdf != null) {

@@ -10,8 +10,11 @@ import com.foodcore.dao.impl.CuentaPorCobrarDAOImpl;
 import com.foodcore.model.Caja;
 import com.foodcore.model.CuentaPorCobrar;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.ReporteExportUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -26,6 +29,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
 import java.sql.Connection;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +54,9 @@ public class CuentasPorCobrarController {
     @FXML private Label lblBadgeAlertaVencidas;
     @FXML private Button btnCobrar;
     @FXML private Button btnActualizar;
+    @FXML private Button btnExportarPdf;
+    @FXML private Button btnExportarExcel;
+    @FXML private Button btnExportarCsv;
 
     @FXML private VBox modalCobro;
     @FXML private Label lblModalDocInfo;
@@ -61,6 +69,7 @@ public class CuentasPorCobrarController {
     private final CuentaPorCobrarDAO cuentaPorCobrarDAO = new CuentaPorCobrarDAOImpl();
     private final CajaDAO cajaDAO = new CajaDAOImpl();
     private final FinanzasService finanzasService = new FinanzasService();
+    private final ExportacionContableService exportacionService = new ExportacionContableService();
 
     private final ObservableList<CuentaPorCobrar> listaCxc = FXCollections.observableArrayList();
     private CuentaPorCobrar cuentaSeleccionada = null;
@@ -201,5 +210,50 @@ public class CuentasPorCobrarController {
             },
             ex -> lblModalCobroError.setText("Error al cobrar: " + (ex != null ? ex.getMessage() : "desconocido"))
         );
+    }
+
+    @FXML
+    public void handleExportarPdf() {
+        exportarCxc(btnExportarPdf, "Guardar Cuentas por Cobrar en PDF", ".pdf", FormatoExportacion.PDF);
+    }
+
+    @FXML
+    public void handleExportarExcel() {
+        exportarCxc(btnExportarExcel, "Guardar Cuentas por Cobrar en Excel", ".xlsx", FormatoExportacion.EXCEL);
+    }
+
+    @FXML
+    public void handleExportarCsv() {
+        exportarCxc(btnExportarCsv, "Guardar Cuentas por Cobrar en CSV", ".csv", FormatoExportacion.CSV);
+    }
+
+    private void exportarCxc(Button origen, String tituloDialogo, String ext, FormatoExportacion formato) {
+        List<String> headers = List.of(
+                "Cliente", "Comprobante", "Fecha Emisión", "Vencimiento", "Monto Total", "Cobrado", "Saldo", "Estado");
+        List<List<String>> filas = new ArrayList<>();
+        for (CuentaPorCobrar c : listaCxc) {
+            filas.add(List.of(
+                    c.getRazonSocialCliente() != null ? c.getRazonSocialCliente() : "",
+                    c.getNumeroComprobante() != null ? c.getNumeroComprobante() : "",
+                    c.getFechaEmision() != null ? c.getFechaEmision().toString() : "-",
+                    c.getFechaVencimiento() != null ? c.getFechaVencimiento().toString() : "-",
+                    String.format("S/ %.2f", c.getMontoTotal()),
+                    String.format("S/ %.2f", c.getMontoCobrado()),
+                    String.format("S/ %.2f", c.getSaldo()),
+                    c.getEstado() != null ? c.getEstado() : ""
+            ));
+        }
+        String sugerido = "CUENTAS_POR_COBRAR_" + LocalDate.now() + ext;
+        ReporteExportUIHelper.exportarTablaConSelector(
+                origen != null ? origen : lblContadorCxc,
+                lblContadorCxc,
+                tituloDialogo,
+                sugerido,
+                "Reporte de Cuentas por Cobrar",
+                "CXC",
+                formato,
+                headers,
+                filas,
+                exportacionService);
     }
 }

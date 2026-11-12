@@ -1,7 +1,10 @@
 package com.foodcore.controller;
 
+import com.foodcore.service.ExportacionContableService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.ReporteExportUIHelper;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -44,6 +47,9 @@ public class KardexController {
     @FXML private DatePicker dpFechaDesde;
     @FXML private DatePicker dpFechaHasta;
     @FXML private Button btnFiltrar;
+    @FXML private Button btnExportarPdf;
+    @FXML private Button btnExportarExcel;
+    @FXML private Button btnExportarCsv;
     @FXML private Label lblResumenKardex;
 
     @FXML private TableView<FilaKardex> tblKardex;
@@ -56,10 +62,14 @@ public class KardexController {
 
     private final ObservableList<FilaKardex> todosLosMovimientos = FXCollections.observableArrayList();
     private final ObservableList<FilaKardex> movimientosFiltrados = FXCollections.observableArrayList();
+    private final ExportacionContableService exportacionService = new ExportacionContableService();
 
     @FXML
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnFiltrar);
+        AnimationUtils.attachTactileFeedback(btnExportarPdf);
+        AnimationUtils.attachTactileFeedback(btnExportarExcel);
+        AnimationUtils.attachTactileFeedback(btnExportarCsv);
         dpFechaDesde.setValue(LocalDate.now().minusDays(7));
         dpFechaHasta.setValue(LocalDate.now());
 
@@ -284,6 +294,41 @@ public class KardexController {
         if (lblResumenKardex != null) {
             lblResumenKardex.setText("Mostrando " + movimientosFiltrados.size() + " movimientos");
         }
+    }
+
+    @FXML
+    public void handleExportarPdf() {
+        exportarKardex(btnExportarPdf, "Guardar Reporte de Kardex en PDF", ".pdf", FormatoExportacion.PDF);
+    }
+
+    @FXML
+    public void handleExportarExcel() {
+        exportarKardex(btnExportarExcel, "Guardar Reporte de Kardex en Excel", ".xlsx", FormatoExportacion.EXCEL);
+    }
+
+    @FXML
+    public void handleExportarCsv() {
+        exportarKardex(btnExportarCsv, "Guardar Reporte de Kardex en CSV", ".csv", FormatoExportacion.CSV);
+    }
+
+    private void exportarKardex(Button origen, String tituloDialogo, String ext, FormatoExportacion formato) {
+        List<String> headers = List.of("Fecha", "Tipo", "Insumo", "Cantidad", "Saldo", "Usuario");
+        List<List<String>> filas = new ArrayList<>();
+        for (FilaKardex f : movimientosFiltrados) {
+            filas.add(List.of(f.fecha(), f.tipo(), f.insumo(), f.cantidad(), f.saldo(), f.usuario()));
+        }
+        String sugerido = "KARDEX_INSUMOS_" + LocalDate.now() + ext;
+        ReporteExportUIHelper.exportarTablaConSelector(
+                origen != null ? origen : lblResumenKardex,
+                lblResumenKardex,
+                tituloDialogo,
+                sugerido,
+                "Kardex Valorizado de Insumos",
+                "KARDEX",
+                formato,
+                headers,
+                filas,
+                exportacionService);
     }
 
     public ObservableList<FilaKardex> getMovimientosFiltrados() {

@@ -10,6 +10,7 @@ import com.foodcore.model.Compra;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.ExportacionContableService.VentaRegistroSunat;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -24,6 +25,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -31,6 +33,7 @@ import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 public class ReportesContablesController {
 
@@ -210,18 +213,15 @@ public class ReportesContablesController {
     public void handleExportarVentasSunat() {
         LocalDate ini = dpInicio.getValue();
         LocalDate fin = dpFin.getValue();
-        lblEstadoExportacion.setText("Exportando registro de ventas...");
-        UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                File archivo = new File("dist/PLE_SUNAT_14.1_VENTAS_" + ini + "_" + fin + ".xlsx");
-                if (archivo.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
-                }
-                exportacionService.exportarVentasSunat14_1_Excel(ini, fin, archivo);
-                return archivo.getName();
-            },
-            nombre -> lblEstadoExportacion.setText("✓ Exportado con éxito: " + nombre),
-            ex -> lblEstadoExportacion.setText("Error al exportar ventas: " + (ex != null ? ex.getMessage() : "desconocido"))
+        exportarConSelector(
+            btnExportarVentasSunat,
+            "Guardar Registro de Ventas PLE 14.1",
+            "PLE_SUNAT_14.1_VENTAS_" + ini + "_" + fin + ".xlsx",
+            ExportFileChooserHelper.FormatoExportacion.EXCEL,
+            "Exportando registro de ventas...",
+            archivo -> exportacionService.exportarVentasSunat14_1_Excel(ini, fin, archivo),
+            "✓ Exportado con éxito: ",
+            "Error al exportar ventas: "
         );
     }
 
@@ -229,18 +229,15 @@ public class ReportesContablesController {
     public void handleExportarComprasSunat() {
         LocalDate ini = dpInicio.getValue();
         LocalDate fin = dpFin.getValue();
-        lblEstadoExportacion.setText("Exportando registro de compras...");
-        UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                File archivo = new File("dist/PLE_SUNAT_8.1_COMPRAS_" + ini + "_" + fin + ".xlsx");
-                if (archivo.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
-                }
-                exportacionService.exportarComprasSunat8_1_Excel(ini, fin, archivo);
-                return archivo.getName();
-            },
-            nombre -> lblEstadoExportacion.setText("✓ Exportado con éxito: " + nombre),
-            ex -> lblEstadoExportacion.setText("Error al exportar compras: " + (ex != null ? ex.getMessage() : "desconocido"))
+        exportarConSelector(
+            btnExportarComprasSunat,
+            "Guardar Registro de Compras PLE 8.1",
+            "PLE_SUNAT_8.1_COMPRAS_" + ini + "_" + fin + ".xlsx",
+            ExportFileChooserHelper.FormatoExportacion.EXCEL,
+            "Exportando registro de compras...",
+            archivo -> exportacionService.exportarComprasSunat8_1_Excel(ini, fin, archivo),
+            "✓ Exportado con éxito: ",
+            "Error al exportar compras: "
         );
     }
 
@@ -248,18 +245,65 @@ public class ReportesContablesController {
     public void handleExportarResumenCaja() {
         LocalDate ini = dpInicio.getValue();
         LocalDate fin = dpFin.getValue();
-        lblEstadoExportacion.setText("Generando resumen Z...");
+        exportarConSelector(
+            btnExportarResumenCaja,
+            "Guardar Resumen Mensual de Caja Z",
+            "RESUMEN_CAJA_Z_" + ini + "_" + fin + ".pdf",
+            ExportFileChooserHelper.FormatoExportacion.PDF,
+            "Generando resumen Z...",
+            archivo -> exportacionService.exportarResumenCajaMensualPdf(ini, fin, archivo),
+            "✓ Resumen Z generado: ",
+            "Error al exportar resumen caja: "
+        );
+    }
+
+    @FunctionalInterface
+    private interface ExportAction {
+        void write(File destino) throws Exception;
+    }
+
+    private void exportarConSelector(
+            Button origenBtn,
+            String tituloDialogo,
+            String nombreSugerido,
+            ExportFileChooserHelper.FormatoExportacion formato,
+            String estadoProcesando,
+            ExportAction accion,
+            String prefijoExito,
+            String prefijoError) {
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                origenBtn != null ? origenBtn : lblEstadoExportacion,
+                tituloDialogo,
+                nombreSugerido,
+                formato);
+        if (elegidoOpt.isEmpty()) {
+            if (lblEstadoExportacion != null) {
+                lblEstadoExportacion.setText("Exportación cancelada.");
+            }
+            return;
+        }
+        File archivo = elegidoOpt.get();
+        if (lblEstadoExportacion != null) {
+            lblEstadoExportacion.setText(estadoProcesando);
+        }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                File archivo = new File("dist/RESUMEN_CAJA_Z_" + ini + "_" + fin + ".pdf");
                 if (archivo.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(archivo.getParentFile().toPath());
+                    Files.createDirectories(archivo.getParentFile().toPath());
                 }
-                exportacionService.exportarResumenCajaMensualPdf(ini, fin, archivo);
+                accion.write(archivo);
                 return archivo.getName();
             },
-            nombre -> lblEstadoExportacion.setText("✓ Resumen Z generado: " + nombre),
-            ex -> lblEstadoExportacion.setText("Error al exportar resumen caja: " + (ex != null ? ex.getMessage() : "desconocido"))
+            nombre -> {
+                if (lblEstadoExportacion != null) {
+                    lblEstadoExportacion.setText(prefijoExito + nombre);
+                }
+            },
+            ex -> {
+                if (lblEstadoExportacion != null) {
+                    lblEstadoExportacion.setText(prefijoError + (ex != null ? ex.getMessage() : "desconocido"));
+                }
+            }
         );
     }
 

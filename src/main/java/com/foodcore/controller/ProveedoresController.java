@@ -11,6 +11,8 @@ import com.foodcore.model.Insumo;
 import com.foodcore.model.Proveedor;
 import com.foodcore.service.FinanzasService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -24,8 +26,10 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class ProveedoresController {
@@ -260,6 +264,18 @@ public class ProveedoresController {
         if (proveedorSeleccionado == null) return;
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final String ruc = proveedorSeleccionado.getRuc();
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                btnGenerarOrdenCompra != null ? btnGenerarOrdenCompra : lblDetalleFacturas,
+                "Guardar Orden de Compra en PDF",
+                "ORDEN_COMPRA_" + ruc + ".pdf",
+                FormatoExportacion.PDF);
+        if (elegidoOpt.isEmpty()) {
+            if (lblDetalleFacturas != null) {
+                lblDetalleFacturas.setText("Exportación de orden de compra cancelada.");
+            }
+            return;
+        }
+        final File doc = elegidoOpt.get();
         UiAsyncExecutor.ejecutarAsync(
             () -> {
                 List<Insumo> insumosBajos;
@@ -272,9 +288,8 @@ public class ProveedoresController {
                         insumosBajos = insumoDAO.listarTodos(conn).stream().limit(3).collect(Collectors.toList());
                     }
                 }
-                File doc = new File("dist/ORDEN_COMPRA_" + ruc + ".pdf");
                 if (doc.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                    Files.createDirectories(doc.getParentFile().toPath());
                 }
                 finanzasService.generarOrdenCompraPdf(idProveedor, insumosBajos, doc);
                 return doc.getName();

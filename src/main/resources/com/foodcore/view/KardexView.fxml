@@ -60,6 +60,9 @@
                     </VBox>
 
                     <Button fx:id="btnFiltrar" mnemonicParsing="false" onAction="#handleFiltrar" styleClass="btn-primary" text="Filtrar" />
+                    <Button fx:id="btnExportarPdf" mnemonicParsing="false" onAction="#handleExportarPdf" styleClass="btn-secondary" text="Exportar PDF" />
+                    <Button fx:id="btnExportarExcel" mnemonicParsing="false" onAction="#handleExportarExcel" styleClass="btn-secondary" text="Exportar Excel" />
+                    <Button fx:id="btnExportarCsv" mnemonicParsing="false" onAction="#handleExportarCsv" styleClass="btn-secondary" text="Exportar CSV" />
                 </children>
             </HBox>
         </children>

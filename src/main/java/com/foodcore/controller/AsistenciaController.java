@@ -4,6 +4,8 @@ import com.foodcore.App;
 import com.foodcore.model.Asistencia;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -22,9 +24,11 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -205,16 +209,32 @@ public class AsistenciaController {
         int anio = f.getYear();
         int mes = f.getMonthValue();
 
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                btnExportarPlanilla != null ? btnExportarPlanilla : lblTotalRegistros,
+                "Guardar Planilla Mensual en Excel",
+                "PLANILLA_MENSUAL_" + anio + "_" + String.format("%02d", mes) + ".xlsx",
+                FormatoExportacion.EXCEL);
+        if (elegidoOpt.isEmpty()) {
+            if (lblTotalRegistros != null) {
+                lblTotalRegistros.setText("Exportación de planilla cancelada.");
+            }
+            return;
+        }
+
         try {
-            File doc = new File("dist/PLANILLA_MENSUAL_" + anio + "_" + String.format("%02d", mes) + ".xlsx");
+            File doc = elegidoOpt.get();
             if (doc.getParentFile() != null) {
-                java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                Files.createDirectories(doc.getParentFile().toPath());
             }
             asistenciaService.exportarPlanillaMensualExcel(anio, mes, doc);
-            lblTotalRegistros.setText("✓ Planilla exportada con éxito: " + doc.getName());
+            if (lblTotalRegistros != null) {
+                lblTotalRegistros.setText("✓ Planilla exportada con éxito: " + doc.getName());
+            }
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error al exportar planilla mensual Excel", ex);
-            lblTotalRegistros.setText("Error exportando planilla: " + ex.getMessage());
+            if (lblTotalRegistros != null) {
+                lblTotalRegistros.setText("Error exportando planilla: " + ex.getMessage());
+            }
         }
     }
 }

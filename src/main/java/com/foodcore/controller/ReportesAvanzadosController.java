@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -21,6 +22,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -28,6 +30,7 @@ import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -462,69 +465,103 @@ public class ReportesAvanzadosController {
     @FXML
     public void handleExportarPdf() {
         String categoria = cbCategoriaReporte.getValue();
-        List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-        List<List<String>> filas = new ArrayList<>();
-        for (FilaReporteAvanzado f : listaFilas) {
-            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-        }
-        lblEstadoReporte.setText("Exportando PDF...");
-        UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".pdf");
-                if (doc.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
-                }
-                exportacionService.exportarReporteGenericoPdf(categoria, headers, filas, doc);
-                return doc.getName();
-            },
-            nombre -> lblEstadoReporte.setText("✓ PDF exportado: " + nombre),
-            ex -> lblEstadoReporte.setText("Error al exportar PDF: " + (ex != null ? ex.getMessage() : "desconocido"))
+        exportarTablaConSelector(
+            btnExportarPdf,
+            "Guardar Reporte en PDF",
+            "REPORTE_" + sanitizarNombre(categoria) + ".pdf",
+            ExportFileChooserHelper.FormatoExportacion.PDF,
+            "Exportando PDF...",
+            (headers, filas, doc) -> exportacionService.exportarReporteGenericoPdf(
+                    categoria != null ? categoria : "REPORTE", headers, filas, doc),
+            "✓ PDF exportado: ",
+            "Error al exportar PDF: "
         );
     }
 
     @FXML
     public void handleExportarExcel() {
         String categoria = cbCategoriaReporte.getValue();
-        List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-        List<List<String>> filas = new ArrayList<>();
-        for (FilaReporteAvanzado f : listaFilas) {
-            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-        }
-        lblEstadoReporte.setText("Exportando Excel...");
-        UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".xlsx");
-                if (doc.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
-                }
-                exportacionService.exportarReporteGenericoExcel("ANALISIS", headers, filas, doc);
-                return doc.getName();
-            },
-            nombre -> lblEstadoReporte.setText("✓ Excel exportado: " + nombre),
-            ex -> lblEstadoReporte.setText("Error al exportar Excel: " + (ex != null ? ex.getMessage() : "desconocido"))
+        exportarTablaConSelector(
+            btnExportarExcel,
+            "Guardar Reporte en Excel",
+            "REPORTE_" + sanitizarNombre(categoria) + ".xlsx",
+            ExportFileChooserHelper.FormatoExportacion.EXCEL,
+            "Exportando Excel...",
+            (headers, filas, doc) -> exportacionService.exportarReporteGenericoExcel("ANALISIS", headers, filas, doc),
+            "✓ Excel exportado: ",
+            "Error al exportar Excel: "
         );
     }
 
     @FXML
     public void handleExportarCsv() {
         String categoria = cbCategoriaReporte.getValue();
+        exportarTablaConSelector(
+            btnExportarCsv,
+            "Guardar Reporte en CSV",
+            "REPORTE_" + sanitizarNombre(categoria) + ".csv",
+            ExportFileChooserHelper.FormatoExportacion.CSV,
+            "Exportando CSV...",
+            (headers, filas, doc) -> exportacionService.exportarReporteGenericoCsv(headers, filas, doc),
+            "✓ CSV exportado: ",
+            "Error al exportar CSV: "
+        );
+    }
+
+    @FunctionalInterface
+    private interface ExportTablaAction {
+        void export(List<String> headers, List<List<String>> filas, File destino) throws Exception;
+    }
+
+    private void exportarTablaConSelector(
+            Button origenBtn,
+            String tituloDialogo,
+            String nombreSugerido,
+            ExportFileChooserHelper.FormatoExportacion formato,
+            String estadoProcesando,
+            ExportTablaAction action,
+            String prefijoExito,
+            String prefijoError) {
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                origenBtn != null ? origenBtn : lblEstadoReporte,
+                tituloDialogo,
+                nombreSugerido,
+                formato);
+        if (elegidoOpt.isEmpty()) {
+            if (lblEstadoReporte != null) {
+                lblEstadoReporte.setText("Exportación cancelada.");
+            }
+            return;
+        }
+
+        File doc = elegidoOpt.get();
         List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
         List<List<String>> filas = new ArrayList<>();
         for (FilaReporteAvanzado f : listaFilas) {
             filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
         }
-        lblEstadoReporte.setText("Exportando CSV...");
+
+        if (lblEstadoReporte != null) {
+            lblEstadoReporte.setText(estadoProcesando);
+        }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                File doc = new File("dist/REPORTE_" + sanitizarNombre(categoria) + ".csv");
                 if (doc.getParentFile() != null) {
-                    java.nio.file.Files.createDirectories(doc.getParentFile().toPath());
+                    Files.createDirectories(doc.getParentFile().toPath());
                 }
-                exportacionService.exportarReporteGenericoCsv(headers, filas, doc);
+                action.export(headers, filas, doc);
                 return doc.getName();
             },
-            nombre -> lblEstadoReporte.setText("✓ CSV exportado: " + nombre),
-            ex -> lblEstadoReporte.setText("Error al exportar CSV: " + (ex != null ? ex.getMessage() : "desconocido"))
+            nombre -> {
+                if (lblEstadoReporte != null) {
+                    lblEstadoReporte.setText(prefijoExito + nombre);
+                }
+            },
+            ex -> {
+                if (lblEstadoReporte != null) {
+                    lblEstadoReporte.setText(prefijoError + (ex != null ? ex.getMessage() : "desconocido"));
+                }
+            }
         );
     }
 

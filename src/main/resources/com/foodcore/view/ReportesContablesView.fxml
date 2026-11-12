@@ -40,7 +40,7 @@
                                             <children>
                                                 <Button fx:id="btnExportarVentasSunat" mnemonicParsing="false" onAction="#handleExportarVentasSunat" styleClass="btn-primary" text="Exportar Ventas 14.1" />
                                                 <Button fx:id="btnExportarComprasSunat" mnemonicParsing="false" onAction="#handleExportarComprasSunat" styleClass="btn-secondary" text="Exportar Compras 8.1" />
-                                                <Button fx:id="btnExportarResumenCaja" mnemonicParsing="false" onAction="#handleExportarResumenCaja" styleClass="btn-kds-outline" text="Resumen Caja Z (PDF)" />
+                                                <Button fx:id="btnExportarResumenCaja" mnemonicParsing="false" onAction="#handleExportarResumenCaja" styleClass="btn-secondary" text="Resumen Caja Z (PDF)" />
                                             </children>
                                         </HBox>
                                     </children>
@@ -52,9 +52,9 @@
                                         <Label styleClass="text-body-strong" text="Período:" />
                                         <ComboBox fx:id="cbPeriodo" prefWidth="160.0" styleClass="form-combo-box" />
                                         <Label styleClass="text-body-strong" text="Desde:" />
-                                        <DatePicker fx:id="dpInicio" prefWidth="135.0" styleClass="form-date-picker" />
+                                        <DatePicker fx:id="dpInicio" prefWidth="148.0" styleClass="form-date-picker" />
                                         <Label styleClass="text-body-strong" text="Hasta:" />
-                                        <DatePicker fx:id="dpFin" prefWidth="135.0" styleClass="form-date-picker" />
+                                        <DatePicker fx:id="dpFin" prefWidth="148.0" styleClass="form-date-picker" />
                                         <Button fx:id="btnFiltrar" mnemonicParsing="false" onAction="#handleFiltrar" styleClass="btn-secondary" text="Consultar" />
                                         <Region HBox.hgrow="ALWAYS" />
                                         <Label fx:id="lblEstadoExportacion" styleClass="text-body-caption" text="Listo para exportar" />
