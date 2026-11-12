@@ -34,6 +34,8 @@ public class DetallePedido {
     private String nombreVariante;
     private String modificadoresTexto;
     private List<ProductoModificador> modificadoresSeleccionados = new ArrayList<>();
+    private Integer idCombo;
+    private String comboComponentesTexto;
 
     public DetallePedido() {
         this.enviadoEn = LocalDateTime.now(ZONA_LIMA);
@@ -129,6 +131,12 @@ public class DetallePedido {
                 ? new ArrayList<>(modificadoresSeleccionados)
                 : new ArrayList<>();
     }
+
+    public Integer getIdCombo() { return idCombo; }
+    public void setIdCombo(Integer idCombo) { this.idCombo = idCombo; }
+
+    public String getComboComponentesTexto() { return comboComponentesTexto; }
+    public void setComboComponentesTexto(String comboComponentesTexto) { this.comboComponentesTexto = comboComponentesTexto; }
 
     @Override
     public String toString() {

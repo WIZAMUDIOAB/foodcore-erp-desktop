@@ -1,5 +1,6 @@
 package com.foodcore.util;
 
+import com.foodcore.model.ComboDetalle;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Producto;
@@ -11,11 +12,15 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Utilidad compartida de cálculo y formateo de variantes/modificadores para POS, Mozo, KDS y Tickets (v4.8.0).
  */
 public final class FormatoPersonalizacionUtil {
+
+    private static final Pattern PATRON_CANTIDAD_COMPONENTE = Pattern.compile("^(\\d+)\\s*x\\s+(.+)$", Pattern.CASE_INSENSITIVE);
 
     private FormatoPersonalizacionUtil() {
     }
@@ -161,7 +166,72 @@ public final class FormatoPersonalizacionUtil {
         if (producto == null) {
             return "";
         }
+        if (producto.isEsCombo()) {
+            return "COMBO";
+        }
         return construirResumenOpciones(producto.getVariantes().size(), producto.getModificadores().size(), "");
+    }
+
+    /**
+     * Formatea en una sola línea los componentes incluidos de un combo (ej. {@code "1x Pizza · 4x Gaseosa"}).
+     */
+    public static String formatearResumenComponentesCombo(List<ComboDetalle> componentes) {
+        if (componentes == null || componentes.isEmpty()) {
+            return "";
+        }
+        List<String> partes = new ArrayList<>();
+        for (ComboDetalle det : componentes) {
+            if (det != null) {
+                partes.add(det.formatearLinea());
+            }
+        }
+        return String.join(" · ", partes);
+    }
+
+    /**
+     * Formatea el desglose multilínea de un combo para almacenamiento y despliegue en KDS / Comanda.
+     */
+    public static String formatearDesgloseComboMultilinea(List<ComboDetalle> componentes) {
+        if (componentes == null || componentes.isEmpty()) {
+            return "";
+        }
+        List<String> lineas = new ArrayList<>();
+        for (ComboDetalle det : componentes) {
+            if (det != null) {
+                lineas.add(det.formatearLinea());
+            }
+        }
+        return String.join("\n", lineas);
+    }
+
+    /**
+     * Parsea el texto de componentes de un combo y escala cantidades por {@code cantidadCombo} para cocina.
+     */
+    public static List<String> extraerLineasDesgloseCombo(String componentesTexto, int cantidadCombo) {
+        if (componentesTexto == null || componentesTexto.isBlank()) {
+            return List.of();
+        }
+        int mult = Math.max(1, cantidadCombo);
+        String[] rawPartes = componentesTexto.split("\\R|[|·•]");
+        List<String> resultado = new ArrayList<>();
+        for (String raw : rawPartes) {
+            if (raw == null) {
+                continue;
+            }
+            String limpio = raw.trim();
+            if (limpio.isEmpty()) {
+                continue;
+            }
+            Matcher m = PATRON_CANTIDAD_COMPONENTE.matcher(limpio);
+            if (m.matches()) {
+                int cantBase = Integer.parseInt(m.group(1));
+                String nom = m.group(2).trim();
+                resultado.add((cantBase * mult) + "x " + nom);
+            } else {
+                resultado.add((mult > 1 ? mult + "x " : "") + limpio);
+            }
+        }
+        return resultado;
     }
 
     /**

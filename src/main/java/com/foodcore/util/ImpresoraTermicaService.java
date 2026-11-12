@@ -407,6 +407,11 @@ public class ImpresoraTermicaService {
         for (DetallePedido item : detalles) {
             String descCocina = FormatoPersonalizacionUtil.formatearDescripcionItem(item);
             agregarLineasEnvolventes(lineas, item.getCantidad() + "x " + descCocina, "   ");
+            List<String> componentesCombo = FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
+                    item.getComboComponentesTexto(), item.getCantidad());
+            for (String comp : componentesCombo) {
+                agregarLineasEnvolventes(lineas, "   - " + comp, "     ");
+            }
             if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
                 agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion().trim(), "   ");
             }

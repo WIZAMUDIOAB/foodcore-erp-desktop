@@ -552,6 +552,8 @@ public class VentaController {
                 dv.setNombreVariante(dp.getNombreVariante());
                 dv.setModificadoresTexto(dp.getModificadoresTexto());
                 dv.setModificadoresSeleccionados(dp.getModificadoresSeleccionados());
+                dv.setIdCombo(dp.getIdCombo());
+                dv.setComboComponentesTexto(dp.getComboComponentesTexto());
                 itemsVenta.add(dv);
             }
         }
@@ -819,7 +821,13 @@ public class VentaController {
                     content.getChildren().addAll(lblNombre, lblCodigo);
                 }
 
-                if (p.tieneOpcionesPersonalizacion()) {
+                if (p.isEsCombo()) {
+                    Label lblComboBadge = new Label("COMBO");
+                    lblComboBadge.setStyle("-fx-background-color: #EEF2FF; -fx-text-fill: #4338CA; "
+                            + "-fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2 7; "
+                            + "-fx-background-radius: 6; -fx-border-color: #A5B4FC; -fx-border-radius: 6;");
+                    content.getChildren().add(lblComboBadge);
+                } else if (p.tieneOpcionesPersonalizacion()) {
                     Label lblOpciones = new Label(FormatoPersonalizacionUtil.construirResumenOpciones(p));
                     lblOpciones.setStyle("-fx-background-color: #FFF4EC; -fx-text-fill: #C2410C; "
                             + "-fx-font-size: 10px; -fx-font-weight: 700; -fx-padding: 2 6; "
@@ -937,6 +945,11 @@ public class VentaController {
         nuevoItem.setNombreVariante(nombreVariante);
         nuevoItem.setModificadoresTexto(modsTexto);
         nuevoItem.setModificadoresSeleccionados(mods);
+        if (p.isEsCombo()) {
+            nuevoItem.setIdCombo(p.getIdCombo());
+            nuevoItem.setComboComponentesTexto(
+                    FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(p.getComboComponentes()));
+        }
 
         try {
             Pedido actualizado = pedidoService.agregarItemsAPedido(idPedido, List.of(nuevoItem));
@@ -992,6 +1005,11 @@ public class VentaController {
         nuevo.setModificadoresTexto(modsTexto);
         nuevo.setModificadoresSeleccionados(mods);
         nuevo.setNotasPreparacion(nota);
+        if (p.isEsCombo()) {
+            nuevo.setIdCombo(p.getIdCombo());
+            nuevo.setComboComponentesTexto(
+                    FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(p.getComboComponentes()));
+        }
         itemsVenta.add(nuevo);
         if (tblDetalle != null) {
             tblDetalle.refresh();
@@ -1535,6 +1553,8 @@ public class VentaController {
         dp.setNombreVariante(dv.getNombreVariante());
         dp.setModificadoresTexto(dv.getModificadoresTexto());
         dp.setModificadoresSeleccionados(dv.getModificadoresSeleccionados());
+        dp.setIdCombo(dv.getIdCombo());
+        dp.setComboComponentesTexto(dv.getComboComponentesTexto());
         return dp;
     }
 

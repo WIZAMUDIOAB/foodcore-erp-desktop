@@ -244,7 +244,12 @@ public class MozoOrderController {
             Label lblPrecio = new Label("S/ " + precioVal);
             lblPrecio.setStyle("-fx-font-family: 'JetBrains Mono', 'Consolas', monospace; -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #F05A22;");
 
-            if (p.tieneOpcionesPersonalizacion()) {
+            if (p.isEsCombo()) {
+                Label lblCombo = new Label("COMBO");
+                lblCombo.setStyle("-fx-background-color: #EEF2FF; -fx-text-fill: #4338CA; "
+                        + "-fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
+                infoBox.getChildren().addAll(lblNombre, lblCombo, lblPrecio);
+            } else if (p.tieneOpcionesPersonalizacion()) {
                 Label lblOpciones = new Label(FormatoPersonalizacionUtil.construirResumenOpciones(p));
                 lblOpciones.setStyle("-fx-background-color: #FFF4EC; -fx-text-fill: #C2410C; "
                         + "-fx-font-size: 10px; -fx-font-weight: 700; -fx-padding: 2 6; -fx-background-radius: 6;");
@@ -333,6 +338,11 @@ public class MozoOrderController {
         nuevo.setNombreVariante(nombreVariante);
         nuevo.setModificadoresTexto(modsTexto);
         nuevo.setModificadoresSeleccionados(mods);
+        if (p.isEsCombo()) {
+            nuevo.setIdCombo(p.getIdCombo());
+            nuevo.setComboComponentesTexto(
+                    FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(p.getComboComponentes()));
+        }
         items.add(nuevo);
         if (tblItems != null) {
             tblItems.refresh();

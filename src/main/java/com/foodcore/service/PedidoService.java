@@ -299,6 +299,12 @@ public class PedidoService {
                     if (!mods.isEmpty()) {
                         item.addProperty("modificadores", mods);
                     }
+                    if (d.getIdCombo() != null && d.getIdCombo() > 0) {
+                        item.addProperty("idCombo", d.getIdCombo());
+                    }
+                    if (d.getComboComponentesTexto() != null && !d.getComboComponentesTexto().isBlank()) {
+                        item.addProperty("componentes", d.getComboComponentesTexto());
+                    }
                     item.addProperty("cantidad", d.getCantidad());
                     item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
                     items.add(item);

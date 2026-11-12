@@ -1,10 +1,13 @@
 package com.foodcore.service.impl;
 
+import com.foodcore.dao.ComboDAO;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.ProductoPersonalizacionDAO;
+import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.model.Combo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
@@ -32,17 +35,26 @@ public class PersonalizacionProductoServiceImpl implements PersonalizacionProduc
     private final TransactionManager tx;
     private final ProductoDAO productoDAO;
     private final ProductoPersonalizacionDAO personalizacionDAO;
+    private final ComboDAO comboDAO;
 
     public PersonalizacionProductoServiceImpl() {
-        this(new JdbcTransactionManager(), new ProductoDAOImpl(), new ProductoPersonalizacionDAOImpl());
+        this(new JdbcTransactionManager(), new ProductoDAOImpl(), new ProductoPersonalizacionDAOImpl(), new ComboDAOImpl());
     }
 
     public PersonalizacionProductoServiceImpl(TransactionManager tx,
                                               ProductoDAO productoDAO,
                                               ProductoPersonalizacionDAO personalizacionDAO) {
+        this(tx, productoDAO, personalizacionDAO, new ComboDAOImpl());
+    }
+
+    public PersonalizacionProductoServiceImpl(TransactionManager tx,
+                                              ProductoDAO productoDAO,
+                                              ProductoPersonalizacionDAO personalizacionDAO,
+                                              ComboDAO comboDAO) {
         this.tx = Objects.requireNonNull(tx);
         this.productoDAO = Objects.requireNonNull(productoDAO);
         this.personalizacionDAO = Objects.requireNonNull(personalizacionDAO);
+        this.comboDAO = Objects.requireNonNull(comboDAO);
     }
 
     @Override
@@ -80,11 +92,17 @@ public class PersonalizacionProductoServiceImpl implements PersonalizacionProduc
         }
         producto.setVariantes(personalizacionDAO.listarVariantesPorProducto(conn, producto.getIdProducto()));
         producto.setModificadores(personalizacionDAO.listarModificadoresPorProducto(conn, producto.getIdProducto()));
+        comboDAO.obtenerPorIdProducto(conn, producto.getIdProducto()).ifPresent(combo -> {
+            producto.setEsCombo(true);
+            producto.setIdCombo(combo.getIdCombo());
+            producto.setComboComponentes(combo.getDetalles());
+        });
     }
 
     @Override
     public Producto resolverOpcionesProducto(Producto producto) {
         if (producto == null || producto.tieneOpcionesPersonalizacion()
+                || (producto.isEsCombo() && !producto.getComboComponentes().isEmpty())
                 || producto.getIdProducto() <= 0
                 || producto.getCodigo() == null || producto.getCodigo().isBlank()) {
             return producto;
@@ -189,9 +207,16 @@ public class PersonalizacionProductoServiceImpl implements PersonalizacionProduc
         }
         Map<Integer, List<ProductoVariante>> mapaVariantes = personalizacionDAO.listarVariantesPorProductos(conn);
         Map<Integer, List<ProductoModificador>> mapaMods = personalizacionDAO.listarModificadoresPorProductos(conn);
+        Map<Integer, Combo> mapaCombos = comboDAO.listarMapaCombosActivosPorProducto(conn);
         for (Producto p : productos) {
             p.setVariantes(mapaVariantes.getOrDefault(p.getIdProducto(), List.of()));
             p.setModificadores(mapaMods.getOrDefault(p.getIdProducto(), List.of()));
+            Combo combo = mapaCombos.get(p.getIdProducto());
+            if (combo != null) {
+                p.setEsCombo(true);
+                p.setIdCombo(combo.getIdCombo());
+                p.setComboComponentes(combo.getDetalles());
+            }
         }
     }
 }

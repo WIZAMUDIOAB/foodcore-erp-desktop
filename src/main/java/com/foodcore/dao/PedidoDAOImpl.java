@@ -3,8 +3,10 @@ package com.foodcore.dao;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.exception.ConflictoEstadoException;
+import com.foodcore.model.Combo;
 import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
@@ -23,6 +25,7 @@ public class PedidoDAOImpl implements PedidoDAO {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private final ProductoPersonalizacionDAO personalizacionDAO = new ProductoPersonalizacionDAOImpl();
+    private final ComboDAO comboDAO = new ComboDAOImpl();
 
     @Override
     public int crearPedido(Connection conn, Pedido pedido) throws SQLException {
@@ -151,9 +154,11 @@ public class PedidoDAOImpl implements PedidoDAO {
         if (!modsTexto.isEmpty()) {
             detalle.setModificadoresTexto(modsTexto);
         }
+        completarComboDetallePedido(conn, detalle);
         String sql = "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario, subtotal, " +
-                     "notas_preparacion, estado_cocina, enviado_en, id_variante, nombre_variante, modificadores_texto) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     "notas_preparacion, estado_cocina, enviado_en, id_variante, nombre_variante, modificadores_texto, " +
+                     "id_combo, combo_componentes_texto) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, detalle.getIdPedido());
             ps.setInt(2, detalle.getIdProducto());
@@ -177,6 +182,16 @@ public class PedidoDAOImpl implements PedidoDAO {
                 ps.setString(11, modsTexto);
             } else {
                 ps.setNull(11, Types.VARCHAR);
+            }
+            if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0) {
+                ps.setInt(12, detalle.getIdCombo());
+            } else {
+                ps.setNull(12, Types.INTEGER);
+            }
+            if (detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+                ps.setString(13, detalle.getComboComponentesTexto().trim());
+            } else {
+                ps.setNull(13, Types.VARCHAR);
             }
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -398,10 +413,38 @@ public class PedidoDAOImpl implements PedidoDAO {
             }
             dp.setNombreVariante(rs.getString("nombre_variante"));
             dp.setModificadoresTexto(rs.getString("modificadores_texto"));
+            int idCombo = rs.getInt("id_combo");
+            if (!rs.wasNull() && idCombo > 0) {
+                dp.setIdCombo(idCombo);
+            }
+            dp.setComboComponentesTexto(rs.getString("combo_componentes_texto"));
         } catch (SQLException ignored) {
             // Columnas opcionales en esquemas previos
         }
         return dp;
+    }
+
+    private void completarComboDetallePedido(Connection conn, DetallePedido detalle) throws SQLException {
+        if (detalle == null || detalle.getIdProducto() <= 0) {
+            return;
+        }
+        if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0
+                && detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+            return;
+        }
+        Optional<Combo> opt = (detalle.getIdCombo() != null && detalle.getIdCombo() > 0)
+                ? comboDAO.obtenerPorId(conn, detalle.getIdCombo())
+                : comboDAO.obtenerPorIdProducto(conn, detalle.getIdProducto());
+        if (opt.isPresent()) {
+            Combo combo = opt.get();
+            if (detalle.getIdCombo() == null || detalle.getIdCombo() <= 0) {
+                detalle.setIdCombo(combo.getIdCombo());
+            }
+            if (detalle.getComboComponentesTexto() == null || detalle.getComboComponentesTexto().isBlank()) {
+                detalle.setComboComponentesTexto(
+                        FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(combo.getDetalles()));
+            }
+        }
     }
 
     @Override

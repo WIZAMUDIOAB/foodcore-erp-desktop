@@ -88,7 +88,8 @@ public class VentaDAOImpl implements VentaDAO {
             throw new SQLException("Detalle de venta inválido: cantidad, producto y montos deben ser válidos.");
         }
         String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal, "
-                + "id_variante, nombre_variante, modificadores_texto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                + "id_variante, nombre_variante, modificadores_texto, id_combo, combo_componentes_texto) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, detalle.getIdVenta());
             ps.setInt(2, detalle.getIdProducto());
@@ -111,6 +112,16 @@ public class VentaDAOImpl implements VentaDAO {
                 ps.setString(8, mods);
             } else {
                 ps.setNull(8, java.sql.Types.VARCHAR);
+            }
+            if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0) {
+                ps.setInt(9, detalle.getIdCombo());
+            } else {
+                ps.setNull(9, java.sql.Types.INTEGER);
+            }
+            if (detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+                ps.setString(10, detalle.getComboComponentesTexto().trim());
+            } else {
+                ps.setNull(10, java.sql.Types.VARCHAR);
             }
             ps.executeUpdate();
         }

@@ -137,6 +137,12 @@ public class KdsController {
                     if (!mods.isEmpty()) {
                         itemNode.put("modificadores", mods);
                     }
+                    if (dp.getIdCombo() != null && dp.getIdCombo() > 0) {
+                        itemNode.put("id_combo", dp.getIdCombo());
+                    }
+                    if (dp.getComboComponentesTexto() != null && !dp.getComboComponentesTexto().isBlank()) {
+                        itemNode.put("componentes", dp.getComboComponentesTexto());
+                    }
                     itemNode.put("cantidad", dp.getCantidad());
                     itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
                     itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");

@@ -1,7 +1,9 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.VentaDAOImpl;
+import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
@@ -46,10 +48,11 @@ public class VentaService {
     private final CajaDAO cajaDAO;
     private final InsumoDAO insumoDAO;
     private final PedidoDAO pedidoDAO;
+    private final ComboDAO comboDAO;
     private final AutorizacionService autorizacionService = new AutorizacionService();
 
     public VentaService() {
-        this(new JdbcTransactionManager(), new VentaDAOImpl(), new CajaDAOImpl(), new InsumoDAOImpl(), new PedidoDAOImpl());
+        this(new JdbcTransactionManager(), new VentaDAOImpl(), new CajaDAOImpl(), new InsumoDAOImpl(), new PedidoDAOImpl(), new ComboDAOImpl());
     }
 
     public VentaService(TransactionManager tx,
@@ -57,11 +60,21 @@ public class VentaService {
                         CajaDAO cajaDAO,
                         InsumoDAO insumoDAO,
                         PedidoDAO pedidoDAO) {
+        this(tx, ventaDAO, cajaDAO, insumoDAO, pedidoDAO, new ComboDAOImpl());
+    }
+
+    public VentaService(TransactionManager tx,
+                        VentaDAO ventaDAO,
+                        CajaDAO cajaDAO,
+                        InsumoDAO insumoDAO,
+                        PedidoDAO pedidoDAO,
+                        ComboDAO comboDAO) {
         this.tx = tx;
         this.ventaDAO = ventaDAO;
         this.cajaDAO = cajaDAO;
         this.insumoDAO = insumoDAO;
         this.pedidoDAO = pedidoDAO;
+        this.comboDAO = comboDAO != null ? comboDAO : new ComboDAOImpl();
     }
 
     public Venta procesarCobroVenta(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante)
@@ -211,20 +224,18 @@ public class VentaService {
             );
             cajaDAO.registrarMovimiento(conn, movAnulacion);
 
-            // Leer ítems vendidos y sus recetas para revertir stock o registrar merma (§3.2)
+            // Leer ítems vendidos y sus recetas (o componentes de combo) para revertir stock o registrar merma (§3.2, v4.8.0)
             Map<Long, BigDecimal> insumosAfectados = new TreeMap<>();
-            String sqlDet = "SELECT id_producto, cantidad FROM detalle_venta WHERE id_venta = ?";
+            String sqlDet = "SELECT id_producto, id_combo, cantidad FROM detalle_venta WHERE id_venta = ?";
             try (PreparedStatement psDet = conn.prepareStatement(sqlDet)) {
                 psDet.setInt(1, idVenta);
                 try (ResultSet rsDet = psDet.executeQuery()) {
                     while (rsDet.next()) {
                         int idProd = rsDet.getInt("id_producto");
+                        int rawCombo = rsDet.getInt("id_combo");
+                        Integer idCombo = rsDet.wasNull() || rawCombo <= 0 ? null : rawCombo;
                         int cant = rsDet.getInt("cantidad");
-                        List<Receta> recetas = insumoDAO.obtenerRecetaPorProducto(conn, idProd);
-                        for (Receta r : recetas) {
-                            BigDecimal req = r.getCantidadNecesaria().multiply(BigDecimal.valueOf(cant));
-                            insumosAfectados.merge(r.getIdInsumo(), req, BigDecimal::add);
-                        }
+                        acumularInsumosParaLinea(conn, insumosAfectados, idCombo, idProd, cant);
                     }
                 }
             }
@@ -321,16 +332,13 @@ public class VentaService {
             int idCaja = cajaAbierta.get().getIdCaja();
             venta.setIdCaja(idCaja);
 
-            // 3.1 Consolidar requerimientos de insumos de todas las líneas ordenados ascendentemente por id_insumo (R-09)
+            // 3.1 Consolidar requerimientos de insumos de todas las líneas (explotando combos) ordenados por id_insumo (R-09, v4.8.0)
             TreeMap<Long, BigDecimal> requerimientosPorInsumo = new TreeMap<>();
             for (DetalleVenta detalle : detalles) {
-                List<Receta> componentes = insumoDAO.obtenerRecetaPorProducto(conn, detalle.getIdProducto());
-                for (Receta rec : componentes) {
-                    BigDecimal cantRequerida = DesgloseFiscal.normalizarStock(
-                        rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(detalle.getCantidad()))
-                    );
-                    requerimientosPorInsumo.merge(rec.getIdInsumo(), cantRequerida, BigDecimal::add);
-                }
+                completarTrazabilidadComboDetalle(conn, detalle);
+                acumularInsumosParaLinea(
+                        conn, requerimientosPorInsumo, detalle.getIdCombo(), detalle.getIdProducto(), detalle.getCantidad()
+                );
             }
 
             // 3.2 Adquirir bloqueo pesimista SELECT ... FOR UPDATE en orden ascendente de id_insumo (R-09)
@@ -426,5 +434,56 @@ public class VentaService {
             LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + desglose.getTotal() + ").");
             return venta;
         });
+    }
+
+    private void completarTrazabilidadComboDetalle(java.sql.Connection conn, DetalleVenta detalle) throws SQLException {
+        if (detalle == null || detalle.getIdProducto() <= 0) {
+            return;
+        }
+        Optional<Combo> optCombo = (detalle.getIdCombo() != null && detalle.getIdCombo() > 0)
+                ? comboDAO.obtenerPorId(conn, detalle.getIdCombo())
+                : comboDAO.obtenerPorIdProducto(conn, detalle.getIdProducto());
+        if (optCombo.isEmpty()) {
+            return;
+        }
+        Combo combo = optCombo.get();
+        if (detalle.getIdCombo() == null || detalle.getIdCombo() <= 0) {
+            detalle.setIdCombo(combo.getIdCombo());
+        }
+        if (detalle.getComboComponentesTexto() == null || detalle.getComboComponentesTexto().isBlank()) {
+            String desglose = FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(combo.getDetalles());
+            if (!desglose.isBlank()) {
+                detalle.setComboComponentesTexto(desglose);
+            }
+        }
+    }
+
+    private void acumularInsumosParaLinea(java.sql.Connection conn,
+                                          Map<Long, BigDecimal> destino,
+                                          Integer idCombo,
+                                          int idProducto,
+                                          int cantidadVendida) throws SQLException, NegocioException {
+        List<ComboDetalle> componentesCombo = comboDAO.obtenerComponentesParaVenta(conn, idCombo, idProducto);
+        if (!componentesCombo.isEmpty()) {
+            for (ComboDetalle comp : componentesCombo) {
+                int cantComp = Math.max(1, cantidadVendida) * Math.max(1, comp.getCantidad());
+                acumularRecetaProducto(conn, destino, comp.getIdProducto(), cantComp);
+            }
+            return;
+        }
+        acumularRecetaProducto(conn, destino, idProducto, Math.max(1, cantidadVendida));
+    }
+
+    private void acumularRecetaProducto(java.sql.Connection conn,
+                                        Map<Long, BigDecimal> destino,
+                                        int idProducto,
+                                        int cantidad) throws SQLException, NegocioException {
+        List<Receta> receta = insumoDAO.obtenerRecetaPorProducto(conn, idProducto);
+        for (Receta rec : receta) {
+            BigDecimal cantRequerida = DesgloseFiscal.normalizarStock(
+                    rec.getCantidadNecesaria().multiply(BigDecimal.valueOf(cantidad))
+            );
+            destino.merge(rec.getIdInsumo(), cantRequerida, BigDecimal::add);
+        }
     }
 }

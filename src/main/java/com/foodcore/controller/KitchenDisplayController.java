@@ -257,6 +257,12 @@ public class KitchenDisplayController {
                     if (obj.has("modificadores") && !obj.get("modificadores").isJsonNull()) {
                         dp.setModificadoresTexto(obj.get("modificadores").getAsString());
                     }
+                    if (obj.has("idCombo") && !obj.get("idCombo").isJsonNull()) {
+                        dp.setIdCombo(obj.get("idCombo").getAsInt());
+                    }
+                    if (obj.has("componentes") && !obj.get("componentes").isJsonNull()) {
+                        dp.setComboComponentesTexto(obj.get("componentes").getAsString());
+                    }
                     dp.setCantidad(obj.get("cantidad").getAsInt());
                     dp.setNotasPreparacion(obj.has("notas") ? obj.get("notas").getAsString() : "");
                     dp.setEnviadoEn(LocalDateTime.now(ZONA_LIMA));

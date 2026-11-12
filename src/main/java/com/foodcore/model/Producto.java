@@ -21,8 +21,11 @@ public class Producto {
 
     // Relación descriptiva y opciones configurables (v4.8.0)
     private String nombreCategoria;
+    private boolean esCombo;
+    private Integer idCombo;
     private List<ProductoVariante> variantes = new ArrayList<>();
     private List<ProductoModificador> modificadores = new ArrayList<>();
+    private List<ComboDetalle> comboComponentes = new ArrayList<>();
 
     public Producto() {}
 
@@ -100,8 +103,30 @@ public class Producto {
         this.modificadores = modificadores != null ? new ArrayList<>(modificadores) : new ArrayList<>();
     }
 
+    public boolean isEsCombo() { return esCombo; }
+    public void setEsCombo(boolean esCombo) { this.esCombo = esCombo; }
+
+    public Integer getIdCombo() { return idCombo; }
+    public void setIdCombo(Integer idCombo) {
+        this.idCombo = idCombo;
+        if (idCombo != null && idCombo > 0) {
+            this.esCombo = true;
+        }
+    }
+
+    public List<ComboDetalle> getComboComponentes() {
+        return Collections.unmodifiableList(comboComponentes);
+    }
+
+    public void setComboComponentes(List<ComboDetalle> comboComponentes) {
+        this.comboComponentes = comboComponentes != null ? new ArrayList<>(comboComponentes) : new ArrayList<>();
+        if (!this.comboComponentes.isEmpty()) {
+            this.esCombo = true;
+        }
+    }
+
     public boolean tieneOpcionesPersonalizacion() {
-        return !variantes.isEmpty() || !modificadores.isEmpty();
+        return !esCombo && (!variantes.isEmpty() || !modificadores.isEmpty());
     }
 
     @Override

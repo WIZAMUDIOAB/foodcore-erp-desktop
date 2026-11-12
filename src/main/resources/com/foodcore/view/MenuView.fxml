@@ -45,6 +45,7 @@
                         <HBox spacing="8.0" alignment="CENTER_RIGHT">
                             <children>
                                 <Button fx:id="btnMenuDigitalQr" mnemonicParsing="false" onAction="#handleAbrirMenuQr" styleClass="btn-secondary" text="📱 Menú QR Digital" />
+                                <Button fx:id="btnNuevoCombo" mnemonicParsing="false" onAction="#handleNuevoCombo" styleClass="btn-secondary" text="📦 Crear Combo" />
                                 <Button fx:id="btnLimpiarForm" mnemonicParsing="false" onAction="#handleNuevoPlatillo" styleClass="btn-secondary" text="+ Nuevo Platillo" />
                             </children>
                         </HBox>
@@ -234,6 +235,77 @@
                                                                         <ListView fx:id="lstModificadoresGlobales" prefHeight="120.0" />
                                                                     </children>
                                                                 </VBox>
+                                                            </children>
+                                                        </VBox>
+                                                    </content>
+                                                </ScrollPane>
+                                            </content>
+                                        </Tab>
+
+                                        <!-- Tab 4: Crear / Editar Combo (v4.8.0 Módulo 3) -->
+                                        <Tab fx:id="tabCombo" text="Combo">
+                                            <content>
+                                                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+                                                    <content>
+                                                        <VBox spacing="9.0" style="-fx-padding: 10 4 6 2;">
+                                                            <children>
+                                                                <Label styleClass="text-caption-muted" text="Agrupe platillos existentes en un combo con precio final propio, descuento automático de inventario y desglose en KDS." wrapText="true" />
+                                                                <HBox spacing="8.0">
+                                                                    <children>
+                                                                        <VBox spacing="4.0" prefWidth="115.0">
+                                                                            <children>
+                                                                                <Label styleClass="text-body-strong" text="Código Combo" />
+                                                                                <TextField fx:id="txtComboCodigo" promptText="Ej. CMB-FAM" styleClass="input-field" />
+                                                                            </children>
+                                                                        </VBox>
+                                                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                                            <children>
+                                                                                <Label styleClass="text-body-strong" text="Precio Final (S/)" />
+                                                                                <TextField fx:id="txtComboPrecio" promptText="49.90" styleClass="input-field" />
+                                                                            </children>
+                                                                        </VBox>
+                                                                    </children>
+                                                                </HBox>
+                                                                <VBox spacing="4.0">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Nombre del Combo" />
+                                                                        <TextField fx:id="txtComboNombre" promptText="Ej. Combo Duo Burger / Combo Familiar" styleClass="input-field" />
+                                                                    </children>
+                                                                </VBox>
+                                                                <VBox spacing="6.0" styleClass="client-section-box">
+                                                                    <children>
+                                                                        <Label styleClass="text-body-strong" text="Componentes incluidos en el Combo" />
+                                                                        <HBox spacing="6.0" alignment="CENTER_LEFT">
+                                                                            <children>
+                                                                                <ComboBox fx:id="cmbComboComponente" promptText="Seleccione producto..." HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                                                                                <TextField fx:id="txtComboCantidad" prefWidth="58.0" promptText="Cant" text="1" styleClass="input-field" />
+                                                                            </children>
+                                                                        </HBox>
+                                                                        <HBox spacing="8.0">
+                                                                            <children>
+                                                                                <Button fx:id="btnAgregarComponenteCombo" mnemonicParsing="false" onAction="#handleAgregarComponenteCombo" styleClass="btn-secondary" text="+ Añadir Producto" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                                                                                <Button fx:id="btnQuitarComponenteCombo" mnemonicParsing="false" onAction="#handleQuitarComponenteCombo" styleClass="btn-secondary" text="Quitar" />
+                                                                            </children>
+                                                                        </HBox>
+                                                                    </children>
+                                                                </VBox>
+                                                                <TableView fx:id="tblComboComponentes" prefHeight="155.0">
+                                                                    <columns>
+                                                                        <TableColumn fx:id="colComboCompNombre" prefWidth="215.0" text="Producto Incluido" />
+                                                                        <TableColumn fx:id="colComboCompCantidad" prefWidth="65.0" text="Cant." />
+                                                                    </columns>
+                                                                    <columnResizePolicy>
+                                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                                    </columnResizePolicy>
+                                                                </TableView>
+                                                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                                                    <children>
+                                                                        <CheckBox fx:id="chkComboActivo" mnemonicParsing="false" selected="true" styleClass="text-body-strong" text="Combo Activo en POS" />
+                                                                        <Region HBox.hgrow="ALWAYS" />
+                                                                        <Label fx:id="lblComboResumen" styleClass="text-caption-muted" text="0 productos" />
+                                                                    </children>
+                                                                </HBox>
+                                                                <Button fx:id="btnGuardarCombo" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleGuardarCombo" styleClass="btn-primary" text="Guardar Combo" />
                                                             </children>
                                                         </VBox>
                                                     </content>
