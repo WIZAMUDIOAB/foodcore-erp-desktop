@@ -105,6 +105,35 @@ public class ProductoDAOImpl implements ProductoDAO {
     }
 
     @Override
+    public Producto buscarPorCodigo(Connection conn, String codigo) throws SQLException {
+        if (codigo == null || codigo.isBlank()) {
+            return null;
+        }
+        String sql = "SELECT p.*, COALESCE(c.nombre, 'General') AS nombre_cat " +
+                     "FROM producto p " +
+                     "LEFT JOIN categoria c ON p.id_categoria = c.id_categoria " +
+                     "WHERE UPPER(TRIM(p.codigo)) = UPPER(?) LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codigo.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapearProducto(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void reactivar(Connection conn, int idProducto) throws SQLException {
+        String sql = "UPDATE producto SET activo = 1 WHERE id_producto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idProducto);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
     public int crear(Connection conn, Producto p) throws SQLException {
         String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, " +
                      "costo_estimado, disponible, imagen_url, es_menu_del_dia, fecha_disponibilidad) " +

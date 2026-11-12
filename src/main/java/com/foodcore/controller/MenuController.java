@@ -6,8 +6,10 @@ import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
+import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -20,6 +22,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -75,9 +78,14 @@ public class MenuController {
     @FXML private Button btnSeleccionarFoto;
     @FXML private Button btnGuardarPlatillo;
     @FXML private Button btnLimpiarForm;
+    @FXML private Button btnDescargarPlantillaMenu;
+    @FXML private Button btnImportarMenu;
+    @FXML private ProgressIndicator pbImportacionMenu;
+    @FXML private Label lblResumenImportacionMenu;
 
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final CategoriaDAO categoriaDAO = new CategoriaDAOImpl();
+    private final ImportacionMasivaService importacionMasivaService = new ImportacionMasivaService();
     private final ObservableList<Producto> listaProductos = FXCollections.observableArrayList();
     private final ObservableList<Categoria> listaCategorias = FXCollections.observableArrayList();
     private Producto productoEnEdicion;
@@ -88,6 +96,8 @@ public class MenuController {
         AnimationUtils.attachTactileFeedback(btnSeleccionarFoto);
         AnimationUtils.attachTactileFeedback(btnGuardarPlatillo);
         AnimationUtils.attachTactileFeedback(btnLimpiarForm);
+        AnimationUtils.attachTactileFeedback(btnDescargarPlantillaMenu);
+        AnimationUtils.attachTactileFeedback(btnImportarMenu);
 
         configurarTabla();
         tblMenu.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
@@ -521,5 +531,29 @@ public class MenuController {
             LOGGER.log(Level.SEVERE, "Error al abrir modal Menu QR: " + e.getMessage(), e);
             AnimationUtils.mostrarToast(rootMenuStack, "No se pudo abrir el modal del Menu QR: " + e.getMessage(), true);
         }
+    }
+
+    @FXML
+    public void handleDescargarPlantillaExcel(ActionEvent event) {
+        ImportacionUIHelper.descargarPlantilla(
+                btnDescargarPlantillaMenu != null ? btnDescargarPlantillaMenu : rootMenuStack,
+                rootMenuStack,
+                lblResumenImportacionMenu,
+                "Guardar Plantilla Excel de Menú",
+                "plantilla_menu.xlsx",
+                importacionMasivaService::exportarPlantillaMenu);
+    }
+
+    @FXML
+    public void handleImportarDesdeExcel(ActionEvent event) {
+        ImportacionUIHelper.ejecutarImportacion(
+                btnImportarMenu != null ? btnImportarMenu : rootMenuStack,
+                rootMenuStack,
+                btnImportarMenu,
+                pbImportacionMenu,
+                lblResumenImportacionMenu,
+                "Importar Catálogo de Menú (Excel / CSV)",
+                importacionMasivaService::importarMenu,
+                this::cargarDatosMenu);
     }
 }

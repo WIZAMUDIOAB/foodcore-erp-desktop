@@ -5,10 +5,12 @@ import com.foodcore.dao.InsumoDAOImpl;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.KardexMovimiento;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.application.Platform;
@@ -23,6 +25,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -57,6 +60,10 @@ public class InventarioController {
     @FXML private Button btnRegistrarCompra;
     @FXML private Button btnNuevoInsumo;
     @FXML private Button btnEliminarInsumo;
+    @FXML private Button btnDescargarPlantillaInsumos;
+    @FXML private Button btnImportarInsumos;
+    @FXML private ProgressIndicator pbImportacionInsumos;
+    @FXML private Label lblResumenImportacionInsumos;
 
     @FXML private TableView<Insumo> tblInventario;
     @FXML private TableColumn<Insumo, String> colCodigo;
@@ -68,6 +75,7 @@ public class InventarioController {
     @FXML private TableColumn<Insumo, String> colEstado;
 
     private final InsumoDAO insumoDAO = new InsumoDAOImpl();
+    private final ImportacionMasivaService importacionMasivaService = new ImportacionMasivaService();
     private final TransactionManager tx = new JdbcTransactionManager();
     private final ObservableList<Insumo> todosLosInsumos = FXCollections.observableArrayList();
     private final ObservableList<Insumo> insumosFiltrados = FXCollections.observableArrayList();
@@ -76,6 +84,8 @@ public class InventarioController {
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnRegistrarCompra);
         AnimationUtils.attachTactileFeedback(btnNuevoInsumo);
+        AnimationUtils.attachTactileFeedback(btnDescargarPlantillaInsumos);
+        AnimationUtils.attachTactileFeedback(btnImportarInsumos);
 
         configurarColumnas();
         if (txtBuscarInsumo != null) {
@@ -453,5 +463,29 @@ public class InventarioController {
 
     public ObservableList<Insumo> getTodosLosInsumos() {
         return todosLosInsumos;
+    }
+
+    @FXML
+    public void handleDescargarPlantillaExcel(ActionEvent event) {
+        ImportacionUIHelper.descargarPlantilla(
+                btnDescargarPlantillaInsumos != null ? btnDescargarPlantillaInsumos : rootInventarioStack,
+                rootInventarioStack,
+                lblResumenImportacionInsumos,
+                "Guardar Plantilla Excel de Insumos",
+                "plantilla_insumos.xlsx",
+                importacionMasivaService::exportarPlantillaInsumos);
+    }
+
+    @FXML
+    public void handleImportarDesdeExcel(ActionEvent event) {
+        ImportacionUIHelper.ejecutarImportacion(
+                btnImportarInsumos != null ? btnImportarInsumos : rootInventarioStack,
+                rootInventarioStack,
+                btnImportarInsumos,
+                pbImportacionInsumos,
+                lblResumenImportacionInsumos,
+                "Importar Catálogo de Insumos (Excel / CSV)",
+                importacionMasivaService::importarInsumos,
+                this::cargarInventarioDesdeBD);
     }
 }

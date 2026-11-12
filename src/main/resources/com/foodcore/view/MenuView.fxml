@@ -4,6 +4,7 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressIndicator?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
@@ -59,9 +60,18 @@
                     </rowConstraints>
                     <children>
 
-                        <!-- Tabla de Platillos (§2.2: Imagen thumbnail, Nombre, Categoría, Precio, Estado) -->
+                        <!-- Tabla de Platillos (§2.2 + Carga Masiva v4.6.0) -->
                         <VBox spacing="10.0" GridPane.columnIndex="0">
                             <children>
+                                <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="surface-card">
+                                    <children>
+                                        <Button fx:id="btnDescargarPlantillaMenu" mnemonicParsing="false" onAction="#handleDescargarPlantillaExcel" styleClass="btn-secondary" text="Descargar Plantilla Excel" />
+                                        <Button fx:id="btnImportarMenu" mnemonicParsing="false" onAction="#handleImportarDesdeExcel" styleClass="btn-secondary" text="Importar desde Excel" />
+                                        <ProgressIndicator fx:id="pbImportacionMenu" managed="false" prefHeight="22.0" prefWidth="22.0" visible="false" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblResumenImportacionMenu" styleClass="text-caption" text="Carga masiva (.xlsx / .csv)" />
+                                    </children>
+                                </HBox>
                                 <TableView fx:id="tblMenu" VBox.vgrow="ALWAYS">
                                     <columns>
                                         <TableColumn fx:id="colImagen" prefWidth="85.0" text="Imagen" />

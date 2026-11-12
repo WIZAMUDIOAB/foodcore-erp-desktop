@@ -47,6 +47,32 @@ public class InsumoDAOImpl implements InsumoDAO {
         return null;
     }
 
+    @Override
+    public Insumo buscarPorCodigo(Connection conn, String codigo) throws SQLException {
+        if (codigo == null || codigo.isBlank()) {
+            return null;
+        }
+        String sql = "SELECT * FROM insumo WHERE UPPER(TRIM(codigo)) = UPPER(?) LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codigo.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapearInsumo(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void reactivar(Connection conn, long idInsumo) throws SQLException {
+        String sql = "UPDATE insumo SET activo = 1 WHERE id_insumo = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, idInsumo);
+            ps.executeUpdate();
+        }
+    }
+
     private Insumo mapearInsumo(ResultSet rs) throws SQLException {
         Insumo i = new Insumo();
         i.setIdInsumo(rs.getLong("id_insumo"));
