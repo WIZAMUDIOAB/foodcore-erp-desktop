@@ -57,7 +57,7 @@
                 <HBox spacing="16.0" styleClass="view-content" BorderPane.alignment="CENTER">
                     <children>
                         <!-- Tabla Clientes -->
-                        <VBox spacing="8.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                        <VBox spacing="10.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
                             <children>
                                 <Label styleClass="text-h3" text="Cartera de Clientes Registrados" />
                                 <TableView fx:id="tblClientes" VBox.vgrow="ALWAYS">
@@ -79,46 +79,89 @@
                             </children>
                         </VBox>
 
-                        <!-- Panel Detalle Lateral -->
-                        <VBox prefWidth="320.0" spacing="16.0" styleClass="stat-card">
+                        <!-- Panel Detalle Lateral (v4.6.0 Fase 3: .surface-card + secciones Overline) -->
+                        <VBox fx:id="panelFichaCliente" fillWidth="true" minWidth="320.0" prefWidth="345.0" spacing="8.0" style="-fx-padding: 14px;" styleClass="surface-card">
                             <children>
-                                <Label styleClass="text-h3" text="Ficha del Cliente" />
-                                <VBox spacing="8.0">
+                                <HBox alignment="CENTER_LEFT" spacing="8.0">
                                     <children>
-                                        <Label styleClass="text-body-caption" text="RAZÓN SOCIAL / TITULAR" />
-                                        <Label fx:id="lblDetalleRazonSocial" styleClass="text-h4" text="Seleccione un cliente" wrapText="true" />
+                                        <Label styleClass="text-h3" text="Ficha del Cliente" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label styleClass="badge-pill-accent" text="PERFIL 360°" />
+                                    </children>
+                                </HBox>
+                                <Region styleClass="client-sheet-divider" />
 
-                                        <Label styleClass="text-body-caption" text="DOCUMENTO DE IDENTIDAD" />
-                                        <Label fx:id="lblDetalleDocumento" styleClass="text-body-strong" text="-" />
+                                <!-- Sección 1: DATOS GENERALES -->
+                                <VBox spacing="4.0" styleClass="client-section-box">
+                                    <children>
+                                        <Label styleClass="text-overline" text="DATOS GENERALES" />
+                                        <VBox spacing="1.0">
+                                            <children>
+                                                <Label styleClass="text-caption" text="RAZÓN SOCIAL / TITULAR" />
+                                                <Label fx:id="lblDetalleRazonSocial" styleClass="text-body-strong" text="Seleccione un cliente" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="1.0">
+                                            <children>
+                                                <Label styleClass="text-caption" text="DOCUMENTO DE IDENTIDAD" />
+                                                <Label fx:id="lblDetalleDocumento" styleClass="text-mono" text="-" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="1.0">
+                                            <children>
+                                                <Label styleClass="text-caption" text="CONTACTO Y TELÉFONO" />
+                                                <Label fx:id="lblDetalleContacto" styleClass="text-body" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="1.0">
+                                            <children>
+                                                <Label styleClass="text-caption" text="CORREO ELECTRÓNICO" />
+                                                <Label fx:id="lblDetalleEmail" styleClass="text-body" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </VBox>
 
-                                        <Label styleClass="text-body-caption" text="CONTACTO Y TELÉFONO" />
-                                        <Label fx:id="lblDetalleContacto" styleClass="text-body" text="-" />
+                                <!-- Sección 2: FINANZAS -->
+                                <VBox spacing="6.0" styleClass="client-section-box">
+                                    <children>
+                                        <Label styleClass="text-overline" text="FINANZAS" />
+                                        <VBox spacing="1.0">
+                                            <children>
+                                                <Label styleClass="text-caption" text="LÍMITE Y CONDICIÓN DE CRÉDITO" />
+                                                <Label fx:id="lblDetalleLimite" styleClass="text-body-strong" text="-" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="2.0" styleClass="client-debt-box">
+                                            <children>
+                                                <Label styleClass="text-overline" text="SALDO DEUDOR PENDIENTE" />
+                                                <Label fx:id="lblDetalleSaldoDeudor" styleClass="kpi-value-24-accent" text="S/ 0.00" />
+                                                <Label fx:id="lblDetalleComprobantes" styleClass="kpi-subtitle-muted" text="0 comprobantes al crédito" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </VBox>
 
-                                        <Label styleClass="text-body-caption" text="CORREO ELECTRÓNICO" />
-                                        <Label fx:id="lblDetalleEmail" styleClass="text-body" text="-" />
-
-                                        <Label styleClass="text-body-caption" text="LÍMITE DE CRÉDITO" />
-                                        <Label fx:id="lblDetalleLimite" styleClass="text-body-strong" text="-" />
-
-                                        <Label styleClass="text-body-caption" text="PROGRAMA DE FIDELIZACIÓN" />
+                                <!-- Sección 3: FIDELIZACIÓN -->
+                                <VBox spacing="4.0" styleClass="client-section-box">
+                                    <children>
+                                        <Label styleClass="text-overline" text="FIDELIZACIÓN" />
                                         <Label fx:id="lblDetallePuntos" styleClass="badge-pill-accent" text="0 Puntos Acumulados" />
                                     </children>
                                 </VBox>
 
-                                <VBox spacing="6.0" styleClass="stat-card-accent">
-                                    <children>
-                                        <Label styleClass="stat-card-title" text="SALDO DEUDOR PENDIENTE" />
-                                        <Label fx:id="lblDetalleSaldoDeudor" styleClass="stat-card-value" text="S/ 0.00" />
-                                        <Label fx:id="lblDetalleComprobantes" styleClass="stat-card-subtitle" text="0 comprobantes al crédito" />
-                                    </children>
-                                </VBox>
+                                <Region VBox.vgrow="ALWAYS" />
 
-                                <VBox spacing="8.0" VBox.vgrow="ALWAYS">
+                                <!-- Acciones alineadas al fondo -->
+                                <VBox fx:id="boxAccionesCliente" fillWidth="true" spacing="6.0">
                                     <children>
-                                        <Region VBox.vgrow="ALWAYS" />
                                         <Button fx:id="btnEstadoCuentaPdf" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleGenerarEstadoCuentaPdf" styleClass="btn-primary" text="Estado de Cuenta (PDF)" />
-                                        <Button fx:id="btnEditarCliente" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEditarSeleccionado" styleClass="btn-secondary" text="Editar Datos" />
-                                        <Button fx:id="btnCambiarEstado" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCambiarEstado" styleClass="btn-kds-outline" text="Activar / Inactivar" />
+                                        <HBox spacing="8.0">
+                                            <children>
+                                                <Button fx:id="btnEditarCliente" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEditarSeleccionado" styleClass="btn-secondary" text="Editar Datos" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnCambiarEstado" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCambiarEstado" styleClass="btn-secondary" text="Activar / Inactivar" HBox.hgrow="ALWAYS" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
                             </children>

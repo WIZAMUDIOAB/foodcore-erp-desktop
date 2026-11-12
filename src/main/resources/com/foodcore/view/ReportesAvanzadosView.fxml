@@ -14,6 +14,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootAvanzadosStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ReportesAvanzadosController">
     <children>
@@ -48,15 +49,15 @@
                         </HBox>
 
                         <!-- Filtros del Reporte -->
-                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <children>
-                                <Label styleClass="text-body-strong" text="Categoría de Análisis:" />
-                                <ComboBox fx:id="cbCategoriaReporte" prefWidth="250.0" styleClass="form-combo-box" />
-                                <Label styleClass="text-body-strong" text="Desde:" />
-                                <DatePicker fx:id="dpInicio" prefWidth="135.0" styleClass="form-date-picker" />
-                                <Label styleClass="text-body-strong" text="Hasta:" />
-                                <DatePicker fx:id="dpFin" prefWidth="135.0" styleClass="form-date-picker" />
-                                <Button fx:id="btnConsultar" mnemonicParsing="false" onAction="#handleConsultarReporte" styleClass="btn-secondary" text="Generar Análisis" />
+                                <Label minWidth="-Infinity" styleClass="text-body-strong" text="Categoría:" />
+                                <ComboBox fx:id="cbCategoriaReporte" prefWidth="230.0" styleClass="form-combo-box" />
+                                <Label minWidth="-Infinity" styleClass="text-body-strong" text="Desde:" />
+                                <DatePicker fx:id="dpInicio" minWidth="148.0" prefWidth="148.0" styleClass="form-date-picker" />
+                                <Label minWidth="-Infinity" styleClass="text-body-strong" text="Hasta:" />
+                                <DatePicker fx:id="dpFin" minWidth="148.0" prefWidth="148.0" styleClass="form-date-picker" />
+                                <Button fx:id="btnConsultar" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleConsultarReporte" styleClass="btn-secondary" text="Generar Análisis" />
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Label fx:id="lblEstadoReporte" styleClass="text-body-caption" text="Listo" />
                             </children>
@@ -69,37 +70,67 @@
             <center>
                 <VBox spacing="14.0" styleClass="view-content" BorderPane.alignment="CENTER">
                     <children>
-                        <!-- Tarjetas de KPIs del Reporte Activo -->
-                        <HBox spacing="12.0">
+                        <!-- Tarjetas de KPIs del Reporte Activo (v4.6.0 Fase 3) -->
+                        <HBox spacing="14.0">
                             <children>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="MONTO TOTAL DE LA MUESTRA" />
-                                        <Label fx:id="lblKpiMontoTotal" styleClass="stat-card-value" text="S/ 0.00" />
-                                        <Label fx:id="lblKpiSubTotal" styleClass="stat-card-subtitle" text="0 registros analizados" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="MONTO TOTAL DE LA MUESTRA" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-accent">
+                                                    <children>
+                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-coins" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiMontoTotal" styleClass="kpi-value-24-accent" text="S/ 0.00" />
+                                        <Label fx:id="lblKpiSubTotal" styleClass="kpi-subtitle-muted" text="0 registros analizados" />
                                     </children>
                                 </VBox>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="PROMEDIO POR TRANSACCIÓN" />
-                                        <Label fx:id="lblKpiPromedio" styleClass="stat-card-value" text="S/ 0.00" />
-                                        <Label styleClass="stat-card-subtitle" text="Ticket o costo promedio" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="PROMEDIO POR TRANSACCIÓN" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-blue">
+                                                    <children>
+                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-chart-line" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiPromedio" styleClass="kpi-value-24-blue" text="S/ 0.00" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Ticket o costo promedio" />
                                     </children>
                                 </VBox>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="MAYOR APORTE AL VOLUMEN" />
-                                        <Label fx:id="lblKpiTopItem" styleClass="stat-card-value" text="-" />
-                                        <Label fx:id="lblKpiTopValor" styleClass="stat-card-subtitle" text="S/ 0.00 facturado" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="MAYOR APORTE AL VOLUMEN" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-success">
+                                                    <children>
+                                                        <FontIcon iconColor="#059669" iconLiteral="fas-trophy" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiTopItem" styleClass="kpi-value-24" text="-" />
+                                        <Label fx:id="lblKpiTopValor" styleClass="kpi-subtitle-muted" text="S/ 0.00 facturado" />
                                     </children>
                                 </VBox>
                             </children>
                         </HBox>
 
-                        <HBox spacing="12.0" VBox.vgrow="ALWAYS">
+                        <HBox spacing="14.0" VBox.vgrow="ALWAYS">
                             <children>
                                 <!-- Tabla de Resultados -->
-                                <VBox spacing="8.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="8.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
                                     <children>
                                         <Label fx:id="lblTituloTabla" styleClass="text-h3" text="Resultados Detallados" />
                                         <TableView fx:id="tblReporte" VBox.vgrow="ALWAYS">
@@ -118,7 +149,7 @@
                                 </VBox>
 
                                 <!-- Gráfico de Distribución (Donut / PieChart Moderno) -->
-                                <VBox prefWidth="420.0" spacing="8.0" styleClass="stat-card">
+                                <VBox prefWidth="420.0" spacing="8.0" styleClass="surface-card">
                                     <children>
                                         <Label styleClass="text-h3" text="Distribución Gráfica" />
                                         <PieChart fx:id="pieChartDistribucion" animated="false" labelsVisible="false" legendSide="BOTTOM" VBox.vgrow="ALWAYS" />
