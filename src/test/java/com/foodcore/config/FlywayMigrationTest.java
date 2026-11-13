@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V20 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V21 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(20, result.migrationsExecuted);
-        assertEquals("20", result.targetSchemaVersion);
+        assertEquals(21, result.migrationsExecuted);
+        assertEquals("21", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -45,7 +45,15 @@ class FlywayMigrationTest {
             }
             assertTrue(versiones.containsAll(Set.of(
                 "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20")));
+                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21")));
+        }
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rsMinoristas = st.executeQuery(
+                 "SELECT COUNT(*) FROM cliente WHERE tipo_cliente = 'MINORISTA'")) {
+            rsMinoristas.next();
+            assertTrue(rsMinoristas.getInt(1) >= 2, "Deben existir clientes minoristas seedeados en V21");
         }
     }
 
