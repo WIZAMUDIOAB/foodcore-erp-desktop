@@ -52,12 +52,23 @@
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                             <children>
                                 <Label minWidth="-Infinity" styleClass="text-body-strong" text="Categoría:" />
-                                <ComboBox fx:id="cbCategoriaReporte" prefWidth="230.0" styleClass="form-combo-box" />
+                                <ComboBox fx:id="cbCategoriaReporte" prefWidth="265.0" styleClass="form-combo-box" />
                                 <Label minWidth="-Infinity" styleClass="text-body-strong" text="Desde:" />
-                                <DatePicker fx:id="dpInicio" minWidth="148.0" prefWidth="148.0" styleClass="form-date-picker" />
+                                <DatePicker fx:id="dpInicio" minWidth="142.0" prefWidth="142.0" styleClass="form-date-picker" />
                                 <Label minWidth="-Infinity" styleClass="text-body-strong" text="Hasta:" />
-                                <DatePicker fx:id="dpFin" minWidth="148.0" prefWidth="148.0" styleClass="form-date-picker" />
+                                <DatePicker fx:id="dpFin" minWidth="142.0" prefWidth="142.0" styleClass="form-date-picker" />
                                 <Button fx:id="btnConsultar" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleConsultarReporte" styleClass="btn-secondary" text="Generar Análisis" />
+                                <Region HBox.hgrow="ALWAYS" />
+                            </children>
+                        </HBox>
+
+                        <!-- Accesos Rápidos BI v4.9.0 -->
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <children>
+                                <Label minWidth="-Infinity" styleClass="text-body-caption" text="Vistas BI:" />
+                                <Button fx:id="btnModoAnalitica" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleModoAnalitica" styleClass="btn-primary" text="Analítica General" />
+                                <Button fx:id="btnModoMargenes" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleModoMargenes" styleClass="btn-secondary" text="Márgenes por Categoría" />
+                                <Button fx:id="btnModoCohortes" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleModoCohortes" styleClass="btn-secondary" text="Cohortes y Retención" />
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Label fx:id="lblEstadoReporte" styleClass="text-body-caption" text="Listo" />
                             </children>
@@ -66,10 +77,51 @@
                 </VBox>
             </top>
 
-            <!-- Centro: KPIs, Gráfico y Tabla -->
+            <!-- Centro: Comparativas, KPIs, Gráfico/Tabla o Cohortes -->
             <center>
-                <VBox spacing="14.0" styleClass="view-content" BorderPane.alignment="CENTER">
+                <VBox spacing="12.0" styleClass="view-content" BorderPane.alignment="CENTER">
                     <children>
+                        <!-- Comparativas Automáticas de Períodos (v4.9.0 Fase 2.1) — usa surface-card para preservar las 3 kpi-card-secondary -->
+                        <HBox fx:id="panelComparativasReportes" spacing="14.0">
+                            <children>
+                                <VBox spacing="4.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="VENTAS DE HOY VS. AYER" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblRepHoyVsAyerBadge" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="BASELINE_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblRepHoyVsAyerValor" styleClass="kpi-value-24-blue" text="S/ 0.00" />
+                                                <Label fx:id="lblRepHoyVsAyerSub" styleClass="kpi-subtitle-muted" text="Ayer: S/ 0.00" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="4.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="VENTAS DE ESTE MES VS. MES ANTERIOR" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblRepMesVsAntBadge" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="BASELINE_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblRepMesVsAntValor" styleClass="kpi-value-24-success" text="S/ 0.00" />
+                                                <Label fx:id="lblRepMesVsAntSub" styleClass="kpi-subtitle-muted" text="Mes anterior: S/ 0.00" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+
                         <!-- Tarjetas de KPIs del Reporte Activo (v4.6.0 Fase 3) -->
                         <HBox spacing="14.0">
                             <children>
@@ -127,7 +179,58 @@
                             </children>
                         </HBox>
 
-                        <HBox spacing="14.0" VBox.vgrow="ALWAYS">
+                        <!-- Panel de Cohortes y Retención de Clientes (v4.9.0 Fase 3.1) -->
+                        <VBox fx:id="panelCohortes" managed="false" spacing="10.0" visible="false" VBox.vgrow="ALWAYS">
+                            <children>
+                                <Label fx:id="lblCohortesAviso" managed="false" styleClass="badge-pill-warning" visible="false" wrapText="true" />
+                                <HBox spacing="14.0" VBox.vgrow="ALWAYS">
+                                    <children>
+                                        <VBox prefWidth="445.0" spacing="6.0" styleClass="surface-card">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                                    <children>
+                                                        <Label styleClass="text-h3" text="Resumen de Fidelización" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label styleClass="badge-pill-neutral" text="Corte Mensual" />
+                                                    </children>
+                                                </HBox>
+                                                <TableView fx:id="tblResumenCohortes" prefHeight="250.0" VBox.vgrow="ALWAYS">
+                                                    <columns>
+                                                        <TableColumn fx:id="colSegNombre" prefWidth="245.0" text="Segmento" />
+                                                        <TableColumn fx:id="colSegCantidad" prefWidth="85.0" text="Cant." />
+                                                        <TableColumn fx:id="colSegPorcentaje" prefWidth="80.0" text="Part. %" />
+                                                    </columns>
+                                                    <columnResizePolicy>
+                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                    </columnResizePolicy>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="text-h3" text="Matriz de Cohortes Mensuales (% Retención)" />
+                                                <TableView fx:id="tblMatrizCohortes" prefHeight="250.0" VBox.vgrow="ALWAYS">
+                                                    <columns>
+                                                        <TableColumn fx:id="colCohorteMes" prefWidth="130.0" text="Cohorte" />
+                                                        <TableColumn fx:id="colCohorteTamano" prefWidth="70.0" text="Tamaño" />
+                                                        <TableColumn fx:id="colCohorteM1" prefWidth="80.0" text="Mes 1" />
+                                                        <TableColumn fx:id="colCohorteM2" prefWidth="80.0" text="Mes 2" />
+                                                        <TableColumn fx:id="colCohorteM3" prefWidth="80.0" text="Mes 3" />
+                                                        <TableColumn fx:id="colCohorteM4" prefWidth="80.0" text="Mes 4" />
+                                                    </columns>
+                                                    <columnResizePolicy>
+                                                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                                    </columnResizePolicy>
+                                                </TableView>
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+
+                        <HBox fx:id="panelTablaGrafico" spacing="14.0" VBox.vgrow="ALWAYS">
                             <children>
                                 <!-- Tabla de Resultados -->
                                 <VBox spacing="8.0" styleClass="surface-card" HBox.hgrow="ALWAYS">
