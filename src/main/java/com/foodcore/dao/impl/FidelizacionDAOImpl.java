@@ -1,8 +1,12 @@
 package com.foodcore.dao.impl;
 
 import com.foodcore.dao.FidelizacionDAO;
+import com.foodcore.model.CompraClienteResumen;
 import com.foodcore.model.CuponCumpleanos;
 import com.foodcore.model.FidelizacionMovimiento;
+import com.foodcore.model.HistorialPuntos;
+
+import java.math.BigDecimal;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -54,6 +58,43 @@ public class FidelizacionDAOImpl implements FidelizacionDAO {
     }
 
     @Override
+    public long registrarHistorialPuntos(Connection conn, HistorialPuntos entry) throws SQLException {
+        String sql = "INSERT INTO historial_puntos (id_cliente, id_venta, puntos_ganados, tipo_movimiento, descripcion, fecha) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, entry.getIdCliente());
+            if (entry.getIdVenta() != null && entry.getIdVenta() > 0 && existeVenta(conn, entry.getIdVenta())) {
+                ps.setInt(2, entry.getIdVenta());
+            } else {
+                ps.setNull(2, java.sql.Types.INTEGER);
+            }
+            ps.setInt(3, entry.getPuntosGanados());
+            ps.setString(4, entry.getTipoMovimiento() != null ? entry.getTipoMovimiento() : "ACUMULACION");
+            ps.setString(5, entry.getDescripcion());
+            java.time.LocalDateTime fecha = entry.getFecha() != null ? entry.getFecha() : java.time.LocalDateTime.now();
+            ps.setTimestamp(6, java.sql.Timestamp.valueOf(fecha));
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    long id = rs.getLong(1);
+                    entry.setIdHistorial(id);
+                    return id;
+                }
+            }
+        }
+        return 0L;
+    }
+
+    private boolean existeVenta(Connection conn, int idVenta) throws SQLException {
+        try (PreparedStatement psV = conn.prepareStatement("SELECT 1 FROM venta WHERE id_venta = ?")) {
+            psV.setInt(1, idVenta);
+            try (ResultSet rsV = psV.executeQuery()) {
+                return rsV.next();
+            }
+        }
+    }
+
+    @Override
     public List<FidelizacionMovimiento> listarPorCliente(Connection conn, int idCliente) throws SQLException {
         String sql = "SELECT fm.*, c.razon_social, c.nombre_razon_social "
                 + "FROM fidelizacion_movimiento fm "
@@ -83,6 +124,77 @@ public class FidelizacionDAOImpl implements FidelizacionDAO {
             }
         }
         return lista;
+    }
+
+    @Override
+    public List<HistorialPuntos> listarHistorialPuntos(Connection conn, int idCliente) throws SQLException {
+        String sql = "SELECT id_historial, id_cliente, id_venta, puntos_ganados, tipo_movimiento, descripcion, fecha "
+                + "FROM historial_puntos WHERE id_cliente = ? ORDER BY fecha DESC, id_historial DESC";
+        List<HistorialPuntos> lista = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCliente);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    HistorialPuntos hp = new HistorialPuntos();
+                    hp.setIdHistorial(rs.getLong("id_historial"));
+                    hp.setIdCliente(rs.getInt("id_cliente"));
+                    int idV = rs.getInt("id_venta");
+                    hp.setIdVenta(rs.wasNull() ? null : idV);
+                    hp.setPuntosGanados(rs.getInt("puntos_ganados"));
+                    hp.setTipoMovimiento(rs.getString("tipo_movimiento"));
+                    hp.setDescripcion(rs.getString("descripcion"));
+                    java.sql.Timestamp ts = rs.getTimestamp("fecha");
+                    if (ts != null) {
+                        hp.setFecha(ts.toLocalDateTime());
+                    }
+                    lista.add(hp);
+                }
+            }
+        }
+        return lista;
+    }
+
+    @Override
+    public List<CompraClienteResumen> listarUltimasComprasCliente(Connection conn, int idCliente, int limite) throws SQLException {
+        int lim = Math.max(1, Math.min(limite, 50));
+        String sql = "SELECT v.id_venta, v.fecha_hora, v.total, v.metodo_pago, "
+                + "COALESCE(GROUP_CONCAT(CONCAT(dv.cantidad, 'x ', COALESCE(p.nombre, 'Producto'), "
+                + "CASE WHEN dv.nombre_variante IS NOT NULL AND dv.nombre_variante <> '' "
+                + "THEN CONCAT(' (', dv.nombre_variante, ')') ELSE '' END) "
+                + "ORDER BY dv.id_detalle_venta SEPARATOR ', '), 'Consumo POS') AS resumen_productos, "
+                + "COALESCE((SELECT SUM(hp.puntos_ganados) FROM historial_puntos hp "
+                + "          WHERE hp.id_venta = v.id_venta AND hp.id_cliente = ? AND hp.puntos_ganados > 0), 0) AS puntos_ganados "
+                + "FROM venta v "
+                + "LEFT JOIN pedido ped ON v.id_pedido = ped.id_pedido "
+                + "LEFT JOIN detalle_venta dv ON v.id_venta = dv.id_venta "
+                + "LEFT JOIN producto p ON dv.id_producto = p.id_producto "
+                + "WHERE v.estado = 'COMPLETADA' AND COALESCE(v.id_cliente, ped.id_cliente) = ? "
+                + "GROUP BY v.id_venta, v.fecha_hora, v.total, v.metodo_pago "
+                + "ORDER BY v.fecha_hora DESC, v.id_venta DESC "
+                + "LIMIT ?";
+        List<CompraClienteResumen> compras = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCliente);
+            ps.setInt(2, idCliente);
+            ps.setInt(3, lim);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    CompraClienteResumen item = new CompraClienteResumen();
+                    item.setIdVenta(rs.getInt("id_venta"));
+                    java.sql.Timestamp ts = rs.getTimestamp("fecha_hora");
+                    if (ts != null) {
+                        item.setFechaHora(ts.toLocalDateTime());
+                    }
+                    BigDecimal total = rs.getBigDecimal("total");
+                    item.setMontoTotal(total != null ? total : BigDecimal.ZERO);
+                    item.setMetodoPago(rs.getString("metodo_pago"));
+                    item.setResumenProductos(rs.getString("resumen_productos"));
+                    item.setPuntosGanados(rs.getInt("puntos_ganados"));
+                    compras.add(item);
+                }
+            }
+        }
+        return compras;
     }
 
     @Override

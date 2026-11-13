@@ -43,9 +43,9 @@ public class VentaDAOImpl implements VentaDAO {
             }
         }
 
-        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, descuento, total, "
+        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, descuento, descuento_puntos, total, "
                 + "metodo_pago, monto_recibido, vuelto, estado, idempotency_key) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             if (venta.getIdPedido() != null) {
                 ps.setInt(1, venta.getIdPedido());
@@ -62,12 +62,13 @@ public class VentaDAOImpl implements VentaDAO {
             ps.setBigDecimal(5, venta.getSubtotal() != null ? venta.getSubtotal() : venta.getTotal());
             ps.setBigDecimal(6, venta.getIgv() != null ? venta.getIgv() : BigDecimal.ZERO);
             ps.setBigDecimal(7, venta.getDescuento() != null ? venta.getDescuento() : BigDecimal.ZERO);
-            ps.setBigDecimal(8, venta.getTotal());
-            ps.setString(9, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
-            ps.setBigDecimal(10, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
-            ps.setBigDecimal(11, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
-            ps.setString(12, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
-            ps.setString(13, idemKey != null ? idemKey.trim() : null);
+            ps.setBigDecimal(8, venta.getDescuentoPuntos() != null ? venta.getDescuentoPuntos() : BigDecimal.ZERO);
+            ps.setBigDecimal(9, venta.getTotal());
+            ps.setString(10, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
+            ps.setBigDecimal(11, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
+            ps.setBigDecimal(12, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
+            ps.setString(13, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
+            ps.setString(14, idemKey != null ? idemKey.trim() : null);
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -167,6 +168,12 @@ public class VentaDAOImpl implements VentaDAO {
                 v.setSubtotal(rs.getBigDecimal("subtotal"));
                 v.setIgv(rs.getBigDecimal("igv"));
                 v.setDescuento(rs.getBigDecimal("descuento"));
+                try {
+                    BigDecimal dp = rs.getBigDecimal("descuento_puntos");
+                    v.setDescuentoPuntos(dp != null ? dp : BigDecimal.ZERO);
+                } catch (SQLException ignored) {
+                    v.setDescuentoPuntos(BigDecimal.ZERO);
+                }
                 v.setTotal(rs.getBigDecimal("total"));
                 v.setMetodoPago(rs.getString("metodo_pago"));
                 v.setMontoRecibido(rs.getBigDecimal("monto_recibido"));
