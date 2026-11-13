@@ -10,6 +10,7 @@ public enum CodigoError {
     INSUMO_NO_ENCONTRADO("ERR-102", "El insumo requerido en la receta no existe en almacén"),
     CAJA_CERRADA("ERR-201", "No existe un turno de caja abierto para operar"),
     CONFLICTO_ESTADO("ERR-301", "Conflicto de concurrencia o transición de estado inválida"),
+    PERIODO_CERRADO("ERR-302", "El período contable mensual ya se encuentra cerrado"),
     TERMINAL_NO_AUTORIZADA("ERR-401", "Terminal de red no autorizada o firma HMAC inválida"),
     USUARIO_BLOQUEADO("ERR-402", "Cuenta de usuario temporalmente bloqueada por intentos fallidos"),
     ACCESO_DENEGADO("ERR-403", "El usuario no posee el permiso requerido (RBAC)"),

@@ -23,6 +23,7 @@ public class DetallePedido {
     private BigDecimal subtotal;
     private String notasPreparacion;
     private String estadoCocina = "PENDIENTE"; // PENDIENTE | EN_PREPARACION | LISTO | ENTREGADO
+    private int prioridad = 0;
     private LocalDateTime enviadoEn;
     private LocalDateTime iniciadoEn;
     private LocalDateTime listoEn;
@@ -97,6 +98,9 @@ public class DetallePedido {
 
     public String getEstadoCocina() { return estadoCocina; }
     public void setEstadoCocina(String estadoCocina) { this.estadoCocina = estadoCocina; }
+
+    public int getPrioridad() { return prioridad; }
+    public void setPrioridad(int prioridad) { this.prioridad = prioridad; }
 
     public LocalDateTime getEnviadoEn() { return enviadoEn; }
     public void setEnviadoEn(LocalDateTime enviadoEn) { this.enviadoEn = enviadoEn; }

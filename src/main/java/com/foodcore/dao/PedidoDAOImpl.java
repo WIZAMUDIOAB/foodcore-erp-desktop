@@ -348,7 +348,7 @@ public class PedidoDAOImpl implements PedidoDAO {
                      "JOIN pedido ped ON dp.id_pedido = ped.id_pedido " +
                      "WHERE dp.estado_cocina IN ('PENDIENTE', 'EN_PREPARACION', 'LISTO') " +
                      "AND ped.estado IN ('ABIERTO', 'PENDIENTE', 'REGISTRADO', 'EN_PREPARACION', 'LISTO', 'ITEMS_ADICIONALES') " +
-                     "ORDER BY dp.id_detalle_pedido ASC";
+                     "ORDER BY dp.prioridad DESC, dp.id_detalle_pedido ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -418,6 +418,7 @@ public class PedidoDAOImpl implements PedidoDAO {
                 dp.setIdCombo(idCombo);
             }
             dp.setComboComponentesTexto(rs.getString("combo_componentes_texto"));
+            dp.setPrioridad(rs.getInt("prioridad"));
         } catch (SQLException ignored) {
             // Columnas opcionales en esquemas previos
         }
@@ -487,6 +488,28 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now(ZONA_LIMA)));
             ps.setInt(3, idDetallePedido);
             ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void actualizarPrioridadesCocina(Connection conn, List<Integer> idsDetalleOrdenDescendente) throws SQLException {
+        if (idsDetalleOrdenDescendente == null || idsDetalleOrdenDescendente.isEmpty()) {
+            return;
+        }
+        String sql = "UPDATE detalle_pedido SET prioridad = ? WHERE id_detalle_pedido = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int total = idsDetalleOrdenDescendente.size();
+            for (int i = 0; i < total; i++) {
+                int idDet = idsDetalleOrdenDescendente.get(i);
+                if (idDet <= 0) {
+                    continue;
+                }
+                int pesoPrioridad = (total - i) * 10;
+                ps.setInt(1, pesoPrioridad);
+                ps.setInt(2, idDet);
+                ps.addBatch();
+            }
+            ps.executeBatch();
         }
     }
 

@@ -321,4 +321,20 @@ public class PedidoService {
             }
         }).start();
     }
+
+    /**
+     * Persiste el orden manual del KDS asignando prioridades descendentes en {@code detalle_pedido} (v5.2.0).
+     */
+    public void reordenarPrioridadKds(List<Integer> idsDetalleOrdenDescendente) throws SQLException {
+        if (idsDetalleOrdenDescendente == null || idsDetalleOrdenDescendente.isEmpty()) {
+            return;
+        }
+        try {
+            tx.executeVoidChecked(conn ->
+                pedidoDAO.actualizarPrioridadesCocina(conn, idsDetalleOrdenDescendente)
+            );
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
 }

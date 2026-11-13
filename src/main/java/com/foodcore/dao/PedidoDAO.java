@@ -26,6 +26,7 @@ public interface PedidoDAO {
     boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException;
     void actualizarEstadoPedido(Connection conn, int idPedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoDetalleCocina(Connection conn, int idDetallePedido, String nuevoEstado) throws SQLException;
+    void actualizarPrioridadesCocina(Connection conn, List<Integer> idsDetalleOrdenDescendente) throws SQLException;
     void actualizarEstadoComanda(Connection conn, int idComanda, String nuevoEstado) throws SQLException;
     void actualizarEstadoMesaConVersion(Connection conn, long idMesa, String nuevoEstado, int versionEsperada) throws SQLException;
     BigDecimal calcularTotalPedido(Connection conn, int idPedido) throws SQLException;
