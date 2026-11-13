@@ -1,6 +1,7 @@
 package com.foodcore.dao;
 
 import com.foodcore.model.Caja;
+import com.foodcore.model.CategoriaGasto;
 import com.foodcore.model.MovimientoCaja;
 
 import java.math.BigDecimal;
@@ -10,7 +11,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -114,7 +118,8 @@ public class CajaDAOImpl implements CajaDAO {
 
     @Override
     public void registrarMovimiento(Connection conn, MovimientoCaja mov) throws SQLException {
-        String sql = "INSERT INTO movimiento_caja (id_caja, id_usuario, tipo_movimiento, medio_pago, monto, concepto) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO movimiento_caja (id_caja, id_usuario, tipo_movimiento, medio_pago, monto, concepto, id_categoria_gasto) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, mov.getIdCaja());
             ps.setInt(2, mov.getIdUsuario());
@@ -122,6 +127,11 @@ public class CajaDAOImpl implements CajaDAO {
             ps.setString(4, mov.getMedioPago() != null ? mov.getMedioPago() : "EFECTIVO");
             ps.setBigDecimal(5, mov.getMonto());
             ps.setString(6, mov.getConcepto());
+            if (mov.getIdCategoriaGasto() != null) {
+                ps.setInt(7, mov.getIdCategoriaGasto());
+            } else {
+                ps.setNull(7, Types.INTEGER);
+            }
             ps.executeUpdate();
         }
     }
@@ -171,5 +181,81 @@ public class CajaDAOImpl implements CajaDAO {
             }
         }
         return totales;
+    }
+
+    @Override
+    public List<CategoriaGasto> listarCategoriasGastoActivas(Connection conn) throws SQLException {
+        String sql = "SELECT id_categoria_gasto, codigo, nombre, descripcion, activo "
+            + "FROM categoria_gasto WHERE activo = 1 ORDER BY id_categoria_gasto ASC";
+        List<CategoriaGasto> lista = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(mapearCategoriaGasto(rs));
+            }
+        }
+        return lista;
+    }
+
+    @Override
+    public Optional<CategoriaGasto> obtenerCategoriaGastoPorId(Connection conn, int idCategoriaGasto) throws SQLException {
+        String sql = "SELECT id_categoria_gasto, codigo, nombre, descripcion, activo "
+            + "FROM categoria_gasto WHERE id_categoria_gasto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCategoriaGasto);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearCategoriaGasto(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public List<MovimientoCaja> listarGastosTurno(Connection conn, int idCaja) throws SQLException {
+        String sql = "SELECT m.id_movimiento, m.id_caja, m.id_usuario, m.tipo_movimiento, m.medio_pago, "
+            + "m.monto, m.concepto, m.id_categoria_gasto, cg.nombre AS categoria_nombre, m.fecha_hora "
+            + "FROM movimiento_caja m "
+            + "LEFT JOIN categoria_gasto cg ON m.id_categoria_gasto = cg.id_categoria_gasto "
+            + "WHERE m.id_caja = ? AND m.tipo_movimiento = 'EGRESO' "
+            + "AND m.concepto NOT LIKE 'Cierre Z de turno%' "
+            + "ORDER BY m.fecha_hora DESC, m.id_movimiento DESC";
+        List<MovimientoCaja> lista = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCaja);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    MovimientoCaja m = new MovimientoCaja();
+                    m.setIdMovimiento(rs.getInt("id_movimiento"));
+                    m.setIdCaja(rs.getInt("id_caja"));
+                    m.setIdUsuario(rs.getInt("id_usuario"));
+                    m.setTipoMovimiento(rs.getString("tipo_movimiento"));
+                    m.setMedioPago(rs.getString("medio_pago"));
+                    m.setMonto(rs.getBigDecimal("monto"));
+                    m.setConcepto(rs.getString("concepto"));
+                    int idCat = rs.getInt("id_categoria_gasto");
+                    m.setIdCategoriaGasto(rs.wasNull() ? null : idCat);
+                    String nomCat = rs.getString("categoria_nombre");
+                    m.setNombreCategoriaGasto(nomCat != null ? nomCat : "Sin categoría");
+                    Timestamp fh = rs.getTimestamp("fecha_hora");
+                    if (fh != null) {
+                        m.setFechaHora(fh.toLocalDateTime());
+                    }
+                    lista.add(m);
+                }
+            }
+        }
+        return lista;
+    }
+
+    private CategoriaGasto mapearCategoriaGasto(ResultSet rs) throws SQLException {
+        return new CategoriaGasto(
+            rs.getInt("id_categoria_gasto"),
+            rs.getString("codigo"),
+            rs.getString("nombre"),
+            rs.getString("descripcion"),
+            rs.getBoolean("activo")
+        );
     }
 }

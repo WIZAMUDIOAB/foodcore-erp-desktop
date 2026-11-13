@@ -1,6 +1,8 @@
 package com.foodcore.controller;
 
 import com.foodcore.model.Caja;
+import com.foodcore.model.CategoriaGasto;
+import com.foodcore.model.MovimientoCaja;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
@@ -13,7 +15,9 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -28,6 +32,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -70,6 +75,7 @@ public class ArqueoCajaController {
 
     private final CajaService cajaService = new CajaService();
     private final ObservableList<FilaCierreZ> itemsCierreZ = FXCollections.observableArrayList();
+    private volatile List<CategoriaGasto> categoriasGastoCache = List.of();
     private Caja cajaActual;
     private BigDecimal totalEsperado = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
@@ -125,6 +131,11 @@ public class ArqueoCajaController {
     public void cargarDatosCaja() {
         new Thread(() -> {
             try {
+                try {
+                    categoriasGastoCache = List.copyOf(cajaService.listarCategoriasGastoActivas());
+                } catch (Exception exCat) {
+                    LOGGER.log(Level.FINE, "Aviso cargando categorías de gasto", exCat);
+                }
                 Optional<Caja> opt = cajaService.obtenerCajaActiva();
                 if (opt.isPresent()) {
                     Caja activa = opt.get();
@@ -134,7 +145,8 @@ public class ArqueoCajaController {
                         .setScale(2, RoundingMode.HALF_UP);
                     BigDecimal apertura = activa.getMontoApertura().setScale(2, RoundingMode.HALF_UP);
                     BigDecimal esperado = apertura.add(ventas).subtract(gastos).setScale(2, RoundingMode.HALF_UP);
-                    ObservableList<FilaCierreZ> desgloseZ = consultarDesgloseCierreZ(activa.getIdCaja(), gastos);
+                    List<MovimientoCaja> gastosDetallados = cajaService.listarGastosTurno(activa.getIdCaja());
+                    ObservableList<FilaCierreZ> desgloseZ = consultarDesgloseCierreZ(activa.getIdCaja(), gastos, gastosDetallados);
 
                     Platform.runLater(() -> aplicarEstadoCajaAbierta(activa, apertura, ventas, gastos, esperado, desgloseZ));
                 } else {
@@ -149,7 +161,10 @@ public class ArqueoCajaController {
         }).start();
     }
 
-    private ObservableList<FilaCierreZ> consultarDesgloseCierreZ(int idCaja, BigDecimal gastosEfectivo) {
+    private ObservableList<FilaCierreZ> consultarDesgloseCierreZ(
+            int idCaja,
+            BigDecimal gastosEfectivo,
+            List<MovimientoCaja> gastosDetallados) {
         Map<String, Integer> conteoPorMedio = new LinkedHashMap<>();
         Map<String, BigDecimal> montoPorMedio = new LinkedHashMap<>();
         for (String medio : new String[]{"EFECTIVO", "TARJETA", "YAPE_PLIN"}) {
@@ -188,7 +203,24 @@ public class ArqueoCajaController {
             filas.add(new FilaCierreZ(medio, String.valueOf(ops), "S/ " + sub));
         }
         if (gastosEfectivo != null && gastosEfectivo.compareTo(BigDecimal.ZERO) > 0) {
-            filas.add(new FilaCierreZ("EGRESOS CAJA CHICA", "-", "-S/ " + gastosEfectivo));
+            if (gastosDetallados != null && !gastosDetallados.isEmpty()) {
+                Map<String, BigDecimal> porCat = new LinkedHashMap<>();
+                Map<String, Integer> opsPorCat = new LinkedHashMap<>();
+                for (MovimientoCaja mov : gastosDetallados) {
+                    String catNom = mov.getNombreCategoriaGasto() != null ? mov.getNombreCategoriaGasto() : "Sin categoría";
+                    porCat.merge(catNom, mov.getMonto().abs(), BigDecimal::add);
+                    opsPorCat.merge(catNom, 1, Integer::sum);
+                }
+                for (Map.Entry<String, BigDecimal> e : porCat.entrySet()) {
+                    filas.add(new FilaCierreZ(
+                        "EGRESO · " + e.getKey(),
+                        String.valueOf(opsPorCat.getOrDefault(e.getKey(), 1)),
+                        "-S/ " + e.getValue().setScale(2, RoundingMode.HALF_UP)
+                    ));
+                }
+            } else {
+                filas.add(new FilaCierreZ("EGRESOS CAJA CHICA", "-", "-S/ " + gastosEfectivo));
+            }
         }
         filas.add(new FilaCierreZ("TOTAL CONSOLIDADO Z", String.valueOf(totalOps), "S/ " + granTotal));
         return filas;
@@ -258,34 +290,69 @@ public class ArqueoCajaController {
     }
 
     /**
-     * Abre modal para registrar un gasto operativo / salida de caja chica (§3.4).
+     * Abre modal para registrar un gasto operativo categorizado / salida de caja chica (§3.4, v4.9.0).
      */
     @FXML
     public void handleAbrirModalGasto(ActionEvent event) {
         if (cajaActual == null || rootCajaStack == null) {
             return;
         }
+        List<CategoriaGasto> categorias = categoriasGastoCache;
+        if (categorias.isEmpty()) {
+            try {
+                categorias = cajaService.listarCategoriasGastoActivas();
+                categoriasGastoCache = List.copyOf(categorias);
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "No se pudieron cargar categorías de gasto", ex);
+            }
+        }
+
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(14);
-        card.setMaxWidth(420);
-        card.setMaxHeight(310);
+        VBox card = new VBox(12);
+        card.setMaxWidth(440);
+        card.setMaxHeight(410);
         card.getStyleClass().add("modal-dialog-surface");
 
         Label lblTitle = new Label("Registrar Gasto Operativo");
         lblTitle.getStyleClass().add("text-h1");
 
-        Label lblSub = new Label("Salida de efectivo de caja chica (afecta el arqueo físico pero no el IGV ni las ventas).");
+        Label lblSub = new Label("Salida de efectivo categorizada para Cierre Z y Estado de Resultados (P&L).");
         lblSub.getStyleClass().add("text-body-secondary");
         lblSub.setWrapText(true);
 
+        Label lblCat = new Label("Categoría de gasto");
+        lblCat.getStyleClass().add("text-body-strong");
+
+        ComboBox<CategoriaGasto> cbCategoriaGasto = new ComboBox<>(FXCollections.observableArrayList(categorias));
+        cbCategoriaGasto.setId("cbCategoriaGasto");
+        cbCategoriaGasto.setPromptText("Seleccione categoría (ej. Pago de Luz)");
+        cbCategoriaGasto.setMaxWidth(Double.MAX_VALUE);
+        cbCategoriaGasto.getStyleClass().add("form-combo-box");
+        cbCategoriaGasto.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(CategoriaGasto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getNombre());
+            }
+        });
+        cbCategoriaGasto.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(CategoriaGasto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "Seleccione categoría (ej. Pago de Luz)" : item.getNombre());
+            }
+        });
+
         TextField txtMontoGasto = new TextField();
-        txtMontoGasto.setPromptText("Monto en S/ (ej. 15.00)");
+        txtMontoGasto.setId("txtMontoGasto");
+        txtMontoGasto.setPromptText("Monto en S/ (ej. 180.00)");
         txtMontoGasto.getStyleClass().add("input-field");
 
         TextField txtConceptoGasto = new TextField();
-        txtConceptoGasto.setPromptText("Motivo (ej. Compra de hielo, movilidad)");
+        txtConceptoGasto.setId("txtConceptoGasto");
+        txtConceptoGasto.setPromptText("Motivo / Nro. recibo (ej. Recibo Luz Enel Noviembre)");
         txtConceptoGasto.getStyleClass().add("input-field");
 
         Button btnCancelar = new Button("Cancelar");
@@ -293,16 +360,30 @@ public class ArqueoCajaController {
         btnCancelar.setOnAction(ev -> rootCajaStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Registrar Egreso");
+        btnGuardar.setId("btnConfirmarRegistroGasto");
         btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             try {
+                CategoriaGasto seleccionada = cbCategoriaGasto.getValue();
+                if (seleccionada == null) {
+                    AnimationUtils.mostrarToast(rootCajaStack, "Seleccione una categoría de gasto operativo.", true);
+                    return;
+                }
                 BigDecimal monto = new BigDecimal(txtMontoGasto.getText().trim()).setScale(2, RoundingMode.HALF_UP);
                 String concepto = txtConceptoGasto.getText() != null ? txtConceptoGasto.getText().trim() : "";
                 int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                cajaService.registrarGastoOperativo(cajaActual.getIdCaja(), idUsuario, monto, concepto);
+                cajaService.registrarGastoOperativo(
+                    cajaActual.getIdCaja(), idUsuario, monto, concepto, seleccionada.getIdCategoriaGasto()
+                );
                 rootCajaStack.getChildren().remove(backdrop);
-                AnimationUtils.mostrarToast(rootCajaStack, "Gasto operativo de S/ " + monto + " registrado.", false);
+                AnimationUtils.mostrarToast(
+                    rootCajaStack,
+                    "Gasto [" + seleccionada.getNombre() + "] de S/ " + monto + " registrado.",
+                    false
+                );
                 cargarDatosCaja();
+            } catch (NumberFormatException nfe) {
+                AnimationUtils.mostrarToast(rootCajaStack, "Ingrese un monto numérico válido para el egreso.", true);
             } catch (Exception ex) {
                 AnimationUtils.mostrarToast(rootCajaStack, ex.getMessage(), true);
             }
@@ -311,7 +392,7 @@ public class ArqueoCajaController {
         HBox actions = new HBox(12, btnCancelar, btnGuardar);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        card.getChildren().addAll(lblTitle, lblSub, txtMontoGasto, txtConceptoGasto, actions);
+        card.getChildren().addAll(lblTitle, lblSub, lblCat, cbCategoriaGasto, txtMontoGasto, txtConceptoGasto, actions);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);

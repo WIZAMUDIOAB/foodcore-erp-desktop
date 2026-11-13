@@ -56,8 +56,9 @@
                                     <Button fx:id="btnNavKiosco" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKiosco" styleClass="sidebar-nav-button" text="📱 Kiosco Autoservicio" />
                                     <Button fx:id="btnNavMenuQr" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenuQr" styleClass="sidebar-nav-button" text="📲 Menú Digital QR" />
 
-                                    <!-- Sección FINANZAS (Sub-Fase 4A v2.0) -->
+                                    <!-- Sección FINANZAS (Sub-Fase 4A v2.0 + v4.9.0 BI) -->
                                     <Label fx:id="lblSecFinanzas" styleClass="sidebar-section-header" text="FINANZAS" />
+                                    <Button fx:id="btnNavEstadoResultados" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavEstadoResultados" styleClass="sidebar-nav-button" text="💹 Estado de Resultados (P&amp;L)" />
                                     <Button fx:id="btnNavReportesContables" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesContables" styleClass="sidebar-nav-button" text="📑 Reportes Contables" />
                                     <Button fx:id="btnNavProveedores" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavProveedores" styleClass="sidebar-nav-button" text="🏢 Proveedores y CxP" />
                                     <Button fx:id="btnNavClientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavClientes" styleClass="sidebar-nav-button" text="👥 Clientes y CxC" />

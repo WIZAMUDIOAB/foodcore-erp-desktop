@@ -11,6 +11,8 @@ public class MovimientoCaja {
     private String medioPago;      // EFECTIVO, TARJETA, YAPE, PLIN
     private BigDecimal monto;
     private String concepto;
+    private Integer idCategoriaGasto;
+    private String nombreCategoriaGasto;
     private LocalDateTime fechaHora;
 
     public MovimientoCaja() {
@@ -18,10 +20,16 @@ public class MovimientoCaja {
     }
 
     public MovimientoCaja(int idMovimiento, int idCaja, int idUsuario, String tipoMovimiento, BigDecimal monto, String concepto) {
-        this(idMovimiento, idCaja, idUsuario, tipoMovimiento, "EFECTIVO", monto, concepto);
+        this(idMovimiento, idCaja, idUsuario, tipoMovimiento, "EFECTIVO", monto, concepto, null);
     }
 
-    public MovimientoCaja(int idMovimiento, int idCaja, int idUsuario, String tipoMovimiento, String medioPago, BigDecimal monto, String concepto) {
+    public MovimientoCaja(int idMovimiento, int idCaja, int idUsuario, String tipoMovimiento,
+                          String medioPago, BigDecimal monto, String concepto) {
+        this(idMovimiento, idCaja, idUsuario, tipoMovimiento, medioPago, monto, concepto, null);
+    }
+
+    public MovimientoCaja(int idMovimiento, int idCaja, int idUsuario, String tipoMovimiento,
+                          String medioPago, BigDecimal monto, String concepto, Integer idCategoriaGasto) {
         this.idMovimiento = idMovimiento;
         this.idCaja = idCaja;
         this.idUsuario = idUsuario;
@@ -29,6 +37,7 @@ public class MovimientoCaja {
         this.medioPago = medioPago != null ? medioPago : "EFECTIVO";
         this.monto = monto;
         this.concepto = concepto;
+        this.idCategoriaGasto = idCategoriaGasto;
         this.fechaHora = LocalDateTime.now();
     }
 
@@ -86,6 +95,22 @@ public class MovimientoCaja {
 
     public void setConcepto(String concepto) {
         this.concepto = concepto;
+    }
+
+    public Integer getIdCategoriaGasto() {
+        return idCategoriaGasto;
+    }
+
+    public void setIdCategoriaGasto(Integer idCategoriaGasto) {
+        this.idCategoriaGasto = idCategoriaGasto;
+    }
+
+    public String getNombreCategoriaGasto() {
+        return nombreCategoriaGasto;
+    }
+
+    public void setNombreCategoriaGasto(String nombreCategoriaGasto) {
+        this.nombreCategoriaGasto = nombreCategoriaGasto;
     }
 
     public LocalDateTime getFechaHora() {
