@@ -40,10 +40,14 @@ import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,13 +86,23 @@ class SpecFoodcoreV20Subfase4BTest {
     @Test
     @DisplayName("4B-1: Marcaje Kiosco - Entrada puntual y detección de colaborador por DNI/PIN")
     void testMarcajeKioscoEntrada() throws Exception {
-        // Limpiar asistencias abiertas de hoy para admin y asegurar entrada programada en el futuro (puntual)
-        try (Connection conn = ConexionBD.getConnection();
-             Statement st = conn.createStatement()) {
-            st.execute("DELETE FROM asistencia WHERE id_usuario = 1 AND fecha = CURRENT_DATE");
-            st.execute("UPDATE usuario SET hora_entrada_programada = "
-                    + "CASE WHEN CURRENT_TIME() >= '22:55:00' THEN '23:59:59' ELSE ADDTIME(CURRENT_TIME(), '01:00:00') END "
-                    + "WHERE id_usuario = 1");
+        // Limpiar asistencias abiertas de hoy (reloj JVM) y asegurar entrada programada en el futuro (puntual)
+        LocalDate hoy = LocalDate.now();
+        LocalTime ahora = LocalTime.now();
+        LocalTime entradaProgramada = !ahora.isBefore(LocalTime.of(22, 55))
+                ? LocalTime.of(23, 59, 59)
+                : ahora.plusHours(1);
+        try (Connection conn = ConexionBD.getConnection()) {
+            try (PreparedStatement psDel = conn.prepareStatement(
+                    "DELETE FROM asistencia WHERE id_usuario = 1 AND fecha = ?")) {
+                psDel.setDate(1, Date.valueOf(hoy));
+                psDel.executeUpdate();
+            }
+            try (PreparedStatement psUpd = conn.prepareStatement(
+                    "UPDATE usuario SET hora_entrada_programada = ? WHERE id_usuario = 1")) {
+                psUpd.setTime(1, Time.valueOf(entradaProgramada));
+                psUpd.executeUpdate();
+            }
         }
 
         // Marcaje de entrada usando DNI de admin ("45892147")
@@ -249,14 +263,20 @@ class SpecFoodcoreV20Subfase4BTest {
             // Limpiar asistencias previas para evitar duplicidad entre Flyway y fixtures de prueba
             st.execute("DELETE FROM asistencia");
 
-            // Asistencias demostrativas para cálculos de nómina
+            // Asistencias demostrativas alineadas al mes del reloj JVM para cálculos de nómina
+            LocalDate hoyFecha = LocalDate.now();
+            LocalDate diaAnteriorMes = hoyFecha.getDayOfMonth() > 1
+                    ? hoyFecha.minusDays(1)
+                    : hoyFecha;
+            String hoyStr = hoyFecha.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String ayerStr = diaAnteriorMes.format(DateTimeFormatter.ISO_LOCAL_DATE);
             st.execute("INSERT INTO asistencia (id_asistencia, id_usuario, id_empleado, fecha, hora_entrada, hora_ingreso, hora_salida, horas_trabajadas, horas_extra, tardanza_minutos, estado, tipo_marcaje, observaciones) VALUES "
-                    + "(101, 1, 1, CURRENT_DATE, CONCAT(CURRENT_DATE, ' 07:55:00'), '07:55:00', NULL, 0.00, 0.00, 0, 'PRESENTE', 'DNI', 'Ingreso puntual administrador'), "
-                    + "(102, 2, 2, CURRENT_DATE, CONCAT(CURRENT_DATE, ' 08:14:00'), '08:14:00', NULL, 0.00, 0.00, 14, 'TARDE', 'DNI', 'Tardanza de 14 min por tráfico'), "
-                    + "(103, 4, 4, CURRENT_DATE, CONCAT(CURRENT_DATE, ' 09:58:00'), '09:58:00', NULL, 0.00, 0.00, 0, 'PRESENTE', 'PIN', 'Marcaje por PIN en cocina'), "
-                    + "(104, 3, 3, DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 11:58:00'), '11:58:00', CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 21:00:00'), 9.03, 1.03, 0, 'FINALIZADO', 'DNI', 'Turno extendido con horas extra'), "
-                    + "(105, 2, 2, DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 08:02:00'), '08:02:00', CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 16:05:00'), 8.05, 0.05, 0, 'FINALIZADO', 'DNI', 'Jornada regular completa'), "
-                    + "(106, 1, 1, DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 07:50:00'), '07:50:00', CONCAT(DATE_SUB(CURRENT_DATE, INTERVAL 1 DAY), ' 17:10:00'), 9.33, 1.33, 0, 'FINALIZADO', 'DNI', 'Supervisión general')");
+                    + "(101, 1, 1, '" + hoyStr + "', '" + hoyStr + " 07:55:00', '07:55:00', NULL, 0.00, 0.00, 0, 'PRESENTE', 'DNI', 'Ingreso puntual administrador'), "
+                    + "(102, 2, 2, '" + hoyStr + "', '" + hoyStr + " 08:14:00', '08:14:00', NULL, 0.00, 0.00, 14, 'TARDE', 'DNI', 'Tardanza de 14 min por tráfico'), "
+                    + "(103, 4, 4, '" + hoyStr + "', '" + hoyStr + " 09:58:00', '09:58:00', NULL, 0.00, 0.00, 0, 'PRESENTE', 'PIN', 'Marcaje por PIN en cocina'), "
+                    + "(104, 3, 3, '" + ayerStr + "', '" + ayerStr + " 11:58:00', '11:58:00', '" + ayerStr + " 21:00:00', 9.03, 1.03, 0, 'FINALIZADO', 'DNI', 'Turno extendido con horas extra'), "
+                    + "(105, 2, 2, '" + ayerStr + "', '" + ayerStr + " 08:02:00', '08:02:00', '" + ayerStr + " 16:05:00', 8.05, 0.05, 0, 'FINALIZADO', 'DNI', 'Jornada regular completa'), "
+                    + "(106, 1, 1, '" + ayerStr + "', '" + ayerStr + " 07:50:00', '07:50:00', '" + ayerStr + " 17:10:00', 9.33, 1.33, 0, 'FINALIZADO', 'DNI', 'Supervisión general')");
         }
     }
 

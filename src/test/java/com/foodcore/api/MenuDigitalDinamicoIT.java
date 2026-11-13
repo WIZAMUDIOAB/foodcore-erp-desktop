@@ -3,8 +3,10 @@ package com.foodcore.api;
 import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
+import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +39,11 @@ class MenuDigitalDinamicoIT {
     private static final String CODIGO_AGOTABLE = "F2-QR-AGOT";
     private static final byte[] TEST_SECRET =
             "FoodCore_Fase2_IT_Secret_Key_32_Bytes_Minimum!!".getBytes(StandardCharsets.UTF_8);
+
+    @BeforeEach
+    void inicializarBd() {
+        MySqlIntegrationTestSupport.inicializarEntornoMySql();
+    }
 
     @AfterEach
     void limpiarDatosPrueba() throws Exception {

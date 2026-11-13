@@ -44,6 +44,28 @@ public class SubFaseC2CajaE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "CAJERO");
 
+            // 0. Cerrar cualquier turno previo abierto por tests anteriores para garantizar aislamiento
+            for (int intento = 0; intento < 10; intento++) {
+                APIResponse respPre = request.get("/api/caja/estado");
+                assertEquals(200, respPre.status(), "Consulta previa de estado de caja debe responder 200 OK");
+                JsonNode jsonPre = MAPPER.readTree(respPre.text());
+                if (!jsonPre.path("abierta").asBoolean()) {
+                    break;
+                }
+                int idPre = jsonPre.path("id_caja").asInt(1);
+                double contadoPre = Math.max(0.0, jsonPre.path("saldo_esperado").asDouble(0.0));
+                APIResponse respCierrePre = request.post("/api/caja/cerrar",
+                        RequestOptions.create()
+                                .setHeader("Content-Type", "application/json")
+                                .setData(Map.of(
+                                        "id_caja", idPre,
+                                        "id_usuario", 1,
+                                        "efectivo_fisico_contado", contadoPre
+                                )));
+                assertEquals(200, respCierrePre.status(),
+                        "El cierre preventivo de caja previa debe responder 200 OK");
+            }
+
             // 1. Abrir turno de caja
             APIResponse respAbrir = request.post("/api/caja/abrir",
                     RequestOptions.create()
