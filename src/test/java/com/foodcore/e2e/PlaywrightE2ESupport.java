@@ -151,7 +151,7 @@ public final class PlaywrightE2ESupport {
             opts.setHeader("Authorization", "Bearer " + bearerToken);
         }
         APIResponse resp = request.post(path, opts);
-        if (resp.status() == 429) {
+        for (int intento = 0; intento < 3 && resp.status() == 429; intento++) {
             esperarRetryAfter(resp.headers().get("retry-after"));
             resp = request.post(path, opts);
         }
@@ -166,7 +166,7 @@ public final class PlaywrightE2ESupport {
         Response resp = page.waitForResponse(
                 r -> r.url().contains("/api/auth/login") && "POST".equalsIgnoreCase(r.request().method()),
                 submitBtn::click);
-        if (resp.status() == 429) {
+        for (int intento = 0; intento < 3 && resp.status() == 429; intento++) {
             esperarRetryAfter(resp.headerValue("retry-after"));
             resp = page.waitForResponse(
                     r -> r.url().contains("/api/auth/login") && "POST".equalsIgnoreCase(r.request().method()),
@@ -285,7 +285,7 @@ public final class PlaywrightE2ESupport {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() == 429) {
+            for (int intento = 0; intento < 3 && resp.statusCode() == 429; intento++) {
                 esperarRetryAfter(resp.headers().firstValue("retry-after").orElse(null));
                 resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             }

@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V21 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V22 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(21, result.migrationsExecuted);
-        assertEquals("21", result.targetSchemaVersion);
+        assertEquals(22, result.migrationsExecuted);
+        assertEquals("22", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -45,7 +45,16 @@ class FlywayMigrationTest {
             }
             assertTrue(versiones.containsAll(Set.of(
                 "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21")));
+                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22")));
+        }
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rsBlacklist = st.executeQuery(
+                 "SELECT COUNT(*) FROM information_schema.tables "
+                     + "WHERE table_schema = DATABASE() AND table_name = 'token_blacklist'")) {
+            rsBlacklist.next();
+            assertEquals(1, rsBlacklist.getInt(1), "La tabla token_blacklist de V22 debe existir");
         }
 
         try (Connection conn = ConexionBD.getConnection();

@@ -156,7 +156,7 @@ public class SubFaseC1PinLoginE2ETest {
 
             // 4. Ingresar PIN válido '1234' esperando explícitamente la respuesta de /api/auth/pin-login
             Response respuestaPin = ingresarPinYEsperarRespuesta(page, btn1, btn2, btn3, btn4);
-            if (respuestaPin.status() == 429) {
+            for (int intento = 0; intento < 3 && respuestaPin.status() == 429; intento++) {
                 // El servidor E2E compartido en CI aplica rate limit por IP en /api/auth/*: se respeta Retry-After
                 PlaywrightE2ESupport.esperarRetryAfter(respuestaPin.headerValue("retry-after"));
                 btnClear.click();
@@ -222,7 +222,7 @@ public class SubFaseC1PinLoginE2ETest {
                     r -> r.url().contains("/api/auth/pin-switch") && "POST".equalsIgnoreCase(r.request().method()),
                     new Page.WaitForResponseOptions().setTimeout(REDIRECCION_TIMEOUT_MS),
                     btn9::click);
-            if (respSwitch.status() == 429) {
+            for (int intento = 0; intento < 3 && respSwitch.status() == 429; intento++) {
                 PlaywrightE2ESupport.esperarRetryAfter(respSwitch.headerValue("retry-after"));
                 btn9.click();
                 btn9.click();
