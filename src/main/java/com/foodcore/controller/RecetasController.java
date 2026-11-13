@@ -121,33 +121,38 @@ public class RecetasController {
         tblComponentesReceta.setItems(listaComponentes);
     }
 
+    private record DatosRecetasCarga(List<Producto> prods, List<Insumo> insumos) {
+    }
+
     public void cargarDatosIniciales() {
-        new Thread(() -> {
-            List<Producto> prods = new ArrayList<>();
-            List<Insumo> ins = new ArrayList<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                prods = productoDAO.listarTodos(conn);
-                ins = insumoDAO.listarTodos(conn);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando datos de recetas", e);
-            }
-            final List<Producto> prodsFinal = prods;
-            final List<Insumo> insFinal = ins;
-            Platform.runLater(() -> {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Producto> prods = new ArrayList<>();
+                List<Insumo> ins = new ArrayList<>();
+                try (Connection conn = ConexionBD.getConnection()) {
+                    prods = productoDAO.listarTodos(conn);
+                    ins = insumoDAO.listarTodos(conn);
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Error cargando datos de recetas", e);
+                }
+                return new DatosRecetasCarga(prods, ins);
+            },
+            datos -> {
                 costosPorInsumo.clear();
-                for (Insumo i : insFinal) {
+                for (Insumo i : datos.insumos()) {
                     costosPorInsumo.put(i.getIdInsumo(), i.getCostoUnitario() != null ? i.getCostoUnitario() : BigDecimal.ZERO);
                 }
-                listaInsumos.setAll(insFinal);
+                listaInsumos.setAll(datos.insumos());
                 if (!listaInsumos.isEmpty()) {
                     cmbInsumoReceta.getSelectionModel().selectFirst();
                 }
-                listaPlatillos.setAll(prodsFinal);
+                listaPlatillos.setAll(datos.prods());
                 if (!listaPlatillos.isEmpty()) {
                     tblPlatillos.getSelectionModel().selectFirst();
                 }
-            });
-        }).start();
+            },
+            e -> LOGGER.log(Level.FINE, "Error cargando datos de recetas", e)
+        );
     }
 
     public void cargarRecetaDePlatillo(Producto p) {

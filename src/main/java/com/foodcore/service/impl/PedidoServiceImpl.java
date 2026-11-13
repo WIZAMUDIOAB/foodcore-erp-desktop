@@ -10,6 +10,7 @@ import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.PedidoService;
 import com.foodcore.tx.TransactionManager;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -47,5 +48,26 @@ public class PedidoServiceImpl extends PedidoService {
     public Pedido adicionarItemsPostEntrega(int idPedido, List<DetallePedido> nuevosItems, SesionUsuario sesion)
             throws NegocioException, SQLException {
         return super.adicionarItemsPostEntrega(idPedido, nuevosItems, sesion);
+    }
+
+    @Override
+    public BigDecimal calcularTotal(int idPedido) throws SQLException {
+        return super.calcularTotal(idPedido);
+    }
+
+    @Override
+    public List<DetallePedido> listarDetallesPorPedido(int idPedido) throws SQLException {
+        return super.listarDetallesPorPedido(idPedido);
+    }
+
+    @Override
+    public Pedido agregarItemsAPedido(int idPedido, List<DetallePedido> nuevosItems)
+            throws NegocioException, SQLException {
+        return super.agregarItemsAPedido(idPedido, nuevosItems);
+    }
+
+    @Override
+    public boolean transferirMesa(int idMesaOrigen, int idMesaDestino) throws SQLException {
+        return super.transferirMesa(idMesaOrigen, idMesaDestino);
     }
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodcore.App;
 import com.foodcore.api.ApiServer;
+import com.foodcore.e2e.PlaywrightE2ESupport;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
@@ -57,14 +58,15 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
 
     private static final Logger LOGGER = Logger.getLogger(SpecFoodcoreV30RedesignScreenshotsTest.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
-    private static final Path SCREENSHOT_DIR = Path.of("target/screenshots-v3.0");
-    private static final Path ARTIFACT_DIR = Path.of("C:/Users/HP/.gemini/antigravity/brain/1a2d19c5-8aa0-4627-8a35-de732abf3cab");
+    private static final Path SCREENSHOT_DIR = Path.of("target", "screenshots-v3.0");
+    private static final Path TARGET_SCREENSHOT_DIR = Path.of("target", "screenshots");
 
     @BeforeEach
     void setUp() throws Exception {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
         JavaFxTestSupport.iniciarToolkit();
         Files.createDirectories(SCREENSHOT_DIR);
+        Files.createDirectories(TARGET_SCREENSHOT_DIR);
         sembrarDatosVisualesDemostracion();
     }
 
@@ -680,18 +682,18 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
     }
 
     private void capturarPwaEnNavegadorTablet(String url, String filename) throws Exception {
-        File edgeExe = new File("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
-        if (!edgeExe.exists()) {
-            edgeExe = new File("C:/Program Files/Microsoft/Edge/Application/msedge.exe");
-        }
-        if (!edgeExe.exists()) {
+        Path edgeExe = PlaywrightE2ESupport.resolverEdgeEjecutable();
+        if (edgeExe == null) {
             return;
+        }
+        if (!Files.exists(SCREENSHOT_DIR)) {
+            Files.createDirectories(SCREENSHOT_DIR);
         }
         File targetFile = SCREENSHOT_DIR.resolve(filename).toFile().getAbsoluteFile();
         Path freshProfileDir = Path.of("target", "edge-pwa-profile-" + UUID.randomUUID()).toAbsolutePath();
         Files.createDirectories(freshProfileDir);
         ProcessBuilder pb = new ProcessBuilder(
-                edgeExe.getAbsolutePath(),
+                edgeExe.toAbsolutePath().toString(),
                 "--headless",
                 "--disable-gpu",
                 "--no-sandbox",
@@ -707,8 +709,11 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
         proc.waitFor(20, TimeUnit.SECONDS);
 
         if (targetFile.exists() && targetFile.length() > 2000) {
-            File artifactFile = ARTIFACT_DIR.resolve(filename).toFile();
-            Files.copy(targetFile.toPath(), artifactFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            if (!Files.exists(TARGET_SCREENSHOT_DIR)) {
+                Files.createDirectories(TARGET_SCREENSHOT_DIR);
+            }
+            Path targetCopy = TARGET_SCREENSHOT_DIR.resolve(filename);
+            Files.copy(targetFile.toPath(), targetCopy, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -730,12 +735,18 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
 
         BufferedImage img = imgRef.get();
         assertNotNull(img, "Imagen no debe ser nula");
+        if (!Files.exists(SCREENSHOT_DIR)) {
+            Files.createDirectories(SCREENSHOT_DIR);
+        }
         File targetFile = SCREENSHOT_DIR.resolve(filename).toFile();
         ImageIO.write(img, "png", targetFile);
         assertTrue(targetFile.exists() && targetFile.length() > 2000, "Archivo de captura generado: " + targetFile);
 
-        File artifactFile = ARTIFACT_DIR.resolve(filename).toFile();
-        Files.copy(targetFile.toPath(), artifactFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        if (!Files.exists(TARGET_SCREENSHOT_DIR)) {
+            Files.createDirectories(TARGET_SCREENSHOT_DIR);
+        }
+        Path targetCopy = TARGET_SCREENSHOT_DIR.resolve(filename);
+        Files.copy(targetFile.toPath(), targetCopy, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private void normalizarAnimaciones(Node node) {

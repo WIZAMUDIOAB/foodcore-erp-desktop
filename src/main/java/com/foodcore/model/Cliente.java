@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 public class Cliente {
     private int idCliente;
     private String tipoDocumento; // RUC, DNI
+    private String tipoCliente; // CORPORATIVO, MINORISTA
     private String numeroDocumento;
     private String razonSocial;
     private String contacto;
@@ -26,6 +27,7 @@ public class Cliente {
 
     public Cliente() {
         this.tipoDocumento = "RUC";
+        this.tipoCliente = "CORPORATIVO";
         this.estado = "ACTIVO";
         this.activo = true;
         this.diasCredito = 30;
@@ -178,6 +180,29 @@ public class Cliente {
             return false;
         }
         return fechaNacimiento.getMonthValue() == LocalDate.now().getMonthValue();
+    }
+
+    public String getTipoCliente() {
+        if (tipoCliente == null || tipoCliente.isBlank()) {
+            return "DNI".equalsIgnoreCase(tipoDocumento) ? "MINORISTA" : "CORPORATIVO";
+        }
+        return tipoCliente;
+    }
+
+    public void setTipoCliente(String tipoCliente) {
+        this.tipoCliente = tipoCliente;
+    }
+
+    public boolean isMinorista() {
+        return "MINORISTA".equalsIgnoreCase(getTipoCliente());
+    }
+
+    public String getNombreCompleto() {
+        return razonSocial;
+    }
+
+    public void setNombreCompleto(String nombreCompleto) {
+        this.razonSocial = nombreCompleto;
     }
 
 }

@@ -105,10 +105,39 @@ public class ProductoDAOImpl implements ProductoDAO {
     }
 
     @Override
+    public Producto buscarPorCodigo(Connection conn, String codigo) throws SQLException {
+        if (codigo == null || codigo.isBlank()) {
+            return null;
+        }
+        String sql = "SELECT p.*, COALESCE(c.nombre, 'General') AS nombre_cat " +
+                     "FROM producto p " +
+                     "LEFT JOIN categoria c ON p.id_categoria = c.id_categoria " +
+                     "WHERE UPPER(TRIM(p.codigo)) = UPPER(?) LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codigo.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapearProducto(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void reactivar(Connection conn, int idProducto) throws SQLException {
+        String sql = "UPDATE producto SET activo = 1 WHERE id_producto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idProducto);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
     public int crear(Connection conn, Producto p) throws SQLException {
         String sql = "INSERT INTO producto (id_categoria, codigo, nombre, descripcion, precio_venta, " +
-                     "costo_estimado, disponible, imagen_url, es_menu_del_dia, fecha_disponibilidad) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     "costo_estimado, disponible, imagen_url, es_menu_del_dia, fecha_disponibilidad, es_combo) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, p.getIdCategoria());
             ps.setString(2, p.getCodigo());
@@ -124,6 +153,7 @@ public class ProductoDAOImpl implements ProductoDAO {
             } else {
                 ps.setNull(10, java.sql.Types.DATE);
             }
+            ps.setBoolean(11, p.isEsCombo());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -140,7 +170,7 @@ public class ProductoDAOImpl implements ProductoDAO {
     public void actualizar(Connection conn, Producto p) throws SQLException {
         String sql = "UPDATE producto SET id_categoria = ?, codigo = ?, nombre = ?, descripcion = ?, " +
                      "precio_venta = ?, costo_estimado = ?, disponible = ?, imagen_url = ?, " +
-                     "es_menu_del_dia = ?, fecha_disponibilidad = ? " +
+                     "es_menu_del_dia = ?, fecha_disponibilidad = ?, es_combo = ? " +
                      "WHERE id_producto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, p.getIdCategoria());
@@ -157,7 +187,8 @@ public class ProductoDAOImpl implements ProductoDAO {
             } else {
                 ps.setNull(10, java.sql.Types.DATE);
             }
-            ps.setInt(11, p.getIdProducto());
+            ps.setBoolean(11, p.isEsCombo());
+            ps.setInt(12, p.getIdProducto());
             ps.executeUpdate();
         }
     }
@@ -219,6 +250,11 @@ public class ProductoDAOImpl implements ProductoDAO {
             }
         } catch (SQLException ignored) {
             p.setFechaDisponibilidad(null);
+        }
+        try {
+            p.setEsCombo(rs.getBoolean("es_combo"));
+        } catch (SQLException ignored) {
+            p.setEsCombo(false);
         }
         p.setNombreCategoria(rs.getString("nombre_cat"));
         return p;

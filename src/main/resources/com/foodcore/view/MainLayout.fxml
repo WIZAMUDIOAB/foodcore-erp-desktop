@@ -56,8 +56,9 @@
                                     <Button fx:id="btnNavKiosco" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKiosco" styleClass="sidebar-nav-button" text="📱 Kiosco Autoservicio" />
                                     <Button fx:id="btnNavMenuQr" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenuQr" styleClass="sidebar-nav-button" text="📲 Menú Digital QR" />
 
-                                    <!-- Sección FINANZAS (Sub-Fase 4A v2.0) -->
+                                    <!-- Sección FINANZAS (Sub-Fase 4A v2.0 + v4.9.0 BI) -->
                                     <Label fx:id="lblSecFinanzas" styleClass="sidebar-section-header" text="FINANZAS" />
+                                    <Button fx:id="btnNavEstadoResultados" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavEstadoResultados" styleClass="sidebar-nav-button" text="💹 Estado de Resultados (P&amp;L)" />
                                     <Button fx:id="btnNavReportesContables" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesContables" styleClass="sidebar-nav-button" text="📑 Reportes Contables" />
                                     <Button fx:id="btnNavProveedores" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavProveedores" styleClass="sidebar-nav-button" text="🏢 Proveedores y CxP" />
                                     <Button fx:id="btnNavClientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavClientes" styleClass="sidebar-nav-button" text="👥 Clientes y CxC" />
@@ -71,6 +72,8 @@
                                     <Button fx:id="btnNavHorarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHorarios" styleClass="sidebar-nav-button" text="🗓️ Turnos y Horarios" />
                                     <Button fx:id="btnNavMiHorario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMiHorario" styleClass="sidebar-nav-button" text="👤 Mi Portal y Horario" />
                                     <Button fx:id="btnNavSolicitudes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavSolicitudes" styleClass="sidebar-nav-button" text="📝 Solicitudes y Ausencias" />
+                                    <Button fx:id="btnNavExpedientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavExpedientes" styleClass="sidebar-nav-button" text="🗂️ Expedientes y Legajos" />
+                                    <Button fx:id="btnNavPlanilla" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPlanilla" styleClass="sidebar-nav-button" text="💵 Pagos y Planilla" />
 
                                     <!-- Sección BACKOFFICE -->
                                     <Label fx:id="lblSecBackoffice" styleClass="sidebar-section-header" text="BACKOFFICE" />

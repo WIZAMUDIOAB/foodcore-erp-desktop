@@ -14,6 +14,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootReservasStack" prefHeight="768.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ReservasController">
     <children>
@@ -39,41 +40,81 @@
                                     <children>
                                         <Button fx:id="btnNuevaReserva" mnemonicParsing="false" onAction="#handleAbrirModal" styleClass="btn-primary" text="+ Nueva Reserva" />
                                         <Button fx:id="btnWhatsApp" mnemonicParsing="false" onAction="#handleEnviarWhatsApp" styleClass="btn-secondary" text="📲 Enviar WhatsApp" />
-                                        <Button fx:id="btnSentar" mnemonicParsing="false" onAction="#handleSentarReserva" styleClass="btn-kds-outline" text="✓ Sentar Comensales" />
+                                        <Button fx:id="btnSentar" mnemonicParsing="false" onAction="#handleSentarReserva" styleClass="btn-secondary" text="✓ Sentar Comensales" />
                                     </children>
                                 </HBox>
                             </children>
                         </HBox>
 
-                        <!-- 4 KPI Cards de Reservas (§9.1) -->
+                        <!-- 4 KPI Cards de Reservas (v4.6.0 Fase 3) -->
                         <HBox spacing="14.0">
                             <children>
-                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="RESERVAS DEL DÍA" />
-                                        <Label fx:id="lblKpiTotalReservas" styleClass="stat-card-value" text="0" />
-                                        <Label styleClass="stat-card-subtitle" text="Mesas programadas" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="RESERVAS DEL DÍA" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-blue">
+                                                    <children>
+                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-calendar-alt" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiTotalReservas" styleClass="kpi-value-24-blue" text="0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Mesas programadas" />
                                     </children>
                                 </VBox>
-                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="COMENSALES ESPERADOS" />
-                                        <Label fx:id="lblKpiPersonas" styleClass="stat-card-value" text="0" />
-                                        <Label styleClass="stat-card-subtitle" text="Personas en salón" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="COMENSALES ESPERADOS" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-success">
+                                                    <children>
+                                                        <FontIcon iconColor="#059669" iconLiteral="fas-users" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiPersonas" styleClass="kpi-value-24-success" text="0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Personas en salón" />
                                     </children>
                                 </VBox>
-                                <VBox styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="MESAS COMPROMETIDAS" />
-                                        <Label fx:id="lblKpiMesasComprometidas" styleClass="stat-card-value" text="0" />
-                                        <Label styleClass="stat-card-subtitle" text="Con bloqueo en POS" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="MESAS COMPROMETIDAS" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-amber">
+                                                    <children>
+                                                        <FontIcon iconColor="#D97706" iconLiteral="fas-chair" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiMesasComprometidas" styleClass="kpi-value-24-amber" text="0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Con bloqueo en POS" />
                                     </children>
                                 </VBox>
-                                <VBox styleClass="stat-card-accent" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="ESTADO DE CONFIRMACIÓN" />
-                                        <Label fx:id="lblKpiConfirmadas" styleClass="stat-card-value" text="0 / 0" />
-                                        <Label styleClass="stat-card-subtitle" text="Confirmadas vs Pendientes" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="ESTADO DE CONFIRMACIÓN" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-accent">
+                                                    <children>
+                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-check-double" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiConfirmadas" styleClass="kpi-value-24-accent" text="0 / 0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Confirmadas vs Pendientes" />
                                     </children>
                                 </VBox>
                             </children>

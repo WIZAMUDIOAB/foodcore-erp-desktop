@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox fx:id="rootPersonalizacion" maxWidth="540.0" prefWidth="520.0" spacing="14.0"
+      styleClass="modal-dialog-surface" stylesheets="@../../../css/foodcore.css"
+      xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.foodcore.controller.PersonalizacionProductoController">
+    <children>
+
+        <!-- Encabezado Platillo -->
+        <VBox spacing="4.0" styleClass="surface-card">
+            <children>
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <children>
+                        <Label fx:id="lblNombrePlatillo" styleClass="text-h2" text="Personalizar Platillo" wrapText="true" />
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Label fx:id="lblBadgePrecioBase" styleClass="badge-pill-accent" text="S/ 0.00" />
+                    </children>
+                </HBox>
+                <Label fx:id="lblDescripcionPlatillo" styleClass="text-caption-muted" text="Seleccione tamaño y adicionales" wrapText="true" />
+            </children>
+        </VBox>
+
+        <!-- Contenido scrollable de Variantes y Modificadores -->
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" maxHeight="520.0" prefHeight="465.0" vbarPolicy="AS_NEEDED">
+            <content>
+                <VBox spacing="12.0" style="-fx-padding: 2 4 2 2;">
+                    <children>
+
+                        <!-- Módulo 1: Tamaños / Variantes -->
+                        <VBox fx:id="vboxSeccionVariantes" spacing="8.0" styleClass="client-section-box">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="1. Tamaño / Variante (Obligatorio)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label styleClass="badge-pill-neutral" text="1 OPCIÓN" />
+                                    </children>
+                                </HBox>
+                                <VBox fx:id="vboxVariantes" spacing="6.0" />
+                            </children>
+                        </VBox>
+
+                        <!-- Módulo 2: Modificadores / Extras -->
+                        <VBox fx:id="vboxSeccionModificadores" spacing="8.0" styleClass="client-section-box">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="2. Extras / Modificadores (Opcional)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label styleClass="badge-pill-success" text="ADICIONALES" />
+                                    </children>
+                                </HBox>
+                                <VBox fx:id="vboxModificadores" spacing="6.0" />
+                            </children>
+                        </VBox>
+
+                        <!-- Cantidad y Nota especial -->
+                        <VBox spacing="8.0" styleClass="client-section-box">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="text-body-strong" text="Cantidad:" />
+                                        <Button fx:id="btnMenos" mnemonicParsing="false" onAction="#handleDisminuirCantidad" prefWidth="36.0" styleClass="btn-secondary" text="-" />
+                                        <Label fx:id="lblCantidad" minWidth="28.0" alignment="CENTER" styleClass="text-mono" text="1" />
+                                        <Button fx:id="btnMas" mnemonicParsing="false" onAction="#handleAumentarCantidad" prefWidth="36.0" styleClass="btn-secondary" text="+" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                    </children>
+                                </HBox>
+                                <TextField fx:id="txtNotaEspecial" promptText="Indicación para cocina (ej. término medio, poco hielo)..." styleClass="input-field" />
+                            </children>
+                        </VBox>
+
+                    </children>
+                </VBox>
+            </content>
+        </ScrollPane>
+
+        <!-- Vista previa y Total en vivo -->
+        <VBox spacing="6.0" styleClass="pos-totals-card">
+            <children>
+                <Label fx:id="lblResumenSeleccion" styleClass="text-caption" text="Resumen de selección" wrapText="true" />
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <children>
+                        <Label fx:id="lblPrecioUnitario" styleClass="text-caption-muted" text="P. Unitario: S/ 0.00" />
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Label styleClass="text-body-strong" text="Subtotal:" />
+                        <Label fx:id="lblTotalCalculado" styleClass="text-mono-lg-accent" text="S/ 0.00" />
+                    </children>
+                </HBox>
+            </children>
+        </VBox>
+
+        <!-- Acciones -->
+        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+            <children>
+                <Button fx:id="btnCancelar" mnemonicParsing="false" onAction="#handleCancelar" prefHeight="44.0" styleClass="btn-secondary" text="Cancelar" />
+                <Button fx:id="btnConfirmarPersonalizacion" defaultButton="true" mnemonicParsing="false" onAction="#handleConfirmar" prefHeight="44.0" styleClass="btn-primary" text="Agregar al Pedido" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+            </children>
+        </HBox>
+
+    </children>
+</VBox>

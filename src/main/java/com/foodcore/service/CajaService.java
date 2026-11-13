@@ -5,6 +5,7 @@ import com.foodcore.dao.CajaDAOImpl;
 import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Caja;
+import com.foodcore.model.CategoriaGasto;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.tx.TransactionManager;
@@ -14,6 +15,7 @@ import com.foodcore.util.ConexionBD;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Logger;
@@ -74,6 +76,14 @@ public class CajaService {
      */
     public void registrarGastoOperativo(int idCaja, int idUsuario, BigDecimal monto, String concepto)
             throws NegocioException, SQLException {
+        registrarGastoOperativo(idCaja, idUsuario, monto, concepto, null);
+    }
+
+    /**
+     * Registra una salida de efectivo de caja chica / gasto operativo categorizado (v4.9.0 Fase 1.1).
+     */
+    public void registrarGastoOperativo(int idCaja, int idUsuario, BigDecimal monto, String concepto, Integer idCategoriaGasto)
+            throws NegocioException, SQLException {
         if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new NegocioException("El monto del gasto operativo debe ser mayor a cero.");
         }
@@ -88,10 +98,30 @@ public class CajaService {
             if (opt.isEmpty() || opt.get().getIdCaja() != idCaja) {
                 throw new CajaCerradaException("No hay un turno de caja abierto para registrar el gasto.");
             }
-            MovimientoCaja movGasto = new MovimientoCaja(0, idCaja, idUsuario, "EGRESO", "EFECTIVO", montoNorm, glosa);
+            if (idCategoriaGasto != null) {
+                Optional<CategoriaGasto> catOpt = cajaDAO.obtenerCategoriaGastoPorId(conn, idCategoriaGasto);
+                if (catOpt.isEmpty() || !catOpt.get().isActivo()) {
+                    throw new NegocioException("La categoría de gasto seleccionada no existe o está inactiva.");
+                }
+            }
+            MovimientoCaja movGasto = new MovimientoCaja(
+                0, idCaja, idUsuario, "EGRESO", "EFECTIVO", montoNorm, glosa, idCategoriaGasto
+            );
             cajaDAO.registrarMovimiento(conn, movGasto);
             LOGGER.info("Gasto operativo registrado en Caja #" + idCaja + ": S/ " + montoNorm + " (" + glosa + ")");
         });
+    }
+
+    public List<CategoriaGasto> listarCategoriasGastoActivas() throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return cajaDAO.listarCategoriasGastoActivas(conn);
+        }
+    }
+
+    public List<MovimientoCaja> listarGastosTurno(int idCaja) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return cajaDAO.listarGastosTurno(conn, idCaja);
+        }
     }
 
     public BigDecimal calcularVentasTurno(int idCaja) throws SQLException {

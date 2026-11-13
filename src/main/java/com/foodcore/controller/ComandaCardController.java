@@ -6,6 +6,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
+import com.foodcore.util.UiAsyncExecutor;
 import com.google.gson.JsonObject;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -19,6 +20,7 @@ import javafx.util.Duration;
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -82,11 +84,7 @@ public class ComandaCardController {
         String mesa = item.getNumeroMesa() != null ? item.getNumeroMesa() : "01";
         String estado = item.getEstadoCocina() != null ? item.getEstadoCocina() : "PENDIENTE";
         initData(mesa, "PED-" + item.getIdPedido() + " · ITEM-" + item.getIdDetallePedido(), estado);
-        agregarPlato(
-            item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto(),
-            item.getCantidad(),
-            item.getNotasPreparacion()
-        );
+        agregarPlatoDetalle(item);
         long seg = item.calcularSegundosDesdeEnvio(LocalDateTime.now(ZONA_LIMA));
         setSegundosTranscurridos((int) seg);
 
@@ -190,13 +188,54 @@ public class ComandaCardController {
         AnimationUtils.setSoftPulse(cardContainer, false);
     }
 
+    public void agregarPlatoDetalle(DetallePedido item) {
+        if (item == null) {
+            return;
+        }
+        String tituloCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+        List<String> componentesCombo = com.foodcore.util.FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
+                item.getComboComponentesTexto(), item.getCantidad());
+        agregarPlato(tituloCocina, item.getCantidad(), item.getNotasPreparacion(), componentesCombo);
+    }
+
     public void agregarPlato(String producto, int cantidad, String notas) {
-        VBox itemBox = new VBox(4);
+        agregarPlato(producto, cantidad, notas, List.of());
+    }
+
+    public void agregarPlato(String producto, int cantidad, String notas, List<String> componentesCombo) {
+        VBox itemBox = new VBox(5);
+        boolean esCombo = componentesCombo != null && !componentesCombo.isEmpty();
+        if (esCombo) {
+            Label badgeCombo = new Label("COMBO");
+            badgeCombo.setStyle("-fx-background-color: #4F46E5; -fx-text-fill: #FFFFFF; -fx-font-size: 10px; "
+                    + "-fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
+            itemBox.getChildren().add(badgeCombo);
+        }
+
         Label lblPlato = new Label(cantidad + "x  " + producto);
         lblPlato.setWrapText(true);
         lblPlato.setMaxWidth(275);
         lblPlato.getStyleClass().add("text-body-strong-inverse");
         itemBox.getChildren().add(lblPlato);
+
+        if (esCombo) {
+            VBox boxDesglose = new VBox(3);
+            boxDesglose.setMaxWidth(275);
+            boxDesglose.setStyle("-fx-background-color: rgba(255, 255, 255, 0.08); "
+                    + "-fx-border-color: rgba(165, 180, 252, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
+                    + "-fx-padding: 6 9;");
+            Label lblCabeceraDesglose = new Label("Desglose de empaquetado:");
+            lblCabeceraDesglose.setStyle("-fx-text-fill: #A5B4FC; -fx-font-size: 11px; -fx-font-weight: 700;");
+            boxDesglose.getChildren().add(lblCabeceraDesglose);
+            for (String comp : componentesCombo) {
+                Label lblComp = new Label("•  " + comp);
+                lblComp.setWrapText(true);
+                lblComp.setMaxWidth(252);
+                lblComp.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 12.5px; -fx-font-weight: 600;");
+                boxDesglose.getChildren().add(lblComp);
+            }
+            itemBox.getChildren().add(boxDesglose);
+        }
 
         if (notas != null && !notas.trim().isEmpty()) {
             Label lblNota = new Label("Nota: " + notas);
@@ -252,18 +291,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("EN_PREPARACION");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+                        }
+                        if (idPedido > 0) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
+                        }
                     }
-                    if (idPedido > 0) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -276,24 +317,26 @@ public class ComandaCardController {
         aplicarEstadoVisual("LISTO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
-                    }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
-                    }
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
+                        }
 
-                    JsonObject json = new JsonObject();
-                    json.addProperty("accion", "PLATO_DESPACHADO");
-                    json.addProperty("idPedido", idPedido);
-                    json.addProperty("idDetallePedido", idDetallePedido);
-                    ServidorSockets.getInstance().emitirMensaje(json);
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex);
-                }
-            }).start();
+                        JsonObject json = new JsonObject();
+                        json.addProperty("accion", "PLATO_DESPACHADO");
+                        json.addProperty("idPedido", idPedido);
+                        json.addProperty("idDetallePedido", idDetallePedido);
+                        ServidorSockets.getInstance().emitirMensaje(json);
+                    }
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -310,18 +353,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("ENTREGADO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                        }
                     }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex)
+            );
         }
 
         if (onDespachadoListener != null) {

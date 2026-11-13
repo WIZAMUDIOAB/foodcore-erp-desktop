@@ -242,4 +242,100 @@ class PedidoServiceTest {
                 "El ítem de 12 min dentro del mismo pedido debe evaluarse como RED (> 10 min)");
         }
     }
+
+    @Test
+    @DisplayName("v4.6.0-F1.1: calcularTotalYAgregarItemsAPedidoDebeAcumularTodosLosItems - Monto acumulado")
+    void calcularTotalYAgregarItemsAPedidoDebeAcumularTodosLosItems() throws Exception {
+        Pedido inicial = new Pedido(0, 1, null, "01", "REGISTRADO", new BigDecimal("28.00"));
+        DetallePedido det1 = new DetallePedido(0, 0, idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Inicial");
+        Pedido creado = pedidoService.crearPedido(inicial, List.of(det1));
+
+        DetallePedido det2 = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Adicional 1");
+        DetallePedido det3 = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Alitas BBQ x6", 1,
+            new BigDecimal("14.00"), new BigDecimal("14.00"), "Adicional 2");
+
+        Pedido actualizado = pedidoService.agregarItemsAPedido(creado.getIdPedido(), List.of(det2, det3));
+        BigDecimal totalCalculado = pedidoService.calcularTotal(creado.getIdPedido());
+
+        assertEquals(0, new BigDecimal("70.00").compareTo(totalCalculado),
+            "calcularTotal debe sumar los 3 ítems acumulados (28 + 28 + 14 = 70.00)");
+        assertEquals(0, new BigDecimal("70.00").compareTo(actualizado.getTotal()));
+        assertEquals(3, actualizado.getDetalles().size(), "Debe conservar los 3 ítems completos del pedido");
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            Pedido enBd = pedidoDAO.obtenerPorId(conn, creado.getIdPedido()).orElseThrow();
+            assertEquals(0, new BigDecimal("70.00").compareTo(enBd.getTotal()),
+                "El campo total en tabla pedido debe actualizarse al acumulado");
+        }
+    }
+
+    @Test
+    @DisplayName("v4.6.0-F1.2: transferirMesaDebeConservarTodosLosItemsSinCrearNuevoPedido - Transferencia completa")
+    void transferirMesaDebeConservarTodosLosItemsSinCrearNuevoPedido() throws Exception {
+        int idMesaOrigen;
+        int idMesaDestino;
+        String numOrigen;
+        String numDestino;
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT id_mesa, numero FROM mesa ORDER BY id_mesa ASC LIMIT 2");
+             ResultSet rs = ps.executeQuery()) {
+            assertTrue(rs.next(), "Debe existir mesa origen en BD");
+            idMesaOrigen = rs.getInt("id_mesa");
+            numOrigen = rs.getString("numero");
+            assertTrue(rs.next(), "Debe existir mesa destino en BD");
+            idMesaDestino = rs.getInt("id_mesa");
+            numDestino = rs.getString("numero");
+        }
+
+        Pedido pedidoOrigen = new Pedido(0, 1, null, numOrigen, "REGISTRADO", new BigDecimal("56.00"));
+        pedidoOrigen.setIdMesa(idMesaOrigen);
+        DetallePedido d1 = new DetallePedido(0, 0, idProductoPrueba, "Plato 1", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Ronda 1");
+        DetallePedido d2 = new DetallePedido(0, 0, idProductoPrueba, "Plato 2", 1,
+            new BigDecimal("28.00"), new BigDecimal("28.00"), "Ronda 1");
+        Pedido creado = pedidoService.crearPedido(pedidoOrigen, List.of(d1, d2));
+
+        DetallePedido d3 = new DetallePedido(0, creado.getIdPedido(), idProductoPrueba, "Plato 3", 1,
+            new BigDecimal("19.50"), new BigDecimal("19.50"), "Ronda 2");
+        pedidoService.agregarItemsAPedido(creado.getIdPedido(), List.of(d3));
+
+        boolean transferido = pedidoService.transferirMesa(idMesaOrigen, idMesaDestino);
+        assertTrue(transferido, "La transferencia de mesa debe completarse con éxito");
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            try (Statement st = conn.createStatement();
+                 ResultSet rsCount = st.executeQuery("SELECT COUNT(*) FROM pedido")) {
+                rsCount.next();
+                assertEquals(1, rsCount.getInt(1), "No se debe crear ningún nuevo pedido al transferir");
+            }
+
+            Pedido movido = pedidoDAO.obtenerPorId(conn, creado.getIdPedido()).orElseThrow();
+            assertEquals(Integer.valueOf(idMesaDestino), movido.getIdMesa(), "Debe apuntar al id_mesa destino");
+            assertEquals(numDestino, movido.getNumeroMesa(), "Debe actualizar numero_mesa al destino");
+
+            List<DetallePedido> itemsMovidos = pedidoDAO.listarDetallesPorPedido(conn, creado.getIdPedido());
+            assertEquals(3, itemsMovidos.size(), "Deben conservarse los 3 ítems completos bajo el mismo id_pedido");
+            assertEquals(0, new BigDecimal("75.50").compareTo(pedidoService.calcularTotal(creado.getIdPedido())),
+                "El total acumulado después de transferir debe seguir siendo 75.50");
+
+            try (PreparedStatement psOri = conn.prepareStatement("SELECT estado, id_pedido_actual FROM mesa WHERE id_mesa = ?")) {
+                psOri.setInt(1, idMesaOrigen);
+                try (ResultSet rsOri = psOri.executeQuery()) {
+                    assertTrue(rsOri.next());
+                    assertEquals("LIBRE", rsOri.getString("estado"));
+                    assertNull(rsOri.getObject("id_pedido_actual"));
+                }
+            }
+            try (PreparedStatement psDest = conn.prepareStatement("SELECT estado, id_pedido_actual FROM mesa WHERE id_mesa = ?")) {
+                psDest.setInt(1, idMesaDestino);
+                try (ResultSet rsDest = psDest.executeQuery()) {
+                    assertTrue(rsDest.next());
+                    assertEquals("OCUPADA", rsDest.getString("estado"));
+                    assertEquals(creado.getIdPedido(), rsDest.getInt("id_pedido_actual"));
+                }
+            }
+        }
+    }
 }

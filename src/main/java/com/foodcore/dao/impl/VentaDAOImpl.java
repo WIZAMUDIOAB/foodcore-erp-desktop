@@ -43,9 +43,9 @@ public class VentaDAOImpl implements VentaDAO {
             }
         }
 
-        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, descuento, total, "
+        String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, descuento, descuento_puntos, total, "
                 + "metodo_pago, monto_recibido, vuelto, estado, idempotency_key) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             if (venta.getIdPedido() != null) {
                 ps.setInt(1, venta.getIdPedido());
@@ -62,12 +62,13 @@ public class VentaDAOImpl implements VentaDAO {
             ps.setBigDecimal(5, venta.getSubtotal() != null ? venta.getSubtotal() : venta.getTotal());
             ps.setBigDecimal(6, venta.getIgv() != null ? venta.getIgv() : BigDecimal.ZERO);
             ps.setBigDecimal(7, venta.getDescuento() != null ? venta.getDescuento() : BigDecimal.ZERO);
-            ps.setBigDecimal(8, venta.getTotal());
-            ps.setString(9, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
-            ps.setBigDecimal(10, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
-            ps.setBigDecimal(11, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
-            ps.setString(12, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
-            ps.setString(13, idemKey != null ? idemKey.trim() : null);
+            ps.setBigDecimal(8, venta.getDescuentoPuntos() != null ? venta.getDescuentoPuntos() : BigDecimal.ZERO);
+            ps.setBigDecimal(9, venta.getTotal());
+            ps.setString(10, venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO");
+            ps.setBigDecimal(11, venta.getMontoRecibido() != null ? venta.getMontoRecibido() : venta.getTotal());
+            ps.setBigDecimal(12, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
+            ps.setString(13, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
+            ps.setString(14, idemKey != null ? idemKey.trim() : null);
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -87,13 +88,42 @@ public class VentaDAOImpl implements VentaDAO {
                 || detalle.getPrecioUnitario() == null || detalle.getSubtotal() == null) {
             throw new SQLException("Detalle de venta inválido: cantidad, producto y montos deben ser válidos.");
         }
-        String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario, subtotal, "
+                + "id_variante, nombre_variante, modificadores_texto, id_combo, combo_componentes_texto) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, detalle.getIdVenta());
             ps.setInt(2, detalle.getIdProducto());
             ps.setInt(3, detalle.getCantidad());
             ps.setBigDecimal(4, detalle.getPrecioUnitario());
             ps.setBigDecimal(5, detalle.getSubtotal());
+            if (detalle.getIdVariante() != null && detalle.getIdVariante() > 0) {
+                ps.setInt(6, detalle.getIdVariante());
+            } else {
+                ps.setNull(6, java.sql.Types.INTEGER);
+            }
+            if (detalle.getNombreVariante() != null && !detalle.getNombreVariante().isBlank()) {
+                ps.setString(7, detalle.getNombreVariante().trim());
+            } else {
+                ps.setNull(7, java.sql.Types.VARCHAR);
+            }
+            String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                    detalle.getModificadoresSeleccionados(), detalle.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                ps.setString(8, mods);
+            } else {
+                ps.setNull(8, java.sql.Types.VARCHAR);
+            }
+            if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0) {
+                ps.setInt(9, detalle.getIdCombo());
+            } else {
+                ps.setNull(9, java.sql.Types.INTEGER);
+            }
+            if (detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+                ps.setString(10, detalle.getComboComponentesTexto().trim());
+            } else {
+                ps.setNull(10, java.sql.Types.VARCHAR);
+            }
             ps.executeUpdate();
         }
     }
@@ -138,6 +168,12 @@ public class VentaDAOImpl implements VentaDAO {
                 v.setSubtotal(rs.getBigDecimal("subtotal"));
                 v.setIgv(rs.getBigDecimal("igv"));
                 v.setDescuento(rs.getBigDecimal("descuento"));
+                try {
+                    BigDecimal dp = rs.getBigDecimal("descuento_puntos");
+                    v.setDescuentoPuntos(dp != null ? dp : BigDecimal.ZERO);
+                } catch (SQLException ignored) {
+                    v.setDescuentoPuntos(BigDecimal.ZERO);
+                }
                 v.setTotal(rs.getBigDecimal("total"));
                 v.setMetodoPago(rs.getString("metodo_pago"));
                 v.setMontoRecibido(rs.getBigDecimal("monto_recibido"));

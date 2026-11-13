@@ -110,5 +110,30 @@
 
          </children>
       </GridPane>
+
+      <!-- Modal Verificación en Dos Pasos 2FA TOTP (v5.1.0 ÍTEM 7) -->
+      <VBox fx:id="overlayTotp" alignment="CENTER" managed="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="modal-backdrop" visible="false">
+         <children>
+            <VBox maxWidth="420.0" spacing="14.0" styleClass="modal-dialog-surface">
+               <children>
+                  <Label styleClass="text-h2" text="Verificación en Dos Pasos (2FA)" />
+                  <Label fx:id="lblTotpSubtitulo" styleClass="text-body-secondary" text="Ingrese el código TOTP de 6 dígitos generado por su aplicación autenticadora." wrapText="true" />
+                  <VBox spacing="6.0">
+                     <children>
+                        <Label styleClass="text-body-strong" text="Código 2FA (6 dígitos)" />
+                        <TextField fx:id="txtTotpCodigo" onAction="#handleVerificarTotp" promptText="Ej. 123456" styleClass="input-field" />
+                     </children>
+                  </VBox>
+                  <Label fx:id="lblTotpError" managed="false" styleClass="text-error" text="" visible="false" wrapText="true" />
+                  <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                     <children>
+                        <Button fx:id="btnCancelarTotp" mnemonicParsing="false" onAction="#handleCancelarTotp" styleClass="btn-secondary" text="Cancelar" />
+                        <Button fx:id="btnVerificarTotp" mnemonicParsing="false" onAction="#handleVerificarTotp" styleClass="btn-primary" text="Verificar y Entrar" />
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </children>
+      </VBox>
    </children>
 </StackPane>

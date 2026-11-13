@@ -51,7 +51,7 @@ public class PwaOrderFlowE2ETest {
             page.navigate(PlaywrightE2ESupport.BASE_URL + "/");
             page.fill("#txtUsername", "mozo");
             page.fill("#txtPassword", "Admin#2026!");
-            page.click("button[type='submit']");
+            PlaywrightE2ESupport.submitLoginConReintento429(page, page.locator("button[type='submit']"));
             page.waitForURL("**/mesas.html**");
 
             // 2. Hacer clic en "Mesa 01" -> verificar redirección a catalogo.html

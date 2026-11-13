@@ -32,6 +32,11 @@ public class Usuario {
     private LocalDate fechaVencimientoContrato;
     private LocalDate fechaVencimientoCarnetSanidad;
 
+    // Campos de Seguridad v5.1.0 (2FA TOTP e invalidación de sesiones JWT)
+    private String totpSecret;
+    private boolean totpHabilitado;
+    private long tokensInvalidadosAntes;
+
     public Usuario() {
     }
 
@@ -187,6 +192,112 @@ public class Usuario {
     public LocalDate getFechaVencimientoCarnetSanidad() { return fechaVencimientoCarnetSanidad; }
 
     public void setFechaVencimientoCarnetSanidad(LocalDate fechaVencimientoCarnetSanidad) { this.fechaVencimientoCarnetSanidad = fechaVencimientoCarnetSanidad; }
+
+    private String tipoDocumento;
+    private String direccion;
+    private String telefono;
+    private String telefonoEmergencia;
+    private String contactoEmergencia;
+    private LocalDate fechaNacimiento;
+    private String tipoContrato;
+    private LocalDate fechaIngreso;
+    private String cargo;
+
+    public String getTipoDocumento() {
+        return tipoDocumento;
+    }
+
+    public void setTipoDocumento(String tipoDocumento) {
+        this.tipoDocumento = tipoDocumento;
+    }
+
+    public String getDireccion() {
+        return direccion;
+    }
+
+    public void setDireccion(String direccion) {
+        this.direccion = direccion;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
+    }
+
+    public String getTelefonoEmergencia() {
+        return telefonoEmergencia;
+    }
+
+    public void setTelefonoEmergencia(String telefonoEmergencia) {
+        this.telefonoEmergencia = telefonoEmergencia;
+    }
+
+    public String getContactoEmergencia() {
+        return contactoEmergencia;
+    }
+
+    public void setContactoEmergencia(String contactoEmergencia) {
+        this.contactoEmergencia = contactoEmergencia;
+    }
+
+    public LocalDate getFechaNacimiento() {
+        return fechaNacimiento;
+    }
+
+    public void setFechaNacimiento(LocalDate fechaNacimiento) {
+        this.fechaNacimiento = fechaNacimiento;
+    }
+
+    public String getTipoContrato() {
+        return tipoContrato;
+    }
+
+    public void setTipoContrato(String tipoContrato) {
+        this.tipoContrato = tipoContrato;
+    }
+
+    public LocalDate getFechaIngreso() {
+        return fechaIngreso;
+    }
+
+    public void setFechaIngreso(LocalDate fechaIngreso) {
+        this.fechaIngreso = fechaIngreso;
+    }
+
+    public String getCargo() {
+        return cargo;
+    }
+
+    public void setCargo(String cargo) {
+        this.cargo = cargo;
+    }
+
+    public String getTotpSecret() {
+        return totpSecret;
+    }
+
+    public void setTotpSecret(String totpSecret) {
+        this.totpSecret = totpSecret;
+    }
+
+    public boolean isTotpHabilitado() {
+        return totpHabilitado;
+    }
+
+    public void setTotpHabilitado(boolean totpHabilitado) {
+        this.totpHabilitado = totpHabilitado;
+    }
+
+    public long getTokensInvalidadosAntes() {
+        return tokensInvalidadosAntes;
+    }
+
+    public void setTokensInvalidadosAntes(long tokensInvalidadosAntes) {
+        this.tokensInvalidadosAntes = tokensInvalidadosAntes;
+    }
 
     @Override
     public String toString() {

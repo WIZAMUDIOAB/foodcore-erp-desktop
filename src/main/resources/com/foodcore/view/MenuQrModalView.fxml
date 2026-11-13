@@ -27,7 +27,7 @@
 
     <!-- URL de Red Local para Clientes (v4.3.2) -->
     <VBox spacing="6.0" styleClass="surface-card">
-        <Label styleClass="text-caption-muted" text="URL DE RED LOCAL (WI-FI SMARTPHONES):" />
+        <Label styleClass="text-caption-muted" text="ENLACE DEL MENÚ DIGITAL QR (TÚNEL PÚBLICO / WI-FI):" />
         <HBox alignment="CENTER_LEFT" spacing="8.0">
             <TextField fx:id="txtUrlMenu" editable="false" HBox.hgrow="ALWAYS" styleClass="search-box" />
             <Button mnemonicParsing="false" onAction="#handleAbrirEnNavegador" styleClass="btn-secondary" text="🌐 Probar" />

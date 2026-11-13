@@ -4,6 +4,7 @@ import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -27,4 +28,10 @@ public interface PedidoDAO {
     void actualizarEstadoDetalleCocina(Connection conn, int idDetallePedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoComanda(Connection conn, int idComanda, String nuevoEstado) throws SQLException;
     void actualizarEstadoMesaConVersion(Connection conn, long idMesa, String nuevoEstado, int versionEsperada) throws SQLException;
+    BigDecimal calcularTotalPedido(Connection conn, int idPedido) throws SQLException;
+    Optional<Pedido> buscarPedidoActivoPorMesa(Connection conn, long idMesa) throws SQLException;
+    Optional<Pedido> buscarPedidoActivoPorNumeroMesa(Connection conn, String numeroMesa) throws SQLException;
+    void moverPedidoAMesa(Connection conn, int idPedido, long idMesaDestino, String numeroMesaDestino) throws SQLException;
+    Optional<String> obtenerNumeroMesaPorId(Connection conn, long idMesa) throws SQLException;
+    void actualizarEstadoMesaDirecto(Connection conn, long idMesa, String estado, Integer idPedidoActual) throws SQLException;
 }

@@ -60,6 +60,9 @@
                     </VBox>
 
                     <Button fx:id="btnFiltrar" mnemonicParsing="false" onAction="#handleFiltrar" styleClass="btn-primary" text="Filtrar" />
+                    <Button fx:id="btnExportarPdf" mnemonicParsing="false" onAction="#handleExportarPdf" styleClass="btn-secondary" text="Exportar PDF" />
+                    <Button fx:id="btnExportarExcel" mnemonicParsing="false" onAction="#handleExportarExcel" styleClass="btn-secondary" text="Exportar Excel" />
+                    <Button fx:id="btnExportarCsv" mnemonicParsing="false" onAction="#handleExportarCsv" styleClass="btn-secondary" text="Exportar CSV" />
                 </children>
             </HBox>
         </children>
@@ -79,5 +82,13 @@
             <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
         </columnResizePolicy>
     </TableView>
+
+    <HBox alignment="CENTER_RIGHT" spacing="10.0">
+        <children>
+            <Button fx:id="btnAnteriorKardex" mnemonicParsing="false" onAction="#handlePaginaAnterior" styleClass="btn-secondary" text="Anterior" />
+            <Label fx:id="lblPaginaKardex" styleClass="text-caption" text="Página 1 de 1" />
+            <Button fx:id="btnSiguienteKardex" mnemonicParsing="false" onAction="#handlePaginaSiguiente" styleClass="btn-secondary" text="Siguiente" />
+        </children>
+    </HBox>
 
 </VBox>

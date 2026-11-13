@@ -60,7 +60,7 @@
                                     <children>
                                         <HBox alignment="CENTER_LEFT">
                                             <children>
-                                                <Label styleClass="text-overline" text="VENTAS DEL DÍA" />
+                                                <Label styleClass="text-overline" text="VENTAS DE HOY" />
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-accent">
                                                     <children>
@@ -72,8 +72,8 @@
                                         <Label fx:id="lblKpiVentasDia" styleClass="text-mono-lg-accent" text="S/ 0.00" />
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Label styleClass="badge-pill-success" text="↑ +14.2%" />
-                                                <Label styleClass="text-caption" text="vs mes anterior" />
+                                                <Label fx:id="lblVarHoyVsAyer" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                                <Label fx:id="lblDetalleAyer" styleClass="text-caption" text="vs ayer (S/ 0.00)" />
                                             </children>
                                         </HBox>
                                     </children>
@@ -96,8 +96,8 @@
                                         <Label fx:id="lblKpiTicketPromedio" styleClass="text-mono-lg" text="S/ 0.00" />
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Label styleClass="badge-pill-success" text="↑ +5.8%" />
-                                                <Label styleClass="text-caption" text="vs mes anterior" />
+                                                <Label fx:id="lblVarMesVsAnteriorMini" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                                <Label styleClass="text-caption" text="mes vs anterior" />
                                             </children>
                                         </HBox>
                                     </children>
@@ -120,8 +120,8 @@
                                         <Label fx:id="lblKpiTransacciones" styleClass="text-mono-lg-success" text="0" />
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Label styleClass="badge-pill-success" text="↑ +8.4%" />
-                                                <Label styleClass="text-caption" text="comprobantes hoy" />
+                                                <Label fx:id="lblBadgeComprobantes" styleClass="badge-pill-accent" text="COMPLETADAS" />
+                                                <Label styleClass="text-caption" text="comprobantes válidos" />
                                             </children>
                                         </HBox>
                                     </children>
@@ -143,6 +143,54 @@
                                         </HBox>
                                         <Label fx:id="lblKpiPlatoTop" styleClass="text-h2" text="Hamburguesa Royal" />
                                         <Label fx:id="lblKpiPlatoTopDetalle" styleClass="text-caption" text="18 unidades despachadas" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </GridPane>
+
+                        <!-- Comparativas Automáticas de Períodos (v4.9.0 Fase 2.1) -->
+                        <GridPane fx:id="panelComparativasDashboard" hgap="16.0" vgap="12.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints vgrow="SOMETIMES" />
+                            </rowConstraints>
+                            <children>
+                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="COMPARATIVA: VENTAS DE HOY VS. AYER" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblDashCompHoyBadge" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="BASELINE_LEFT" spacing="12.0">
+                                            <children>
+                                                <Label fx:id="lblDashCompHoyMonto" styleClass="text-mono-lg" text="S/ 0.00" />
+                                                <Label fx:id="lblDashCompHoyDetalle" styleClass="text-caption" text="Hoy: S/ 0.00 · Ayer: S/ 0.00" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+
+                                <VBox spacing="6.0" styleClass="surface-card" GridPane.columnIndex="1">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="COMPARATIVA: VENTAS DE ESTE MES VS. MES ANTERIOR" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblDashCompMesBadge" styleClass="badge-pill-neutral" text="→ 0.0%" />
+                                            </children>
+                                        </HBox>
+                                        <HBox alignment="BASELINE_LEFT" spacing="12.0">
+                                            <children>
+                                                <Label fx:id="lblDashCompMesMonto" styleClass="text-mono-lg" text="S/ 0.00" />
+                                                <Label fx:id="lblDashCompMesDetalle" styleClass="text-caption" text="Este mes: S/ 0.00 · Mes anterior: S/ 0.00" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
                             </children>
@@ -228,6 +276,44 @@
                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                     </columnResizePolicy>
                                 </TableView>
+                            </children>
+                        </VBox>
+
+                        <!-- Alertas de Seguridad del Sistema (v5.1.0 ÍTEM 9) -->
+                        <VBox fx:id="cardAlertasSeguridad" spacing="12.0" styleClass="surface-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="text-h2" text="Alertas de Seguridad del Sistema (Hoy)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblSecEstadoBadge" styleClass="badge-pill-success" text="SIN ANOMALÍAS" />
+                                    </children>
+                                </HBox>
+                                <HBox spacing="14.0">
+                                    <children>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="INTENTOS FALLIDOS HOY" />
+                                                <Label fx:id="lblSecIntentosFallidos" styleClass="kpi-value-24-accent" text="0" />
+                                                <Label styleClass="kpi-card-subtitle" text="Logins o códigos 2FA rechazados" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="ANULACIONES HOY" />
+                                                <Label fx:id="lblSecAnulacionesHoy" styleClass="kpi-value-24-amber" text="0" />
+                                                <Label styleClass="kpi-card-subtitle" text="Anulaciones de pedidos y comprobantes" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="ÚLTIMO ACCESO SOSPECHOSO" />
+                                                <Label fx:id="lblSecUltimoSospechoso" styleClass="text-body-strong" text="Sin eventos sospechosos" wrapText="true" />
+                                                <Label fx:id="lblSecUltimoSospechosoDetalle" styleClass="kpi-card-subtitle" text="Bitácora de auditoría de seguridad" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
                             </children>
                         </VBox>
 

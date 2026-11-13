@@ -9,8 +9,8 @@ import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -76,40 +76,45 @@ public class MermasController {
         cargarDatosMermas();
     }
 
+    private record DatosMermasCarga(List<Insumo> insumos, List<FilaMerma> filas) {
+    }
+
     public void cargarDatosMermas() {
-        new Thread(() -> {
-            List<Insumo> ins = new ArrayList<>();
-            List<FilaMerma> filas = new ArrayList<>();
-            String sql = "SELECT k.created_at, i.nombre, i.unidad_medida, k.cantidad, k.saldo_posterior, k.observacion "
-                + "FROM kardex_movimiento k JOIN insumo i ON k.id_insumo = i.id_insumo "
-                + "WHERE k.tipo_movimiento LIKE 'MERMA%' ORDER BY k.id_kardex DESC LIMIT 100";
-            try (Connection conn = ConexionBD.getConnection()) {
-                ins = insumoDAO.listarTodos(conn);
-                try (PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String fecha = String.valueOf(rs.getTimestamp("created_at")).substring(0, 16);
-                        String nom = rs.getString("nombre");
-                        String um = rs.getString("unidad_medida");
-                        String cant = UnidadMedidaFormatter.formatear(rs.getBigDecimal("cantidad"), um, true);
-                        String saldo = UnidadMedidaFormatter.formatear(rs.getBigDecimal("saldo_posterior"), um, false);
-                        String obs = rs.getString("observacion");
-                        filas.add(new FilaMerma(fecha, nom, cant, saldo, obs != null ? obs : "Merma de cocina"));
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Insumo> ins = new ArrayList<>();
+                List<FilaMerma> filas = new ArrayList<>();
+                String sql = "SELECT k.created_at, i.nombre, i.unidad_medida, k.cantidad, k.saldo_posterior, k.observacion "
+                    + "FROM kardex_movimiento k JOIN insumo i ON k.id_insumo = i.id_insumo "
+                    + "WHERE k.tipo_movimiento LIKE 'MERMA%' ORDER BY k.id_kardex DESC LIMIT 100";
+                try (Connection conn = ConexionBD.getConnection()) {
+                    ins = insumoDAO.listarTodos(conn);
+                    try (PreparedStatement ps = conn.prepareStatement(sql);
+                         ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String fecha = String.valueOf(rs.getTimestamp("created_at")).substring(0, 16);
+                            String nom = rs.getString("nombre");
+                            String um = rs.getString("unidad_medida");
+                            String cant = UnidadMedidaFormatter.formatear(rs.getBigDecimal("cantidad"), um, true);
+                            String saldo = UnidadMedidaFormatter.formatear(rs.getBigDecimal("saldo_posterior"), um, false);
+                            String obs = rs.getString("observacion");
+                            filas.add(new FilaMerma(fecha, nom, cant, saldo, obs != null ? obs : "Merma de cocina"));
+                        }
                     }
+                } catch (java.sql.SQLException | RuntimeException e) {
+                    LOGGER.log(Level.FINE, "Error cargando mermas", e);
                 }
-            } catch (java.sql.SQLException | RuntimeException e) {
-                LOGGER.log(Level.FINE, "Error cargando mermas", e);
-            }
-            final List<Insumo> insFinal = ins;
-            final List<FilaMerma> filasFinal = filas;
-            Platform.runLater(() -> {
-                listaInsumos.setAll(insFinal);
+                return new DatosMermasCarga(ins, filas);
+            },
+            datos -> {
+                listaInsumos.setAll(datos.insumos());
                 if (!listaInsumos.isEmpty() && cmbInsumoMerma.getValue() == null) {
                     cmbInsumoMerma.getSelectionModel().selectFirst();
                 }
-                listaMermas.setAll(filasFinal);
-            });
-        }).start();
+                listaMermas.setAll(datos.filas());
+            },
+            e -> LOGGER.log(Level.FINE, "Error cargando mermas", e)
+        );
     }
 
     /**

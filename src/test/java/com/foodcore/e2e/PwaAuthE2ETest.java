@@ -47,7 +47,7 @@ public class PwaAuthE2ETest {
             // 3. Ingresar credenciales erróneas y verificar mensaje de error
             page.fill("#txtUsername", "usuario_invalido");
             page.fill("#txtPassword", "clave_incorrecta_999");
-            btnIngresar.click();
+            PlaywrightE2ESupport.submitLoginConReintento429(page, btnIngresar);
 
             Locator errorBanner = page.locator("#loginErrorMsg");
             errorBanner.waitFor();
@@ -60,7 +60,7 @@ public class PwaAuthE2ETest {
             // 4. Ingresar credenciales correctas y verificar redirección a mesas.html
             page.fill("#txtUsername", "mozo");
             page.fill("#txtPassword", "Admin#2026!");
-            btnIngresar.click();
+            PlaywrightE2ESupport.submitLoginConReintento429(page, btnIngresar);
 
             page.waitForURL("**/mesas.html**");
             assertTrue(page.url().contains("mesas.html"), "El login exitoso debe redirigir a mesas.html");

@@ -13,6 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootAsistenciaStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.AsistenciaController">
     <children>
@@ -36,42 +37,82 @@
                                 </VBox>
                                 <HBox alignment="CENTER_RIGHT" spacing="10.0">
                                     <children>
-                                        <Button fx:id="btnAbrirKiosco" mnemonicParsing="false" onAction="#handleAbrirKiosco" styleClass="btn-kds-outline" text="⏱ Abrir Kiosco de Marcaje" />
+                                        <Button fx:id="btnAbrirKiosco" mnemonicParsing="false" onAction="#handleAbrirKiosco" styleClass="btn-secondary" text="⏱ Abrir Kiosco de Marcaje" />
                                         <Button fx:id="btnExportarPlanilla" mnemonicParsing="false" onAction="#handleExportarPlanillaExcel" styleClass="btn-primary" text="Exportar Planilla (.xlsx)" />
                                     </children>
                                 </HBox>
                             </children>
                         </HBox>
 
-                        <!-- Fila de Tarjetas KPI -->
-                        <HBox spacing="12.0">
+                        <!-- Fila de Tarjetas KPI (v4.6.0 Fase 3) -->
+                        <HBox spacing="14.0">
                             <children>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="PERSONAL ACTIVO AHORA" />
-                                        <Label fx:id="lblKpiActivos" styleClass="stat-card-value" text="0" />
-                                        <Label styleClass="stat-card-subtitle" text="En servicio en este momento" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="PERSONAL ACTIVO AHORA" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-success">
+                                                    <children>
+                                                        <FontIcon iconColor="#059669" iconLiteral="fas-user-check" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiActivos" styleClass="kpi-value-24-success" text="0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="En servicio en este momento" />
                                     </children>
                                 </VBox>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="MARCAJES PUNTUALES" />
-                                        <Label fx:id="lblKpiPuntuales" styleClass="stat-card-value" text="0" />
-                                        <Label styleClass="stat-card-subtitle" text="Llegadas dentro de tolerancia" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="MARCAJES PUNTUALES" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-blue">
+                                                    <children>
+                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-stopwatch" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiPuntuales" styleClass="kpi-value-24-blue" text="0" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Llegadas dentro de tolerancia" />
                                     </children>
                                 </VBox>
-                                <VBox spacing="4.0" styleClass="stat-card-accent" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="TARDANZAS HOY" />
-                                        <Label fx:id="lblKpiTardanzas" styleClass="stat-card-value" text="0" />
-                                        <Label fx:id="lblKpiTardanzasMin" styleClass="stat-card-subtitle" text="0 minutos acumulados" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="TARDANZAS HOY" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-amber">
+                                                    <children>
+                                                        <FontIcon iconColor="#D97706" iconLiteral="fas-hourglass-half" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiTardanzas" styleClass="kpi-value-24-amber" text="0" />
+                                        <Label fx:id="lblKpiTardanzasMin" styleClass="kpi-subtitle-muted" text="0 minutos acumulados" />
                                     </children>
                                 </VBox>
-                                <VBox spacing="4.0" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                                <VBox spacing="6.0" styleClass="kpi-card-secondary" HBox.hgrow="ALWAYS">
                                     <children>
-                                        <Label styleClass="stat-card-title" text="HORAS TOTALES DÍA" />
-                                        <Label fx:id="lblKpiHorasTotales" styleClass="stat-card-value" text="0.0 hrs" />
-                                        <Label styleClass="stat-card-subtitle" text="Calculadas sobre turnos cerrados" />
+                                        <HBox alignment="CENTER_LEFT">
+                                            <children>
+                                                <Label styleClass="text-overline" text="HORAS TOTALES DÍA" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <StackPane styleClass="kpi-icon-circle-accent">
+                                                    <children>
+                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-business-time" iconSize="16" />
+                                                    </children>
+                                                </StackPane>
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKpiHorasTotales" styleClass="kpi-value-24-accent" text="0.0 hrs" />
+                                        <Label styleClass="kpi-subtitle-muted" text="Calculadas sobre turnos cerrados" />
                                     </children>
                                 </VBox>
                             </children>
@@ -88,7 +129,7 @@
                     </padding>
                     <children>
                         <!-- Barra de Filtros -->
-                        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="stat-card">
+                        <HBox alignment="CENTER_LEFT" spacing="12.0" styleClass="surface-card">
                             <padding>
                                 <Insets bottom="8.0" left="12.0" right="12.0" top="8.0" />
                             </padding>

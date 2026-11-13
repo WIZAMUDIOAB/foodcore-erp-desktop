@@ -114,10 +114,18 @@ public class ImpresoraTermicaService {
 
         for (DetalleVenta det : detalles) {
             String cantStr = String.format("%3dx", det.getCantidad());
-            String desc = det.getNombreProducto() != null ? det.getNombreProducto() : ("ITEM #" + det.getIdProducto());
+            String baseDesc = det.getNombreProducto() != null ? det.getNombreProducto() : ("ITEM #" + det.getIdProducto());
+            String descConVar = (det.getNombreVariante() != null && !det.getNombreVariante().isBlank())
+                ? baseDesc + " (" + det.getNombreVariante().trim() + ")"
+                : baseDesc;
             String subtotalStr = String.format("S/ %8s",
                 DesgloseFiscal.normalizarMoneda(det.getSubtotal()).toPlainString());
-            lineas.add(alinearColumnas(cantStr, desc, subtotalStr));
+            lineas.add(alinearColumnas(cantStr, descConVar, subtotalStr));
+            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                det.getModificadoresSeleccionados(), det.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                agregarLineasEnvolventes(lineas, "     + " + mods, "       ");
+            }
         }
 
         lineas.add(SEPARADOR_SIMPLE);
@@ -346,11 +354,19 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_SIMPLE);
 
         for (DetallePedido item : detalles) {
-            String nom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String baseNom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String nomVar = (item.getNombreVariante() != null && !item.getNombreVariante().isBlank())
+                ? baseNom + " (" + item.getNombreVariante().trim() + ")"
+                : baseNom;
             String totalFmt = String.format("S/ %.2f", item.getSubtotal());
-            lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nom, totalFmt));
+            lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nomVar, totalFmt));
+            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                item.getModificadoresSeleccionados(), item.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                agregarLineasEnvolventes(lineas, "  + " + mods, "    ");
+            }
             if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
-                lineas.add(ajustarLinea(" * Nota: " + item.getNotasPreparacion()));
+                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion(), "   ");
             }
         }
 
@@ -364,6 +380,88 @@ public class ImpresoraTermicaService {
         lineas.add(centrar("al momento de pagar en caja"));
         lineas.add(centrar("¡Muchas gracias por su visita!"));
         return lineas;
+    }
+
+    /**
+     * Formatea el ticket térmico de comanda para cocina/bar (48 columnas),
+     * imprimiendo explícitamente tamaño/variante y extras (ej. {@code 1x Hamburguesa + Tocino + Extra Queso}).
+     */
+    public List<String> formatearLineasComandaCocina(Pedido pedido, List<DetallePedido> detalles) throws NegocioException {
+        if (pedido == null) {
+            throw new NegocioException("Los datos del pedido son obligatorios para imprimir la comanda de cocina.");
+        }
+        if (detalles == null || detalles.isEmpty()) {
+            throw new NegocioException("La comanda de cocina debe contener al menos un ítem.");
+        }
+
+        List<String> lineas = new ArrayList<>();
+        lineas.add(SEPARADOR_DOBLE);
+        lineas.add(centrar("COMANDA DE COCINA (KDS)"));
+        lineas.add(SEPARADOR_SIMPLE);
+        String mesaStr = pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "01";
+        lineas.add(ajustarLinea("MESA / CANAL : " + mesaStr));
+        lineas.add(ajustarLinea("PEDIDO       : #" + pedido.getIdPedido()));
+        lineas.add(ajustarLinea("FECHA        : " + LocalDateTime.now().format(FMT_FECHA)));
+        lineas.add(SEPARADOR_SIMPLE);
+
+        for (DetallePedido item : detalles) {
+            String descCocina = FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+            agregarLineasEnvolventes(lineas, item.getCantidad() + "x " + descCocina, "   ");
+            List<String> componentesCombo = FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
+                    item.getComboComponentesTexto(), item.getCantidad());
+            for (String comp : componentesCombo) {
+                agregarLineasEnvolventes(lineas, "   - " + comp, "     ");
+            }
+            if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
+                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion().trim(), "   ");
+            }
+        }
+
+        lineas.add(SEPARADOR_DOBLE);
+        return lineas;
+    }
+
+    public boolean imprimirComandaCocina(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
+        try {
+            List<String> lineas = formatearLineasComandaCocina(pedido, detalles);
+            escribirFallbackEnLog(lineas);
+            if (nombreImpresora != null && !nombreImpresora.isBlank()) {
+                try {
+                    byte[] bytesEscPos = generarBytesEscPos(lineas, true);
+                    PrintService printService = PrintServiceLookup.lookupDefaultPrintService();
+                    if (printService != null) {
+                        DocPrintJob job = printService.createPrintJob();
+                        Doc doc = new SimpleDoc(bytesEscPos, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+                        job.print(doc, null);
+                    }
+                } catch (PrintException | RuntimeException pe) {
+                    LOGGER.log(Level.WARNING, "No se pudo enviar comanda de cocina al spooler físico", pe);
+                }
+            }
+            return true;
+        } catch (NegocioException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al emitir ticket de comanda para cocina", ex);
+            return false;
+        }
+    }
+
+    private static void agregarLineasEnvolventes(List<String> destino, String texto, String prefijoContinuacion) {
+        String restante = texto != null ? texto.stripTrailing() : "";
+        boolean primera = true;
+        while (!restante.isEmpty()) {
+            String lineaBase = primera ? restante : prefijoContinuacion + restante.stripLeading();
+            if (lineaBase.length() <= ANCHO_COLUMNAS) {
+                destino.add(ajustarLinea(lineaBase));
+                break;
+            }
+            int corte = lineaBase.lastIndexOf(' ', ANCHO_COLUMNAS);
+            if (corte <= (primera ? 0 : prefijoContinuacion.length())) {
+                corte = ANCHO_COLUMNAS;
+            }
+            destino.add(ajustarLinea(lineaBase.substring(0, corte)));
+            restante = lineaBase.substring(corte).stripLeading();
+            primera = false;
+        }
     }
 
     public boolean imprimirPreCuenta(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {

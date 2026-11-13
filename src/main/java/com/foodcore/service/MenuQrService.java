@@ -67,6 +67,10 @@ public class MenuQrService {
      * Construye la URL de red oficial para acceder al Menú Digital desde smartphones (v4.3.2).
      */
     public static String construirUrlMenuDigital(int puertoHttps) {
+        String urlTunel = TunnelService.construirUrlPublicaEndpoint("/api/public/menu-digital");
+        if (!urlTunel.isBlank()) {
+            return urlTunel;
+        }
         String ip = obtenerIpServidor();
         return "https://" + ip + ":" + puertoHttps + "/api/public/menu-digital";
     }
@@ -106,14 +110,20 @@ public class MenuQrService {
     }
 
     /**
-     * Genera la página web estática responsive del menú digital en HTML.
+     * Construye el HTML responsive del menú digital consultando MySQL en vivo (v4.6.0 Fase 2 — cero caché estático).
+     *
+     * @return documento HTML completo con precios y disponibilidad actualizados en tiempo real.
      */
-    public File generarMenuDigitalHtml(File destinoHtml) throws IOException {
+    public String construirMenuDigitalHtmlDinamico() {
         List<Producto> productos = new ArrayList<>();
         
         try (Connection conn = ConexionBD.getConnection()) {
-            productos = productoDAO.listarProductosDisponibles(conn);
-                    } catch (SQLException e) {
+            productos = new com.foodcore.service.impl.PersonalizacionProductoServiceImpl(
+                new com.foodcore.tx.impl.JdbcTransactionManager(),
+                productoDAO,
+                new com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl()
+            ).listarProductosDisponiblesConOpciones(conn);
+        } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Error al consultar BD para menu digital, generando con datos demo: " + e.getMessage());
         }
 
@@ -162,10 +172,23 @@ public class MenuQrService {
             .append("    <div class=\"grid\">\n");
 
         for (Producto p : productos) {
+            StringBuilder opcionesHtml = new StringBuilder();
+            if (!p.getVariantes().isEmpty()) {
+                List<String> vars = new ArrayList<>();
+                for (com.foodcore.model.ProductoVariante v : p.getVariantes()) {
+                    vars.add(v.getNombreVariante() + " S/ " + v.calcularPrecioEfectivo(p.getPrecioVenta()));
+                }
+                opcionesHtml.append(" · Tamaños: ").append(String.join(" | ", vars));
+            }
+            if (!p.getModificadores().isEmpty()) {
+                opcionesHtml.append(" · +Extras configurables");
+            }
             html.append("      <div class=\"card\">\n")
                 .append("        <div>\n")
                 .append("          <div class=\"card-title\">").append(escapeHtml(p.getNombre())).append("</div>\n")
-                .append("          <div class=\"card-desc\">").append(escapeHtml(p.getDescripcion() != null ? p.getDescripcion() : "Plato elaborado con ingredientes frescos")).append("</div>\n")
+                .append("          <div class=\"card-desc\">")
+                .append(escapeHtml((p.getDescripcion() != null ? p.getDescripcion() : "Plato elaborado con ingredientes frescos") + opcionesHtml))
+                .append("</div>\n")
                 .append("        </div>\n")
                 .append("        <div class=\"card-footer\">\n")
                 .append("          <span class=\"price\">S/ ").append(p.getPrecioVenta()).append("</span>\n")
@@ -180,13 +203,20 @@ public class MenuQrService {
             .append("</body>\n")
             .append("</html>\n");
 
+        return html.toString();
+    }
+
+    /**
+     * Exporta a archivo el HTML responsive del menú digital generado en vivo desde MySQL.
+     */
+    public File generarMenuDigitalHtml(File destinoHtml) throws IOException {
         if (destinoHtml.getParentFile() != null && !destinoHtml.getParentFile().exists()) {
             boolean created = destinoHtml.getParentFile().mkdirs();
             if (!created) {
                 LOGGER.log(Level.FINE, "Directorio para menu digital ya existia o fue creado.");
             }
         }
-        Files.writeString(destinoHtml.toPath(), html.toString(), StandardCharsets.UTF_8);
+        Files.writeString(destinoHtml.toPath(), construirMenuDigitalHtmlDinamico(), StandardCharsets.UTF_8);
         return destinoHtml;
     }
 

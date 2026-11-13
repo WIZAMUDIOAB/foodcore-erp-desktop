@@ -1,8 +1,13 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.dao.impl.FinanzasBiDAOImpl;
+import com.foodcore.model.ComparativaPeriodos;
+import com.foodcore.model.ResumenSeguridadHoy;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.FormatoBiUiHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -89,10 +94,20 @@ public class DashboardController {
     @FXML private Button btnExpandirVentana;
 
     @FXML private Label lblKpiVentasDia;
+    @FXML private Label lblVarHoyVsAyer;
+    @FXML private Label lblDetalleAyer;
     @FXML private Label lblKpiTicketPromedio;
+    @FXML private Label lblVarMesVsAnteriorMini;
     @FXML private Label lblKpiTransacciones;
     @FXML private Label lblKpiPlatoTop;
     @FXML private Label lblKpiPlatoTopDetalle;
+
+    @FXML private Label lblDashCompHoyBadge;
+    @FXML private Label lblDashCompHoyMonto;
+    @FXML private Label lblDashCompHoyDetalle;
+    @FXML private Label lblDashCompMesBadge;
+    @FXML private Label lblDashCompMesMonto;
+    @FXML private Label lblDashCompMesDetalle;
 
     @FXML private AreaChart<String, Number> areaChartVentas;
 
@@ -110,10 +125,20 @@ public class DashboardController {
 
     @FXML private VBox vboxAlertasVencimiento;
     @FXML private Label lblCountAlertasPersonal;
+    @FXML private VBox cardAlertasSeguridad;
+    @FXML private Label lblSecEstadoBadge;
+    @FXML private Label lblSecIntentosFallidos;
+    @FXML private Label lblSecAnulacionesHoy;
+    @FXML private Label lblSecUltimoSospechoso;
+    @FXML private Label lblSecUltimoSospechosoDetalle;
 
     private final ObservableList<FilaRentabilidad> itemsRentabilidad = FXCollections.observableArrayList();
     private final ObservableList<FilaVentasMozo> itemsVentasMozo = FXCollections.observableArrayList();
     private final List<AlertaVencimiento> alertasVencimientoActuales = new ArrayList<>();
+    private final FinanzasBiDAOImpl finanzasBiDao = new FinanzasBiDAOImpl();
+    private final AuditoriaDAOImpl auditoriaDao = new AuditoriaDAOImpl();
+    private ComparativaPeriodos ultimaComparativa;
+    private ResumenSeguridadHoy ultimoResumenSeguridad = ResumenSeguridadHoy.normal();
 
     @FXML
     public void initialize() {
@@ -334,27 +359,41 @@ public class DashboardController {
     }
 
     public void cargarMetricasDashboardSincrono() {
+        LocalDate hoy = LocalDate.now(ZONA_LIMA);
+        ComparativaPeriodos comparativa = new ComparativaPeriodos(
+                hoy,
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
+        );
         BigDecimal ventasDia = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         int numTx = 0;
         BigDecimal ticketProm = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        String platoTop = "Hamburguesa Royal Doble";
-        int platoTopCant = 14;
+        String platoTop = "Sin ventas registradas";
+        int platoTopCant = 0;
         Map<String, BigDecimal> ventasPorHora = new TreeMap<>();
         List<FilaVentasMozo> filasMozo = new ArrayList<>();
         List<FilaRentabilidad> filasRent = new ArrayList<>();
         List<AlertaVencimiento> alertasPersonal = new ArrayList<>();
+        ResumenSeguridadHoy seguridadHoy = ResumenSeguridadHoy.normal();
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
+                comparativa = finanzasBiDao.obtenerComparativaPeriodos(conn, hoy);
+                try {
+                    seguridadHoy = auditoriaDao.obtenerResumenSeguridadHoy(conn);
+                } catch (Exception exSec) {
+                    LOGGER.log(Level.FINE, "Aviso consultando alertas de seguridad en auditoria", exSec);
+                }
+
                 String sqlKpi = "SELECT COALESCE(SUM(total), 0.00) AS suma, COUNT(*) AS tx, COALESCE(AVG(total), 0.00) AS prom "
                     + "FROM venta WHERE estado = 'COMPLETADA'";
                 try (PreparedStatement ps = conn.prepareStatement(sqlKpi);
                      ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        BigDecimal sum = rs.getBigDecimal("suma");
-                        if (sum != null && sum.compareTo(BigDecimal.ZERO) > 0) {
-                            ventasDia = sum.setScale(2, RoundingMode.HALF_UP);
-                        }
                         numTx = rs.getInt("tx");
                         BigDecimal avg = rs.getBigDecimal("prom");
                         if (avg != null && avg.compareTo(BigDecimal.ZERO) > 0) {
@@ -362,6 +401,7 @@ public class DashboardController {
                         }
                     }
                 }
+                ventasDia = comparativa.ventasHoy();
 
                 String sqlTop = "SELECT p.nombre, COALESCE(SUM(dv.cantidad), 0) AS unidades "
                     + "FROM detalle_venta dv JOIN producto p ON dv.id_producto = p.id_producto "
@@ -438,27 +478,8 @@ public class DashboardController {
             LOGGER.log(Level.FINE, "Cargando métricas demostrativas del Dashboard", e);
         }
 
-        if (ventasDia.compareTo(BigDecimal.ZERO) <= 0) {
-            ventasDia = new BigDecimal("1245.50");
-            numTx = 18;
-            ticketProm = new BigDecimal("69.19");
-        }
-
-        if (ventasPorHora.size() < 6) {
-            ventasPorHora.putIfAbsent("12:00", new BigDecimal("145.00"));
-            ventasPorHora.putIfAbsent("13:00", new BigDecimal("285.00"));
-            ventasPorHora.putIfAbsent("14:00", new BigDecimal("215.00"));
-            ventasPorHora.putIfAbsent("15:00", new BigDecimal("340.00"));
-            ventasPorHora.putIfAbsent("18:00", new BigDecimal("195.00"));
-            ventasPorHora.putIfAbsent("19:00", new BigDecimal("390.00"));
-            ventasPorHora.putIfAbsent("20:00", new BigDecimal("325.00"));
-            ventasPorHora.putIfAbsent("21:00", new BigDecimal("460.00"));
-        }
-        if (filasMozo.isEmpty()) {
-            filasMozo.add(new FilaVentasMozo("cajero (CAJERO)", "S/ 580.00", "8", "S/ 72.50"));
-            filasMozo.add(new FilaVentasMozo("mozo (MOZO)", "S/ 665.50", "10", "S/ 66.55"));
-        }
-
+        final ResumenSeguridadHoy seguridadFinal = seguridadHoy;
+        final ComparativaPeriodos compFinal = comparativa;
         final BigDecimal vDiaFinal = ventasDia;
         final int txFinal = numTx;
         final BigDecimal tPromFinal = ticketProm;
@@ -470,11 +491,38 @@ public class DashboardController {
         final List<AlertaVencimiento> alertasFinal = alertasPersonal;
 
         Runnable updateUI = () -> {
+            this.ultimaComparativa = compFinal;
             lblKpiVentasDia.setText("S/ " + vDiaFinal);
             lblKpiTicketPromedio.setText("S/ " + tPromFinal);
             lblKpiTransacciones.setText(String.valueOf(txFinal));
             lblKpiPlatoTop.setText(pTopFinal);
             lblKpiPlatoTopDetalle.setText(pCantFinal + " unidades despachadas");
+
+            FormatoBiUiHelper.aplicarIndicadorComparativa(lblVarHoyVsAyer, compFinal.variacionDiariaPct());
+            if (lblDetalleAyer != null) {
+                lblDetalleAyer.setText("vs ayer (S/ " + compFinal.ventasAyer() + ")");
+            }
+            FormatoBiUiHelper.aplicarIndicadorComparativa(lblVarMesVsAnteriorMini, compFinal.variacionMensualPct());
+
+            FormatoBiUiHelper.aplicarIndicadorComparativa(lblDashCompHoyBadge, compFinal.variacionDiariaPct());
+            if (lblDashCompHoyMonto != null) {
+                lblDashCompHoyMonto.setText("S/ " + compFinal.ventasHoy());
+            }
+            if (lblDashCompHoyDetalle != null) {
+                lblDashCompHoyDetalle.setText(
+                        "Hoy: S/ " + compFinal.ventasHoy() + " · Ayer: S/ " + compFinal.ventasAyer()
+                );
+            }
+
+            FormatoBiUiHelper.aplicarIndicadorComparativa(lblDashCompMesBadge, compFinal.variacionMensualPct());
+            if (lblDashCompMesMonto != null) {
+                lblDashCompMesMonto.setText("S/ " + compFinal.ventasMesActual());
+            }
+            if (lblDashCompMesDetalle != null) {
+                lblDashCompMesDetalle.setText(
+                        "Este mes: S/ " + compFinal.ventasMesActual() + " · Mes anterior: S/ " + compFinal.ventasMesAnterior()
+                );
+            }
 
             if (areaChartVentas != null) {
                 areaChartVentas.getData().clear();
@@ -492,6 +540,7 @@ public class DashboardController {
             itemsVentasMozo.setAll(mozoFinal);
             itemsRentabilidad.setAll(rentFinal);
             renderizarAlertasVencimiento(alertasFinal);
+            renderizarAlertasSeguridad(seguridadFinal);
         };
 
         if (Platform.isFxApplicationThread()) {
@@ -543,6 +592,32 @@ public class DashboardController {
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Aviso consultando vencimientos en empleado", e);
+        }
+
+        String sqlDocs = "SELECT COALESCE(NULLIF(TRIM(u.nombre_completo), ''), "
+                + "NULLIF(TRIM(CONCAT(COALESCE(e.nombres, ''), ' ', COALESCE(e.apellidos, ''))), ''), "
+                + "u.username) AS nombre, "
+                + "COALESCE(NULLIF(TRIM(u.cargo), ''), r.nombre, u.codigo_rol, 'PERSONAL') AS cargo, "
+                + "d.tipo_documento, d.nombre_archivo, d.fecha_vencimiento "
+                + "FROM documento_empleado d "
+                + "JOIN usuario u ON d.id_usuario = u.id_usuario "
+                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.activo = 1 AND d.fecha_vencimiento IS NOT NULL";
+        try (PreparedStatement ps = conn.prepareStatement(sqlDocs);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String nombre = rs.getString("nombre");
+                String cargo = rs.getString("cargo");
+                String tipoDoc = rs.getString("tipo_documento");
+                String nombreArchivo = rs.getString("nombre_archivo");
+                String etiquetaDoc = (tipoDoc != null ? tipoDoc.replace('_', ' ') : "Documento")
+                        + (nombreArchivo != null && !nombreArchivo.isBlank() ? " (" + nombreArchivo + ")" : "");
+                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
+                        etiquetaDoc, rs.getDate("fecha_vencimiento"), hoy);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en documento_empleado", e);
         }
 
         List<AlertaVencimiento> resultado = new ArrayList<>(alertasPorClave.values());
@@ -614,6 +689,58 @@ public class DashboardController {
         }
     }
 
+    /**
+     * Renderiza la tarjeta KPI de alertas de seguridad operacional (ÍTEM 9 v5.1.0).
+     *
+     * @param resumen Métricas del día extraídas de {@code auditoria}.
+     */
+    public void renderizarAlertasSeguridad(ResumenSeguridadHoy resumen) {
+        ResumenSeguridadHoy datos = resumen != null ? resumen : ResumenSeguridadHoy.normal();
+        this.ultimoResumenSeguridad = datos;
+        if (lblSecIntentosFallidos != null) {
+            lblSecIntentosFallidos.setText(String.valueOf(datos.intentosFallidosHoy()));
+        }
+        if (lblSecAnulacionesHoy != null) {
+            lblSecAnulacionesHoy.setText(String.valueOf(datos.anulacionesHoy()));
+        }
+        if (lblSecUltimoSospechoso != null) {
+            lblSecUltimoSospechoso.setText(datos.ultimoAccesoSospechoso());
+        }
+        if (lblSecEstadoBadge != null) {
+            lblSecEstadoBadge.getStyleClass().removeAll("badge-pill-success", "badge-pill-warning", "badge-pill-danger");
+            if (datos.intentosFallidosHoy() > 0 || datos.anulacionesHoy() > 0) {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-danger");
+                lblSecEstadoBadge.setText("ATENCIÓN REQUERIDA");
+            } else if (datos.requiereAtencion()) {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-warning");
+                lblSecEstadoBadge.setText("REVISAR BITÁCORA");
+            } else {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-success");
+                lblSecEstadoBadge.setText("SIN ANOMALÍAS");
+            }
+        }
+    }
+
+    public Label getLblSecIntentosFallidos() {
+        return lblSecIntentosFallidos;
+    }
+
+    public Label getLblSecAnulacionesHoy() {
+        return lblSecAnulacionesHoy;
+    }
+
+    public Label getLblSecUltimoSospechoso() {
+        return lblSecUltimoSospechoso;
+    }
+
+    public Label getLblSecEstadoBadge() {
+        return lblSecEstadoBadge;
+    }
+
+    public ResumenSeguridadHoy getUltimoResumenSeguridad() {
+        return ultimoResumenSeguridad;
+    }
+
     public Label getLblKpiVentasDia() {
         return lblKpiVentasDia;
     }
@@ -639,6 +766,30 @@ public class DashboardController {
     }
 
     public List<AlertaVencimiento> getAlertasVencimientoActuales() {
-        return alertasVencimientoActuales;
+        return List.copyOf(alertasVencimientoActuales);
+    }
+
+    public Label getLblVarHoyVsAyer() {
+        return lblVarHoyVsAyer;
+    }
+
+    public Label getLblDashCompHoyBadge() {
+        return lblDashCompHoyBadge;
+    }
+
+    public Label getLblDashCompMesBadge() {
+        return lblDashCompMesBadge;
+    }
+
+    public Label getLblDashCompHoyDetalle() {
+        return lblDashCompHoyDetalle;
+    }
+
+    public Label getLblDashCompMesDetalle() {
+        return lblDashCompMesDetalle;
+    }
+
+    public ComparativaPeriodos getUltimaComparativa() {
+        return ultimaComparativa;
     }
 }

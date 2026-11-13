@@ -14,6 +14,12 @@
         <maven.compiler.target>17</maven.compiler.target>
         <javafx.version>21.0.2</javafx.version>
         <odc.ossindex.enabled>false</odc.ossindex.enabled>
+        <testfx.headless>true</testfx.headless>
+        <testfx.robot>glass</testfx.robot>
+        <glass.platform>Monocle</glass.platform>
+        <monocle.platform>Headless</monocle.platform>
+        <prism.order>sw</prism.order>
+        <prism.text>t2k</prism.text>
     </properties>
 
     <dependencyManagement>
@@ -180,6 +186,19 @@
             <version>0.10.2</version>
         </dependency>
 
+        <!-- Autenticación 2FA TOTP (RFC 6238 / Google Authenticator) — ÍTEM 7 v5.1.0 -->
+        <dependency>
+            <groupId>com.warrenstrange</groupId>
+            <artifactId>googleauth</artifactId>
+            <version>1.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpclient</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Suite de Pruebas Unitarias, Integración (Testcontainers MySQL 8), UI (TestFX Headless) y E2E (Playwright) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -337,6 +356,15 @@
                 <version>3.2.5</version>
                 <configuration>
                     <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                    <systemPropertyVariables>
+                        <java.awt.headless>true</java.awt.headless>
+                        <testfx.headless>${testfx.headless}</testfx.headless>
+                        <testfx.robot>${testfx.robot}</testfx.robot>
+                        <glass.platform>${glass.platform}</glass.platform>
+                        <monocle.platform>${monocle.platform}</monocle.platform>
+                        <prism.order>${prism.order}</prism.order>
+                        <prism.text>${prism.text}</prism.text>
+                    </systemPropertyVariables>
                     <excludes>
                         <exclude>**/FlywayMigrationTest.java</exclude>
                         <exclude>**/KardexIntegridadTest.java</exclude>
@@ -506,6 +534,7 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.foodcore.Launcher</mainClass>
                                 </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>
                                 <filter>

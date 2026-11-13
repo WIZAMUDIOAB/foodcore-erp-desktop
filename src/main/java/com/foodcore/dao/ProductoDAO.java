@@ -13,8 +13,10 @@ public interface ProductoDAO {
     List<Producto> listarMenuDelDia(Connection conn) throws SQLException;
     List<Producto> listarTodos(Connection conn) throws SQLException;
     List<Producto> listarPorCategoria(Connection conn, int idCategoria) throws SQLException;
+    Producto buscarPorCodigo(Connection conn, String codigo) throws SQLException;
     int crear(Connection conn, Producto p) throws SQLException;
     void actualizar(Connection conn, Producto p) throws SQLException;
+    void reactivar(Connection conn, int idProducto) throws SQLException;
     void cambiarDisponibilidad(Connection conn, int idProducto, boolean disponible) throws SQLException;
     void cambiarMenuDelDia(Connection conn, int idProducto, boolean esMenuDelDia) throws SQLException;
     void eliminar(Connection conn, int idProducto) throws SQLException;

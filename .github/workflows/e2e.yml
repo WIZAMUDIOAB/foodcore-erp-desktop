@@ -92,17 +92,38 @@ jobs:
         run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
 
       - name: Quality Gate (Maven Verify — Unit, Integration, E2E, Checkstyle, SpotBugs, OWASP)
+        timeout-minutes: 20
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          MONOCLE_HEADLESS: "true"
         run: |
           DC_ARGS=""
           if [ -n "${NVD_API_KEY:-}" ]; then
             DC_ARGS="-DnvdApiKey=${NVD_API_KEY}"
           fi
-          mvn verify ${DC_ARGS}
+          mvn clean verify \
+            -DreuseForks=false \
+            -DforkCount=1 \
+            -Dtestfx.headless=true \
+            -Dtestfx.robot=glass \
+            -Dglass.platform=Monocle \
+            -Dmonocle.platform=Headless \
+            -Dprism.order=sw \
+            -Dprism.text=t2k \
+            -Djava.awt.headless=true \
+            ${DC_ARGS}
 
       - name: Coverage Gate
+        timeout-minutes: 5
         run: mvn jacoco:check@jacoco-check
+
+      - name: Reset Database with Flyway for Standalone E2E Server
+        run: |
+          mvn -B flyway:clean flyway:migrate \
+            -Dflyway.cleanDisabled=false \
+            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
+            -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
+            -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
 
       - name: Start FoodCore Server (Javalin)
         run: |
@@ -121,21 +142,34 @@ jobs:
             -ext "SAN=DNS:localhost,IP:127.0.0.1"
           keytool -exportcert -noprompt \
             -alias foodcore -keystore "$KS_PATH" -storepass "$KS_PASS" -file "$CERT_PATH"
+          if [ ! -f target/foodcore-erp.jar ]; then
+            mvn -B package -DskipTests
+          fi
           FOODCORE_OFFLINE_DB_KEY="$OFFLINE_KEY" FOODCORE_JWT_SECRET="$JWT_KEY" \
             FOODCORE_KEYSTORE_PASS="$KS_PASS" FOODCORE_KEYSTORE_PATH="$KS_PATH" FOODCORE_CERT_PATH="$CERT_PATH" \
             SPRING_PROFILES_ACTIVE="e2e-test" \
-            nohup java -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
+            nohup java -Dspring.profiles.active=e2e-test -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
           echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          npx --yes wait-on http://localhost:8080/health --timeout 60000
+          npx --yes wait-on http://127.0.0.1:8080/health --timeout 60000
 
       - name: Run E2E Tests (Playwright)
-        run: mvn test -Dtest="*E2ETest"
+        timeout-minutes: 10
+        run: mvn test -Dtest="*E2ETest" -DreuseForks=false -DforkCount=1
 
       - name: Stop FoodCore Server
         if: always()
         run: |
           if [ -n "${SERVER_PID:-}" ]; then
             kill "$SERVER_PID" || true
+          fi
+
+      - name: Show Server Log on Failure
+        if: failure()
+        run: |
+          if [ -f target/foodcore-server.log ]; then
+            cat target/foodcore-server.log
+          else
+            echo "target/foodcore-server.log no existe."
           fi
 
       - name: Upload Playwright Report & Screenshots

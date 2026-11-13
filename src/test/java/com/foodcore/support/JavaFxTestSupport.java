@@ -23,6 +23,7 @@ public final class JavaFxTestSupport {
         if (FX_INITIALIZED.get()) {
             return;
         }
+        configurarMonocleSiAplica();
         System.setProperty("java.awt.headless", "true");
         CountDownLatch latch = new CountDownLatch(1);
         try {
@@ -37,6 +38,29 @@ public final class JavaFxTestSupport {
             Thread.currentThread().interrupt();
         }
         FX_INITIALIZED.set(true);
+    }
+
+    private static void configurarMonocleSiAplica() {
+        boolean headless = "true".equalsIgnoreCase(System.getProperty("testfx.headless"))
+                || "true".equalsIgnoreCase(System.getenv("MONOCLE_HEADLESS"))
+                || "true".equalsIgnoreCase(System.getenv("CI"))
+                || "true".equalsIgnoreCase(System.getenv("GITHUB_ACTIONS"));
+        if (!headless) {
+            return;
+        }
+        setPropIfAbsent("testfx.headless", "true");
+        setPropIfAbsent("testfx.robot", "glass");
+        setPropIfAbsent("glass.platform", "Monocle");
+        setPropIfAbsent("monocle.platform", "Headless");
+        setPropIfAbsent("prism.order", "sw");
+        setPropIfAbsent("prism.text", "t2k");
+    }
+
+    private static void setPropIfAbsent(String key, String value) {
+        String current = System.getProperty(key);
+        if (current == null || current.isBlank()) {
+            System.setProperty(key, value);
+        }
     }
 
     public static <T> T runOnFxThreadAndWait(Callable<T> action) throws Exception {

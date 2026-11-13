@@ -11,13 +11,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class UsuarioDAOImpl implements UsuarioDAO {
 
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private final EncriptadorPassword encriptador = new EncriptadorPassword();
 
     @Override
@@ -59,20 +62,10 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                     u.setNombreEmpleado(rs.getString("empleado_nombre"));
                     try {
                         u.setIntentosFallidos(rs.getInt("intentos_fallidos"));
-                        Timestamp tsBloqueo = rs.getTimestamp("bloqueado_hasta");
-                        if (tsBloqueo != null) {
-                            u.setBloqueadoHasta(tsBloqueo.toLocalDateTime());
-                        }
+                        u.setBloqueadoHasta(leerFechaLima(rs, "bloqueado_hasta"));
                         u.setCambioPasswordRequerido(rs.getBoolean("cambio_password_requerido"));
-                        Timestamp tsUltimo = rs.getTimestamp("ultimo_login");
-                        if (tsUltimo != null) {
-                            u.setUltimoLogin(tsUltimo.toLocalDateTime());
-                        }
-                        try {
-                            u.setDni(rs.getString("dni"));
-                            u.setPin(rs.getString("pin"));
-                            u.setPinHash(rs.getString("pin_hash"));
-                        } catch (SQLException ignored) {}
+                        u.setUltimoLogin(leerFechaLima(rs, "ultimo_login"));
+                        mapearCamposPinYSeguridad(rs, u);
                     } catch (SQLException ignoredCol) {
                         u.setIntentosFallidos(0);
                     }
@@ -83,11 +76,24 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         return Optional.empty();
     }
 
+    private static LocalDateTime leerFechaLima(ResultSet rs, String columna) throws SQLException {
+        Timestamp ts = rs.getTimestamp(columna);
+        return ts != null ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime() : null;
+    }
+
     @Override
     public void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException {
-        String sql = bloquear15Minutos
-            ? "UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = DATE_ADD(NOW(), INTERVAL 15 MINUTE) WHERE id_usuario = ?"
-            : "UPDATE usuario SET intentos_fallidos = ? WHERE id_usuario = ?";
+        if (bloquear15Minutos) {
+            String sql = "UPDATE usuario SET intentos_fallidos = ?, bloqueado_hasta = ? WHERE id_usuario = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, nuevosIntentos);
+                ps.setObject(2, LocalDateTime.now(ZONA_LIMA).plusMinutes(15));
+                ps.setInt(3, idUsuario);
+                ps.executeUpdate();
+            }
+            return;
+        }
+        String sql = "UPDATE usuario SET intentos_fallidos = ? WHERE id_usuario = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, nuevosIntentos);
             ps.setInt(2, idUsuario);
@@ -97,9 +103,10 @@ public class UsuarioDAOImpl implements UsuarioDAO {
 
     @Override
     public void resetearIntentosLogin(Connection conn, int idUsuario) throws SQLException {
-        String sql = "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_login = NOW() WHERE id_usuario = ?";
+        String sql = "UPDATE usuario SET intentos_fallidos = 0, bloqueado_hasta = NULL, ultimo_login = ? WHERE id_usuario = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idUsuario);
+            ps.setObject(1, LocalDateTime.now(ZONA_LIMA));
+            ps.setInt(2, idUsuario);
             ps.executeUpdate();
         }
     }
@@ -325,9 +332,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         u.setNombreEmpleado(rs.getString("empleado_nombre"));
 
         try {
-            u.setDni(rs.getString("dni"));
-            u.setPin(rs.getString("pin"));
-            u.setPinHash(rs.getString("pin_hash"));
+            mapearCamposPinYSeguridad(rs, u);
             u.setSueldoBase(rs.getDouble("sueldo_base"));
             u.setHorarioLaboral(rs.getString("horario_laboral"));
             Time te = rs.getTime("hora_entrada_programada");
@@ -335,7 +340,82 @@ public class UsuarioDAOImpl implements UsuarioDAO {
             Time ts = rs.getTime("hora_salida_programada");
             if (ts != null) u.setHoraSalidaProgramada(ts.toLocalTime());
         } catch (SQLException ignored) {
+            // Compatibilidad con esquemas sin columnas extendidas de RRHH
         }
         return u;
+    }
+
+    @Override
+    public Optional<Usuario> buscarPorId(Connection conn, int idUsuario) throws SQLException {
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, "
+                + "CONCAT(COALESCE(e.nombres, u.username), ' ', COALESCE(e.apellidos, '')) AS empleado_nombre "
+                + "FROM usuario u "
+                + "JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearUsuarioCompleto(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean actualizarConfiguracion2FA(Connection conn, int idUsuario, String totpSecret,
+            boolean habilitado) throws SQLException {
+        String sql = "UPDATE usuario SET totp_secret = ?, totp_habilitado = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, totpSecret);
+            ps.setBoolean(2, habilitado);
+            ps.setInt(3, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean registrarInvalidacionTokensAntes(Connection conn, int idUsuario, long epochMillis)
+            throws SQLException {
+        String sql = "UPDATE usuario SET tokens_invalidados_antes = GREATEST(tokens_invalidados_antes, ?) "
+                + "WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, epochMillis);
+            ps.setInt(2, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public Optional<Long> obtenerTokensInvalidadosAntes(Connection conn, int idUsuario) throws SQLException {
+        String sql = "SELECT tokens_invalidados_antes FROM usuario WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(rs.getLong("tokens_invalidados_antes"));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void mapearCamposPinYSeguridad(ResultSet rs, Usuario u) {
+        try {
+            u.setDni(rs.getString("dni"));
+            u.setPin(rs.getString("pin"));
+            u.setPinHash(rs.getString("pin_hash"));
+        } catch (SQLException ignored) {
+            u.setPinHash(u.getPinHash());
+        }
+        try {
+            u.setTotpSecret(rs.getString("totp_secret"));
+            u.setTotpHabilitado(rs.getBoolean("totp_habilitado"));
+            u.setTokensInvalidadosAntes(rs.getLong("tokens_invalidados_antes"));
+        } catch (SQLException ignored) {
+            u.setTotpHabilitado(false);
+        }
     }
 }

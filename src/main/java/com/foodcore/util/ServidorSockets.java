@@ -78,22 +78,40 @@ public class ServidorSockets {
         }
         this.puertoActual = puerto;
         corriendo = true;
+        java.util.concurrent.CountDownLatch boundLatch = new java.util.concurrent.CountDownLatch(1);
         threadPool.execute(() -> {
             try {
                 ServerSocket ss = new ServerSocket(puerto);
                 serverSocket.set(ss);
-                LOGGER.info("Servidor de Sockets escuchando en el puerto " + puerto);
+                this.puertoActual = ss.getLocalPort();
+                boundLatch.countDown();
+                LOGGER.info("Servidor de Sockets escuchando en el puerto " + this.puertoActual);
 
                 while (corriendo && !ss.isClosed()) {
                     Socket clientSocket = ss.accept();
                     atenderCliente(clientSocket);
                 }
             } catch (IOException | RuntimeException e) {
+                boundLatch.countDown();
                 if (corriendo) {
                     LOGGER.log(Level.WARNING, "Aviso en ServidorSockets", e);
                 }
             }
         });
+        try {
+            boundLatch.await(2, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public boolean isCorriendo() {
+        ServerSocket ss = serverSocket.get();
+        return corriendo && ss != null && !ss.isClosed();
+    }
+
+    public int getPuertoActual() {
+        return puertoActual;
     }
 
     private void atenderCliente(Socket socket) {

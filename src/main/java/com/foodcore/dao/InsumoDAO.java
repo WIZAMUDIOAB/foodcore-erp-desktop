@@ -13,10 +13,12 @@ import java.util.Map;
 public interface InsumoDAO {
     List<Insumo> listarTodos(Connection conn) throws SQLException;
     Insumo obtenerPorId(Connection conn, long idInsumo) throws SQLException;
+    Insumo buscarPorCodigo(Connection conn, String codigo) throws SQLException;
     List<Receta> obtenerRecetaPorProducto(Connection conn, int idProducto) throws SQLException;
     Map<Long, BigDecimal> lockearPorIds(Connection conn, List<Long> idsInsumos) throws SQLException;
     long crear(Connection conn, Insumo insumo) throws SQLException;
     void actualizar(Connection conn, Insumo insumo) throws SQLException;
+    void reactivar(Connection conn, long idInsumo) throws SQLException;
     void actualizarStock(Connection conn, long idInsumo, BigDecimal nuevoStock) throws SQLException;
     void descontarStock(Connection conn, long idInsumo, BigDecimal cantidadADescontar);
     void registrarMovimientoInventario(Connection conn, long idInsumo, String tipo, BigDecimal cantidad, String motivo, Integer referenciaId) throws SQLException;

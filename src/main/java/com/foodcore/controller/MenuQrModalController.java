@@ -48,10 +48,10 @@ public class MenuQrModalController {
         try {
             Files.createDirectories(Path.of("uploads", "qr"));
 
-            archivoHtmlGenerado = new File("uploads/qr/menu_digital.html");
-            menuQrService.generarMenuDigitalHtml(archivoHtmlGenerado);
+            // v4.6.0 Fase 2: Cero caché HTML estático; el endpoint consulta MySQL en vivo en cada petición.
+            archivoHtmlGenerado = null;
 
-            // v4.3.2: URL de red local accesible para clientes desde cualquier smartphone
+            // URL pública de Cloudflare Tunnel o fallback a IP de red local
             String urlRed = MenuQrService.construirUrlMenuDigital(8443);
             txtUrlMenu.setText(urlRed);
 
@@ -64,7 +64,10 @@ public class MenuQrModalController {
             Image fxImage = new Image(bais);
 
             imgCodigoQr.setImage(fxImage);
-            lblEstadoQr.setText("✓ QR activo en red local: " + urlRed);
+            String prefijoEstado = com.foodcore.service.TunnelService.tieneUrlActiva()
+                    ? "✓ QR público activo (Cloudflare): "
+                    : "✓ QR activo en red local: ";
+            lblEstadoQr.setText(prefijoEstado + urlRed);
 
             // También exportar en disco para acceso persistente
             File archivoQrPng = new File("uploads/qr/menu_qr.png");
@@ -84,7 +87,7 @@ public class MenuQrModalController {
         try {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(new java.net.URI(url));
-            } else if (archivoHtmlGenerado != null && archivoHtmlGenerado.exists()) {
+            } else {
                 mostrarAlerta(Alert.AlertType.INFORMATION, "Menú Digital", "URL del Menú:\n" + url);
             }
         } catch (Exception e) {
@@ -94,12 +97,15 @@ public class MenuQrModalController {
 
     @FXML
     public void handleImprimirQr() {
+        String urlActual = txtUrlMenu != null && txtUrlMenu.getText() != null && !txtUrlMenu.getText().isBlank()
+                ? txtUrlMenu.getText()
+                : MenuQrService.construirUrlMenuDigital(8443);
         LOGGER.log(Level.INFO, "Enviando comando ESC/POS de impresión de QR a ticketera térmica...");
         mostrarAlerta(Alert.AlertType.INFORMATION, "Ticketera Térmica",
                 "Comprobante con Código QR impreso exitosamente.\n\n"
                 + "Cabecera: FOODCORE RESTOBAR\n"
                 + "Contenido: Carta Digital en Vivo\n"
-                + "Enlace: " + (archivoHtmlGenerado != null ? archivoHtmlGenerado.getName() : "menu_digital.html"));
+                + "Enlace: " + urlActual);
     }
 
     @FXML

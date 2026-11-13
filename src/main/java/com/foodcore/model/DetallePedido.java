@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Entidad de Detalle de Pedido con estado individual de cocina y marcas temporales
@@ -24,9 +27,15 @@ public class DetallePedido {
     private LocalDateTime iniciadoEn;
     private LocalDateTime listoEn;
 
-    // Campos descriptivos para KDS
+    // Campos descriptivos para KDS y personalización POS (v4.8.0)
     private String nombreProducto;
     private String numeroMesa;
+    private Integer idVariante;
+    private String nombreVariante;
+    private String modificadoresTexto;
+    private List<ProductoModificador> modificadoresSeleccionados = new ArrayList<>();
+    private Integer idCombo;
+    private String comboComponentesTexto;
 
     public DetallePedido() {
         this.enviadoEn = LocalDateTime.now(ZONA_LIMA);
@@ -103,6 +112,31 @@ public class DetallePedido {
 
     public String getNumeroMesa() { return numeroMesa; }
     public void setNumeroMesa(String numeroMesa) { this.numeroMesa = numeroMesa; }
+
+    public Integer getIdVariante() { return idVariante; }
+    public void setIdVariante(Integer idVariante) { this.idVariante = idVariante; }
+
+    public String getNombreVariante() { return nombreVariante; }
+    public void setNombreVariante(String nombreVariante) { this.nombreVariante = nombreVariante; }
+
+    public String getModificadoresTexto() { return modificadoresTexto; }
+    public void setModificadoresTexto(String modificadoresTexto) { this.modificadoresTexto = modificadoresTexto; }
+
+    public List<ProductoModificador> getModificadoresSeleccionados() {
+        return Collections.unmodifiableList(modificadoresSeleccionados);
+    }
+
+    public void setModificadoresSeleccionados(List<ProductoModificador> modificadoresSeleccionados) {
+        this.modificadoresSeleccionados = modificadoresSeleccionados != null
+                ? new ArrayList<>(modificadoresSeleccionados)
+                : new ArrayList<>();
+    }
+
+    public Integer getIdCombo() { return idCombo; }
+    public void setIdCombo(Integer idCombo) { this.idCombo = idCombo; }
+
+    public String getComboComponentesTexto() { return comboComponentesTexto; }
+    public void setComboComponentesTexto(String comboComponentesTexto) { this.comboComponentesTexto = comboComponentesTexto; }
 
     @Override
     public String toString() {

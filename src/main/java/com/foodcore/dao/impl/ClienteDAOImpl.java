@@ -56,6 +56,29 @@ public class ClienteDAOImpl implements ClienteDAO {
     }
 
     @Override
+    public List<Cliente> listarPorTipo(Connection conn, String tipoCliente) throws SQLException {
+        String sql = "SELECT c.*, "
+                + "COALESCE(SUM(CASE WHEN cxc.estado <> 'COBRADA' THEN (cxc.monto_total - cxc.monto_cobrado) ELSE 0 END), 0) AS saldo_deudor, "
+                + "COUNT(CASE WHEN cxc.estado <> 'COBRADA' THEN 1 END) AS comprobantes_pendientes "
+                + "FROM cliente c "
+                + "LEFT JOIN cuenta_por_cobrar cxc ON c.id_cliente = cxc.id_cliente "
+                + "WHERE UPPER(c.tipo_cliente) = UPPER(?) "
+                + "GROUP BY c.id_cliente "
+                + "ORDER BY c.razon_social ASC";
+
+        List<Cliente> lista = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tipoCliente != null ? tipoCliente : "CORPORATIVO");
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapearCliente(rs));
+                }
+            }
+        }
+        return lista;
+    }
+
+    @Override
     public Optional<Cliente> buscarPorId(Connection conn, int idCliente) throws SQLException {
         String sql = "SELECT c.*, "
                 + "COALESCE(SUM(CASE WHEN cxc.estado <> 'COBRADA' THEN (cxc.monto_total - cxc.monto_cobrado) ELSE 0 END), 0) AS saldo_deudor, "
@@ -91,22 +114,53 @@ public class ClienteDAOImpl implements ClienteDAO {
     }
 
     @Override
+    public Optional<Cliente> buscarPorDniOTelefono(Connection conn, String criterio) throws SQLException {
+        if (criterio == null || criterio.isBlank()) {
+            return Optional.empty();
+        }
+        String clean = criterio.trim();
+        String sql = "SELECT c.*, 0 AS saldo_deudor, 0 AS comprobantes_pendientes "
+                + "FROM cliente c "
+                + "WHERE c.activo = 1 AND (c.numero_documento = ? OR c.telefono = ?) "
+                + "ORDER BY CASE WHEN c.tipo_cliente = 'MINORISTA' THEN 0 ELSE 1 END, c.id_cliente ASC LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, clean);
+            ps.setString(2, clean);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearCliente(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public int insertar(Connection conn, Cliente cliente) throws SQLException {
-        String sql = "INSERT INTO cliente (tipo_documento, numero_documento, nombre_razon_social, razon_social, contacto, telefono, email, "
-                + "limite_credito, dias_credito, puntos_fidelidad, estado, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO cliente (tipo_documento, numero_documento, tipo_cliente, nombre_razon_social, razon_social, contacto, telefono, email, "
+                + "limite_credito, dias_credito, puntos_fidelidad, puntos_acumulados, fecha_nacimiento, estado, activo) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            int puntos = cliente.getPuntosAcumulados();
             ps.setString(1, cliente.getTipoDocumento());
             ps.setString(2, cliente.getNumeroDocumento());
-            ps.setString(3, cliente.getRazonSocial());
+            ps.setString(3, cliente.getTipoCliente());
             ps.setString(4, cliente.getRazonSocial());
-            ps.setString(5, cliente.getContacto());
-            ps.setString(6, cliente.getTelefono());
-            ps.setString(7, cliente.getEmail());
-            ps.setDouble(8, cliente.getLimiteCredito());
-            ps.setInt(9, cliente.getDiasCredito());
-            ps.setInt(10, cliente.getPuntosFidelidad());
-            ps.setString(11, cliente.getEstado());
-            ps.setBoolean(12, cliente.isActivo());
+            ps.setString(5, cliente.getRazonSocial());
+            ps.setString(6, cliente.getContacto());
+            ps.setString(7, cliente.getTelefono());
+            ps.setString(8, cliente.getEmail());
+            ps.setDouble(9, cliente.getLimiteCredito());
+            ps.setInt(10, cliente.getDiasCredito());
+            ps.setInt(11, puntos);
+            ps.setInt(12, puntos);
+            if (cliente.getFechaNacimiento() != null) {
+                ps.setDate(13, java.sql.Date.valueOf(cliente.getFechaNacimiento()));
+            } else {
+                ps.setNull(13, java.sql.Types.DATE);
+            }
+            ps.setString(14, cliente.getEstado());
+            ps.setBoolean(15, cliente.isActivo());
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -120,23 +174,31 @@ public class ClienteDAOImpl implements ClienteDAO {
 
     @Override
     public boolean actualizar(Connection conn, Cliente cliente) throws SQLException {
-        String sql = "UPDATE cliente SET tipo_documento = ?, numero_documento = ?, nombre_razon_social = ?, razon_social = ?, contacto = ?, "
-                + "telefono = ?, email = ?, limite_credito = ?, dias_credito = ?, puntos_fidelidad = ?, estado = ?, activo = ? "
+        String sql = "UPDATE cliente SET tipo_documento = ?, numero_documento = ?, tipo_cliente = ?, nombre_razon_social = ?, razon_social = ?, contacto = ?, "
+                + "telefono = ?, email = ?, limite_credito = ?, dias_credito = ?, puntos_fidelidad = ?, puntos_acumulados = ?, fecha_nacimiento = ?, estado = ?, activo = ? "
                 + "WHERE id_cliente = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int puntos = cliente.getPuntosAcumulados();
             ps.setString(1, cliente.getTipoDocumento());
             ps.setString(2, cliente.getNumeroDocumento());
-            ps.setString(3, cliente.getRazonSocial());
+            ps.setString(3, cliente.getTipoCliente());
             ps.setString(4, cliente.getRazonSocial());
-            ps.setString(5, cliente.getContacto());
-            ps.setString(6, cliente.getTelefono());
-            ps.setString(7, cliente.getEmail());
-            ps.setDouble(8, cliente.getLimiteCredito());
-            ps.setInt(9, cliente.getDiasCredito());
-            ps.setInt(10, cliente.getPuntosFidelidad());
-            ps.setString(11, cliente.getEstado());
-            ps.setBoolean(12, cliente.isActivo());
-            ps.setInt(13, cliente.getIdCliente());
+            ps.setString(5, cliente.getRazonSocial());
+            ps.setString(6, cliente.getContacto());
+            ps.setString(7, cliente.getTelefono());
+            ps.setString(8, cliente.getEmail());
+            ps.setDouble(9, cliente.getLimiteCredito());
+            ps.setInt(10, cliente.getDiasCredito());
+            ps.setInt(11, puntos);
+            ps.setInt(12, puntos);
+            if (cliente.getFechaNacimiento() != null) {
+                ps.setDate(13, java.sql.Date.valueOf(cliente.getFechaNacimiento()));
+            } else {
+                ps.setNull(13, java.sql.Types.DATE);
+            }
+            ps.setString(14, cliente.getEstado());
+            ps.setBoolean(15, cliente.isActivo());
+            ps.setInt(16, cliente.getIdCliente());
             return ps.executeUpdate() > 0;
         }
     }
@@ -156,6 +218,11 @@ public class ClienteDAOImpl implements ClienteDAO {
         Cliente c = new Cliente();
         c.setIdCliente(rs.getInt("id_cliente"));
         c.setTipoDocumento(rs.getString("tipo_documento"));
+        try {
+            c.setTipoCliente(rs.getString("tipo_cliente"));
+        } catch (SQLException ignored) {
+            c.setTipoCliente("DNI".equalsIgnoreCase(c.getTipoDocumento()) ? "MINORISTA" : "CORPORATIVO");
+        }
         c.setNumeroDocumento(rs.getString("numero_documento"));
         c.setRazonSocial(rs.getString("razon_social"));
         c.setContacto(rs.getString("contacto"));

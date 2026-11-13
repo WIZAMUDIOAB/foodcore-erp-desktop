@@ -3,13 +3,17 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.foodcore.dao.ClienteDAO;
+import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.model.Cliente;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.VentaService;
+import com.foodcore.util.ConexionBD;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -39,9 +43,14 @@ public class CobroModalController {
 
     private Integer idPedidoAsociado = null;
     private BigDecimal totalVenta = BigDecimal.ZERO;
+    private BigDecimal descuentoComercial = BigDecimal.ZERO;
+    private BigDecimal descuentoPuntos = BigDecimal.ZERO;
+    private int puntosACanjear = 0;
+    private Cliente clienteAsociado = null;
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
     private final VentaService ventaService = new VentaService();
+    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
 
     @FXML
     public void initialize() {
@@ -68,13 +77,41 @@ public class CobroModalController {
     }
 
     public void initData(BigDecimal total, String metodoPreseleccionado, List<DetalleVenta> items, Runnable onExitosa) {
+        initData(total, BigDecimal.ZERO, BigDecimal.ZERO, 0, null, metodoPreseleccionado, items, onExitosa);
+    }
+
+    public void initData(BigDecimal total,
+                         BigDecimal descuentoComercial,
+                         BigDecimal descuentoPuntos,
+                         int puntosACanjear,
+                         Cliente clienteAsociado,
+                         String metodoPreseleccionado,
+                         List<DetalleVenta> items,
+                         Runnable onExitosa) {
         this.totalVenta = total.setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+        this.descuentoComercial = descuentoComercial != null ? descuentoComercial : BigDecimal.ZERO;
+        this.descuentoPuntos = descuentoPuntos != null ? descuentoPuntos : BigDecimal.ZERO;
+        this.puntosACanjear = Math.max(0, puntosACanjear);
+        this.clienteAsociado = clienteAsociado;
         this.itemsVenta = items;
         this.onVentaExitosa = onExitosa;
 
         lblTotalCobro.setText("S/ " + this.totalVenta);
         if (metodoPreseleccionado != null) {
             cmbMetodoPago.getSelectionModel().select(metodoPreseleccionado);
+        }
+        if (clienteAsociado != null) {
+            if (clienteAsociado.getNumeroDocumento() != null && !clienteAsociado.getNumeroDocumento().isBlank()) {
+                txtDocCliente.setText(clienteAsociado.getNumeroDocumento().trim());
+                if ("RUC".equalsIgnoreCase(clienteAsociado.getTipoDocumento())) {
+                    rbFactura.setSelected(true);
+                } else if (clienteAsociado.getNumeroDocumento().trim().length() == 8) {
+                    rbBoleta.setSelected(true);
+                }
+            }
+            if (clienteAsociado.getRazonSocial() != null && !clienteAsociado.getRazonSocial().isBlank()) {
+                txtNombreCliente.setText(clienteAsociado.getRazonSocial().trim());
+            }
         }
         txtMontoRecibido.setText(this.totalVenta.toString());
         handleCalcularVuelto();
@@ -137,9 +174,15 @@ public class CobroModalController {
             BigDecimal recibido = new BigDecimal(txtMontoRecibido.getText().trim())
                 .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
 
-            // Desglose e invariantes mediante Value Object de Dominio
-            DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(totalVenta);
-            BigDecimal vuelto = desglose.calcularVuelto(recibido, metodo);
+            // Desglose e invariantes mediante Value Object de Dominio (IGV se calcula antes del canje de puntos)
+            BigDecimal baseAntesCanje = totalVenta.add(descuentoPuntos != null ? descuentoPuntos : BigDecimal.ZERO);
+            DesgloseFiscal desgloseFiscal = DesgloseFiscal.desdeTotalConImpuestos(baseAntesCanje);
+            DesgloseFiscal desgloseCobro = totalVenta.compareTo(BigDecimal.ZERO) > 0
+                    ? DesgloseFiscal.desdeTotalConImpuestos(totalVenta)
+                    : desgloseFiscal;
+            BigDecimal vuelto = totalVenta.compareTo(BigDecimal.ZERO) > 0
+                    ? desgloseCobro.calcularVuelto(recibido, metodo)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
             String tipoComp = "TICKET";
             String serie = "TCK";
@@ -156,24 +199,30 @@ public class CobroModalController {
 
             String numero = String.format("%06d", (int) (System.currentTimeMillis() % 1000000));
             int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+            Integer idClienteVenta = clienteAsociado != null && clienteAsociado.getIdCliente() > 0
+                    ? clienteAsociado.getIdCliente()
+                    : null;
 
             Venta venta = new Venta(
                 0,
                 idPedidoAsociado,
                 1,
                 idUsuario,
-                1,
-                desglose.getSubtotalGravado(),
-                desglose.getIgv(),
-                desglose.getTotal(),
+                idClienteVenta,
+                desgloseFiscal.getSubtotalGravado(),
+                desgloseFiscal.getIgv(),
+                totalVenta,
                 metodo,
                 recibido,
                 vuelto
             );
+            venta.setDescuento(descuentoComercial);
+            venta.setDescuentoPuntos(descuentoPuntos);
+            venta.setPuntosACanjear(puntosACanjear);
 
-            ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComp, serie, numero, desglose.getTotal());
+            ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComp, serie, numero, totalVenta);
 
-            // Registro transaccional ACID en BD, descuento de insumos y cierre de comanda si aplica
+            // Registro transaccional ACID en BD, descuento de insumos, puntos CRM y cierre de comanda si aplica
             final String serieFinal = serie;
             final String docCliente = txtDocCliente.getText() != null ? txtDocCliente.getText().trim() : "";
             final String nombreCliente = txtNombreCliente.getText() != null ? txtNombreCliente.getText().trim() : "";
@@ -185,24 +234,27 @@ public class CobroModalController {
 
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> {
+                    if (venta.getIdCliente() == null && !docCliente.isBlank() && !"00000000".equals(docCliente)) {
+                        try (java.sql.Connection connCli = ConexionBD.getConnection()) {
+                            java.util.Optional<Cliente> optCli = clienteDAO.buscarPorDniOTelefono(connCli, docCliente);
+                            optCli.ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
+                        } catch (java.sql.SQLException ignored) {
+                        }
+                    }
                     ventaService.registrarVenta(venta, itemsCopia, comprobante);
 
                     if ("CREDITO_CORPORATIVO".equalsIgnoreCase(metodo)) {
-                        try (java.sql.Connection conn = com.foodcore.util.ConexionBD.getConnection()) {
-                            com.foodcore.dao.ClienteDAO cliDAO = new com.foodcore.dao.impl.ClienteDAOImpl();
+                        try (java.sql.Connection conn = ConexionBD.getConnection()) {
                             com.foodcore.dao.CuentaPorCobrarDAO cxcDAO = new com.foodcore.dao.impl.CuentaPorCobrarDAOImpl();
-                            java.util.Optional<com.foodcore.model.Cliente> cliOpt = cliDAO.buscarPorDocumento(conn, docCliente);
-                            int idCli = 1;
-                            if (cliOpt.isPresent()) {
-                                idCli = cliOpt.get().getIdCliente();
-                            }
+                            java.util.Optional<Cliente> cliOpt = clienteDAO.buscarPorDocumento(conn, docCliente);
+                            int idCli = cliOpt.map(Cliente::getIdCliente).orElse(idClienteVenta != null ? idClienteVenta : 1);
                             com.foodcore.model.CuentaPorCobrar cxc = new com.foodcore.model.CuentaPorCobrar();
                             cxc.setIdCliente(idCli);
                             cxc.setIdVenta(venta.getIdVenta());
                             cxc.setNumeroComprobante(serieFinal + "-" + numero);
                             cxc.setFechaEmision(java.time.LocalDate.now());
                             cxc.setFechaVencimiento(java.time.LocalDate.now().plusDays(30));
-                            cxc.setMontoTotal(desglose.getTotal().doubleValue());
+                            cxc.setMontoTotal(totalVenta.doubleValue());
                             cxc.setMontoCobrado(0.0);
                             cxc.setEstado("PENDIENTE");
                             cxc.setObservaciones("Venta POS a credito corporativo. Cliente: " + nombreCliente);
@@ -262,6 +314,12 @@ public class CobroModalController {
         sb.append("----------------------------------------------------\n");
         sb.append(String.format("%-34s S/ %7.2f%n", "SUBTOTAL:", venta.getSubtotal()));
         sb.append(String.format("%-34s S/ %7.2f%n", "IGV (18%):", venta.getIgv()));
+        if (venta.getDescuento() != null && venta.getDescuento().compareTo(BigDecimal.ZERO) > 0) {
+            sb.append(String.format("%-34s -S/ %6.2f%n", "DESC. APLICADO:", venta.getDescuento()));
+        }
+        if (venta.getDescuentoPuntos() != null && venta.getDescuentoPuntos().compareTo(BigDecimal.ZERO) > 0) {
+            sb.append(String.format("%-34s -S/ %6.2f%n", "CANJE PUNTOS (SIN IGV):", venta.getDescuentoPuntos()));
+        }
         sb.append(String.format("%-34s S/ %7.2f%n", "TOTAL A PAGAR:", venta.getTotal()));
         sb.append("----------------------------------------------------\n");
         sb.append(String.format("%-34s %s%n", "MÉTODO DE PAGO:", venta.getMetodoPago()));

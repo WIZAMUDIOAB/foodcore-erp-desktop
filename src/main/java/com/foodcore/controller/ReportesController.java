@@ -2,7 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.model.ResumenKpi;
 import com.foodcore.service.ReporteService;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.PieChart;
@@ -53,59 +53,65 @@ public class ReportesController {
         return 0; // Histórico completo
     }
 
+    private record DatosReportesCarga(
+            ResumenKpi kpi,
+            Map<String, BigDecimal> ventas,
+            Map<String, Integer> bajaRotacion,
+            Map<String, BigDecimal> metodosPago) {
+    }
+
     @FXML
     public void cargarDatos() {
         int dias = obtenerDiasFiltro();
-
-        new Thread(() -> {
-            try {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
                 ResumenKpi kpi = reporteService.getResumenKpi(dias);
                 Map<String, BigDecimal> ventas = reporteService.getVentasPeriodo(dias);
                 Map<String, Integer> bajaRotacion = reporteService.getRankingPlatosBajaRotacion(6);
                 Map<String, BigDecimal> metodosPago = reporteService.getVentasPorMetodoPago(dias);
+                return new DatosReportesCarga(kpi, ventas, bajaRotacion, metodosPago);
+            },
+            datos -> {
+                // 1. Métricas KPI
+                ResumenKpi kpi = datos.kpi();
+                lblTotalVentas.setText(monedaFormat.format(kpi.getTotalVentas()));
+                lblCantidadVentas.setText(String.valueOf(kpi.getCantidadTransacciones()) + " pedidos");
+                lblTicketPromedio.setText(monedaFormat.format(kpi.getTicketPromedio()));
+                lblPlatoEstrella.setText(kpi.getPlatoMasVendido());
+                lblPlatoEstrellaQty.setText(kpi.getCantidadPlatoMasVendido() + " unidades vendidas");
 
-                Platform.runLater(() -> {
-                    // 1. Métricas KPI
-                    lblTotalVentas.setText(monedaFormat.format(kpi.getTotalVentas()));
-                    lblCantidadVentas.setText(String.valueOf(kpi.getCantidadTransacciones()) + " pedidos");
-                    lblTicketPromedio.setText(monedaFormat.format(kpi.getTicketPromedio()));
-                    lblPlatoEstrella.setText(kpi.getPlatoMasVendido());
-                    lblPlatoEstrellaQty.setText(kpi.getCantidadPlatoMasVendido() + " unidades vendidas");
+                // 2. BarChart: Ventas por Día
+                barChartVentas.getData().clear();
+                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                series.setName("Ventas (S/)");
+                if (datos.ventas().isEmpty()) {
+                    series.getData().add(new XYChart.Data<>("Sin ventas", 0));
+                } else {
+                    datos.ventas().forEach((dia, monto) -> series.getData().add(new XYChart.Data<>(dia, monto)));
+                }
+                barChartVentas.getData().add(series);
 
-                    // 2. BarChart: Ventas por Día
-                    barChartVentas.getData().clear();
-                    XYChart.Series<String, Number> series = new XYChart.Series<>();
-                    series.setName("Ventas (S/)");
-                    if (ventas.isEmpty()) {
-                        series.getData().add(new XYChart.Data<>("Sin ventas", 0));
-                    } else {
-                        ventas.forEach((dia, monto) -> series.getData().add(new XYChart.Data<>(dia, monto)));
-                    }
-                    barChartVentas.getData().add(series);
+                // 3. PieChart: Baja Rotación
+                pieChartBajaRotacion.getData().clear();
+                if (datos.bajaRotacion().isEmpty()) {
+                    pieChartBajaRotacion.getData().add(new PieChart.Data("Sin datos", 1));
+                } else {
+                    datos.bajaRotacion().forEach((plato, cant) ->
+                        pieChartBajaRotacion.getData().add(new PieChart.Data(plato + " (" + cant + ")", cant))
+                    );
+                }
 
-                    // 3. PieChart: Baja Rotación
-                    pieChartBajaRotacion.getData().clear();
-                    if (bajaRotacion.isEmpty()) {
-                        pieChartBajaRotacion.getData().add(new PieChart.Data("Sin datos", 1));
-                    } else {
-                        bajaRotacion.forEach((plato, cant) ->
-                            pieChartBajaRotacion.getData().add(new PieChart.Data(plato + " (" + cant + ")", cant))
-                        );
-                    }
-
-                    // 4. PieChart: Métodos de Pago
-                    pieChartMetodosPago.getData().clear();
-                    if (metodosPago.isEmpty()) {
-                        pieChartMetodosPago.getData().add(new PieChart.Data("Sin pagos", 1));
-                    } else {
-                        metodosPago.forEach((metodo, monto) ->
-                            pieChartMetodosPago.getData().add(new PieChart.Data(metodo + " (S/ " + monto + ")", monto.doubleValue()))
-                        );
-                    }
-                });
-            } catch (Exception e) {
-                LOGGER.error("Error al cargar datos de reportes para {} días", dias, e);
-            }
-        }).start();
+                // 4. PieChart: Métodos de Pago
+                pieChartMetodosPago.getData().clear();
+                if (datos.metodosPago().isEmpty()) {
+                    pieChartMetodosPago.getData().add(new PieChart.Data("Sin pagos", 1));
+                } else {
+                    datos.metodosPago().forEach((metodo, monto) ->
+                        pieChartMetodosPago.getData().add(new PieChart.Data(metodo + " (S/ " + monto + ")", monto.doubleValue()))
+                    );
+                }
+            },
+            e -> LOGGER.error("Error al cargar datos de reportes para {} días", dias, e)
+        );
     }
 }

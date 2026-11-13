@@ -4,6 +4,7 @@ import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -59,5 +60,35 @@ public class PedidoDAOImpl extends com.foodcore.dao.PedidoDAOImpl {
     @Override
     public List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException {
         return super.buscarPorEstadoYFechas(conn, estado, desde, hasta);
+    }
+
+    @Override
+    public BigDecimal calcularTotalPedido(Connection conn, int idPedido) throws SQLException {
+        return super.calcularTotalPedido(conn, idPedido);
+    }
+
+    @Override
+    public Optional<Pedido> buscarPedidoActivoPorMesa(Connection conn, long idMesa) throws SQLException {
+        return super.buscarPedidoActivoPorMesa(conn, idMesa);
+    }
+
+    @Override
+    public Optional<Pedido> buscarPedidoActivoPorNumeroMesa(Connection conn, String numeroMesa) throws SQLException {
+        return super.buscarPedidoActivoPorNumeroMesa(conn, numeroMesa);
+    }
+
+    @Override
+    public void moverPedidoAMesa(Connection conn, int idPedido, long idMesaDestino, String numeroMesaDestino) throws SQLException {
+        super.moverPedidoAMesa(conn, idPedido, idMesaDestino, numeroMesaDestino);
+    }
+
+    @Override
+    public Optional<String> obtenerNumeroMesaPorId(Connection conn, long idMesa) throws SQLException {
+        return super.obtenerNumeroMesaPorId(conn, idMesa);
+    }
+
+    @Override
+    public void actualizarEstadoMesaDirecto(Connection conn, long idMesa, String estado, Integer idPedidoActual) throws SQLException {
+        super.actualizarEstadoMesaDirecto(conn, idMesa, estado, idPedidoActual);
     }
 }

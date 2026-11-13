@@ -31,11 +31,21 @@ public final class MySqlIntegrationTestSupport {
 
     public static synchronized void inicializarEntornoMySql() {
         if (!initialized) {
+            boolean esCi = "true".equalsIgnoreCase(System.getenv("CI"))
+                    || "true".equalsIgnoreCase(System.getenv("GITHUB_ACTIONS"));
+            String ciDbPass = System.getenv("FOODCORE_DB_PASS");
+            String ciMigratorPass = System.getenv("FOODCORE_MIGRATOR_PASS");
+            boolean tieneCredencialesCi = ciDbPass != null && !ciDbPass.isBlank()
+                    && ciMigratorPass != null && !ciMigratorPass.isBlank();
+            boolean forzarTestcontainers = "true".equalsIgnoreCase(
+                    System.getProperty("foodcore.test.useTestcontainers"));
             boolean dockerDisponible = false;
-            try {
-                dockerDisponible = DockerClientFactory.instance().isDockerAvailable();
-            } catch (Throwable ignored) {
-                dockerDisponible = false;
+            if (!(esCi && tieneCredencialesCi && !forzarTestcontainers)) {
+                try {
+                    dockerDisponible = DockerClientFactory.instance().isDockerAvailable();
+                } catch (Throwable ignored) {
+                    dockerDisponible = false;
+                }
             }
 
             if (dockerDisponible) {
@@ -88,8 +98,6 @@ public final class MySqlIntegrationTestSupport {
                     "FOODCORE_DB_PASS"
                 );
 
-                boolean esCi = "true".equalsIgnoreCase(System.getenv("CI"))
-                    || "true".equalsIgnoreCase(System.getenv("GITHUB_ACTIONS"));
                 if (!esCi) {
                     String localMainUrl = "jdbc:mysql://" + host + ":" + port + "/foodcore"
                         + "?sslMode=" + sslMode

@@ -122,6 +122,7 @@
                                                 </VBox>
                                                 <HBox alignment="CENTER_RIGHT" spacing="12.0">
                                                     <children>
+                                                        <Button fx:id="btnRegistrarGasto" mnemonicParsing="false" onAction="#handleAbrirModalGasto" styleClass="btn-secondary" text="Registrar Gasto" />
                                                         <Button fx:id="btnCerrarTurno" mnemonicParsing="false" onAction="#handleCerrarCaja" styleClass="btn-primary" text="Cerrar turno" />
                                                     </children>
                                                 </HBox>
