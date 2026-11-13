@@ -83,4 +83,12 @@
         </columnResizePolicy>
     </TableView>
 
+    <HBox alignment="CENTER_RIGHT" spacing="10.0">
+        <children>
+            <Button fx:id="btnAnteriorKardex" mnemonicParsing="false" onAction="#handlePaginaAnterior" styleClass="btn-secondary" text="Anterior" />
+            <Label fx:id="lblPaginaKardex" styleClass="text-caption" text="Página 1 de 1" />
+            <Button fx:id="btnSiguienteKardex" mnemonicParsing="false" onAction="#handlePaginaSiguiente" styleClass="btn-secondary" text="Siguiente" />
+        </children>
+    </HBox>
+
 </VBox>

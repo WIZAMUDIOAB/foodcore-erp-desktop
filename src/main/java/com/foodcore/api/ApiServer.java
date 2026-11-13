@@ -5,6 +5,8 @@ import com.foodcore.api.security.ApiSecurityFilter;
 import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
+import com.foodcore.api.security.TokenBlacklistService;
+import com.foodcore.security.TotpService;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
@@ -45,6 +47,7 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Properties;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -69,6 +72,7 @@ public class ApiServer {
     private final JwtService jwtService;
     private final CorsPolicy corsPolicy;
     private final AuthRateLimiter rateLimiter;
+    private final TokenBlacklistService tokenBlacklistService;
     private final ApiSecurityFilter securityFilter;
     private final AuthController authController;
     private final PedidoController pedidoController;
@@ -83,21 +87,51 @@ public class ApiServer {
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
                 new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
-                new JwtService(), CorsPolicy.cargarDesdeConfiguracion(), AuthRateLimiter.cargarDesdeConfiguracion());
+                new JwtService(), CorsPolicy.cargarDesdeConfiguracion(), AuthRateLimiter.cargarDesdeConfiguracion(),
+                TokenBlacklistService.getInstance());
     }
 
     private ApiServer(AuthService authService, ProductoDAO productoDAO, MesaDAO mesaDAO,
                       PedidoDAO pedidoDAO, PedidoService pedidoService, UsuarioDAO usuarioDAO,
                       CajaService cajaService, JwtService jwtService, CorsPolicy corsPolicy,
                       AuthRateLimiter rateLimiter) {
+        this(authService, productoDAO, mesaDAO, pedidoDAO, pedidoService, usuarioDAO,
+                cajaService, jwtService, corsPolicy, rateLimiter, TokenBlacklistService.getInstance());
+    }
+
+    private ApiServer(AuthService authService, ProductoDAO productoDAO, MesaDAO mesaDAO,
+                      PedidoDAO pedidoDAO, PedidoService pedidoService, UsuarioDAO usuarioDAO,
+                      CajaService cajaService, JwtService jwtService, CorsPolicy corsPolicy,
+                      AuthRateLimiter rateLimiter, TokenBlacklistService tokenBlacklistService) {
         this.jwtService = jwtService != null ? jwtService : new JwtService();
         this.corsPolicy = corsPolicy != null ? corsPolicy : CorsPolicy.cargarDesdeConfiguracion();
         this.rateLimiter = rateLimiter != null ? rateLimiter : new AuthRateLimiter();
-        this.securityFilter = new ApiSecurityFilter(state, this.jwtService, this.rateLimiter);
-        this.authController = new AuthController(state, authService, usuarioDAO, this.jwtService);
+        this.tokenBlacklistService = tokenBlacklistService != null
+                ? tokenBlacklistService
+                : TokenBlacklistService.getInstance();
+        this.securityFilter = new ApiSecurityFilter(
+                state, this.jwtService, this.rateLimiter, this.tokenBlacklistService);
+        this.authController = new AuthController(
+                state, authService, usuarioDAO, this.jwtService, this.tokenBlacklistService, new TotpService());
         this.pedidoController = new PedidoController(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService);
         this.kdsController = new KdsController(state, pedidoDAO);
         this.reportesController = new ReportesController(state);
+    }
+
+    /**
+     * Crea una instancia aislada para pruebas de seguridad HTTP con lista negra dedicada.
+     */
+    public static ApiServer crearServidorAisladoConBlacklist(JwtService jwtService,
+            CorsPolicy corsPolicy,
+            AuthRateLimiter rateLimiter,
+            TokenBlacklistService tokenBlacklistService) {
+        return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
+                jwtService, corsPolicy, rateLimiter, tokenBlacklistService);
+    }
+
+    public TokenBlacklistService getTokenBlacklistService() {
+        return tokenBlacklistService;
     }
 
     /**
@@ -227,6 +261,7 @@ public class ApiServer {
             config.routes.post("/api/auth/login", authController::handleLogin);
             config.routes.post("/api/auth/pin-login", authController::handlePinLogin);
             config.routes.post("/api/auth/pin-switch", authController::handlePinSwitch);
+            config.routes.post("/api/auth/force-logout", authController::handleForceLogout);
             config.routes.get("/api/usuarios/activos", authController::handleListarUsuariosActivos);
             config.routes.patch("/api/usuarios/{id}/pin", authController::handleActualizarPinUsuario);
 
@@ -317,7 +352,11 @@ public class ApiServer {
     }
 
     public static String resolverKeystorePasswordObligatorio() {
-        String configured = leerVariableOPropiedad(ENV_KEYSTORE_PASS);
+        return resolverKeystorePasswordObligatorio(System::getenv);
+    }
+
+    static String resolverKeystorePasswordObligatorio(Function<String, String> envReader) {
+        String configured = leerVariableOPropiedad(ENV_KEYSTORE_PASS, envReader);
         if (configured == null || configured.isBlank() || configured.startsWith("${")) {
             throw new IllegalStateException(
                 "Variable de entorno obligatoria no configurada: " + ENV_KEYSTORE_PASS
@@ -334,11 +373,16 @@ public class ApiServer {
     }
 
     private static String leerVariableOPropiedad(String name) {
+        return leerVariableOPropiedad(name, System::getenv);
+    }
+
+    private static String leerVariableOPropiedad(String name, Function<String, String> envReader) {
         String sysProp = System.getProperty(name);
-        if (sysProp != null && !sysProp.isBlank()) {
-            return sysProp.trim();
+        if (sysProp != null) {
+            String trimmed = sysProp.trim();
+            return trimmed.isEmpty() ? null : trimmed;
         }
-        String envVal = System.getenv(name);
+        String envVal = envReader != null ? envReader.apply(name) : null;
         if (envVal != null && !envVal.isBlank()) {
             return envVal.trim();
         }

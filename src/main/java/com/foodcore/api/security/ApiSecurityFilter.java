@@ -26,11 +26,22 @@ public final class ApiSecurityFilter {
     private final ApiState state;
     private final JwtService jwtService;
     private final AuthRateLimiter rateLimiter;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public ApiSecurityFilter(ApiState state, JwtService jwtService, AuthRateLimiter rateLimiter) {
+        this(state, jwtService, rateLimiter, TokenBlacklistService.getInstance());
+    }
+
+    public ApiSecurityFilter(ApiState state,
+            JwtService jwtService,
+            AuthRateLimiter rateLimiter,
+            TokenBlacklistService tokenBlacklistService) {
         this.state = state;
         this.jwtService = jwtService;
         this.rateLimiter = rateLimiter;
+        this.tokenBlacklistService = tokenBlacklistService != null
+                ? tokenBlacklistService
+                : TokenBlacklistService.getInstance();
     }
 
     public void handle(Context ctx) {
@@ -76,6 +87,15 @@ public final class ApiSecurityFilter {
         }
 
         JwtService.JwtClaims claims = claimsOpt.get();
+        if (tokenBlacklistService.estaRevocado(claims)) {
+            LOGGER.warning(() -> String.format(
+                "Token revocado o cierre de sesión remoto aplicado (usuario=%s, IP=%s, %s %s)",
+                claims.username(), clientIp, method, path
+            ));
+            state.responderError(ctx, 401, "Sesión revocada o cerrada remotamente.");
+            ctx.skipRemainingHandlers();
+            return;
+        }
         ctx.attribute(ATTR_AUTH_CLAIMS, claims);
 
         Set<String> rolesRequeridos = resolverRolesRequeridos(method, path);
@@ -102,6 +122,9 @@ public final class ApiSecurityFilter {
     private static Set<String> resolverRolesRequeridos(String method, String path) {
         if ("POST".equalsIgnoreCase(method) && "/api/auth/pin-switch".equals(path)) {
             return ROLES_SALON;
+        }
+        if ("POST".equalsIgnoreCase(method) && "/api/auth/force-logout".equals(path)) {
+            return ROLES_ADMIN;
         }
         if (path.startsWith("/api/kds/")) {
             return ROLES_KDS;

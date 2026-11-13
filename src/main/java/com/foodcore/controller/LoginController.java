@@ -1,8 +1,10 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
+import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
@@ -18,6 +20,7 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import org.slf4j.Logger;
@@ -49,10 +52,19 @@ public class LoginController {
     @FXML private ProgressIndicator spinnerLogin;
     @FXML private Label lblMensaje;
     @FXML private Label lblVersionBadge;
+    @FXML private VBox overlayTotp;
+    @FXML private Label lblTotpSubtitulo;
+    @FXML private TextField txtTotpCodigo;
+    @FXML private Label lblTotpError;
+    @FXML private Button btnVerificarTotp;
+    @FXML private Button btnCancelarTotp;
 
     private final AuthService authService;
+    private final TotpService totpService = new TotpService();
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
+    private Usuario usuarioPendiente2FA;
     private boolean autenticating = false;
 
     public LoginController() {
@@ -85,18 +97,130 @@ public class LoginController {
             () -> authService.login(user, pass),
             usuario -> {
                 setEstadoCarga(false);
-                if (usuario.isCambioPasswordRequerido()) {
-                    // Regla §3.2 y §4.3: Abrir diálogo modal automáticamente, NUNCA mostrar label rojo en el login
-                    abrirDialogoCambioPassword(usuario);
-                    return;
-                }
-                irAlDashboard();
+                procesarUsuarioAutenticado(usuario);
             },
             error -> {
                 setEstadoCarga(false);
                 mostrarError(resolverMensajeErrorLogin(error));
             }
         );
+    }
+
+    /**
+     * Evalúa requisitos post-contraseña (2FA TOTP y cambio de clave obligatorio).
+     *
+     * @param usuario Usuario autenticado por credenciales.
+     */
+    public void procesarUsuarioAutenticado(Usuario usuario) {
+        if (usuario == null) {
+            mostrarError("Credenciales inválidas.");
+            return;
+        }
+        if (usuario.isTotpHabilitado()) {
+            abrirModalTotp(usuario);
+            return;
+        }
+        completarPostLogin(usuario);
+    }
+
+    private void abrirModalTotp(Usuario usuario) {
+        this.usuarioPendiente2FA = usuario;
+        if (loginCardContainer != null) {
+            loginCardContainer.setDisable(true);
+        }
+        if (lblTotpSubtitulo != null) {
+            lblTotpSubtitulo.setText("Cuenta protegida (" + usuario.getUsername()
+                    + "). Ingrese el código TOTP de 6 dígitos de su autenticador.");
+        }
+        if (txtTotpCodigo != null) {
+            txtTotpCodigo.clear();
+        }
+        ocultarErrorTotp();
+        if (overlayTotp != null) {
+            overlayTotp.setVisible(true);
+            overlayTotp.setManaged(true);
+        }
+        if (txtTotpCodigo != null) {
+            txtTotpCodigo.requestFocus();
+        }
+    }
+
+    /**
+     * Valida el código TOTP ingresado en la ventana de 2FA antes de habilitar el Dashboard.
+     */
+    @FXML
+    public void handleVerificarTotp() {
+        if (usuarioPendiente2FA == null) {
+            return;
+        }
+        String codigo = txtTotpCodigo != null ? txtTotpCodigo.getText() : "";
+        if (!totpService.verificarCodigo(usuarioPendiente2FA.getTotpSecret(), codigo)) {
+            auditoriaDAO.registrarEventoBestEffort(
+                    usuarioPendiente2FA.getIdUsuario(),
+                    "2FA_FALLIDO",
+                    "USUARIO",
+                    null,
+                    "Código TOTP desktop inválido para " + usuarioPendiente2FA.getUsername());
+            mostrarErrorTotp("Código 2FA inválido o expirado. Verifique los 6 dígitos e intente de nuevo.");
+            return;
+        }
+        Usuario verificado = usuarioPendiente2FA;
+        cerrarModalTotp();
+        completarPostLogin(verificado);
+    }
+
+    /**
+     * Cancela la verificación 2FA y limpia la sesión temporal.
+     */
+    @FXML
+    public void handleCancelarTotp() {
+        cerrarModalTotp();
+        AuthService.logout();
+        if (txtPassword != null) {
+            txtPassword.clear();
+            txtPassword.requestFocus();
+        }
+    }
+
+    public boolean isModalTotpAbierto() {
+        return overlayTotp != null && overlayTotp.isVisible();
+    }
+
+    private void cerrarModalTotp() {
+        this.usuarioPendiente2FA = null;
+        ocultarErrorTotp();
+        if (overlayTotp != null) {
+            overlayTotp.setVisible(false);
+            overlayTotp.setManaged(false);
+        }
+        if (loginCardContainer != null) {
+            loginCardContainer.setDisable(false);
+        }
+    }
+
+    private void completarPostLogin(Usuario usuario) {
+        if (usuario.isCambioPasswordRequerido()) {
+            // Regla §3.2 y §4.3: Abrir diálogo modal automáticamente, NUNCA mostrar label rojo en el login
+            abrirDialogoCambioPassword(usuario);
+            return;
+        }
+        irAlDashboard();
+    }
+
+    private void mostrarErrorTotp(String msg) {
+        if (lblTotpError != null) {
+            lblTotpError.setText(msg);
+            lblTotpError.setVisible(true);
+            lblTotpError.setManaged(true);
+        }
+    }
+
+    private void ocultarErrorTotp() {
+        if (lblTotpError != null) {
+            lblTotpError.setText("");
+            lblTotpError.setVisible(false);
+            lblTotpError.setManaged(false);
+        }
     }
 
     static String resolverMensajeErrorLogin(Throwable error) {

@@ -152,6 +152,13 @@
                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                             </columnResizePolicy>
                                         </TableView>
+                                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                            <children>
+                                                <Button fx:id="btnAnteriorVentas" mnemonicParsing="false" onAction="#handlePaginaAnterior" styleClass="btn-secondary" text="Anterior" />
+                                                <Label fx:id="lblPaginaVentas" styleClass="text-caption" text="Página 1 de 1" />
+                                                <Button fx:id="btnSiguienteVentas" mnemonicParsing="false" onAction="#handlePaginaSiguiente" styleClass="btn-secondary" text="Siguiente" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
                             </children>

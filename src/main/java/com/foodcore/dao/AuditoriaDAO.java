@@ -1,6 +1,7 @@
 package com.foodcore.dao;
 
 import com.foodcore.model.RegistroAuditoria;
+import com.foodcore.model.ResumenSeguridadHoy;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -15,4 +16,6 @@ public interface AuditoriaDAO {
                          String datosAnteriores, String datosNuevos) throws SQLException;
 
     List<RegistroAuditoria> listarUltimosEventos(Connection conn, int limite) throws SQLException;
+
+    ResumenSeguridadHoy obtenerResumenSeguridadHoy(Connection conn) throws SQLException;
 }

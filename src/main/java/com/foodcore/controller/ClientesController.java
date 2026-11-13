@@ -10,6 +10,7 @@ import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ConfiguracionFidelizacion;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.PaginadorTablaHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -73,6 +74,12 @@ public class ClientesController {
 
     @FXML private TextField txtBuscar;
     @FXML private Label lblTotalClientes;
+    @FXML private Button btnAnteriorCorp;
+    @FXML private Label lblPaginaCorp;
+    @FXML private Button btnSiguienteCorp;
+    @FXML private Button btnAnteriorMin;
+    @FXML private Label lblPaginaMin;
+    @FXML private Button btnSiguienteMin;
 
     @FXML private Label lblBadgeTipoCliente;
     @FXML private Label lblDetalleRazonSocial;
@@ -119,12 +126,20 @@ public class ClientesController {
     private final ObservableList<Cliente> listaTodosClientes = FXCollections.observableArrayList();
     private final ObservableList<Cliente> listaCorporativos = FXCollections.observableArrayList();
     private final ObservableList<Cliente> listaMinoristas = FXCollections.observableArrayList();
+    private final ObservableList<Cliente> listaCorporativosPagina = FXCollections.observableArrayList();
+    private final ObservableList<Cliente> listaMinoristasPagina = FXCollections.observableArrayList();
     private final ObservableList<CompraClienteResumen> historialCompras = FXCollections.observableArrayList();
+    private PaginadorTablaHelper<Cliente> paginadorCorporativos;
+    private PaginadorTablaHelper<Cliente> paginadorMinoristas;
     private Cliente clienteSeleccionado = null;
     private boolean modoEdicion = false;
 
     @FXML
     public void initialize() {
+        paginadorCorporativos = new PaginadorTablaHelper<>(
+                listaCorporativosPagina, lblPaginaCorp, btnAnteriorCorp, btnSiguienteCorp);
+        paginadorMinoristas = new PaginadorTablaHelper<>(
+                listaMinoristasPagina, lblPaginaMin, btnAnteriorMin, btnSiguienteMin);
         configurarColumnas();
         configurarColumnasMinoristas();
         configurarTablaHistorialCompras();
@@ -155,7 +170,7 @@ public class ClientesController {
         colSaldoDeudor.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getSaldoDeudor())));
         colPuntos.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPuntosAcumulados() + " pts"));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActivo() ? "ACTIVO" : "INACTIVO"));
-        tblClientes.setItems(listaCorporativos);
+        tblClientes.setItems(listaCorporativosPagina);
         tblClientes.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         colRazonSocial.setCellFactory(col -> crearTooltipCell());
@@ -198,7 +213,7 @@ public class ClientesController {
         colMinNombre.setCellFactory(col -> crearTooltipCell());
         colMinEmail.setCellFactory(col -> crearTooltipCell());
 
-        tblClientesMinoristas.setItems(listaMinoristas);
+        tblClientesMinoristas.setItems(listaMinoristasPagina);
         tblClientesMinoristas.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 
@@ -284,8 +299,7 @@ public class ClientesController {
                         .filter(Cliente::isMinorista)
                         .filter(c -> coincideBusqueda(c, f))
                         .collect(Collectors.toList());
-                listaCorporativos.setAll(filtradosCorp);
-                listaMinoristas.setAll(filtradosMin);
+                actualizarListasPaginadas(filtradosCorp, filtradosMin);
                 actualizarContadorTotalPorTab();
             }
         });
@@ -356,8 +370,9 @@ public class ClientesController {
     }
 
     private void aplicarListasDesdeMaestro(List<Cliente> todos) {
-        listaCorporativos.setAll(todos.stream().filter(c -> !c.isMinorista()).collect(Collectors.toList()));
-        listaMinoristas.setAll(todos.stream().filter(Cliente::isMinorista).collect(Collectors.toList()));
+        List<Cliente> corp = todos.stream().filter(c -> !c.isMinorista()).collect(Collectors.toList());
+        List<Cliente> min = todos.stream().filter(Cliente::isMinorista).collect(Collectors.toList());
+        actualizarListasPaginadas(corp, min);
         actualizarContadorTotalPorTab();
         boolean tabMinActivo = tabPaneClientes != null && tabMinoristas != null
                 && tabPaneClientes.getSelectionModel().getSelectedItem() == tabMinoristas;
@@ -371,6 +386,72 @@ public class ClientesController {
             tblClientesMinoristas.getSelectionModel().selectFirst();
             seleccionarCliente(listaMinoristas.get(0));
         }
+    }
+
+    private void actualizarListasPaginadas(List<Cliente> corporativos, List<Cliente> minoristas) {
+        listaCorporativos.setAll(corporativos);
+        listaMinoristas.setAll(minoristas);
+        if (paginadorCorporativos != null) {
+            paginadorCorporativos.setDatos(corporativos);
+        } else {
+            listaCorporativosPagina.setAll(corporativos);
+        }
+        if (paginadorMinoristas != null) {
+            paginadorMinoristas.setDatos(minoristas);
+        } else {
+            listaMinoristasPagina.setAll(minoristas);
+        }
+    }
+
+    /**
+     * Retrocede de página en la tabla de clientes corporativos.
+     */
+    @FXML
+    public void handlePaginaAnteriorCorp() {
+        if (paginadorCorporativos != null) {
+            paginadorCorporativos.paginaAnterior();
+        }
+    }
+
+    /**
+     * Avanza de página en la tabla de clientes corporativos.
+     */
+    @FXML
+    public void handlePaginaSiguienteCorp() {
+        if (paginadorCorporativos != null) {
+            paginadorCorporativos.paginaSiguiente();
+        }
+    }
+
+    /**
+     * Retrocede de página en la tabla de clientes minoristas.
+     */
+    @FXML
+    public void handlePaginaAnteriorMin() {
+        if (paginadorMinoristas != null) {
+            paginadorMinoristas.paginaAnterior();
+        }
+    }
+
+    /**
+     * Avanza de página en la tabla de clientes minoristas.
+     */
+    @FXML
+    public void handlePaginaSiguienteMin() {
+        if (paginadorMinoristas != null) {
+            paginadorMinoristas.paginaSiguiente();
+        }
+    }
+
+    /**
+     * Carga clientes directamente en memoria para pruebas unitarias y captura de paginación.
+     *
+     * @param clientes Lista completa de clientes a distribuir y paginar.
+     */
+    public void cargarClientesDirectoParaPaginacion(List<Cliente> clientes) {
+        List<Cliente> datos = clientes != null ? clientes : List.of();
+        listaTodosClientes.setAll(datos);
+        aplicarListasDesdeMaestro(datos);
     }
 
     private void actualizarContadorTotalPorTab() {

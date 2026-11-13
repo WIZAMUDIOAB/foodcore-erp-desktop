@@ -30,4 +30,8 @@ public interface UsuarioDAO {
     boolean actualizarPin(Connection conn, int idUsuario, String pinPlano, String pinHash) throws SQLException;
     Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String pinPlano) throws SQLException;
     Optional<Usuario> autenticarPorPinGeneral(Connection conn, String pinPlano) throws SQLException;
+    Optional<Usuario> buscarPorId(Connection conn, int idUsuario) throws SQLException;
+    boolean actualizarConfiguracion2FA(Connection conn, int idUsuario, String totpSecret, boolean habilitado) throws SQLException;
+    boolean registrarInvalidacionTokensAntes(Connection conn, int idUsuario, long epochMillis) throws SQLException;
+    Optional<Long> obtenerTokensInvalidadosAntes(Connection conn, int idUsuario) throws SQLException;
 }

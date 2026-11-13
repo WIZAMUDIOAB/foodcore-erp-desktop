@@ -1,6 +1,12 @@
 package com.foodcore.controller;
 
+import com.foodcore.api.security.TokenBlacklistService;
+import com.foodcore.dao.UsuarioDAO;
+import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.security.EncriptadorPassword;
+import com.foodcore.security.TotpService;
+import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.UiAsyncExecutor;
@@ -21,12 +27,15 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import java.util.Optional;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -40,7 +49,12 @@ public class UsuariosController {
 
     private static final Logger LOGGER = Logger.getLogger(UsuariosController.class.getName());
 
-    public record FilaUsuario(int idUsuario, String username, String nombreCompleto, String rol, boolean cambioRequerido, boolean activo, boolean pinConfigurado) {
+    public record FilaUsuario(int idUsuario, String username, String nombreCompleto, String rol,
+            boolean cambioRequerido, boolean activo, boolean pinConfigurado, boolean totpHabilitado) {
+        public FilaUsuario(int idUsuario, String username, String nombreCompleto, String rol,
+                boolean cambioRequerido, boolean activo, boolean pinConfigurado) {
+            this(idUsuario, username, nombreCompleto, rol, cambioRequerido, activo, pinConfigurado, false);
+        }
     }
 
     @FXML private StackPane rootUsuariosStack;
@@ -50,6 +64,7 @@ public class UsuariosController {
     @FXML private TableColumn<FilaUsuario, String> colRol;
     @FXML private TableColumn<FilaUsuario, String> colCambioClave;
     @FXML private TableColumn<FilaUsuario, String> colPinConfigurado;
+    @FXML private TableColumn<FilaUsuario, String> col2FA;
     @FXML private TableColumn<FilaUsuario, String> colEstado;
 
     @FXML private TextField txtUsername;
@@ -63,15 +78,40 @@ public class UsuariosController {
     @FXML private Button btnCrearUsuario;
     @FXML private Button btnResetearPassword;
     @FXML private Button btnConfigurarPin;
+    @FXML private Button btnConfigurar2FA;
+    @FXML private Button btnCerrarSesionRemota;
+
+    @FXML private VBox modalConfigurar2FA;
+    @FXML private Label lblModal2faUsuario;
+    @FXML private ImageView imgQr2fa;
+    @FXML private Label lblSecreto2fa;
+    @FXML private TextField txtCodigoVerificacion2fa;
+    @FXML private Label lblError2fa;
+    @FXML private Button btnCancelar2FA;
+    @FXML private Button btnDesactivar2FA;
+    @FXML private Button btnConfirmar2FA;
 
     private final EncriptadorPassword encriptador = new EncriptadorPassword();
+    private final TotpService totpService = new TotpService();
+    private final UsuarioDAO usuarioDAO = new UsuarioDAOImpl();
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+    private final TokenBlacklistService tokenBlacklistService = TokenBlacklistService.getInstance();
     private final ObservableList<FilaUsuario> listaUsuarios = FXCollections.observableArrayList();
+
+    private FilaUsuario usuario2faEnEdicion;
+    private String secretoTemporal2fa;
 
     @FXML
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnCrearUsuario);
         AnimationUtils.attachTactileFeedback(btnResetearPassword);
         AnimationUtils.attachTactileFeedback(btnConfigurarPin);
+        if (btnConfigurar2FA != null) {
+            AnimationUtils.attachTactileFeedback(btnConfigurar2FA);
+        }
+        if (btnCerrarSesionRemota != null) {
+            AnimationUtils.attachTactileFeedback(btnCerrarSesionRemota);
+        }
 
         cmbRol.setItems(FXCollections.observableArrayList("ADMIN", "CAJERO", "MOZO", "COCINA", "ALMACEN"));
         cmbRol.getSelectionModel().select("CAJERO");
@@ -104,6 +144,11 @@ public class UsuariosController {
         colCambioClave.setCellValueFactory(c -> new SimpleStringProperty(
             c.getValue().cambioRequerido() ? "REQUERIDO (1)" : "ACTUALIZADA"
         ));
+        if (col2FA != null) {
+            col2FA.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().totpHabilitado() ? "ACTIVO" : "INACTIVO"
+            ));
+        }
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(
             c.getValue().activo() ? "ACTIVO" : "INACTIVO"
         ));
@@ -113,29 +158,36 @@ public class UsuariosController {
     }
 
     public void cargarUsuarios() {
-        new Thread(() -> {
-            List<FilaUsuario> filas = new ArrayList<>();
-            String sql = "SELECT id_usuario, username, COALESCE(nombre_completo, username) AS nom, codigo_rol, "
-                + "cambio_password_requerido, activo, pin, pin_hash FROM usuario ORDER BY id_usuario ASC";
-            try (Connection conn = ConexionBD.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    filas.add(new FilaUsuario(
-                        rs.getInt("id_usuario"),
-                        rs.getString("username"),
-                        rs.getString("nom"),
-                        rs.getString("codigo_rol"),
-                        rs.getBoolean("cambio_password_requerido"),
-                        rs.getBoolean("activo"),
-                        (rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank()) || (rs.getString("pin") != null && !rs.getString("pin").isBlank())
-                    ));
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<FilaUsuario> filas = new ArrayList<>();
+                String sql = "SELECT id_usuario, username, COALESCE(nombre_completo, username) AS nom, codigo_rol, "
+                    + "cambio_password_requerido, activo, pin, pin_hash, COALESCE(totp_habilitado, 0) AS totp_habilitado "
+                    + "FROM usuario ORDER BY id_usuario ASC";
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(sql);
+                     ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        filas.add(new FilaUsuario(
+                            rs.getInt("id_usuario"),
+                            rs.getString("username"),
+                            rs.getString("nom"),
+                            rs.getString("codigo_rol"),
+                            rs.getBoolean("cambio_password_requerido"),
+                            rs.getBoolean("activo"),
+                            (rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank())
+                                    || (rs.getString("pin") != null && !rs.getString("pin").isBlank()),
+                            rs.getBoolean("totp_habilitado")
+                        ));
+                    }
+                } catch (SQLException e) {
+                    LOGGER.log(Level.FINE, "Error cargando usuarios", e);
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando usuarios", e);
-            }
-            Platform.runLater(() -> listaUsuarios.setAll(filas));
-        }).start();
+                return filas;
+            },
+            listaUsuarios::setAll,
+            e -> LOGGER.log(Level.FINE, "Error cargando usuarios", e)
+        );
     }
 
     /**
@@ -312,6 +364,218 @@ public class UsuariosController {
             ps.setString(2, hash);
             ps.setInt(3, idUsuario);
             ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Abre el modal QR TOTP para configurar 2FA del usuario seleccionado (priorizando rol ADMIN).
+     */
+    @FXML
+    public void handleConfigurar2FA(ActionEvent event) {
+        FilaUsuario sel = resolverUsuarioSeleccionadoOAdmin();
+        if (sel == null) {
+            AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario administrador para configurar 2FA.", true);
+            return;
+        }
+        abrirModal2FAParaUsuario(sel);
+    }
+
+    /**
+     * Abre el modal 2FA generando secreto Base32 y QR scannable para pruebas o uso directo.
+     *
+     * @param usuario Usuario objetivo a configurar.
+     */
+    public void abrirModal2FAParaUsuario(FilaUsuario usuario) {
+        if (usuario == null) {
+            return;
+        }
+        this.usuario2faEnEdicion = usuario;
+        this.secretoTemporal2fa = totpService.generarSecretoBase32();
+        if (lblModal2faUsuario != null) {
+            lblModal2faUsuario.setText("Usuario: " + usuario.username() + " (" + usuario.rol()
+                    + "). Escanee el QR con su app autenticadora e ingrese el código.");
+        }
+        if (lblSecreto2fa != null) {
+            lblSecreto2fa.setText(secretoTemporal2fa);
+        }
+        if (txtCodigoVerificacion2fa != null) {
+            txtCodigoVerificacion2fa.clear();
+        }
+        ocultarError2FA();
+        try {
+            if (imgQr2fa != null) {
+                imgQr2fa.setImage(totpService.generarQrImageFx(usuario.username(), secretoTemporal2fa));
+            }
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "No se pudo generar QR 2FA", ex);
+            mostrarError2FA("Error generando QR: " + ex.getMessage());
+        }
+        if (modalConfigurar2FA != null) {
+            modalConfigurar2FA.setVisible(true);
+            modalConfigurar2FA.setManaged(true);
+        }
+    }
+
+    /**
+     * Valida el código TOTP ingresado contra el secreto generado y habilita 2FA en BD.
+     */
+    @FXML
+    public void handleConfirmarActivar2FA(ActionEvent event) {
+        if (usuario2faEnEdicion == null || secretoTemporal2fa == null) {
+            return;
+        }
+        String codigo = txtCodigoVerificacion2fa != null ? txtCodigoVerificacion2fa.getText() : "";
+        if (!totpService.verificarCodigo(secretoTemporal2fa, codigo)) {
+            mostrarError2FA("Código TOTP inválido. Verifique los 6 dígitos de su aplicación.");
+            return;
+        }
+        ocultarError2FA();
+        if (btnConfirmar2FA != null) {
+            btnConfirmar2FA.setDisable(true);
+        }
+        final int idObjetivo = usuario2faEnEdicion.idUsuario();
+        final String usernameObj = usuario2faEnEdicion.username();
+        final String secretoFinal = secretoTemporal2fa;
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, secretoFinal, true);
+                    int actor = AuthService.getUsuarioSesionActual() != null
+                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                    auditoriaDAO.registrarEventoSeguro(
+                            conn, actor, "ACTIVAR_2FA", "USUARIO", null,
+                            "2FA TOTP activado para usuario " + usernameObj);
+                }
+            },
+            () -> {
+                if (btnConfirmar2FA != null) {
+                    btnConfirmar2FA.setDisable(false);
+                }
+                handleCerrarModal2FA(null);
+                AnimationUtils.mostrarToast(rootUsuariosStack, "2FA TOTP activado para " + usernameObj + ".", false);
+                cargarUsuarios();
+            },
+            ex -> {
+                if (btnConfirmar2FA != null) {
+                    btnConfirmar2FA.setDisable(false);
+                }
+                mostrarError2FA("Error guardando 2FA en BD: " + (ex != null ? ex.getMessage() : "desconocido"));
+            }
+        );
+    }
+
+    /**
+     * Desactiva la verificación 2FA del usuario seleccionado.
+     */
+    @FXML
+    public void handleDesactivar2FA(ActionEvent event) {
+        if (usuario2faEnEdicion == null) {
+            return;
+        }
+        final int idObjetivo = usuario2faEnEdicion.idUsuario();
+        final String usernameObj = usuario2faEnEdicion.username();
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, null, false);
+                    int actor = AuthService.getUsuarioSesionActual() != null
+                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                    auditoriaDAO.registrarEventoSeguro(
+                            conn, actor, "DESACTIVAR_2FA", "USUARIO", null,
+                            "2FA TOTP desactivado para usuario " + usernameObj);
+                }
+            },
+            () -> {
+                handleCerrarModal2FA(null);
+                AnimationUtils.mostrarToast(rootUsuariosStack, "2FA desactivado para " + usernameObj + ".", false);
+                cargarUsuarios();
+            },
+            ex -> mostrarError2FA("Error desactivando 2FA: " + (ex != null ? ex.getMessage() : "desconocido"))
+        );
+    }
+
+    @FXML
+    public void handleCerrarModal2FA(ActionEvent event) {
+        if (modalConfigurar2FA != null) {
+            modalConfigurar2FA.setVisible(false);
+            modalConfigurar2FA.setManaged(false);
+        }
+        ocultarError2FA();
+        usuario2faEnEdicion = null;
+        secretoTemporal2fa = null;
+    }
+
+    /**
+     * Invalida remotamente todos los JWT activos del usuario seleccionado (ÍTEM 8 v5.1.0).
+     */
+    @FXML
+    public void handleCerrarSesionRemota(ActionEvent event) {
+        FilaUsuario sel = tblUsuarios != null ? tblUsuarios.getSelectionModel().getSelectedItem() : null;
+        if (sel == null) {
+            AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario para cerrar sus sesiones remotas.", true);
+            return;
+        }
+        if (btnCerrarSesionRemota != null) {
+            btnCerrarSesionRemota.setDisable(true);
+        }
+        int adminId = AuthService.getUsuarioSesionActual() != null
+                ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> tokenBlacklistService.forzarCierreSesionUsuario(
+                    sel.idUsuario(), adminId, "Cierre remoto desde Administración de Usuarios"),
+            () -> {
+                if (btnCerrarSesionRemota != null) {
+                    btnCerrarSesionRemota.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootUsuariosStack,
+                        "Sesiones JWT cerradas remotamente para " + sel.username() + ".",
+                        false);
+            },
+            ex -> {
+                if (btnCerrarSesionRemota != null) {
+                    btnCerrarSesionRemota.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(
+                        rootUsuariosStack,
+                        "Error cerrando sesiones: " + (ex != null ? ex.getMessage() : "desconocido"),
+                        true);
+            }
+        );
+    }
+
+    public String getSecretoTemporal2fa() {
+        return secretoTemporal2fa;
+    }
+
+    public boolean isModal2faVisible() {
+        return modalConfigurar2FA != null && modalConfigurar2FA.isVisible();
+    }
+
+    private FilaUsuario resolverUsuarioSeleccionadoOAdmin() {
+        FilaUsuario sel = tblUsuarios != null ? tblUsuarios.getSelectionModel().getSelectedItem() : null;
+        if (sel != null) {
+            return sel;
+        }
+        return listaUsuarios.stream()
+                .filter(u -> "ADMIN".equalsIgnoreCase(u.rol()) || "admin".equalsIgnoreCase(u.username()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void mostrarError2FA(String mensaje) {
+        if (lblError2fa != null) {
+            lblError2fa.setText(mensaje);
+            lblError2fa.setVisible(true);
+            lblError2fa.setManaged(true);
+        }
+    }
+
+    private void ocultarError2FA() {
+        if (lblError2fa != null) {
+            lblError2fa.setText("");
+            lblError2fa.setVisible(false);
+            lblError2fa.setManaged(false);
         }
     }
 }

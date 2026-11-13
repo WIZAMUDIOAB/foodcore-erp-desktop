@@ -279,6 +279,44 @@
                             </children>
                         </VBox>
 
+                        <!-- Alertas de Seguridad del Sistema (v5.1.0 ÍTEM 9) -->
+                        <VBox fx:id="cardAlertasSeguridad" spacing="12.0" styleClass="surface-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="text-h2" text="Alertas de Seguridad del Sistema (Hoy)" />
+                                        <Region HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblSecEstadoBadge" styleClass="badge-pill-success" text="SIN ANOMALÍAS" />
+                                    </children>
+                                </HBox>
+                                <HBox spacing="14.0">
+                                    <children>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="INTENTOS FALLIDOS HOY" />
+                                                <Label fx:id="lblSecIntentosFallidos" styleClass="kpi-value-24-accent" text="0" />
+                                                <Label styleClass="kpi-card-subtitle" text="Logins o códigos 2FA rechazados" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="ANULACIONES HOY" />
+                                                <Label fx:id="lblSecAnulacionesHoy" styleClass="kpi-value-24-amber" text="0" />
+                                                <Label styleClass="kpi-card-subtitle" text="Anulaciones de pedidos y comprobantes" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="4.0" styleClass="kpi-card, kpi-card-secondary" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="kpi-card-title" text="ÚLTIMO ACCESO SOSPECHOSO" />
+                                                <Label fx:id="lblSecUltimoSospechoso" styleClass="text-body-strong" text="Sin eventos sospechosos" wrapText="true" />
+                                                <Label fx:id="lblSecUltimoSospechosoDetalle" styleClass="kpi-card-subtitle" text="Bitácora de auditoría de seguridad" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </HBox>
+                            </children>
+                        </VBox>
+
                         <!-- Alertas de Vencimiento de Personal (Próximos 30 días) (v4.4.0 §4) -->
                         <VBox spacing="10.0" styleClass="surface-card">
                             <children>

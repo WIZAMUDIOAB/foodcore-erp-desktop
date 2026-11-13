@@ -186,6 +186,19 @@
             <version>0.10.2</version>
         </dependency>
 
+        <!-- Autenticación 2FA TOTP (RFC 6238 / Google Authenticator) — ÍTEM 7 v5.1.0 -->
+        <dependency>
+            <groupId>com.warrenstrange</groupId>
+            <artifactId>googleauth</artifactId>
+            <version>1.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpclient</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- Suite de Pruebas Unitarias, Integración (Testcontainers MySQL 8), UI (TestFX Headless) y E2E (Playwright) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -32,6 +32,11 @@ public class Usuario {
     private LocalDate fechaVencimientoContrato;
     private LocalDate fechaVencimientoCarnetSanidad;
 
+    // Campos de Seguridad v5.1.0 (2FA TOTP e invalidación de sesiones JWT)
+    private String totpSecret;
+    private boolean totpHabilitado;
+    private long tokensInvalidadosAntes;
+
     public Usuario() {
     }
 
@@ -268,6 +273,30 @@ public class Usuario {
 
     public void setCargo(String cargo) {
         this.cargo = cargo;
+    }
+
+    public String getTotpSecret() {
+        return totpSecret;
+    }
+
+    public void setTotpSecret(String totpSecret) {
+        this.totpSecret = totpSecret;
+    }
+
+    public boolean isTotpHabilitado() {
+        return totpHabilitado;
+    }
+
+    public void setTotpHabilitado(boolean totpHabilitado) {
+        this.totpHabilitado = totpHabilitado;
+    }
+
+    public long getTokensInvalidadosAntes() {
+        return tokensInvalidadosAntes;
+    }
+
+    public void setTokensInvalidadosAntes(long tokensInvalidadosAntes) {
+        this.tokensInvalidadosAntes = tokensInvalidadosAntes;
     }
 
     @Override

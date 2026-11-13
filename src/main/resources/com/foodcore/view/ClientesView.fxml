@@ -85,6 +85,13 @@
                                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN" />
                                                             </columnResizePolicy>
                                                         </TableView>
+                                                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                                            <children>
+                                                                <Button fx:id="btnAnteriorCorp" mnemonicParsing="false" onAction="#handlePaginaAnteriorCorp" styleClass="btn-secondary" text="Anterior" />
+                                                                <Label fx:id="lblPaginaCorp" styleClass="text-caption" text="Página 1 de 1" />
+                                                                <Button fx:id="btnSiguienteCorp" mnemonicParsing="false" onAction="#handlePaginaSiguienteCorp" styleClass="btn-secondary" text="Siguiente" />
+                                                            </children>
+                                                        </HBox>
                                                     </children>
                                                 </VBox>
                                             </content>
@@ -107,6 +114,13 @@
                                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN" />
                                                             </columnResizePolicy>
                                                         </TableView>
+                                                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                                            <children>
+                                                                <Button fx:id="btnAnteriorMin" mnemonicParsing="false" onAction="#handlePaginaAnteriorMin" styleClass="btn-secondary" text="Anterior" />
+                                                                <Label fx:id="lblPaginaMin" styleClass="text-caption" text="Página 1 de 1" />
+                                                                <Button fx:id="btnSiguienteMin" mnemonicParsing="false" onAction="#handlePaginaSiguienteMin" styleClass="btn-secondary" text="Siguiente" />
+                                                            </children>
+                                                        </HBox>
                                                     </children>
                                                 </VBox>
                                             </content>

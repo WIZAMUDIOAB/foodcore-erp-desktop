@@ -1,8 +1,10 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.FinanzasBiDAOImpl;
 import com.foodcore.model.ComparativaPeriodos;
+import com.foodcore.model.ResumenSeguridadHoy;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.FormatoBiUiHelper;
@@ -123,12 +125,20 @@ public class DashboardController {
 
     @FXML private VBox vboxAlertasVencimiento;
     @FXML private Label lblCountAlertasPersonal;
+    @FXML private VBox cardAlertasSeguridad;
+    @FXML private Label lblSecEstadoBadge;
+    @FXML private Label lblSecIntentosFallidos;
+    @FXML private Label lblSecAnulacionesHoy;
+    @FXML private Label lblSecUltimoSospechoso;
+    @FXML private Label lblSecUltimoSospechosoDetalle;
 
     private final ObservableList<FilaRentabilidad> itemsRentabilidad = FXCollections.observableArrayList();
     private final ObservableList<FilaVentasMozo> itemsVentasMozo = FXCollections.observableArrayList();
     private final List<AlertaVencimiento> alertasVencimientoActuales = new ArrayList<>();
     private final FinanzasBiDAOImpl finanzasBiDao = new FinanzasBiDAOImpl();
+    private final AuditoriaDAOImpl auditoriaDao = new AuditoriaDAOImpl();
     private ComparativaPeriodos ultimaComparativa;
+    private ResumenSeguridadHoy ultimoResumenSeguridad = ResumenSeguridadHoy.normal();
 
     @FXML
     public void initialize() {
@@ -368,10 +378,16 @@ public class DashboardController {
         List<FilaVentasMozo> filasMozo = new ArrayList<>();
         List<FilaRentabilidad> filasRent = new ArrayList<>();
         List<AlertaVencimiento> alertasPersonal = new ArrayList<>();
+        ResumenSeguridadHoy seguridadHoy = ResumenSeguridadHoy.normal();
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
                 comparativa = finanzasBiDao.obtenerComparativaPeriodos(conn, hoy);
+                try {
+                    seguridadHoy = auditoriaDao.obtenerResumenSeguridadHoy(conn);
+                } catch (Exception exSec) {
+                    LOGGER.log(Level.FINE, "Aviso consultando alertas de seguridad en auditoria", exSec);
+                }
 
                 String sqlKpi = "SELECT COALESCE(SUM(total), 0.00) AS suma, COUNT(*) AS tx, COALESCE(AVG(total), 0.00) AS prom "
                     + "FROM venta WHERE estado = 'COMPLETADA'";
@@ -462,6 +478,7 @@ public class DashboardController {
             LOGGER.log(Level.FINE, "Cargando métricas demostrativas del Dashboard", e);
         }
 
+        final ResumenSeguridadHoy seguridadFinal = seguridadHoy;
         final ComparativaPeriodos compFinal = comparativa;
         final BigDecimal vDiaFinal = ventasDia;
         final int txFinal = numTx;
@@ -523,6 +540,7 @@ public class DashboardController {
             itemsVentasMozo.setAll(mozoFinal);
             itemsRentabilidad.setAll(rentFinal);
             renderizarAlertasVencimiento(alertasFinal);
+            renderizarAlertasSeguridad(seguridadFinal);
         };
 
         if (Platform.isFxApplicationThread()) {
@@ -669,6 +687,58 @@ public class DashboardController {
             fila.getChildren().addAll(lblDoc, datos, sp, lblDias);
             vboxAlertasVencimiento.getChildren().add(fila);
         }
+    }
+
+    /**
+     * Renderiza la tarjeta KPI de alertas de seguridad operacional (ÍTEM 9 v5.1.0).
+     *
+     * @param resumen Métricas del día extraídas de {@code auditoria}.
+     */
+    public void renderizarAlertasSeguridad(ResumenSeguridadHoy resumen) {
+        ResumenSeguridadHoy datos = resumen != null ? resumen : ResumenSeguridadHoy.normal();
+        this.ultimoResumenSeguridad = datos;
+        if (lblSecIntentosFallidos != null) {
+            lblSecIntentosFallidos.setText(String.valueOf(datos.intentosFallidosHoy()));
+        }
+        if (lblSecAnulacionesHoy != null) {
+            lblSecAnulacionesHoy.setText(String.valueOf(datos.anulacionesHoy()));
+        }
+        if (lblSecUltimoSospechoso != null) {
+            lblSecUltimoSospechoso.setText(datos.ultimoAccesoSospechoso());
+        }
+        if (lblSecEstadoBadge != null) {
+            lblSecEstadoBadge.getStyleClass().removeAll("badge-pill-success", "badge-pill-warning", "badge-pill-danger");
+            if (datos.intentosFallidosHoy() > 0 || datos.anulacionesHoy() > 0) {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-danger");
+                lblSecEstadoBadge.setText("ATENCIÓN REQUERIDA");
+            } else if (datos.requiereAtencion()) {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-warning");
+                lblSecEstadoBadge.setText("REVISAR BITÁCORA");
+            } else {
+                lblSecEstadoBadge.getStyleClass().add("badge-pill-success");
+                lblSecEstadoBadge.setText("SIN ANOMALÍAS");
+            }
+        }
+    }
+
+    public Label getLblSecIntentosFallidos() {
+        return lblSecIntentosFallidos;
+    }
+
+    public Label getLblSecAnulacionesHoy() {
+        return lblSecAnulacionesHoy;
+    }
+
+    public Label getLblSecUltimoSospechoso() {
+        return lblSecUltimoSospechoso;
+    }
+
+    public Label getLblSecEstadoBadge() {
+        return lblSecEstadoBadge;
+    }
+
+    public ResumenSeguridadHoy getUltimoResumenSeguridad() {
+        return ultimoResumenSeguridad;
     }
 
     public Label getLblKpiVentasDia() {

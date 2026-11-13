@@ -11,6 +11,7 @@ import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.ExportacionContableService.VentaRegistroSunat;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.PaginadorTablaHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -56,6 +57,9 @@ public class ReportesContablesController {
     @FXML private Label lblTotalIgv;
     @FXML private Label lblTotalCompras;
     @FXML private Label lblContadorFilas;
+    @FXML private Button btnAnteriorVentas;
+    @FXML private Label lblPaginaVentas;
+    @FXML private Button btnSiguienteVentas;
 
     @FXML private TableView<VentaRegistroSunat> tblVentasSunat;
     @FXML private TableColumn<VentaRegistroSunat, String> colFecha;
@@ -70,9 +74,11 @@ public class ReportesContablesController {
     private final ExportacionContableService exportacionService = new ExportacionContableService();
     private final CompraDAO compraDAO = new CompraDAOImpl();
     private final ObservableList<VentaRegistroSunat> listaVentas = FXCollections.observableArrayList();
+    private PaginadorTablaHelper<VentaRegistroSunat> paginadorVentas;
 
     @FXML
     public void initialize() {
+        paginadorVentas = new PaginadorTablaHelper<>(listaVentas, lblPaginaVentas, btnAnteriorVentas, btnSiguienteVentas);
         configurarColumnas();
         configurarFiltrosPeriodo();
         lblTotalVentas.setText("S/ 0.00");
@@ -81,6 +87,7 @@ public class ReportesContablesController {
         lblTotalCompras.setText("S/ 0.00");
         lblContadorFilas.setText("0 Comprobantes");
         lblEstadoExportacion.setText("Cargando período...");
+        paginadorVentas.setDatos(List.of());
         cargarDatosPeriodoAsync();
     }
 
@@ -196,13 +203,60 @@ public class ReportesContablesController {
     }
 
     private void aplicarResultadoPeriodo(ResultadoPeriodoContable res, LocalDate ini, LocalDate fin) {
-        listaVentas.setAll(res.ventas());
+        if (paginadorVentas != null) {
+            paginadorVentas.setDatos(res.ventas());
+        } else {
+            listaVentas.setAll(res.ventas());
+        }
         lblTotalVentas.setText(String.format(Locale.US, "S/ %,.2f", res.sumTotal()));
         lblBaseImponible.setText(String.format(Locale.US, "S/ %,.2f", res.sumBase()));
         lblTotalIgv.setText(String.format(Locale.US, "S/ %,.2f", res.sumIgv()));
         lblTotalCompras.setText(String.format(Locale.US, "S/ %,.2f", res.sumCompras()));
-        lblContadorFilas.setText(listaVentas.size() + " Comprobantes");
+        lblContadorFilas.setText(res.ventas().size() + " Comprobantes");
         lblEstadoExportacion.setText("Período cargado: " + ini + " al " + fin);
+    }
+
+    /**
+     * Navega a la página anterior de ventas.
+     */
+    @FXML
+    public void handlePaginaAnterior() {
+        if (paginadorVentas != null) {
+            paginadorVentas.paginaAnterior();
+        }
+    }
+
+    /**
+     * Navega a la página siguiente de ventas.
+     */
+    @FXML
+    public void handlePaginaSiguiente() {
+        if (paginadorVentas != null) {
+            paginadorVentas.paginaSiguiente();
+        }
+    }
+
+    /**
+     * Carga ventas directamente en el paginador para pruebas unitarias e inspección visual.
+     *
+     * @param ventas Lista completa de ventas a paginar.
+     */
+    public void cargarVentasDirectoParaPaginacion(List<VentaRegistroSunat> ventas) {
+        double sumTotal = 0.0;
+        double sumBase = 0.0;
+        double sumIgv = 0.0;
+        if (ventas != null) {
+            for (VentaRegistroSunat v : ventas) {
+                sumTotal += v.total;
+                sumBase += v.subtotal;
+                sumIgv += v.igv;
+            }
+        }
+        LocalDate hoy = LocalDate.now();
+        aplicarResultadoPeriodo(
+                new ResultadoPeriodoContable(ventas != null ? ventas : List.of(), sumTotal, sumBase, sumIgv, 0.0),
+                hoy.withDayOfMonth(1),
+                hoy);
     }
 
     private record ResultadoPeriodoContable(
