@@ -7,6 +7,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -128,9 +129,19 @@ public class ArqueoCajaController {
         tblCierreZ.setItems(itemsCierreZ);
     }
 
+    private record EstadoCajaCarga(
+            boolean abierta,
+            Caja activa,
+            BigDecimal apertura,
+            BigDecimal ventas,
+            BigDecimal gastos,
+            BigDecimal esperado,
+            ObservableList<FilaCierreZ> desgloseZ) {
+    }
+
     public void cargarDatosCaja() {
-        new Thread(() -> {
-            try {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
                 try {
                     categoriasGastoCache = List.copyOf(cajaService.listarCategoriasGastoActivas());
                 } catch (Exception exCat) {
@@ -147,18 +158,27 @@ public class ArqueoCajaController {
                     BigDecimal esperado = apertura.add(ventas).subtract(gastos).setScale(2, RoundingMode.HALF_UP);
                     List<MovimientoCaja> gastosDetallados = cajaService.listarGastosTurno(activa.getIdCaja());
                     ObservableList<FilaCierreZ> desgloseZ = consultarDesgloseCierreZ(activa.getIdCaja(), gastos, gastosDetallados);
-
-                    Platform.runLater(() -> aplicarEstadoCajaAbierta(activa, apertura, ventas, gastos, esperado, desgloseZ));
-                } else {
-                    Platform.runLater(this::aplicarEstadoCajaCerrada);
+                    return new EstadoCajaCarga(true, activa, apertura, ventas, gastos, esperado, desgloseZ);
                 }
-            } catch (Exception e) {
+                return new EstadoCajaCarga(false, null, null, null, null, null, FXCollections.observableArrayList());
+            },
+            estado -> {
+                if (estado.abierta()) {
+                    aplicarEstadoCajaAbierta(
+                        estado.activa(), estado.apertura(), estado.ventas(),
+                        estado.gastos(), estado.esperado(), estado.desgloseZ()
+                    );
+                } else {
+                    aplicarEstadoCajaCerrada();
+                }
+            },
+            e -> {
                 LOGGER.log(Level.WARNING, "Error al consultar estado de caja", e);
-                Platform.runLater(() -> AnimationUtils.mostrarToast(
-                    rootCajaStack, "Error al consultar caja: " + e.getMessage(), true
-                ));
+                AnimationUtils.mostrarToast(
+                    rootCajaStack, "Error al consultar caja: " + (e != null ? e.getMessage() : "desconocido"), true
+                );
             }
-        }).start();
+        );
     }
 
     private ObservableList<FilaCierreZ> consultarDesgloseCierreZ(

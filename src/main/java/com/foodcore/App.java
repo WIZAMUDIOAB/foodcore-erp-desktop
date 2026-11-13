@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,12 +34,15 @@ import java.util.logging.Logger;
 public class App extends Application {
 
     private static final Logger LOGGER = Logger.getLogger(App.class.getName());
+    private static final AtomicBoolean SHUTDOWN_HOOK_REGISTRADO = new AtomicBoolean(false);
     private static Stage primaryStage;
 
     @Override
     public void start(Stage stage) {
         LoggingBootstrap.installBridge();
         setPrimaryStage(stage);
+        registrarShutdownHookUnaVez();
+        stage.setOnCloseRequest(event -> detenerServiciosAplicacion());
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         cargarFuentesSistema();
 
@@ -230,9 +234,39 @@ public class App extends Application {
         return primaryStage;
     }
 
+    public static void registrarShutdownHookUnaVez() {
+        if (SHUTDOWN_HOOK_REGISTRADO.compareAndSet(false, true)) {
+            Runtime.getRuntime().addShutdownHook(
+                new Thread(App::detenerServiciosAplicacion, "foodcore-app-shutdown")
+            );
+        }
+    }
+
+    /**
+     * Detiene de forma ordenada e idempotente el túnel externo, la API HTTP/HTTPS (8080/8443)
+     * y el servidor TCP KDS (9090) para liberar todos los puertos al cerrar la aplicación.
+     */
+    public static void detenerServiciosAplicacion() {
+        try {
+            com.foodcore.service.TunnelService.detener();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al detener TunnelService durante el cierre", e);
+        }
+        try {
+            ApiServer.getInstance().detener();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al detener ApiServer durante el cierre", e);
+        }
+        try {
+            ServidorSockets.getInstance().detener();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al detener ServidorSockets durante el cierre", e);
+        }
+    }
+
     @Override
     public void stop() throws Exception {
-        com.foodcore.service.TunnelService.detener();
+        detenerServiciosAplicacion();
         super.stop();
     }
 

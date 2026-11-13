@@ -353,32 +353,38 @@ public class MenuController {
         });
     }
 
+    private record DatosMenuCarga(
+            List<Categoria> cats,
+            List<Producto> prods,
+            List<ProductoModificador> mods) {
+    }
+
     public void cargarDatosMenu() {
         final Set<Integer> seleccionadosPrevios = obtenerIdsModificadoresSeleccionadosSet();
-        new Thread(() -> {
-            List<Categoria> cats = new ArrayList<>();
-            List<Producto> prods = new ArrayList<>();
-            List<ProductoModificador> modsGlobales = new ArrayList<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                cats = productoDAO.listarCategorias(conn);
-                prods = personalizacionService.listarTodosConOpciones(conn);
-                modsGlobales = personalizacionService.listarModificadoresGlobales();
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando menú desde BD", e);
-            }
-            final List<Categoria> catsFinal = cats;
-            final List<Producto> prodsFinal = prods;
-            final List<ProductoModificador> modsFinal = modsGlobales;
-            Platform.runLater(() -> {
-                listaCategorias.setAll(catsFinal);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Categoria> cats = new ArrayList<>();
+                List<Producto> prods = new ArrayList<>();
+                List<ProductoModificador> modsGlobales = new ArrayList<>();
+                try (Connection conn = ConexionBD.getConnection()) {
+                    cats = productoDAO.listarCategorias(conn);
+                    prods = personalizacionService.listarTodosConOpciones(conn);
+                    modsGlobales = personalizacionService.listarModificadoresGlobales();
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Error cargando menú desde BD", e);
+                }
+                return new DatosMenuCarga(cats, prods, modsGlobales);
+            },
+            datos -> {
+                listaCategorias.setAll(datos.cats());
                 if (!listaCategorias.isEmpty() && cmbCategoria.getValue() == null) {
                     cmbCategoria.getSelectionModel().selectFirst();
                 }
-                listaProductos.setAll(prodsFinal);
+                listaProductos.setAll(datos.prods());
                 actualizarListaProductosSimples();
-                listaModificadoresGlobales.setAll(modsFinal);
+                listaModificadoresGlobales.setAll(datos.mods());
                 if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
-                    for (Producto pAct : prodsFinal) {
+                    for (Producto pAct : datos.prods()) {
                         if (pAct.getIdProducto() == productoEnEdicion.getIdProducto()) {
                             productoEnEdicion = pAct;
                             listaVariantesEnEdicion.setAll(pAct.getVariantes());
@@ -394,8 +400,9 @@ public class MenuController {
                     renderizarCheckboxesModificadores(seleccionadosPrevios);
                 }
                 actualizarBadgePersonalizacion();
-            });
-        }).start();
+            },
+            e -> LOGGER.log(Level.FINE, "Error cargando menú desde BD", e)
+        );
     }
 
     public void cargarEnFormulario(Producto p) {

@@ -7,7 +7,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
 import com.foodcore.service.MantenimientoService;
 import com.foodcore.util.ConexionBD;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -120,31 +120,25 @@ public class MantenimientoBDController {
     // ==========================================================
     @FXML
     public void cargarProductos() {
-        new Thread(() -> {
-            try {
-                List<Producto> prods = service.listarProductos();
-                Platform.runLater(() -> {
-                    listaProductos.setAll(prods);
-                    cmbRecetaPlato.setItems(FXCollections.observableArrayList(prods));
-                });
-            } catch (Exception e) {
-                mostrarAlerta("Error", "No se pudo cargar productos: " + e.getMessage(), Alert.AlertType.ERROR);
-            }
-        }).start();
+        UiAsyncExecutor.ejecutarAsync(
+            service::listarProductos,
+            prods -> {
+                listaProductos.setAll(prods);
+                cmbRecetaPlato.setItems(FXCollections.observableArrayList(prods));
+            },
+            e -> mostrarAlerta("Error", "No se pudo cargar productos: " + (e != null ? e.getMessage() : "desconocido"), Alert.AlertType.ERROR)
+        );
     }
 
     private void cargarCategorias() {
-        new Thread(() -> {
-            try {
-                List<Categoria> cats = service.listarCategorias();
-                Platform.runLater(() -> {
-                    listaCategorias.setAll(cats);
-                    cmbProdCategoria.setItems(listaCategorias);
-                });
-            } catch (Exception e) {
-                LOGGER.error("Error al cargar categorías de productos", e);
-            }
-        }).start();
+        UiAsyncExecutor.ejecutarAsync(
+            service::listarCategorias,
+            cats -> {
+                listaCategorias.setAll(cats);
+                cmbProdCategoria.setItems(listaCategorias);
+            },
+            e -> LOGGER.error("Error al cargar categorías de productos", e)
+        );
     }
 
     @FXML
@@ -205,17 +199,14 @@ public class MantenimientoBDController {
     // ==========================================================
     @FXML
     public void cargarInsumos() {
-        new Thread(() -> {
-            try {
-                List<Insumo> ins = service.listarInsumos();
-                Platform.runLater(() -> {
-                    listaInsumos.setAll(ins);
-                    cmbAgregarInsumo.setItems(FXCollections.observableArrayList(ins));
-                });
-            } catch (Exception e) {
-                mostrarAlerta("Error", "No se pudo cargar insumos: " + e.getMessage(), Alert.AlertType.ERROR);
-            }
-        }).start();
+        UiAsyncExecutor.ejecutarAsync(
+            service::listarInsumos,
+            ins -> {
+                listaInsumos.setAll(ins);
+                cmbAgregarInsumo.setItems(FXCollections.observableArrayList(ins));
+            },
+            e -> mostrarAlerta("Error", "No se pudo cargar insumos: " + (e != null ? e.getMessage() : "desconocido"), Alert.AlertType.ERROR)
+        );
     }
 
     @FXML
@@ -291,14 +282,11 @@ public class MantenimientoBDController {
     }
 
     private void cargarRecetaPlato(int idProducto) {
-        new Thread(() -> {
-            try {
-                List<Receta> componentes = service.listarRecetaPorProducto(idProducto);
-                Platform.runLater(() -> listaRecetas.setAll(componentes));
-            } catch (Exception e) {
-                LOGGER.error("Error al cargar receta para el producto {}", idProducto, e);
-            }
-        }).start();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> service.listarRecetaPorProducto(idProducto),
+            listaRecetas::setAll,
+            e -> LOGGER.error("Error al cargar receta para el producto {}", idProducto, e)
+        );
     }
 
     @FXML

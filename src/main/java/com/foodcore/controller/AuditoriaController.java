@@ -5,7 +5,7 @@ import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.model.RegistroAuditoria;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -102,22 +102,24 @@ public class AuditoriaController {
 
     @FXML
     public void cargarEventosAuditoria() {
-        new Thread(() -> {
-            List<RegistroAuditoria> items = new ArrayList<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                items = auditoriaDAO.listarUltimosEventos(conn, 100);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Error cargando auditoria", e);
-            }
-
-            final List<RegistroAuditoria> resultadoFinal = items;
-            Platform.runLater(() -> {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<RegistroAuditoria> items = new ArrayList<>();
+                try (Connection conn = ConexionBD.getConnection()) {
+                    items = auditoriaDAO.listarUltimosEventos(conn, 100);
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Error cargando auditoria", e);
+                }
+                return items;
+            },
+            resultadoFinal -> {
                 todosEventos.clear();
                 todosEventos.addAll(resultadoFinal);
                 actualizarComboMozos();
                 aplicarFiltroMozo(cmbFiltroMozo != null ? cmbFiltroMozo.getValue() : null);
-            });
-        }).start();
+            },
+            e -> LOGGER.log(Level.FINE, "Error cargando auditoria", e)
+        );
     }
 
     private void actualizarComboMozos() {

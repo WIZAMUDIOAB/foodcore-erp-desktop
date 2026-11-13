@@ -164,19 +164,22 @@ public class InventarioController {
     }
 
     public void cargarInventarioDesdeBD() {
-        new Thread(() -> {
-            List<Insumo> lista = new ArrayList<>();
-            try (Connection conn = ConexionBD.getConnection()) {
-                lista = insumoDAO.listarTodos(conn);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Cargando insumos de respaldo", e);
-            }
-            final List<Insumo> resultado = lista;
-            Platform.runLater(() -> {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Insumo> lista = new ArrayList<>();
+                try (Connection conn = ConexionBD.getConnection()) {
+                    lista = insumoDAO.listarTodos(conn);
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Cargando insumos de respaldo", e);
+                }
+                return lista;
+            },
+            resultado -> {
                 todosLosInsumos.setAll(resultado);
                 aplicarFiltro();
-            });
-        }).start();
+            },
+            e -> LOGGER.log(Level.FINE, "Cargando insumos de respaldo", e)
+        );
     }
 
     @FXML

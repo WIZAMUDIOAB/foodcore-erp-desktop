@@ -6,6 +6,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
+import com.foodcore.util.UiAsyncExecutor;
 import com.google.gson.JsonObject;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -290,18 +291,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("EN_PREPARACION");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+                        }
+                        if (idPedido > 0) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
+                        }
                     }
-                    if (idPedido > 0) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -314,24 +317,26 @@ public class ComandaCardController {
         aplicarEstadoVisual("LISTO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
-                    }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
-                    }
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
+                        }
 
-                    JsonObject json = new JsonObject();
-                    json.addProperty("accion", "PLATO_DESPACHADO");
-                    json.addProperty("idPedido", idPedido);
-                    json.addProperty("idDetallePedido", idDetallePedido);
-                    ServidorSockets.getInstance().emitirMensaje(json);
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex);
-                }
-            }).start();
+                        JsonObject json = new JsonObject();
+                        json.addProperty("accion", "PLATO_DESPACHADO");
+                        json.addProperty("idPedido", idPedido);
+                        json.addProperty("idDetallePedido", idDetallePedido);
+                        ServidorSockets.getInstance().emitirMensaje(json);
+                    }
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -348,18 +353,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("ENTREGADO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                        }
                     }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex)
+            );
         }
 
         if (onDespachadoListener != null) {

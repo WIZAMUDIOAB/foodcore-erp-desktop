@@ -158,38 +158,41 @@ public class DeliveryController {
     }
 
     public void cargarPedidosDelivery() {
-        new Thread(() -> {
-            List<Pedido> pedidos = new ArrayList<>();
-            String sql = "SELECT * FROM pedido WHERE tipo_pedido = 'DELIVERY' ORDER BY id_pedido DESC LIMIT 50";
-            try (Connection conn = ConexionBD.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Pedido p = new Pedido();
-                    p.setIdPedido(rs.getInt("id_pedido"));
-                    p.setNumeroMesa(rs.getString("numero_mesa"));
-                    p.setTipoPedido("DELIVERY");
-                    p.setClienteNombre(rs.getString("cliente_nombre"));
-                    p.setClienteTelefono(rs.getString("cliente_telefono"));
-                    p.setClienteDireccion(rs.getString("cliente_direccion"));
-                    p.setClienteReferencia(rs.getString("cliente_referencia"));
-                    p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
-                    p.setTotal(rs.getBigDecimal("total"));
-                    p.setEstado(rs.getString("estado"));
-                    p.setRepartidor(rs.getString("repartidor"));
-                    pedidos.add(p);
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                List<Pedido> pedidos = new ArrayList<>();
+                String sql = "SELECT * FROM pedido WHERE tipo_pedido = 'DELIVERY' ORDER BY id_pedido DESC LIMIT 50";
+                try (Connection conn = ConexionBD.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(sql);
+                     ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Pedido p = new Pedido();
+                        p.setIdPedido(rs.getInt("id_pedido"));
+                        p.setNumeroMesa(rs.getString("numero_mesa"));
+                        p.setTipoPedido("DELIVERY");
+                        p.setClienteNombre(rs.getString("cliente_nombre"));
+                        p.setClienteTelefono(rs.getString("cliente_telefono"));
+                        p.setClienteDireccion(rs.getString("cliente_direccion"));
+                        p.setClienteReferencia(rs.getString("cliente_referencia"));
+                        p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
+                        p.setTotal(rs.getBigDecimal("total"));
+                        p.setEstado(rs.getString("estado"));
+                        p.setRepartidor(rs.getString("repartidor"));
+                        pedidos.add(p);
+                    }
+                } catch (java.sql.SQLException | RuntimeException e) {
+                    LOGGER.log(Level.FINE, "Error cargando pedidos delivery", e);
                 }
-            } catch (java.sql.SQLException | RuntimeException e) {
-                LOGGER.log(Level.FINE, "Error cargando pedidos delivery", e);
-            }
-
-            Platform.runLater(() -> {
+                return pedidos;
+            },
+            pedidos -> {
                 listaPedidosDelivery.setAll(pedidos);
                 if (lblContadorBadge != null) {
                     lblContadorBadge.setText(pedidos.size() + " ACTIVOS");
                 }
-            });
-        }).start();
+            },
+            e -> LOGGER.log(Level.FINE, "Error cargando pedidos delivery", e)
+        );
     }
 
     @FXML
