@@ -461,7 +461,7 @@ public class MozoOrderController {
                     Pedido actualizado = pedidoService.agregarItemsAPedido(idObjetivo, adicionales);
                     BigDecimal totalConfirmado = pedidoService.calcularTotal(idObjetivo);
                     actualizado.setTotal(totalConfirmado);
-                    new ImpresoraTermicaService().imprimirComandaCocina(actualizado, adicionales, null);
+                    new ImpresoraTermicaService().imprimirComandaPorCategorias(actualizado, adicionales);
                     return actualizado;
                 },
                 actualizado -> {
@@ -522,7 +522,7 @@ public class MozoOrderController {
                 if (worker.isOnline()) {
                     try {
                         Pedido registrado = pedidoService.registrarPedidoYEnviarComanda(pedido, snapshot);
-                        new ImpresoraTermicaService().imprimirComandaCocina(registrado, snapshot, null);
+                        new ImpresoraTermicaService().imprimirComandaPorCategorias(registrado, snapshot);
                         return "ONLINE";
                     } catch (Exception exNet) {
                         worker.guardarPedidoEnOutboxLocal(pedido, snapshot);

@@ -2,15 +2,20 @@ package com.foodcore.controller;
 
 import com.foodcore.App;
 import com.foodcore.model.Asistencia;
+import com.foodcore.model.CumplimientoTurnoFila;
+import com.foodcore.model.ReporteCumplimientoTurno;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -20,6 +25,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -46,6 +55,7 @@ public class AsistenciaController {
     @FXML private DatePicker dpFecha;
     @FXML private ComboBox<String> cmbFiltroEstado;
     @FXML private Label lblTotalRegistros;
+    @FXML private Button btnReporteCumplimiento;
     @FXML private Button btnAbrirKiosco;
     @FXML private Button btnExportarPlanilla;
 
@@ -59,6 +69,8 @@ public class AsistenciaController {
     @FXML private TableColumn<Asistencia, String> colHoras;
     @FXML private TableColumn<Asistencia, String> colExtra;
     @FXML private TableColumn<Asistencia, String> colTardanza;
+    @FXML private TableColumn<Asistencia, String> colTurnoProgramado;
+    @FXML private TableColumn<Asistencia, String> colCumplimientoTurno;
     @FXML private TableColumn<Asistencia, String> colEstado;
     @FXML private TableColumn<Asistencia, String> colObservaciones;
 
@@ -72,6 +84,7 @@ public class AsistenciaController {
         cmbFiltroEstado.setValue("TODOS");
 
         configurarTabla();
+        AnimationUtils.attachTactileFeedback(btnReporteCumplimiento);
         AnimationUtils.attachTactileFeedback(btnAbrirKiosco);
         AnimationUtils.attachTactileFeedback(btnExportarPlanilla);
 
@@ -114,6 +127,39 @@ public class AsistenciaController {
         colTardanza.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getTardanzaMinutos() > 0 ? c.getValue().getTardanzaMinutos() + " min" : "0 min"));
 
+        if (colTurnoProgramado != null) {
+            colTurnoProgramado.setCellValueFactory(c -> new SimpleStringProperty(
+                    c.getValue().getTurnoProgramadoTexto() != null
+                            ? c.getValue().getTurnoProgramadoTexto() : "Sin turno"));
+        }
+        if (colCumplimientoTurno != null) {
+            colCumplimientoTurno.setCellValueFactory(c -> new SimpleStringProperty(
+                    c.getValue().getCumplimientoTurno() != null
+                            ? c.getValue().getCumplimientoTurno() : "SIN TURNO"));
+            colCumplimientoTurno.setCellFactory(col -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                        return;
+                    }
+                    setText(item);
+                    String upper = item.toUpperCase();
+                    if (upper.startsWith("A TIEMPO")) {
+                        setStyle("-fx-background-color: #E8F6EE; -fx-text-fill: #059669; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                    } else if (upper.startsWith("ATRASO") || upper.contains("FALTA")) {
+                        setStyle("-fx-background-color: #FEE2E2; -fx-text-fill: #DC2626; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                    } else if (upper.startsWith("SALIDA")) {
+                        setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                    } else {
+                        setStyle("-fx-background-color: #EEF0F3; -fx-text-fill: #5C6470; -fx-alignment: CENTER; -fx-background-radius: 12;");
+                    }
+                }
+            });
+        }
+
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getEstado()));
         colEstado.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -150,7 +196,7 @@ public class AsistenciaController {
     public void cargarDatos() {
         LocalDate f = dpFecha.getValue() != null ? dpFecha.getValue() : LocalDate.now();
         try {
-            List<Asistencia> todos = asistenciaService.listarAsistenciaPorFecha(f);
+            List<Asistencia> todos = asistenciaService.listarAsistenciaConCumplimiento(f);
 
             // Calcular KPIs sobre todos los marcajes del día
             long activos = todos.stream().filter(a -> a.getHoraSalidaTimestamp() == null).count();
@@ -236,5 +282,118 @@ public class AsistenciaController {
                 lblTotalRegistros.setText("Error exportando planilla: " + ex.getMessage());
             }
         }
+    }
+
+    @FXML
+    public void handleAbrirReporteAtrasosYFaltas() {
+        LocalDate ref = dpFecha != null && dpFecha.getValue() != null ? dpFecha.getValue() : LocalDate.now();
+        LocalDate desde = ref.minusDays(6);
+        UiAsyncExecutor.ejecutarAsync(
+                () -> asistenciaService.generarReporteAtrasosYFaltas(desde, ref),
+                rep -> {
+                    Stage modal = construirStageReporteCumplimiento(rep);
+                    modal.show();
+                },
+                ex -> {
+                    LOGGER.log(Level.WARNING, "Error al generar reporte de atrasos y faltas", ex);
+                    if (lblTotalRegistros != null) {
+                        lblTotalRegistros.setText("Error generando reporte: " + ex.getMessage());
+                    }
+                }
+        );
+    }
+
+    /** Construye el modal con el cruce turno_programado vs asistencia para exhibir Atrasos y Faltas. */
+    public Stage construirStageReporteCumplimiento(ReporteCumplimientoTurno rep) {
+        Stage stage = new Stage();
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.setTitle("Reporte de Atrasos y Faltas vs Turnos Programados");
+
+        VBox root = new VBox(14);
+        root.setPadding(new Insets(18));
+        root.setPrefSize(920, 560);
+        root.getStyleClass().add("app-canvas");
+
+        Label title = new Label("Cumplimiento de Turnos Programados (" + rep.desde() + " al " + rep.hasta() + ")");
+        title.getStyleClass().add("view-heading");
+
+        Label kpis = new Label(String.format(
+                "Turnos evaluados: %d   |   A tiempo: %d   |   Atrasos: %d   |   Faltas: %d",
+                rep.totalTurnosEvaluados(), rep.totalPuntuales(), rep.totalAtrasos(), rep.totalFaltas()));
+        kpis.getStyleClass().add("badge-pill-accent");
+
+        TableView<CumplimientoTurnoFila> tbl = new TableView<>();
+        VBox.setVgrow(tbl, Priority.ALWAYS);
+
+        TableColumn<CumplimientoTurnoFila, String> cFecha = new TableColumn<>("Fecha");
+        cFecha.setCellValueFactory(d -> new SimpleStringProperty(
+                d.getValue().fecha() + " (" + d.getValue().diaSemana() + ")"));
+
+        TableColumn<CumplimientoTurnoFila, String> cColab = new TableColumn<>("Colaborador");
+        cColab.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().nombreColaborador()));
+
+        TableColumn<CumplimientoTurnoFila, String> cTurno = new TableColumn<>("Turno Prog.");
+        cTurno.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().horarioProgramadoTexto()));
+
+        TableColumn<CumplimientoTurnoFila, String> cIngreso = new TableColumn<>("Ingreso Real");
+        cIngreso.setCellValueFactory(d -> new SimpleStringProperty(
+                d.getValue().horaIngresoReal() != null
+                        ? d.getValue().horaIngresoReal().format(DateTimeFormatter.ofPattern("HH:mm"))
+                        : "Sin marcaje"));
+
+        TableColumn<CumplimientoTurnoFila, String> cEstado = new TableColumn<>("Cumplimiento");
+        cEstado.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().estadoCumplimiento()));
+        cEstado.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+                setText(item);
+                if ("A TIEMPO".equalsIgnoreCase(item)) {
+                    setStyle("-fx-text-fill: #059669; -fx-font-weight: bold;");
+                } else {
+                    setStyle("-fx-text-fill: #DC2626; -fx-font-weight: bold;");
+                }
+            }
+        });
+
+        tbl.getColumns().addAll(List.of(cFecha, cColab, cTurno, cIngreso, cEstado));
+        tbl.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        tbl.getItems().setAll(rep.todasLasFilas());
+
+        Button btnExportar = new Button("Exportar Reporte (.xlsx)");
+        btnExportar.getStyleClass().add("btn-primary");
+        btnExportar.setOnAction(ev -> {
+            Optional<File> dest = ExportFileChooserHelper.elegirDestinoExportacion(
+                    btnExportar,
+                    "Exportar Reporte Atrasos y Faltas",
+                    "REPORTE_ATRASOS_FALTAS_" + rep.hasta() + ".xlsx",
+                    FormatoExportacion.EXCEL);
+            dest.ifPresent(file -> {
+                try {
+                    asistenciaService.exportarReporteCumplimientoExcel(rep, file);
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "Error exportando reporte cumplimiento", ex);
+                }
+            });
+        });
+
+        Button btnCerrar = new Button("Cerrar");
+        btnCerrar.getStyleClass().add("btn-secondary");
+        btnCerrar.setOnAction(ev -> stage.close());
+
+        HBox footer = new HBox(10, new Region(), btnExportar, btnCerrar);
+        HBox.setHgrow(footer.getChildren().get(0), Priority.ALWAYS);
+        footer.setAlignment(Pos.CENTER_RIGHT);
+
+        root.getChildren().addAll(title, kpis, tbl, footer);
+        Scene scene = new Scene(root);
+        App.applyStylesheets(scene);
+        stage.setScene(scene);
+        return stage;
     }
 }

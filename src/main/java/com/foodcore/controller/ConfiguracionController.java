@@ -1,28 +1,49 @@
 package com.foodcore.controller;
 
+import com.foodcore.dao.ConfiguracionImpresoraDAO;
+import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
+import com.foodcore.model.ConfiguracionImpresora;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador de Configuración del Restaurante e Impresora Térmica según SPEC-FOODCORE-v1.2 (§2.4):
- * Persiste Nombre, Dirección, Teléfono, RUC opcional y Nombre de Impresora para el
- * Comprobante Interno No Fiscal.
+ * Controlador de Configuración del Restaurante y Múltiples Impresoras por Categoría (v5.2.0):
+ * persiste datos generales del comprobante y asigna {@code Categoría -> Impresora Windows}.
  */
 public class ConfiguracionController {
 
     private static final Logger LOGGER = Logger.getLogger(ConfiguracionController.class.getName());
+
+    public record CategoriaOpcion(int idCategoria, String nombre) {
+        @Override
+        public String toString() {
+            return nombre;
+        }
+    }
 
     @FXML private StackPane rootConfigStack;
     @FXML private TextField txtNombreRestaurante;
@@ -32,10 +53,152 @@ public class ConfiguracionController {
     @FXML private TextField txtImpresora;
     @FXML private Button btnGuardarConfig;
 
+    @FXML private ComboBox<CategoriaOpcion> cmbCategoriaImpresora;
+    @FXML private ComboBox<String> cmbNombreImpresoraWindows;
+    @FXML private Button btnAsignarImpresora;
+    @FXML private Button btnQuitarImpresora;
+    @FXML private TableView<ConfiguracionImpresora> tblRuteoImpresoras;
+    @FXML private TableColumn<ConfiguracionImpresora, String> colCatNombre;
+    @FXML private TableColumn<ConfiguracionImpresora, String> colImpWindows;
+    @FXML private TableColumn<ConfiguracionImpresora, String> colImpEstado;
+
+    private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
+    private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
+
     @FXML
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnGuardarConfig);
+        AnimationUtils.attachTactileFeedback(btnAsignarImpresora);
+        AnimationUtils.attachTactileFeedback(btnQuitarImpresora);
+        configurarTablaImpresoras();
+        poblarImpresorasDetectadas();
         cargarConfiguracion();
+        cargarRuteoImpresorasAsync();
+    }
+
+    private void configurarTablaImpresoras() {
+        if (tblRuteoImpresoras == null) {
+            return;
+        }
+        colCatNombre.setCellValueFactory(d -> new SimpleStringProperty(
+                d.getValue().getNombreCategoria() != null ? d.getValue().getNombreCategoria()
+                        : "Categoría #" + d.getValue().getIdCategoriaProducto()));
+        colImpWindows.setCellValueFactory(d -> new SimpleStringProperty(
+                d.getValue().getNombreImpresoraWindows() != null ? d.getValue().getNombreImpresoraWindows() : ""));
+        colImpEstado.setCellValueFactory(d -> new SimpleStringProperty(
+                d.getValue().isActiva() ? "ACTIVA" : "INACTIVA"));
+        tblRuteoImpresoras.setItems(asignaciones);
+    }
+
+    private void poblarImpresorasDetectadas() {
+        if (cmbNombreImpresoraWindows == null) {
+            return;
+        }
+        Set<String> opciones = new LinkedHashSet<>();
+        opciones.addAll(ImpresoraTermicaService.listarImpresorasWindows());
+        opciones.add("Cocina");
+        opciones.add("Barra");
+        opciones.add("Parrilla");
+        opciones.add("Caja");
+        cmbNombreImpresoraWindows.getItems().setAll(opciones);
+    }
+
+    public void cargarRuteoImpresorasAsync() {
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    Map<Integer, String> categorias = configImpresoraDAO.obtenerMapaNombreCategorias(conn);
+                    List<ConfiguracionImpresora> lista = configImpresoraDAO.listarTodas(conn);
+                    Map<String, Object> res = new LinkedHashMap<>();
+                    res.put("categorias", categorias);
+                    res.put("lista", lista);
+                    return res;
+                }
+            },
+            res -> {
+                @SuppressWarnings("unchecked")
+                Map<Integer, String> categorias = (Map<Integer, String>) res.get("categorias");
+                @SuppressWarnings("unchecked")
+                List<ConfiguracionImpresora> lista = (List<ConfiguracionImpresora>) res.get("lista");
+
+                if (cmbCategoriaImpresora != null && categorias != null) {
+                    cmbCategoriaImpresora.getItems().clear();
+                    for (Map.Entry<Integer, String> entry : categorias.entrySet()) {
+                        cmbCategoriaImpresora.getItems().add(new CategoriaOpcion(entry.getKey(), entry.getValue()));
+                    }
+                    if (!cmbCategoriaImpresora.getItems().isEmpty() && cmbCategoriaImpresora.getValue() == null) {
+                        cmbCategoriaImpresora.getSelectionModel().selectFirst();
+                    }
+                }
+                asignaciones.setAll(lista != null ? lista : List.of());
+            },
+            ex -> LOGGER.log(Level.WARNING, "No se pudo cargar ruteo de impresoras por categoría", ex)
+        );
+    }
+
+    @FXML
+    public void handleAsignarImpresoraCategoria(ActionEvent event) {
+        CategoriaOpcion catSel = cmbCategoriaImpresora != null ? cmbCategoriaImpresora.getValue() : null;
+        String impresoraRaw = cmbNombreImpresoraWindows != null
+                ? cmbNombreImpresoraWindows.getEditor().getText() : null;
+        if ((impresoraRaw == null || impresoraRaw.isBlank()) && cmbNombreImpresoraWindows != null) {
+            impresoraRaw = cmbNombreImpresoraWindows.getValue();
+        }
+        if (catSel == null || impresoraRaw == null || impresoraRaw.isBlank()) {
+            AnimationUtils.mostrarToast(rootConfigStack,
+                    "Seleccione una categoría e indique el nombre de la impresora Windows.", true);
+            return;
+        }
+        final String impresoraFinal = impresoraRaw.trim();
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    configImpresoraDAO.guardarOActualizar(conn, catSel.idCategoria(), impresoraFinal);
+                }
+            },
+            () -> {
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Impresora asignada: " + catSel.nombre() + " → " + impresoraFinal, false);
+                cargarRuteoImpresorasAsync();
+            },
+            ex -> AnimationUtils.mostrarToast(rootConfigStack,
+                    "No se pudo guardar asignación de impresora: " + ex.getMessage(), true)
+        );
+    }
+
+    @FXML
+    public void handleEliminarImpresoraCategoria(ActionEvent event) {
+        ConfiguracionImpresora sel = tblRuteoImpresoras != null
+                ? tblRuteoImpresoras.getSelectionModel().getSelectedItem() : null;
+        if (sel == null) {
+            AnimationUtils.mostrarToast(rootConfigStack, "Seleccione una asignación en la tabla para quitar.", true);
+            return;
+        }
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> {
+                try (Connection conn = ConexionBD.getConnection()) {
+                    configImpresoraDAO.eliminarPorCategoria(conn, sel.getIdCategoriaProducto());
+                }
+            },
+            () -> {
+                AnimationUtils.mostrarToast(rootConfigStack, "Asignación de impresora eliminada.", false);
+                cargarRuteoImpresorasAsync();
+            },
+            ex -> AnimationUtils.mostrarToast(rootConfigStack,
+                    "Error al quitar asignación: " + ex.getMessage(), true)
+        );
+    }
+
+    public ObservableList<ConfiguracionImpresora> getAsignaciones() {
+        return asignaciones;
+    }
+
+    public ComboBox<CategoriaOpcion> getCmbCategoriaImpresora() {
+        return cmbCategoriaImpresora;
+    }
+
+    public ComboBox<String> getCmbNombreImpresoraWindows() {
+        return cmbNombreImpresoraWindows;
     }
 
     public void cargarConfiguracion() {

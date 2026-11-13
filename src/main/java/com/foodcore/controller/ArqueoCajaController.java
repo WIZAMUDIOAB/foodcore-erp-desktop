@@ -2,7 +2,10 @@ package com.foodcore.controller;
 
 import com.foodcore.model.Caja;
 import com.foodcore.model.CategoriaGasto;
+import com.foodcore.model.DesgloseFiscal;
+import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
+import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
@@ -27,6 +30,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
@@ -74,8 +78,17 @@ public class ArqueoCajaController {
     @FXML private TableColumn<FilaCierreZ, String> colOperaciones;
     @FXML private TableColumn<FilaCierreZ, String> colTotalMedio;
 
+    @FXML private Label lblResumenStockCritico;
+    @FXML private TableView<InsumoCriticoTurno> tblStockCritico;
+    @FXML private TableColumn<InsumoCriticoTurno, String> colCritInsumo;
+    @FXML private TableColumn<InsumoCriticoTurno, String> colCritUnidad;
+    @FXML private TableColumn<InsumoCriticoTurno, String> colCritActual;
+    @FXML private TableColumn<InsumoCriticoTurno, String> colCritMinimo;
+    @FXML private TableColumn<InsumoCriticoTurno, String> colCritEstado;
+
     private final CajaService cajaService = new CajaService();
     private final ObservableList<FilaCierreZ> itemsCierreZ = FXCollections.observableArrayList();
+    private final ObservableList<InsumoCriticoTurno> itemsStockCritico = FXCollections.observableArrayList();
     private volatile List<CategoriaGasto> categoriasGastoCache = List.of();
     private Caja cajaActual;
     private BigDecimal totalEsperado = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -83,6 +96,7 @@ public class ArqueoCajaController {
     @FXML
     public void initialize() {
         configurarTablaCierreZ();
+        configurarTablaStockCritico();
         AnimationUtils.attachTactileFeedback(btnRegistrarGasto);
         AnimationUtils.attachTactileFeedback(btnCerrarTurno);
         cargarDatosCaja();
@@ -129,6 +143,37 @@ public class ArqueoCajaController {
         tblCierreZ.setItems(itemsCierreZ);
     }
 
+    private void configurarTablaStockCritico() {
+        if (tblStockCritico == null) {
+            return;
+        }
+        colCritInsumo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().nombre()));
+        colCritUnidad.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().unidadMedida()));
+        colCritActual.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().stockActual().setScale(DesgloseFiscal.ESCALA_STOCK, RoundingMode.HALF_UP).toPlainString()));
+        colCritMinimo.setCellValueFactory(c -> new SimpleStringProperty(
+                c.getValue().stockMinimo().setScale(DesgloseFiscal.ESCALA_STOCK, RoundingMode.HALF_UP).toPlainString()));
+        colCritEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().nivel()));
+        colCritEstado.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+                setText(item);
+                if ("AGOTADO".equalsIgnoreCase(item)) {
+                    setStyle("-fx-text-fill: #DC2626; -fx-font-weight: bold;");
+                } else {
+                    setStyle("-fx-text-fill: #D97706; -fx-font-weight: bold;");
+                }
+            }
+        });
+        tblStockCritico.setItems(itemsStockCritico);
+    }
+
     private record EstadoCajaCarga(
             boolean abierta,
             Caja activa,
@@ -136,7 +181,8 @@ public class ArqueoCajaController {
             BigDecimal ventas,
             BigDecimal gastos,
             BigDecimal esperado,
-            ObservableList<FilaCierreZ> desgloseZ) {
+            ObservableList<FilaCierreZ> desgloseZ,
+            List<InsumoCriticoTurno> criticos) {
     }
 
     public void cargarDatosCaja() {
@@ -146,6 +192,12 @@ public class ArqueoCajaController {
                     categoriasGastoCache = List.copyOf(cajaService.listarCategoriasGastoActivas());
                 } catch (Exception exCat) {
                     LOGGER.log(Level.FINE, "Aviso cargando categorías de gasto", exCat);
+                }
+                List<InsumoCriticoTurno> criticos = List.of();
+                try {
+                    criticos = cajaService.obtenerInsumosCriticosTurno();
+                } catch (Exception exInv) {
+                    LOGGER.log(Level.FINE, "Aviso cargando inventario crítico del relevo", exInv);
                 }
                 Optional<Caja> opt = cajaService.obtenerCajaActiva();
                 if (opt.isPresent()) {
@@ -158,15 +210,15 @@ public class ArqueoCajaController {
                     BigDecimal esperado = apertura.add(ventas).subtract(gastos).setScale(2, RoundingMode.HALF_UP);
                     List<MovimientoCaja> gastosDetallados = cajaService.listarGastosTurno(activa.getIdCaja());
                     ObservableList<FilaCierreZ> desgloseZ = consultarDesgloseCierreZ(activa.getIdCaja(), gastos, gastosDetallados);
-                    return new EstadoCajaCarga(true, activa, apertura, ventas, gastos, esperado, desgloseZ);
+                    return new EstadoCajaCarga(true, activa, apertura, ventas, gastos, esperado, desgloseZ, criticos);
                 }
-                return new EstadoCajaCarga(false, null, null, null, null, null, FXCollections.observableArrayList());
+                return new EstadoCajaCarga(false, null, null, null, null, null, FXCollections.observableArrayList(), criticos);
             },
             estado -> {
                 if (estado.abierta()) {
                     aplicarEstadoCajaAbierta(
                         estado.activa(), estado.apertura(), estado.ventas(),
-                        estado.gastos(), estado.esperado(), estado.desgloseZ()
+                        estado.gastos(), estado.esperado(), estado.desgloseZ(), estado.criticos()
                     );
                 } else {
                     aplicarEstadoCajaCerrada();
@@ -251,7 +303,8 @@ public class ArqueoCajaController {
                                           BigDecimal ventas,
                                           BigDecimal gastos,
                                           BigDecimal esperado,
-                                          ObservableList<FilaCierreZ> desgloseZ) {
+                                          ObservableList<FilaCierreZ> desgloseZ,
+                                          List<InsumoCriticoTurno> criticos) {
         this.cajaActual = activa;
         this.totalEsperado = esperado;
 
@@ -272,6 +325,18 @@ public class ArqueoCajaController {
         calcularDiferencia();
 
         itemsCierreZ.setAll(desgloseZ);
+        itemsStockCritico.setAll(criticos != null ? criticos : List.of());
+        if (lblResumenStockCritico != null) {
+            long agotados = itemsStockCritico.stream().filter(InsumoCriticoTurno::isAgotado).count();
+            long minimos = itemsStockCritico.size() - agotados;
+            if (itemsStockCritico.isEmpty()) {
+                lblResumenStockCritico.setText("STOCK COMPLETO");
+                lblResumenStockCritico.getStyleClass().setAll("badge-pill-success");
+            } else {
+                lblResumenStockCritico.setText(agotados + " AGOTADO(S) · " + minimos + " MÍNIMO");
+                lblResumenStockCritico.getStyleClass().setAll("badge-pill-danger");
+            }
+        }
 
         panelApertura.setVisible(false);
         panelApertura.setManaged(false);
@@ -477,57 +542,105 @@ public class ArqueoCajaController {
 
     private void mostrarConfirmacionCierreModal(BigDecimal fisico) {
         if (rootCajaStack == null) {
-            ejecutarCierreEfectivo(fisico);
+            ejecutarCierreEfectivo(fisico, null);
             return;
         }
 
         BigDecimal dif = fisico.subtract(totalEsperado).setScale(2, RoundingMode.HALF_UP);
+        long agotados = itemsStockCritico.stream().filter(InsumoCriticoTurno::isAgotado).count();
+        long minimos = itemsStockCritico.size() - agotados;
+
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(16);
-        card.setMaxWidth(420);
-        card.setMaxHeight(260);
+        VBox card = new VBox(14);
+        card.setMaxWidth(480);
+        card.setMaxHeight(340);
         card.getStyleClass().add("modal-dialog-surface");
 
-        Label lblTitle = new Label("Confirmar cierre de turno");
+        Label lblTitle = new Label("Confirmar Cierre de Turno y Relevo");
         lblTitle.getStyleClass().add("text-h1");
 
-        Label lblSub = new Label("Se emitirá el Cierre Z definitivo para " + cajaActual.getNombreCaja()
-            + " con efectivo contado S/ " + fisico + " (Diferencia: S/ " + dif + ").");
+        Label lblSub = new Label("Se emitirá el Cierre Z para " + cajaActual.getNombreCaja()
+            + " con efectivo S/ " + fisico + " (Diferencia: S/ " + dif + ").");
         lblSub.getStyleClass().add("text-body-secondary");
         lblSub.setWrapText(true);
+
+        Label lblAlertaInv = new Label(itemsStockCritico.isEmpty()
+            ? "Inventario OK: sin insumos agotados ni en stock mínimo. Se generará Acta de Entrega PDF."
+            : String.format("Alerta de relevo: %d insumo(s) agotado(s) y %d en mínimo se incluirán en el Acta PDF.",
+                    agotados, minimos));
+        lblAlertaInv.getStyleClass().add(itemsStockCritico.isEmpty() ? "badge-pill-success" : "badge-pill-danger");
+        lblAlertaInv.setWrapText(true);
+
+        TextField txtRelevo = new TextField();
+        txtRelevo.setPromptText("Nombre del cajero entrante (relevo opcional)");
+        txtRelevo.getStyleClass().add("input-field");
 
         Button btnCancelar = new Button("Cancelar");
         btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootCajaStack.getChildren().remove(backdrop));
 
-        Button btnConfirmar = new Button("Confirmar Cierre Z");
+        Button btnConfirmar = new Button("Confirmar Cierre Z y Generar Acta PDF");
         btnConfirmar.getStyleClass().add("btn-primary");
         btnConfirmar.setOnAction(ev -> {
             rootCajaStack.getChildren().remove(backdrop);
-            ejecutarCierreEfectivo(fisico);
+            ejecutarCierreEfectivo(fisico, txtRelevo.getText());
         });
 
         HBox actions = new HBox(12, btnCancelar, btnConfirmar);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        card.getChildren().addAll(lblTitle, lblSub, actions);
+        card.getChildren().addAll(lblTitle, lblSub, lblAlertaInv, txtRelevo, actions);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);
     }
 
-    private void ejecutarCierreEfectivo(BigDecimal fisico) {
-        try {
-            int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-            cajaService.cerrarTurnoCaja(cajaActual.getIdCaja(), idUsuario, fisico);
-            AnimationUtils.mostrarToast(rootCajaStack, "Turno cerrado y Cierre Z registrado exitosamente.", false);
-            cargarDatosCaja();
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error al cerrar turno de caja", e);
-            AnimationUtils.mostrarToast(rootCajaStack, "No se pudo cerrar el turno: " + e.getMessage(), true);
-        }
+    private void ejecutarCierreEfectivo(BigDecimal fisico, String responsableEntrante) {
+        Usuario usr = AuthService.getUsuarioSesionActual();
+        int idUsuario = usr != null ? usr.getIdUsuario() : 1;
+        String respSalida = usr != null && usr.getNombreEmpleado() != null && !usr.getNombreEmpleado().isBlank()
+                ? usr.getNombreEmpleado()
+                : (usr != null ? usr.getUsername() : "Cajero Saliente");
+        int idCajaCerrar = cajaActual.getIdCaja();
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> cajaService.cerrarTurnoConActaPdf(
+                    idCajaCerrar, idUsuario, fisico, respSalida, responsableEntrante, null),
+            res -> {
+                String nombrePdf = res.archivoActaPdf() != null ? res.archivoActaPdf().getName() : "Acta_Turno.pdf";
+                AnimationUtils.mostrarToast(rootCajaStack,
+                        "Turno cerrado · Acta PDF generada: " + nombrePdf, false);
+                cargarDatosCaja();
+            },
+            e -> {
+                LOGGER.log(Level.WARNING, "Error al cerrar turno de caja", e);
+                AnimationUtils.mostrarToast(rootCajaStack,
+                        "No se pudo cerrar el turno: " + (e != null ? e.getMessage() : "desconocido"), true);
+            }
+        );
+    }
+
+    /** Ejecuta cierre síncrono con ruta PDF explícita para pruebas integrales del Acta de Entrega. */
+    public CajaService.ResultadoCierreConActa ejecutarCierreConActaArchivoSync(
+            BigDecimal fisico, String respEntrante, File destinoPdf) throws Exception {
+        Usuario usr = AuthService.getUsuarioSesionActual();
+        int idUsuario = usr != null ? usr.getIdUsuario() : 1;
+        String respSalida = usr != null ? usr.getUsername() : "Cajero Saliente";
+        return cajaService.cerrarTurnoConActaPdf(
+                cajaActual.getIdCaja(), idUsuario, fisico, respSalida, respEntrante, destinoPdf);
+    }
+
+    /** Pobla el arqueo y el panel de stock crítico directamente para pruebas de interfaz sin BD. */
+    public void aplicarVistaArqueoPrueba(Caja activa,
+                                         BigDecimal apertura,
+                                         BigDecimal ventas,
+                                         BigDecimal gastos,
+                                         BigDecimal esperado,
+                                         ObservableList<FilaCierreZ> desgloseZ,
+                                         List<InsumoCriticoTurno> criticos) {
+        aplicarEstadoCajaAbierta(activa, apertura, ventas, gastos, esperado, desgloseZ, criticos);
     }
 
     public BigDecimal getTotalEsperado() {
@@ -536,5 +649,9 @@ public class ArqueoCajaController {
 
     public ObservableList<FilaCierreZ> getItemsCierreZ() {
         return itemsCierreZ;
+    }
+
+    public ObservableList<InsumoCriticoTurno> getItemsStockCritico() {
+        return itemsStockCritico;
     }
 }
