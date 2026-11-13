@@ -50,6 +50,7 @@ public class VentaService {
     private final PedidoDAO pedidoDAO;
     private final ComboDAO comboDAO;
     private final AutorizacionService autorizacionService = new AutorizacionService();
+    private final FidelizacionService fidelizacionService = new FidelizacionService();
 
     public VentaService() {
         this(new JdbcTransactionManager(), new VentaDAOImpl(), new CajaDAOImpl(), new InsumoDAOImpl(), new PedidoDAOImpl(), new ComboDAOImpl());
@@ -159,6 +160,7 @@ public class VentaService {
             Venta v = new Venta(0, null, 1, idUsuario, 1,
                 desglose.getSubtotalGravado(), desglose.getIgv(), desglose.getTotal(),
                 medio, desglose.getTotal(), BigDecimal.ZERO);
+            v.setAplicarFidelizacion(false);
             v.setIdempotencyKey(UUID.randomUUID().toString());
             ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SP" + correlativo,
                 String.valueOf(System.currentTimeMillis() % 1000000), desglose.getTotal());
@@ -304,22 +306,34 @@ public class VentaService {
         if (descuentoAplicado.compareTo(BigDecimal.ZERO) < 0 || descuentoAplicado.compareTo(sumaLineas) >= 0) {
             throw new NegocioException("El descuento aplicado es inválido respecto al total de la venta.");
         }
-        BigDecimal totalNeto = sumaLineas.subtract(descuentoAplicado);
+        BigDecimal totalTrasDescuentoComercial = sumaLineas.subtract(descuentoAplicado);
 
-        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(totalNeto);
+        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(totalTrasDescuentoComercial);
+
+        // El canje de puntos reduce únicamente el Total a pagar sin alterar la base imponible ni el IGV (SPEC v5.0.0 §2.3)
+        BigDecimal descuentoPuntos = venta.getDescuentoPuntos() != null
+            ? venta.getDescuentoPuntos().setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO)
+            : BigDecimal.ZERO;
+        if (descuentoPuntos.compareTo(BigDecimal.ZERO) < 0 || descuentoPuntos.compareTo(totalTrasDescuentoComercial) > 0) {
+            throw new NegocioException("El descuento por canje de puntos excede el importe de la venta.");
+        }
+        BigDecimal totalFinal = totalTrasDescuentoComercial.subtract(descuentoPuntos)
+            .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+
         venta.setSubtotal(desglose.getSubtotalGravado());
         venta.setIgv(desglose.getIgv());
         venta.setDescuento(descuentoAplicado);
-        venta.setTotal(desglose.getTotal());
+        venta.setDescuentoPuntos(descuentoPuntos);
+        venta.setTotal(totalFinal);
 
         if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
             BigDecimal sumaPagos = BigDecimal.ZERO;
             for (PagoSplit p : pagosDivididos) {
                 sumaPagos = sumaPagos.add(p.monto());
             }
-            if (sumaPagos.setScale(2, RoundingMode.HALF_EVEN).compareTo(desglose.getTotal()) != 0) {
+            if (sumaPagos.setScale(2, RoundingMode.HALF_EVEN).compareTo(totalFinal) != 0) {
                 throw new NegocioException("La suma de los pagos divididos (S/ " + sumaPagos
-                    + ") no coincide con el total de la venta (S/ " + desglose.getTotal() + ").");
+                    + ") no coincide con el total de la venta (S/ " + totalFinal + ").");
             }
         }
 
@@ -410,7 +424,7 @@ public class VentaService {
                 String medioPago = venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO";
                 MovimientoCaja movVenta = new MovimientoCaja(
                     0, idCaja, idUsrMov,
-                    "VENTA", medioPago, desglose.getTotal(),
+                    "VENTA", medioPago, totalFinal,
                     "Cobro Venta #" + idVenta + " [" + medioPago + "]"
                 );
                 cajaDAO.registrarMovimiento(conn, movVenta);
@@ -419,7 +433,7 @@ public class VentaService {
             // 3.6 Emitir Comprobante de Pago
             if (comprobante != null) {
                 comprobante.setIdVenta(idVenta);
-                comprobante.setTotal(desglose.getTotal());
+                comprobante.setTotal(totalFinal);
                 ventaDAO.insertarComprobante(conn, comprobante);
             }
 
@@ -428,10 +442,22 @@ public class VentaService {
                 pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
             }
 
+            // 3.8 Fidelización CRM (v5.0.0): redimir puntos usados y acumular puntos ganados en historial_puntos ACID
+            if (venta.getIdCliente() != null && venta.getIdCliente() > 0 && venta.isAplicarFidelizacion()) {
+                if (venta.getPuntosACanjear() > 0 && descuentoPuntos.compareTo(BigDecimal.ZERO) > 0) {
+                    fidelizacionService.canjearPuntosConfiguradosEnVenta(
+                            conn, venta.getIdCliente(), idVenta, venta.getPuntosACanjear(), descuentoPuntos
+                    );
+                }
+                if (totalFinal.compareTo(BigDecimal.ZERO) > 0) {
+                    fidelizacionService.acumularPuntosPorVenta(conn, venta.getIdCliente(), idVenta, totalFinal);
+                }
+            }
+
             if (idemKey != null) {
                 REGISTRO_IDEMPOTENCIA.put(idemKey, venta);
             }
-            LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + desglose.getTotal() + ").");
+            LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + totalFinal + ").");
             return venta;
         });
     }
