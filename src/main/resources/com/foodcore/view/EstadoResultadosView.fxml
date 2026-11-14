@@ -32,6 +32,7 @@
                                                     <children>
                                                         <Label styleClass="view-heading" text="Estado de Resultados (P&amp;L)" />
                                                         <Label styleClass="badge-pill-accent" text="FINANZAS v4.9" />
+                                                        <Label fx:id="lblEstadoCierreMes" styleClass="badge-pill-success" text="PERÍODO ABIERTO" />
                                                     </children>
                                                 </HBox>
                                                 <Label styleClass="view-subheading" text="Ingresos brutos, costo de ventas por recetas/Kardex, gastos operativos categorizados, utilidad bruta y utilidad neta" />
@@ -39,6 +40,7 @@
                                         </VBox>
                                         <HBox alignment="CENTER_RIGHT" spacing="8.0">
                                             <children>
+                                                <Button fx:id="btnCerrarMes" mnemonicParsing="false" onAction="#handleCerrarMes" styleClass="btn-destructive" text="Cerrar Mes" />
                                                 <Button fx:id="btnExportarPnlPdf" mnemonicParsing="false" onAction="#handleExportarPdf" styleClass="btn-primary" text="Exportar PDF" />
                                                 <Button fx:id="btnExportarPnlExcel" mnemonicParsing="false" onAction="#handleExportarExcel" styleClass="btn-secondary" text="Exportar Excel (.xlsx)" />
                                             </children>

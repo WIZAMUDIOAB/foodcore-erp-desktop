@@ -14,6 +14,9 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
@@ -38,6 +41,7 @@ public class ComandaCardController {
 
     @FXML private VBox cardContainer;
     @FXML private Label lblNumeroMesa;
+    @FXML private Label lblPrioridadBadge;
     @FXML private Label lblTiempo;
     @FXML private Label lblNumeroComanda;
     @FXML private VBox vboxItems;
@@ -48,12 +52,14 @@ public class ComandaCardController {
 
     private int idPedido = 0;
     private int idDetallePedido = 0;
+    private int prioridad = 0;
     private int segundosTranscurridos = 0;
     private String estadoActual = "PENDIENTE";
     private String colorUmbral = "GREEN";
     private Timeline timer;
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
+    private BiConsumer<Integer, Integer> onDragReordenarListener;
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
 
     public static String determinarColorPorSegundos(long segundos) {
@@ -75,7 +81,75 @@ public class ComandaCardController {
         if (btnDespachar != null && (btnDespachar.getId() == null || btnDespachar.getId().isBlank())) {
             btnDespachar.setId("btnListo");
         }
+        configurarDragAndDrop();
         iniciarTemporizador();
+    }
+
+    private void configurarDragAndDrop() {
+        if (cardContainer == null) {
+            return;
+        }
+        cardContainer.setOnDragDetected(ev -> {
+            if (idDetallePedido <= 0 || "ENTREGADO".equalsIgnoreCase(estadoActual)) {
+                return;
+            }
+            Dragboard db = cardContainer.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putString("KDS_DET:" + idDetallePedido);
+            db.setContent(content);
+            cardContainer.setOpacity(0.65);
+            ev.consume();
+        });
+        cardContainer.setOnDragDone(ev -> {
+            cardContainer.setOpacity(1.0);
+            ev.consume();
+        });
+        cardContainer.setOnDragOver(ev -> {
+            Dragboard db = ev.getDragboard();
+            if (db != null && db.hasString() && db.getString().startsWith("KDS_DET:")) {
+                ev.acceptTransferModes(TransferMode.MOVE);
+            }
+            ev.consume();
+        });
+        cardContainer.setOnDragDropped(ev -> {
+            Dragboard db = ev.getDragboard();
+            boolean ok = false;
+            if (db != null && db.hasString() && db.getString().startsWith("KDS_DET:") && idDetallePedido > 0) {
+                try {
+                    int idOrigen = Integer.parseInt(db.getString().substring("KDS_DET:".length()));
+                    if (idOrigen > 0 && idOrigen != idDetallePedido && onDragReordenarListener != null) {
+                        onDragReordenarListener.accept(idOrigen, idDetallePedido);
+                        ok = true;
+                    }
+                } catch (NumberFormatException ignored) {
+                    ok = false;
+                }
+            }
+            ev.setDropCompleted(ok);
+            ev.consume();
+        });
+    }
+
+    public void setPrioridad(int prioridad) {
+        this.prioridad = prioridad;
+        if (lblPrioridadBadge != null) {
+            if (prioridad > 0) {
+                lblPrioridadBadge.setText("P" + prioridad);
+                lblPrioridadBadge.setVisible(true);
+                lblPrioridadBadge.setManaged(true);
+            } else {
+                lblPrioridadBadge.setVisible(false);
+                lblPrioridadBadge.setManaged(false);
+            }
+        }
+    }
+
+    public int getPrioridad() {
+        return prioridad;
+    }
+
+    public void setOnDragReordenarListener(BiConsumer<Integer, Integer> listener) {
+        this.onDragReordenarListener = listener;
     }
 
     public void initDataItem(DetallePedido item, Consumer<DetallePedido> onIniciar, Consumer<DetallePedido> onListo) {
@@ -105,6 +179,12 @@ public class ComandaCardController {
     }
 
     public void initData(String mesa, String comanda, String estado) {
+        if (lblTiempo != null) {
+            lblTiempo.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        }
+        if (lblPrioridadBadge != null) {
+            lblPrioridadBadge.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        }
         if (mesa != null && (mesa.toUpperCase().contains("DELIVERY") || mesa.toUpperCase().contains("DL-"))) {
             lblNumeroMesa.setText("DELIVERY " + mesa);
             lblNumeroMesa.getStyleClass().add("badge-pill-accent");

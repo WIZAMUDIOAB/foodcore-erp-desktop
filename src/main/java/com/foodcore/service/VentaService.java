@@ -1,12 +1,16 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.VentaDAOImpl;
+import com.foodcore.util.ConexionBD;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.exception.CajaCerradaException;
+import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.exception.StockInsuficienteException;
 import com.foodcore.model.*;
 import com.foodcore.model.enums.Permiso;
@@ -17,10 +21,14 @@ import com.foodcore.tx.impl.JdbcTransactionManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -35,12 +43,27 @@ import java.util.logging.Logger;
 public class VentaService {
 
     private static final Logger LOGGER = Logger.getLogger(VentaService.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private static final Map<String, Venta> REGISTRO_IDEMPOTENCIA = new ConcurrentHashMap<>();
 
     public record PagoSplit(String medioPago, BigDecimal monto) {
     }
 
     public record SubcuentaItems(List<DetalleVenta> detalles, String medioPago) {
+    }
+
+    /** Resultado de una devolución parcial de ítems en venta existente (v5.2.0). */
+    public record ResultadoDevolucionParcial(
+            int idVenta,
+            List<Integer> idsDetalleDevueltos,
+            BigDecimal montoReembolso,
+            BigDecimal nuevoTotalVenta,
+            String nuevoEstadoVenta,
+            int cantidadInsumosRevertidos
+    ) {
+        public ResultadoDevolucionParcial {
+            idsDetalleDevueltos = idsDetalleDevueltos != null ? List.copyOf(idsDetalleDevueltos) : List.of();
+        }
     }
 
     private final TransactionManager tx;
@@ -51,6 +74,9 @@ public class VentaService {
     private final ComboDAO comboDAO;
     private final AutorizacionService autorizacionService = new AutorizacionService();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
+    private final CierreContableService cierreContableService = new CierreContableService();
+    private final SupervisorAutorizacionService supervisorAutorizacionService = new SupervisorAutorizacionService();
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
 
     public VentaService() {
         this(new JdbcTransactionManager(), new VentaDAOImpl(), new CajaDAOImpl(), new InsumoDAOImpl(), new PedidoDAOImpl(), new ComboDAOImpl());
@@ -187,14 +213,46 @@ public class VentaService {
             throw new NegocioException("ID de venta inválido para anulación.");
         }
         String glosaMotivo = (motivo != null && !motivo.isBlank()) ? motivo.trim() : "Anulación operativa POS";
+        ejecutarAnulacionTx(idVenta, platoYaPreparado, sesion.getIdUsuario(), glosaMotivo, null, sesion.getNombreCompleto());
+    }
 
+    /**
+     * Anulación en Modo Supervisor (v5.2.0): permite a un cajero sin {@link Permiso#VENTA_ANULAR}
+     * anular una venta previa autenticación PIN de un {@code SUPERVISOR} o {@code ADMIN},
+     * registrando trazabilidad explícita de ambos usuarios en {@code auditoria}.
+     */
+    public Usuario anularVentaConSupervisor(int idVenta,
+                                            boolean platoYaPreparado,
+                                            SesionUsuario sesionCajero,
+                                            String pinSupervisor,
+                                            String motivo) throws NegocioException, SQLException {
+        if (sesionCajero == null || sesionCajero.haExpirado(LocalDateTime.now())) {
+            throw new NegocioException(CodigoError.ACCESO_DENEGADO,
+                    "Debe iniciar sesión vigente para solicitar una anulación supervisada.");
+        }
+        if (idVenta <= 0) {
+            throw new NegocioException("ID de venta inválido para anulación.");
+        }
+        Usuario supervisor = supervisorAutorizacionService.autenticarSupervisorPorPin(pinSupervisor);
+        String glosaMotivo = (motivo != null && !motivo.isBlank()) ? motivo.trim() : "Anulación supervisada POS";
+        ejecutarAnulacionTx(idVenta, platoYaPreparado, sesionCajero.getIdUsuario(), glosaMotivo, supervisor, sesionCajero.getNombreCompleto());
+        return supervisor;
+    }
+
+    private void ejecutarAnulacionTx(int idVenta,
+                                     boolean platoYaPreparado,
+                                     long idUsuarioSolicitante,
+                                     String glosaMotivo,
+                                     Usuario supervisorAutorizante,
+                                     String usernameSolicitante) throws NegocioException, SQLException {
         tx.executeVoidChecked(conn -> {
             int idCaja;
             BigDecimal totalVenta;
             String metodoPago;
             String estadoActual;
+            LocalDateTime fechaVenta = null;
 
-            String sqlVenta = "SELECT id_caja, total, metodo_pago, estado FROM venta WHERE id_venta = ? FOR UPDATE";
+            String sqlVenta = "SELECT id_caja, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
             try (PreparedStatement ps = conn.prepareStatement(sqlVenta)) {
                 ps.setInt(1, idVenta);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -205,30 +263,50 @@ public class VentaService {
                     totalVenta = rs.getBigDecimal("total");
                     metodoPago = rs.getString("metodo_pago");
                     estadoActual = rs.getString("estado");
+                    Timestamp ts = rs.getTimestamp("fecha_hora");
+                    if (ts != null) {
+                        fechaVenta = ts.toLocalDateTime();
+                    }
                 }
             }
 
             if ("ANULADA".equalsIgnoreCase(estadoActual)) {
                 throw new NegocioException("La venta #" + idVenta + " ya fue anulada previamente.");
             }
+            cierreContableService.validarPeriodoAbierto(conn, fechaVenta);
 
             try (PreparedStatement psUpd = conn.prepareStatement("UPDATE venta SET estado = 'ANULADA' WHERE id_venta = ?")) {
                 psUpd.setInt(1, idVenta);
                 psUpd.executeUpdate();
             }
 
-            int idUsuario = (int) sesion.getIdUsuario();
+            int idUsuarioMov = (int) idUsuarioSolicitante;
+            String sufijoSupervisor = supervisorAutorizante != null
+                    ? " [Autorizado por " + supervisorAutorizante.getUsername() + "]" : "";
             MovimientoCaja movAnulacion = new MovimientoCaja(
-                0, idCaja, idUsuario, "ANULACION",
+                0, idCaja, idUsuarioMov, "ANULACION",
                 metodoPago != null ? metodoPago : "EFECTIVO",
                 totalVenta.negate(),
-                "Anulación Venta #" + idVenta + ": " + glosaMotivo
+                "Anulación Venta #" + idVenta + ": " + glosaMotivo + sufijoSupervisor
             );
             cajaDAO.registrarMovimiento(conn, movAnulacion);
 
-            // Leer ítems vendidos y sus recetas (o componentes de combo) para revertir stock o registrar merma (§3.2, v4.8.0)
+            if (supervisorAutorizante != null) {
+                auditoriaDAO.registrarEventoSeguro(
+                        conn,
+                        supervisorAutorizante.getIdUsuario(),
+                        "ANULACION_VENTA_SUPERVISOR",
+                        "venta#" + idVenta,
+                        estadoActual + " (S/ " + totalVenta + ")",
+                        "ANULADA | Solicitante=" + (usernameSolicitante != null ? usernameSolicitante : "cajero#" + idUsuarioSolicitante)
+                                + " | Autorizante=" + supervisorAutorizante.getUsername()
+                                + " (" + supervisorAutorizante.getNombreRol() + ") | Motivo=" + glosaMotivo
+                );
+            }
+
+            // Leer ítems vendidos no devueltos y sus recetas (o componentes de combo) para revertir stock o registrar merma (§3.2, v4.8.0)
             Map<Long, BigDecimal> insumosAfectados = new TreeMap<>();
-            String sqlDet = "SELECT id_producto, id_combo, cantidad FROM detalle_venta WHERE id_venta = ?";
+            String sqlDet = "SELECT id_producto, id_combo, cantidad FROM detalle_venta WHERE id_venta = ? AND COALESCE(estado, 'COMPLETADO') <> 'DEVUELTO'";
             try (PreparedStatement psDet = conn.prepareStatement(sqlDet)) {
                 psDet.setInt(1, idVenta);
                 try (ResultSet rsDet = psDet.executeQuery()) {
@@ -246,13 +324,11 @@ public class VentaService {
                 long idIns = entry.getKey();
                 BigDecimal cantInsumo = entry.getValue();
                 if (!platoYaPreparado) {
-                    // Revertir al inventario porque el plato no llegó a cocinarse
                     insumoDAO.registrarMovimientoKardexAtomico(
-                        conn, idIns, "ENTRADA", cantInsumo, sesion.getIdUsuario(),
+                        conn, idIns, "ENTRADA", cantInsumo, idUsuarioSolicitante,
                         "Reversión por Anulación Venta #" + idVenta + " (No preparado)"
                     );
                 } else {
-                    // El plato ya fue cocinado: el descuento de venta ya ocurrió; registramos asiento de MERMA
                     Insumo ins = insumoDAO.obtenerPorId(conn, idIns);
                     BigDecimal saldoActual = ins != null ? ins.getStockActualDisponible() : BigDecimal.ZERO;
                     BigDecimal costo = ins != null && ins.getCostoUnitario() != null ? ins.getCostoUnitario() : BigDecimal.ZERO;
@@ -260,11 +336,203 @@ public class VentaService {
                     insumoDAO.registrarMovimientoInventario(conn, idIns, "MERMA", cantInsumo, obsMerma, idVenta);
                     KardexMovimiento kmMerma = new KardexMovimiento(
                         0L, idIns, "MERMA", cantInsumo.negate(), saldoActual, saldoActual,
-                        costo, "ANULACION", (long) idVenta, sesion.getIdUsuario(), obsMerma, LocalDateTime.now()
+                        costo, "ANULACION", (long) idVenta, idUsuarioSolicitante, obsMerma, LocalDateTime.now()
                     );
                     insumoDAO.insertarKardex(conn, kmMerma);
                 }
             }
+        });
+    }
+
+    /** Lista ventas del historial filtrables por rango de fechas y texto (v5.2.0). */
+    public List<Venta> listarVentasHistorial(LocalDate desde, LocalDate hasta, String textoBusqueda) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return ventaDAO.listarVentasConFiltro(conn, desde, hasta, textoBusqueda);
+        }
+    }
+
+    /** Lista los ítems de detalle de una venta con su estado de devolución (v5.2.0). */
+    public List<DetalleVenta> listarDetallesVenta(int idVenta) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return ventaDAO.listarDetallesPorVenta(conn, idVenta);
+        }
+    }
+
+    /**
+     * Ejecuta la devolución parcial atómica de ítems específicos de una venta (v5.2.0):
+     * marca {@code detalle_venta.estado = 'DEVUELTO'}, recalcula cabecera, registra egreso de caja,
+     * devuelve insumos al inventario con movimiento Kárdex {@code DEVOLUCION} y audita la operación.
+     */
+    public ResultadoDevolucionParcial devolverItemsParcial(int idVenta,
+                                                           List<Integer> idsDetalleADevolver,
+                                                           SesionUsuario sesion,
+                                                           String motivo) throws NegocioException, SQLException {
+        if (sesion == null || sesion.haExpirado(LocalDateTime.now())) {
+            throw new NegocioException(CodigoError.ACCESO_DENEGADO,
+                    "Debe iniciar sesión vigente para procesar devoluciones parciales.");
+        }
+        if (idVenta <= 0 || idsDetalleADevolver == null || idsDetalleADevolver.isEmpty()) {
+            throw new NegocioException(CodigoError.VALIDACION_ENTRADA,
+                    "Debe seleccionar una venta y al menos un ítem válido para devolver.");
+        }
+        Set<Integer> idsUnicos = new LinkedHashSet<>();
+        for (Integer idDet : idsDetalleADevolver) {
+            if (idDet != null && idDet > 0) {
+                idsUnicos.add(idDet);
+            }
+        }
+        if (idsUnicos.isEmpty()) {
+            throw new NegocioException(CodigoError.VALIDACION_ENTRADA,
+                    "Debe seleccionar al menos un ítem válido para devolver.");
+        }
+        String glosaMotivo = (motivo != null && !motivo.isBlank()) ? motivo.trim() : "Devolución parcial en POS";
+
+        return tx.executeChecked(conn -> {
+            int idCajaVenta;
+            BigDecimal totalActual;
+            String metodoPago;
+            String estadoVenta;
+            LocalDateTime fechaVenta = null;
+
+            String sqlVenta = "SELECT id_caja, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
+            try (PreparedStatement ps = conn.prepareStatement(sqlVenta)) {
+                ps.setInt(1, idVenta);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new NegocioException(CodigoError.RECURSO_NO_ENCONTRADO,
+                                "No se encontró la venta #" + idVenta + ".");
+                    }
+                    idCajaVenta = rs.getInt("id_caja");
+                    totalActual = rs.getBigDecimal("total") != null ? rs.getBigDecimal("total") : BigDecimal.ZERO;
+                    metodoPago = rs.getString("metodo_pago");
+                    estadoVenta = rs.getString("estado");
+                    Timestamp ts = rs.getTimestamp("fecha_hora");
+                    if (ts != null) {
+                        fechaVenta = ts.toLocalDateTime();
+                    }
+                }
+            }
+
+            if ("ANULADA".equalsIgnoreCase(estadoVenta)) {
+                throw new NegocioException("La venta #" + idVenta + " está ANULADA; no admite devoluciones parciales.");
+            }
+            cierreContableService.validarPeriodoAbierto(conn, fechaVenta);
+
+            List<DetalleVenta> todosDetalles = ventaDAO.listarDetallesPorVenta(conn, idVenta);
+            Map<Integer, DetalleVenta> mapaDetalles = new LinkedHashMap<>();
+            for (DetalleVenta d : todosDetalles) {
+                mapaDetalles.put(d.getIdDetalleVenta(), d);
+            }
+
+            BigDecimal subtotalDevuelto = BigDecimal.ZERO;
+            BigDecimal subtotalRestante = BigDecimal.ZERO;
+            List<DetalleVenta> aDevolver = new ArrayList<>();
+
+            for (Integer idReq : idsUnicos) {
+                DetalleVenta det = mapaDetalles.get(idReq);
+                if (det == null) {
+                    throw new NegocioException(CodigoError.RECURSO_NO_ENCONTRADO,
+                            "El ítem #" + idReq + " no pertenece a la venta #" + idVenta + ".");
+                }
+                if (det.isDevuelto()) {
+                    throw new NegocioException("El ítem '" + det.getNombreProducto() + "' ya fue devuelto previamente.");
+                }
+                aDevolver.add(det);
+                BigDecimal sub = det.getSubtotal() != null ? det.getSubtotal() : BigDecimal.ZERO;
+                subtotalDevuelto = subtotalDevuelto.add(sub);
+            }
+
+            for (DetalleVenta det : todosDetalles) {
+                if (!det.isDevuelto() && !idsUnicos.contains(det.getIdDetalleVenta())) {
+                    BigDecimal sub = det.getSubtotal() != null ? det.getSubtotal() : BigDecimal.ZERO;
+                    subtotalRestante = subtotalRestante.add(sub);
+                }
+            }
+
+            BigDecimal montoReembolso = DesgloseFiscal.normalizarMoneda(subtotalDevuelto.min(totalActual));
+            BigDecimal nuevoTotal = DesgloseFiscal.normalizarMoneda(totalActual.subtract(montoReembolso).max(BigDecimal.ZERO));
+            DesgloseFiscal desgloseRestante = nuevoTotal.compareTo(BigDecimal.ZERO) > 0
+                    ? DesgloseFiscal.desdeTotalConImpuestos(nuevoTotal)
+                    : null;
+            BigDecimal nuevoSubtotal = desgloseRestante != null ? desgloseRestante.getSubtotalGravado() : BigDecimal.ZERO;
+            BigDecimal nuevoIgv = desgloseRestante != null ? desgloseRestante.getIgv() : BigDecimal.ZERO;
+            String nuevoEstado = (subtotalRestante.compareTo(BigDecimal.ZERO) <= 0 || nuevoTotal.compareTo(BigDecimal.ZERO) <= 0)
+                    ? "ANULADA" : "COMPLETADA";
+
+            Map<Long, BigDecimal> insumosARevertir = new TreeMap<>();
+            for (DetalleVenta det : aDevolver) {
+                int actualizados = ventaDAO.marcarDetalleDevuelto(conn, det.getIdDetalleVenta(), glosaMotivo);
+                if (actualizados == 0) {
+                    throw new NegocioException("El ítem #" + det.getIdDetalleVenta() + " ya se encontraba devuelto.");
+                }
+                acumularInsumosParaLinea(conn, insumosARevertir, det.getIdCombo(), det.getIdProducto(), det.getCantidad());
+            }
+
+            ventaDAO.actualizarTotalesVentaPorDevolucion(conn, idVenta, nuevoSubtotal, nuevoIgv, nuevoTotal, nuevoEstado);
+
+            Optional<Caja> cajaActiva = cajaDAO.obtenerCajaAbierta(conn);
+            int idCajaEgreso = cajaActiva.map(Caja::getIdCaja).orElse(idCajaVenta);
+            MovimientoCaja movEgreso = new MovimientoCaja(
+                    0,
+                    idCajaEgreso,
+                    (int) sesion.getIdUsuario(),
+                    "EGRESO",
+                    metodoPago != null ? metodoPago : "EFECTIVO",
+                    montoReembolso,
+                    "Devolución parcial Venta #" + idVenta + " (" + aDevolver.size() + " ítem(s)): " + glosaMotivo
+            );
+            cajaDAO.registrarMovimiento(conn, movEgreso);
+
+            if (!insumosARevertir.isEmpty()) {
+                List<Long> idsOrdenados = new ArrayList<>(insumosARevertir.keySet());
+                Map<Long, BigDecimal> saldosAnteriores = insumoDAO.lockearPorIds(conn, idsOrdenados);
+                for (Long idIns : idsOrdenados) {
+                    BigDecimal cantRevertir = DesgloseFiscal.normalizarStock(insumosARevertir.get(idIns));
+                    BigDecimal saldoAnterior = saldosAnteriores.getOrDefault(idIns, BigDecimal.ZERO);
+                    BigDecimal saldoPosterior = DesgloseFiscal.normalizarStock(saldoAnterior.add(cantRevertir));
+                    insumoDAO.actualizarStock(conn, idIns, saldoPosterior);
+
+                    Insumo ins = insumoDAO.obtenerPorId(conn, idIns);
+                    BigDecimal costoUnit = (ins != null && ins.getCostoUnitario() != null)
+                            ? ins.getCostoUnitario() : BigDecimal.ZERO;
+                    String obsKardex = "DEVOLUCION parcial Venta #" + idVenta + ": " + glosaMotivo;
+                    insumoDAO.registrarMovimientoInventario(conn, idIns, "ENTRADA", cantRevertir, obsKardex, idVenta);
+                    KardexMovimiento km = new KardexMovimiento(
+                            0L,
+                            idIns,
+                            "DEVOLUCION",
+                            cantRevertir,
+                            saldoAnterior,
+                            saldoPosterior,
+                            costoUnit,
+                            "DEVOLUCION",
+                            (long) idVenta,
+                            sesion.getIdUsuario(),
+                            obsKardex,
+                            LocalDateTime.now()
+                    );
+                    insumoDAO.insertarKardex(conn, km);
+                }
+            }
+
+            auditoriaDAO.registrarEventoSeguro(
+                    conn,
+                    (int) sesion.getIdUsuario(),
+                    "DEVOLUCION_PARCIAL_VENTA",
+                    "venta#" + idVenta,
+                    "Total=S/ " + totalActual,
+                    "Reembolso=S/ " + montoReembolso + " | NuevoTotal=S/ " + nuevoTotal
+                            + " | Items=" + idsUnicos + " | Motivo=" + glosaMotivo
+            );
+
+            return new ResultadoDevolucionParcial(
+                    idVenta,
+                    List.copyOf(idsUnicos),
+                    montoReembolso,
+                    nuevoTotal,
+                    nuevoEstado,
+                    insumosARevertir.size()
+            );
         });
     }
 
@@ -339,6 +607,8 @@ public class VentaService {
 
         // 3. Ejecutar unidad de trabajo atómica ACID vía TransactionManager (§7.1, §9.1, R-09, R-10, R-11)
         return tx.executeChecked(conn -> {
+            cierreContableService.validarPeriodoAbierto(conn, venta.getFechaHora());
+
             Optional<Caja> cajaAbierta = cajaDAO.obtenerCajaAbierta(conn);
             if (cajaAbierta.isEmpty()) {
                 throw new CajaCerradaException();

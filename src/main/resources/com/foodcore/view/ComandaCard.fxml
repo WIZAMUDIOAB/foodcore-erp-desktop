@@ -15,6 +15,7 @@
             <Label fx:id="lblNumeroComanda" styleClass="text-caption-muted" text="PED-0012 · ITEM-01" />
         </VBox>
         <Region HBox.hgrow="ALWAYS" />
+        <Label fx:id="lblPrioridadBadge" managed="false" styleClass="badge-pill-accent" text="PRIO" visible="false" />
         <Label fx:id="lblTiempo" styleClass="kds-timer-green" text="00:00 min" />
     </HBox>
 

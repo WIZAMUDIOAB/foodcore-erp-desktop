@@ -1,6 +1,7 @@
 package com.foodcore.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +13,11 @@ public class DetalleVenta {
     private int cantidad;
     private BigDecimal precioUnitario;
     private BigDecimal subtotal;
+
+    // Estado y auditoría de devoluciones parciales (v5.2.0)
+    private String estado = "COMPLETADO";
+    private LocalDateTime fechaDevolucion;
+    private String motivoDevolucion;
 
     // Campo descriptivo y personalización POS (v4.8.0)
     private String nombreProducto;
@@ -87,6 +93,17 @@ public class DetalleVenta {
 
     public String getComboComponentesTexto() { return comboComponentesTexto; }
     public void setComboComponentesTexto(String comboComponentesTexto) { this.comboComponentesTexto = comboComponentesTexto; }
+
+    public String getEstado() { return estado != null ? estado : "COMPLETADO"; }
+    public void setEstado(String estado) { this.estado = estado != null ? estado : "COMPLETADO"; }
+
+    public LocalDateTime getFechaDevolucion() { return fechaDevolucion; }
+    public void setFechaDevolucion(LocalDateTime fechaDevolucion) { this.fechaDevolucion = fechaDevolucion; }
+
+    public String getMotivoDevolucion() { return motivoDevolucion; }
+    public void setMotivoDevolucion(String motivoDevolucion) { this.motivoDevolucion = motivoDevolucion; }
+
+    public boolean isDevuelto() { return "DEVUELTO".equalsIgnoreCase(getEstado()); }
 
     @Override
     public String toString() {

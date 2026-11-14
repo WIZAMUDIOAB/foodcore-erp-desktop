@@ -54,11 +54,13 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
@@ -67,6 +69,7 @@ import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -633,8 +636,12 @@ public class VentaController {
             if (btnDescuento != null && !autorizacionService.tienePermiso(sesion, Permiso.VENTA_DESCUENTO)) {
                 btnDescuento.setDisable(true);
             }
-            if (btnAnularVenta != null && !autorizacionService.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
-                btnAnularVenta.setDisable(true);
+            if (btnAnularVenta != null) {
+                // v5.2.0: El CAJERO mantiene habilitado Anular Venta; al pulsar solicita PIN de Supervisor
+                btnAnularVenta.setDisable(false);
+                if (!autorizacionService.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
+                    btnAnularVenta.setTooltip(new Tooltip("Modo Supervisor: requiere PIN de SUPERVISOR/ADMIN para anular"));
+                }
             }
         }
     }
@@ -1131,7 +1138,7 @@ public class VentaController {
                 if (registrado.getDetalles() != null && !registrado.getDetalles().isEmpty()) {
                     aplicarDetallesPedidoEnPOS(registrado.getDetalles());
                 }
-                new ImpresoraTermicaService().imprimirComandaCocina(registrado, detallesCocina, null);
+                new ImpresoraTermicaService().imprimirComandaPorCategorias(registrado, detallesCocina);
                 mostrarAlerta("Comanda Enviada",
                         "Orden #" + registrado.getIdPedido() + " enviada a Línea de Cocina (KDS) correctamente.",
                         Alert.AlertType.INFORMATION);
@@ -1140,7 +1147,7 @@ public class VentaController {
                 LOGGER.log(Level.FINE, "Envío KDS POS usando respaldo local/offline", ex);
             }
         }
-        new ImpresoraTermicaService().imprimirComandaCocina(pedido, detallesCocina, null);
+        new ImpresoraTermicaService().imprimirComandaPorCategorias(pedido, detallesCocina);
         mostrarAlerta("Comanda Enviada", "Orden enviada a Línea de Cocina (KDS) correctamente.", Alert.AlertType.INFORMATION);
     }
 
@@ -1255,15 +1262,110 @@ public class VentaController {
         return this.descuentoActivo;
     }
 
+    /** Modal estructurado para autorizar anulaciones desde caja en Modo Supervisor (v5.2.0). */
+    public record ModalModoSupervisorHandle(
+            Dialog<ButtonType> dialog,
+            VBox rootContenido,
+            TextField txtIdVenta,
+            PasswordField txtPinSupervisor,
+            TextField txtMotivo,
+            CheckBox chkPlatoPreparado
+    ) {
+    }
+
+    /** Construye el modal de Modo Supervisor sin bloquear el hilo UI para uso interactivo y pruebas FX. */
+    public ModalModoSupervisorHandle construirModalModoSupervisor(int idVentaPrellenado) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Modo Supervisor — Autorización de Anulación");
+        dialog.setHeaderText(null);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(18));
+        root.setPrefWidth(430);
+        root.setStyle("-fx-background-color: #FFFFFF;");
+
+        Label badge = new Label("AUTORIZACIÓN DE SUPERVISOR / ADMIN REQUERIDA");
+        badge.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #92400E; "
+                + "-fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 6;");
+
+        Label lblSub = new Label("Su rol actual no tiene permiso directo para anular ventas. "
+                + "Solicite a un Supervisor o Administrador ingresar su PIN para autorizar y auditar la operación.");
+        lblSub.setWrapText(true);
+        lblSub.setStyle("-fx-text-fill: #4B5563; -fx-font-size: 12px;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+
+        TextField txtId = new TextField(idVentaPrellenado > 0 ? String.valueOf(idVentaPrellenado) : "");
+        txtId.setPromptText("Ej. 1024");
+        txtId.setId("txtIdVentaSupervisor");
+
+        PasswordField txtPin = new PasswordField();
+        txtPin.setPromptText("PIN secreto de SUPERVISOR / ADMIN");
+        txtPin.setId("txtPinSupervisor");
+
+        TextField txtMotivo = new TextField();
+        txtMotivo.setPromptText("Motivo de anulación (obligatorio)");
+        txtMotivo.setId("txtMotivoSupervisor");
+
+        CheckBox chkMerma = new CheckBox("Plato ya preparado en cocina (registrar MERMA)");
+
+        grid.add(new Label("ID de Venta:"), 0, 0);
+        grid.add(txtId, 1, 0);
+        grid.add(new Label("PIN Supervisor:"), 0, 1);
+        grid.add(txtPin, 1, 1);
+        grid.add(new Label("Motivo:"), 0, 2);
+        grid.add(txtMotivo, 1, 2);
+        GridPane.setHgrow(txtId, Priority.ALWAYS);
+        GridPane.setHgrow(txtPin, Priority.ALWAYS);
+        GridPane.setHgrow(txtMotivo, Priority.ALWAYS);
+
+        root.getChildren().addAll(badge, lblSub, grid, chkMerma);
+
+        ButtonType btnConfirmar = new ButtonType("Autorizar y Anular Venta", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().setContent(root);
+        dialog.getDialogPane().getButtonTypes().setAll(btnConfirmar, ButtonType.CANCEL);
+
+        return new ModalModoSupervisorHandle(dialog, root, txtId, txtPin, txtMotivo, chkMerma);
+    }
+
     /**
-     * Anulación de Venta (§3.2 y v4.4.0 §5): exige permiso {@code VENTA_ANULAR} (Admin/Supervisor).
+     * Anulación de Venta (§3.2 y Modo Supervisor v5.2.0): si el usuario tiene {@code VENTA_ANULAR}
+     * procede directamente; si es {@code CAJERO}, abre modal de Modo Supervisor exigiendo PIN de SUPERVISOR/ADMIN.
      */
     @FXML
     public void handleAnularVenta(ActionEvent event) {
         Usuario usr = AuthService.getUsuarioSesionActual();
         SesionUsuario sesion = crearSesionActualPOS(usr);
         if (!autorizacionService.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
-            mostrarAlerta("Acceso Denegado", "El rol CAJERO no tiene permisos para anular ventas cerradas.", Alert.AlertType.ERROR);
+            ModalModoSupervisorHandle modal = construirModalModoSupervisor(0);
+            Optional<ButtonType> res = modal.dialog().showAndWait();
+            if (res.isPresent() && res.get().getButtonData() == ButtonBar.ButtonData.OK_DONE) {
+                String idRaw = modal.txtIdVenta().getText() != null ? modal.txtIdVenta().getText().trim() : "";
+                String pinSup = modal.txtPinSupervisor().getText() != null ? modal.txtPinSupervisor().getText().trim() : "";
+                String motivo = modal.txtMotivo().getText() != null ? modal.txtMotivo().getText().trim() : "";
+                boolean yaPreparado = modal.chkPlatoPreparado().isSelected();
+                if (idRaw.isEmpty()) {
+                    mostrarAlerta("Dato requerido", "Debe indicar el ID de la venta a anular.", Alert.AlertType.WARNING);
+                    return;
+                }
+                try {
+                    int idVenta = Integer.parseInt(idRaw);
+                    Usuario supervisor = ventaService.anularVentaConSupervisor(
+                            idVenta, yaPreparado, sesion, pinSup,
+                            motivo.isEmpty() ? "Anulación autorizada en caja (Modo Supervisor)" : motivo);
+                    String nomSup = supervisor.getNombreEmpleado() != null && !supervisor.getNombreEmpleado().isBlank()
+                            ? supervisor.getNombreEmpleado() : supervisor.getUsername();
+                    mostrarAlerta("Venta Anulada (Modo Supervisor)",
+                            "La venta #" + idVenta + " fue anulada correctamente.\n"
+                                    + "Autorizado por: " + nomSup + " (" + supervisor.getNombreRol() + ").",
+                            Alert.AlertType.INFORMATION);
+                } catch (Exception e) {
+                    mostrarAlerta("Autorización Denegada", e.getMessage(), Alert.AlertType.ERROR);
+                }
+            }
             return;
         }
         TextInputDialog dlg = new TextInputDialog();

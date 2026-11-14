@@ -49,6 +49,7 @@
                                     <Button fx:id="btnNavPOS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPOS" styleClass="sidebar-nav-button" text="💳 Punto de Venta (POS)" />
                                     <Button fx:id="btnNavKDS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKDS" styleClass="sidebar-nav-button" text="👨‍🍳 Cocina (KDS)" />
                                     <Button fx:id="btnNavCaja" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavCaja" styleClass="sidebar-nav-button" text="💵 Caja y Turnos" />
+                                    <Button fx:id="btnNavHistorialVentas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHistorialVentas" styleClass="sidebar-nav-button" text="🧾 Historial y Devoluciones" />
 
                                     <!-- Sección CRECIMIENTO COMERCIAL (Sub-Fase 4D v2.0) -->
                                     <Label fx:id="lblSecComercial" styleClass="sidebar-section-header" text="COMERCIAL Y MARKETING" />
@@ -78,6 +79,7 @@
                                     <!-- Sección BACKOFFICE -->
                                     <Label fx:id="lblSecBackoffice" styleClass="sidebar-section-header" text="BACKOFFICE" />
                                     <Button fx:id="btnNavInventario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavInventario" styleClass="sidebar-nav-button" text="📦 Inventario de Insumos" />
+                                    <Button fx:id="btnNavInventarioFisico" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavInventarioFisico" styleClass="sidebar-nav-button" text="📐 Toma de Inventario Físico" />
                                     <Button fx:id="btnNavMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenu" styleClass="sidebar-nav-button" text="🍽️ Menú y Platillos" />
                                     <Button fx:id="btnNavRecetas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRecetas" styleClass="sidebar-nav-button" text="📖 Recetas y Escandallo" />
                                     <Button fx:id="btnNavMermas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMermas" styleClass="sidebar-nav-button" text="📉 Registro de Mermas" />

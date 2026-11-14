@@ -20,11 +20,13 @@ public class Asistencia {
     private String tipoMarcaje = "DNI"; // DNI, PIN
     private String observaciones;
 
-    // Campos de visualización
+    // Campos de visualización y cruce de turnos (v5.2.0)
     private String nombreEmpleado;
     private String dniEmpleado;
     private String nombreUsuario;
     private String rol;
+    private String turnoProgramadoTexto;
+    private String cumplimientoTurno;
 
     public Asistencia() {
     }
@@ -207,5 +209,21 @@ public class Asistencia {
 
     public void setRol(String rol) {
         this.rol = rol;
+    }
+
+    public String getTurnoProgramadoTexto() {
+        return turnoProgramadoTexto;
+    }
+
+    public void setTurnoProgramadoTexto(String turnoProgramadoTexto) {
+        this.turnoProgramadoTexto = turnoProgramadoTexto;
+    }
+
+    public String getCumplimientoTurno() {
+        return cumplimientoTurno;
+    }
+
+    public void setCumplimientoTurno(String cumplimientoTurno) {
+        this.cumplimientoTurno = cumplimientoTurno;
     }
 }

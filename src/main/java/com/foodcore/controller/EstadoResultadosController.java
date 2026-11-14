@@ -1,8 +1,12 @@
 package com.foodcore.controller;
 
+import com.foodcore.model.CierreContable;
 import com.foodcore.model.EstadoResultadosReporte;
 import com.foodcore.model.EstadoResultadosReporte.GastoPorCategoria;
 import com.foodcore.model.EstadoResultadosReporte.LineaPnl;
+import com.foodcore.model.Usuario;
+import com.foodcore.service.AuthService;
+import com.foodcore.service.CierreContableService;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.util.AnimationUtils;
@@ -12,7 +16,9 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
@@ -50,9 +56,11 @@ public class EstadoResultadosController {
     @FXML private Button btnRangoHoy;
     @FXML private Button btnRangoMes;
     @FXML private Button btnRangoMesAnterior;
+    @FXML private Button btnCerrarMes;
     @FXML private Button btnExportarPnlPdf;
     @FXML private Button btnExportarPnlExcel;
     @FXML private Label lblEstadoPnl;
+    @FXML private Label lblEstadoCierreMes;
 
     @FXML private Label lblPnlIngresosBrutos;
     @FXML private Label lblPnlVentasDetalle;
@@ -79,19 +87,28 @@ public class EstadoResultadosController {
 
     private final FinanzasBiService finanzasBiService;
     private final ExportacionContableService exportacionService;
+    private final CierreContableService cierreContableService;
     private final ObservableList<LineaPnl> lineasPnl = FXCollections.observableArrayList();
     private final ObservableList<GastoPorCategoria> filasGastos = FXCollections.observableArrayList();
     private EstadoResultadosReporte ultimoReporte;
 
     public EstadoResultadosController() {
-        this(new FinanzasBiService(), new ExportacionContableService());
+        this(new FinanzasBiService(), new ExportacionContableService(), new CierreContableService());
     }
 
     public EstadoResultadosController(
             FinanzasBiService finanzasBiService,
             ExportacionContableService exportacionService) {
+        this(finanzasBiService, exportacionService, new CierreContableService());
+    }
+
+    public EstadoResultadosController(
+            FinanzasBiService finanzasBiService,
+            ExportacionContableService exportacionService,
+            CierreContableService cierreContableService) {
         this.finanzasBiService = finanzasBiService;
         this.exportacionService = exportacionService;
+        this.cierreContableService = cierreContableService;
     }
 
     @FXML
@@ -102,6 +119,7 @@ public class EstadoResultadosController {
 
         configurarTablas();
         AnimationUtils.attachTactileFeedback(btnConsultarPnl);
+        AnimationUtils.attachTactileFeedback(btnCerrarMes);
         AnimationUtils.attachTactileFeedback(btnExportarPnlPdf);
         AnimationUtils.attachTactileFeedback(btnExportarPnlExcel);
         cargarPnlAsync();
@@ -222,9 +240,17 @@ public class EstadoResultadosController {
         LocalDate desde = dpDesde.getValue() != null ? dpDesde.getValue() : LocalDate.now(ZONA_LIMA).withDayOfMonth(1);
         LocalDate hasta = dpHasta.getValue() != null ? dpHasta.getValue() : LocalDate.now(ZONA_LIMA);
         lblEstadoPnl.setText("Calculando P&L...");
+        YearMonth ym = YearMonth.from(desde);
         UiAsyncExecutor.ejecutarAsync(
-                () -> finanzasBiService.generarEstadoResultados(desde, hasta),
-                this::aplicarReportePnl,
+                () -> {
+                    EstadoResultadosReporte rep = finanzasBiService.generarEstadoResultados(desde, hasta);
+                    Optional<CierreContable> cierre = cierreContableService.obtenerCierre(ym.getYear(), ym.getMonthValue());
+                    return new Object[]{rep, cierre.orElse(null)};
+                },
+                pair -> {
+                    aplicarReportePnl((EstadoResultadosReporte) pair[0]);
+                    aplicarEstadoCierreVisual(ym, (CierreContable) pair[1]);
+                },
                 ex -> {
                     LOGGER.log(Level.WARNING, "Error generando Estado de Resultados (P&L)", ex);
                     lblEstadoPnl.setText("Error: " + ex.getMessage());
@@ -241,8 +267,84 @@ public class EstadoResultadosController {
     public void cargarPnlSincrono() throws Exception {
         LocalDate desde = dpDesde.getValue() != null ? dpDesde.getValue() : LocalDate.now(ZONA_LIMA).withDayOfMonth(1);
         LocalDate hasta = dpHasta.getValue() != null ? dpHasta.getValue() : LocalDate.now(ZONA_LIMA);
+        YearMonth ym = YearMonth.from(desde);
         EstadoResultadosReporte rep = finanzasBiService.generarEstadoResultados(desde, hasta);
+        Optional<CierreContable> cierre = cierreContableService.obtenerCierre(ym.getYear(), ym.getMonthValue());
         aplicarReportePnl(rep);
+        aplicarEstadoCierreVisual(ym, cierre.orElse(null));
+    }
+
+    public void aplicarEstadoCierreVisual(YearMonth ym, CierreContable cierre) {
+        String etiquetaPeriodo = String.format("%04d-%02d", ym.getYear(), ym.getMonthValue());
+        boolean cerrado = cierre != null && cierre.estaCerrado();
+        if (lblEstadoCierreMes != null) {
+            if (cerrado) {
+                lblEstadoCierreMes.setText("MES " + etiquetaPeriodo + " CERRADO (BLOQUEADO)");
+                lblEstadoCierreMes.getStyleClass().setAll("badge-pill-danger");
+            } else {
+                lblEstadoCierreMes.setText("MES " + etiquetaPeriodo + " ABIERTO");
+                lblEstadoCierreMes.getStyleClass().setAll("badge-pill-success");
+            }
+        }
+        if (btnCerrarMes != null) {
+            btnCerrarMes.setDisable(cerrado);
+        }
+    }
+
+    @FXML
+    public void handleCerrarMes() {
+        LocalDate ref = dpDesde != null && dpDesde.getValue() != null
+                ? dpDesde.getValue() : LocalDate.now(ZONA_LIMA);
+        YearMonth ym = YearMonth.from(ref);
+        String periodoTxt = String.format("%04d-%02d", ym.getYear(), ym.getMonthValue());
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "¿Desea ejecutar el Cierre Contable definitivo del período " + periodoTxt + "?\n"
+                        + "No se podrán registrar ventas, devoluciones parciales ni gastos operativos en ese mes.",
+                ButtonType.YES, ButtonType.NO);
+        confirm.setTitle("Cerrar Mes Contable — " + periodoTxt);
+        confirm.setHeaderText("Bloqueo contable irreversible del período");
+        Optional<ButtonType> ans = confirm.showAndWait();
+        if (ans.isEmpty() || ans.get() != ButtonType.YES) {
+            return;
+        }
+
+        Usuario usr = AuthService.getUsuarioSesionActual();
+        int idUsr = usr != null ? usr.getIdUsuario() : 1;
+        if (btnCerrarMes != null) {
+            btnCerrarMes.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+                () -> cierreContableService.cerrarMes(ym.getYear(), ym.getMonthValue(), idUsr,
+                        "Cierre contable ejecutado desde Estado de Resultados (P&L)"),
+                guardado -> {
+                    aplicarEstadoCierreVisual(ym, guardado);
+                    if (lblEstadoPnl != null) {
+                        lblEstadoPnl.setText("✓ Período " + periodoTxt + " cerrado contablemente.");
+                    }
+                    if (rootEstadoResultadosStack != null) {
+                        AnimationUtils.mostrarToast(rootEstadoResultadosStack,
+                                "Mes contable " + periodoTxt + " cerrado con éxito.", false);
+                    }
+                },
+                ex -> {
+                    if (btnCerrarMes != null) {
+                        btnCerrarMes.setDisable(false);
+                    }
+                    if (rootEstadoResultadosStack != null) {
+                        AnimationUtils.mostrarToast(rootEstadoResultadosStack,
+                                ex != null ? ex.getMessage() : "No se pudo cerrar el mes.", true);
+                    }
+                }
+        );
+    }
+
+    public Button getBtnCerrarMes() {
+        return btnCerrarMes;
+    }
+
+    public Label getLblEstadoCierreMes() {
+        return lblEstadoCierreMes;
     }
 
     private void aplicarReportePnl(EstadoResultadosReporte rep) {

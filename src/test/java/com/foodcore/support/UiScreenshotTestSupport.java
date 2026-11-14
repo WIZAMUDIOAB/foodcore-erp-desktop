@@ -70,7 +70,12 @@ public final class UiScreenshotTestSupport {
      * @throws IOException si falla la escritura en disco.
      */
     public static void capturarEvidencia(Parent root, String filename) throws IOException {
-        Files.createDirectories(EVIDENCE_DIR);
+        capturarEvidencia(EVIDENCE_DIR, root, filename);
+    }
+
+    /** Captura una vista JavaFX en PNG dentro de un directorio de evidencia específico. */
+    public static void capturarEvidencia(Path evidenceDir, Parent root, String filename) throws IOException {
+        Files.createDirectories(evidenceDir);
         root.applyCss();
         root.layout();
         normalizarAnimaciones(root);
@@ -85,7 +90,7 @@ public final class UiScreenshotTestSupport {
                 buffered.setRGB(x, y, reader.getArgb(x, y));
             }
         }
-        Path outFile = EVIDENCE_DIR.resolve(filename);
+        Path outFile = evidenceDir.resolve(filename);
         ImageIO.write(buffered, "png", outFile.toFile());
         assertTrue(Files.exists(outFile) && Files.size(outFile) > 2000,
                 "La captura PNG debe existir con contenido válido: " + outFile.toAbsolutePath());

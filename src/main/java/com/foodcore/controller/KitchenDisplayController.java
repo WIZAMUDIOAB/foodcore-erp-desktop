@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
 import com.foodcore.model.DetallePedido;
+import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
@@ -60,6 +61,7 @@ public class KitchenDisplayController {
     @FXML private Label lblContadorActivas;
 
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final PedidoService pedidoService = new PedidoService();
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
     private final Set<Integer> itemsDespachadosLocal = Collections.synchronizedSet(new HashSet<>());
     private final Set<Integer> itemsSimuladosLocal = Collections.synchronizedSet(new HashSet<>());
@@ -293,8 +295,10 @@ public class KitchenDisplayController {
             cardCtrl.initData(mesa, comanda, estado);
             cardCtrl.setIdPedido(idPedido);
             cardCtrl.setIdDetallePedido(idDetallePedido);
+            cardCtrl.setPrioridad(item.getPrioridad());
             cardCtrl.setSegundosTranscurridos(segundos);
             cardCtrl.agregarPlatoDetalle(item);
+            cardCtrl.setOnDragReordenarListener(this::reordenarTarjetaSobreDestino);
 
             cardCtrl.setOnEstadoCambiadoListener((ctrl, nuevoEstado) -> {
                 ubicarEnColumnaKanban(ctrl.getCardContainer(), nuevoEstado);
@@ -439,6 +443,91 @@ public class KitchenDisplayController {
         }
     }
 
+    /** Mueve la tarjeta origen a la posición de destino en el Kanban KDS y persiste prioridades (v5.2.0). */
+    public void reordenarTarjetaSobreDestino(int idDetalleOrigen, int idDetalleDestino) {
+        ComandaCardController destino = tarjetasActivas.get(idDetalleDestino);
+        if (destino == null || destino.getCardContainer() == null) {
+            return;
+        }
+        VBox col = resolverColumnaPadre(destino.getCardContainer());
+        if (col == null) {
+            return;
+        }
+        int idxDestino = col.getChildren().indexOf(destino.getCardContainer());
+        if (idxDestino >= 0) {
+            reordenarTarjetaManual(idDetalleOrigen, idxDestino, col);
+        }
+    }
+
+    /** Reubica una tarjeta KDS al índice indicado dentro de su columna y persiste el orden en BD. */
+    public void reordenarTarjetaManual(int idDetalleOrigen, int nuevaPosicion) {
+        ComandaCardController origen = tarjetasActivas.get(idDetalleOrigen);
+        if (origen == null || origen.getCardContainer() == null) {
+            return;
+        }
+        VBox col = resolverColumnaPadre(origen.getCardContainer());
+        if (col != null) {
+            reordenarTarjetaManual(idDetalleOrigen, nuevaPosicion, col);
+        }
+    }
+
+    private void reordenarTarjetaManual(int idDetalleOrigen, int nuevaPosicion, VBox columna) {
+        ComandaCardController origen = tarjetasActivas.get(idDetalleOrigen);
+        if (origen == null || origen.getCardContainer() == null || columna == null) {
+            return;
+        }
+        Parent nodoOrigen = origen.getCardContainer();
+        if (!columna.getChildren().contains(nodoOrigen)) {
+            return;
+        }
+        columna.getChildren().remove(nodoOrigen);
+        int clamped = Math.max(0, Math.min(nuevaPosicion, columna.getChildren().size()));
+        columna.getChildren().add(clamped, nodoOrigen);
+
+        List<Integer> idsOrdenDescendente = extraerIdsOrdenColumna(columna);
+        aplicarPrioridadVisualColumna(idsOrdenDescendente);
+        UiAsyncExecutor.ejecutarVoidAsync(
+                () -> pedidoService.reordenarPrioridadKds(idsOrdenDescendente),
+                () -> LOGGER.fine("Prioridad KDS actualizada: " + idsOrdenDescendente),
+                ex -> LOGGER.log(Level.WARNING, "No se pudo persistir prioridad KDS", ex)
+        );
+    }
+
+    private void aplicarPrioridadVisualColumna(List<Integer> idsOrdenDescendente) {
+        int total = idsOrdenDescendente.size();
+        for (int i = 0; i < total; i++) {
+            ComandaCardController ctrl = tarjetasActivas.get(idsOrdenDescendente.get(i));
+            if (ctrl != null) {
+                ctrl.setPrioridad(total - i);
+            }
+        }
+    }
+
+    public List<Integer> extraerIdsOrdenColumna(VBox columna) {
+        if (columna == null) {
+            return List.of();
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (javafx.scene.Node n : columna.getChildren()) {
+            for (ComandaCardController ctrl : tarjetasActivas.values()) {
+                if (ctrl.getCardContainer() == n && ctrl.getIdDetallePedido() > 0) {
+                    ids.add(ctrl.getIdDetallePedido());
+                    break;
+                }
+            }
+        }
+        return ids;
+    }
+
+    private VBox resolverColumnaPadre(Parent cardNode) {
+        for (VBox col : new VBox[]{vboxColPendiente, vboxColEnPreparacion, vboxColListo, vboxColHistorial}) {
+            if (col != null && col.getChildren().contains(cardNode)) {
+                return col;
+            }
+        }
+        return null;
+    }
+
     public void recalcularContadoresKanban() {
         int cPend = vboxColPendiente != null ? vboxColPendiente.getChildren().size() : 0;
         int cPrep = vboxColEnPreparacion != null ? vboxColEnPreparacion.getChildren().size() : 0;
@@ -533,6 +622,11 @@ public class KitchenDisplayController {
 
     public Label getLblCountEnPreparacion() {
         return lblCountEnPreparacion;
+    }
+
+    /** Pobla directamente tarjetas en el tablero KDS sin consultar BD (pruebas UI v5.2.0). */
+    public void aplicarItemsKdsPrueba(List<DetallePedido> items, LocalDateTime ahoraLima, boolean sinAnimacion) {
+        renderizarItemsKds(items, ahoraLima, sinAnimacion);
     }
 
     public Label getLblCountListo() {
