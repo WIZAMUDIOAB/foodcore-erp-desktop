@@ -92,6 +92,9 @@
     card.dataset.category = category;
     card.dataset.id = String(producto.id || visibleIndex);
     card.dataset.basePrice = basePrice.toFixed(2);
+    if (visibleIndex < 6) {
+      card.style.animationDelay = (visibleIndex * 50) + 'ms';
+    }
 
     const badge = document.createElement('span');
     badge.className = 'card-cat-badge';
