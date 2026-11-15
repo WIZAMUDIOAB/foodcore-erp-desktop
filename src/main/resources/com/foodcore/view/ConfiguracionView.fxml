@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
@@ -17,17 +22,17 @@
             <content>
                 <StackPane styleClass="pos-catalog-panel">
                     <children>
-                        <VBox alignment="TOP_CENTER" maxWidth="780.0" prefWidth="780.0" spacing="18.0" styleClass="caja-centered-column">
+                        <VBox alignment="TOP_CENTER" maxWidth="820.0" prefWidth="820.0" spacing="18.0" styleClass="caja-centered-column">
                             <children>
                                 <VBox spacing="4.0" styleClass="surface-card">
                                     <children>
                                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                                             <children>
                                                 <Label styleClass="view-heading" text="Configuración del Restaurante e Impresoras" />
-                                                <Label styleClass="badge-pill-neutral" text="TICKET Y MÚLTIPLES IMPRESORAS" />
+                                                <Label styleClass="badge-pill-neutral" text="TICKET, IMPRESORAS, BACKUPS Y ALERTAS" />
                                             </children>
                                         </HBox>
-                                        <Label styleClass="view-subheading" text="Datos de cabecera del comprobante y ruteo simultáneo de comandas KDS por categoría hacia impresoras de Windows" />
+                                        <Label styleClass="view-subheading" text="Datos de cabecera del comprobante, ruteo KDS multi-impresora, respaldo automatizado y alertas SMTP" />
                                     </children>
                                 </VBox>
 
@@ -106,6 +111,107 @@
                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                             </columnResizePolicy>
                                         </TableView>
+                                    </children>
+                                </VBox>
+
+                                <!-- Alertas de Fallo por Email SMTP (v5.3.0 Ítem 6) -->
+                                <VBox spacing="12.0" styleClass="surface-card">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Alertas de Fallo por Email (SMTP)" />
+                                                <Label styleClass="badge-pill-warning" text="MONITOREO 24/7" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Notifica automáticamente al dueño si MySQL cae por más de 1 minuto, disco libre baja de 5 GB o la RAM supera 90% por más de 5 minutos." />
+
+                                        <GridPane hgap="12.0" vgap="10.0">
+                                            <columnConstraints>
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" />
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+                                            </columnConstraints>
+                                            <rowConstraints>
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                            </rowConstraints>
+                                            <children>
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Email de Alertas (Dueño / TI)" />
+                                                        <TextField fx:id="txtEmailAlertas" promptText="dueno@foodcore.pe" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox alignment="BOTTOM_LEFT" spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <CheckBox fx:id="chkAlertasEmailHabilitadas" selected="true" text="Alertas automáticas activas" />
+                                                        <CheckBox fx:id="chkSmtpTlsHabilitado" selected="true" text="Usar cifrado TLS / STARTTLS" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Servidor SMTP (Host)" />
+                                                        <TextField fx:id="txtSmtpHost" promptText="smtp.gmail.com" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Puerto SMTP" />
+                                                        <TextField fx:id="txtSmtpPort" promptText="587" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="2">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Usuario Remitente SMTP" />
+                                                        <TextField fx:id="txtSmtpUser" promptText="alertas@foodcore.pe" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Contraseña / App Password SMTP" />
+                                                        <PasswordField fx:id="txtSmtpPassword" promptText="Contraseña SMTP (opcional en test)" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </GridPane>
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoAlertasEmail" styleClass="badge-pill-neutral" text="Configuración SMTP cargada" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnProbarAlertaEmail" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleProbarAlertaEmail" styleClass="btn-secondary" text="Enviar Alerta de Prueba" />
+                                                <Button fx:id="btnGuardarAlertasEmail" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleGuardarConfiguracionAlertas" styleClass="btn-primary" text="Guardar Alertas Email" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+
+                                <!-- Respaldo y Restauración Automatizada de BD (v5.3.0 Ítem 3) -->
+                                <VBox spacing="12.0" styleClass="surface-card">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Respaldo y Restauración Automatizada de Base de Datos" />
+                                                <Label styleClass="badge-pill-danger" text="RECUPERACIÓN DE DESASTRES" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Ejecuta backups comprimidos (.sql.gz) con retención de 30 días o restaura un respaldo validando su integridad previa confirmación." />
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <TextField fx:id="txtRutaBackupRestaurar" promptText="Ruta de backup (ej. backups/foodcore_20261115.sql.gz)" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnSeleccionarBackup" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleSeleccionarArchivoBackup" styleClass="btn-secondary" text="Examinar..." />
+                                            </children>
+                                        </HBox>
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoRestauracion" styleClass="badge-pill-neutral" text="Sin operaciones recientes" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnGenerarBackupAhora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleEjecutarBackupAhora" styleClass="btn-secondary" text="Generar Backup Ahora" />
+                                                <Button fx:id="btnRestaurarBackup" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleRestaurarDesdeBackup" styleClass="btn-destructive" text="Restaurar desde Backup" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
                             </children>

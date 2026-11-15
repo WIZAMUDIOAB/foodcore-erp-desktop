@@ -22,6 +22,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -94,6 +95,7 @@ public class MainDashboardController {
     @FXML private Button btnNavUsuarios;
     @FXML private Button btnNavRoles;
     @FXML private Button btnNavConfiguracion;
+    @FXML private Button btnNavEstadoSistema;
 
     @FXML private Button btnNavReportes;
     @FXML private Button btnNavMantenimiento;
@@ -112,7 +114,7 @@ public class MainDashboardController {
             btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
             btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes, btnNavPlanilla,
             btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
-            btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento,
+            btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavEstadoSistema, btnNavReportes, btnNavMantenimiento,
             btnCambiarPasswordMenu, btnCerrarSesion
         };
         for (Button btn : buttons) {
@@ -171,7 +173,10 @@ public class MainDashboardController {
             return;
         }
 
-        String rol = user.getNombreRol().toUpperCase();
+        String rol = user.getNombreRol().toUpperCase(Locale.ROOT);
+        if (!rol.contains("ADMIN")) {
+            ocultarNodo(btnNavEstadoSistema);
+        }
 
         if (rol.contains("MOZO") || rol.contains("MESERO")) {
             ocultarNodo(btnNavDashboard);
@@ -224,6 +229,7 @@ public class MainDashboardController {
         ocultarNodo(btnNavUsuarios);
         ocultarNodo(btnNavRoles);
         ocultarNodo(btnNavConfiguracion);
+        ocultarNodo(btnNavEstadoSistema);
         ocultarNodo(btnNavReportes);
         ocultarNodo(btnNavMantenimiento);
     }
@@ -235,7 +241,7 @@ public class MainDashboardController {
             btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
             btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes, btnNavPlanilla,
             btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
-            btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion
+            btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavEstadoSistema
         };
         for (Node n : nodes) {
             if (n != null) {
@@ -483,6 +489,8 @@ public class MainDashboardController {
             vc.stopTimeline();
         } else if (controladorActivo instanceof KitchenDisplayController kdc) {
             kdc.stopTimers();
+        } else if (controladorActivo instanceof EstadoSistemaController esc) {
+            esc.stopTimeline();
         }
         controladorActivo = null;
     }
@@ -519,7 +527,7 @@ public class MainDashboardController {
             btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
             btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes, btnNavPlanilla,
             btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas,
-            btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavReportes, btnNavMantenimiento
+            btnNavKardex, btnNavAuditoria, btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavEstadoSistema, btnNavReportes, btnNavMantenimiento
         };
         for (Button btn : buttons) {
             if (btn != null) {
@@ -590,6 +598,22 @@ public class MainDashboardController {
 
     public Button getBtnNavMiHorario() {
         return btnNavMiHorario;
+    }
+
+    public Button getBtnNavEstadoSistema() {
+        return btnNavEstadoSistema;
+    }
+
+    @FXML
+    public void handleNavEstadoSistema(ActionEvent event) {
+        Usuario act = AuthService.getUsuarioSesionActual();
+        if (act != null && (act.getNombreRol() == null
+                || !act.getNombreRol().toUpperCase(Locale.ROOT).contains("ADMIN"))) {
+            AnimationUtils.mostrarToast(rootDashboardStack,
+                    "Acceso restringido: Estado del Sistema es exclusivo para ADMIN.", true);
+            return;
+        }
+        cargarVista("/com/foodcore/view/EstadoSistemaView.fxml", btnNavEstadoSistema);
     }
 
     public boolean isSidebarColapsado() {

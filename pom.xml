@@ -565,7 +565,7 @@
                         <version>1.6.0</version>
                         <configuration>
                             <name>FoodCoreERP</name>
-                            <appVersion>4.3.0</appVersion>
+                            <appVersion>5.3.0</appVersion>
                             <vendor>FoodCore S.A.C.</vendor>
                             <destination>${project.basedir}/dist</destination>
                             <input>${project.build.directory}</input>
