@@ -1,25 +1,24 @@
 /* ==========================================================================
-   FOODCORE ERP v4.2.0 — PWA KDS (KITCHEN DISPLAY SYSTEM)
-   High-Contrast Dark Mode para Pantallas Táctiles de Cocina y Bar
-   Colores: Fondo #121417, Tarjetas #1E2228, Acentos #F05A22, #10B981, #EF4444
+   FOODCORE ERP v5.4.0 — PWA KDS (KITCHEN DISPLAY SYSTEM)
+   Contraste WCAG AAA (>= 7:1): Texto blanco puro #FFFFFF sobre fondo #090D16
    ========================================================================== */
 
 :root {
-  --kds-bg-canvas: #121417;
-  --kds-bg-surface: #1E2228;
-  --kds-bg-elevated: #282E37;
-  --kds-border: #2E3642;
-  --kds-border-light: #3D4756;
-  --kds-text-primary: #F9FAFB;
-  --kds-text-secondary: #9CA3AF;
-  --kds-text-muted: #6B7280;
+  --kds-bg-canvas: #090D16;
+  --kds-bg-surface: #111622;
+  --kds-bg-elevated: #1A2233;
+  --kds-border: #2D3748;
+  --kds-border-light: #4A5568;
+  --kds-text-primary: #FFFFFF;
+  --kds-text-secondary: #E5E7EB;
+  --kds-text-muted: #CBD5E1;
 
   --kds-brand: #F05A22;
   --kds-brand-hover: #D94E1B;
-  --kds-success: #10B981;
+  --kds-success: #065F46;
   --kds-warning: #F59E0B;
-  --kds-danger: #EF4444;
-  --kds-info: #3B82F6;
+  --kds-danger: #B91C1C;
+  --kds-info: #1E40AF;
 
   --kds-radius: 12px;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -49,7 +48,7 @@ body {
 /* TOPBAR KDS */
 .kds-topbar {
   height: 64px;
-  background-color: #0D0E11;
+  background-color: #050811;
   border-bottom: 1px solid var(--kds-border);
   display: flex;
   align-items: center;
@@ -98,9 +97,9 @@ body {
 .kds-filter-btn {
   min-width: 56px;
   min-height: 56px;
-  background: #1A1F26;
+  background: #111622;
   border: 1px solid var(--kds-border);
-  color: var(--kds-text-secondary);
+  color: #FFFFFF;
   padding: 10px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -125,8 +124,8 @@ body {
   font-family: var(--font-mono);
   font-size: 18px;
   font-weight: 700;
-  color: #E5E7EB;
-  background: #181C22;
+  color: #FFFFFF;
+  background: #111622;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--kds-border);
@@ -138,11 +137,11 @@ body {
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--kds-success);
-  background: rgba(16, 185, 129, 0.1);
+  color: #6EE7B7;
+  background: #062C22;
   padding: 6px 12px;
   border-radius: 20px;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid #10B981;
 }
 
 .kds-dot {
@@ -165,7 +164,7 @@ body {
   min-height: 56px;
   background: transparent;
   border: 1px solid var(--kds-border);
-  color: #D1D5DB;
+  color: #FFFFFF;
   padding: 10px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -193,7 +192,7 @@ body {
 }
 
 .kds-column {
-  background: #16191E;
+  background: #0C101B;
   border: 1px solid var(--kds-border);
   border-radius: var(--kds-radius);
   display: flex;
@@ -203,7 +202,7 @@ body {
 
 .kds-col-header {
   padding: 14px 18px;
-  background: #1C2027;
+  background: #111622;
   border-bottom: 2px solid var(--kds-border);
   display: flex;
   align-items: center;
@@ -231,6 +230,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  color: #FFFFFF;
 }
 
 .kds-badge-count {
@@ -239,8 +239,8 @@ body {
   font-weight: 700;
   padding: 3px 9px;
   border-radius: 12px;
-  background: #272E38;
-  color: #E5E7EB;
+  background: #1A2233;
+  color: #FFFFFF;
 }
 
 .kds-cards-container {
@@ -279,7 +279,7 @@ body {
   font-size: 14px;
   font-weight: 800;
   color: #FFFFFF;
-  background: #28303C;
+  background: #1A2233;
   padding: 4px 10px;
   border-radius: 6px;
   letter-spacing: -0.2px;
@@ -296,23 +296,23 @@ body {
   gap: 4px;
 }
 
-/* Semáforo Cronómetro */
+/* Semáforo Cronómetro AAA (>= 7:1) */
 .timer-green {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34D399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: #062C22;
+  color: #A7F3D0;
+  border: 1px solid #10B981;
 }
 
 .timer-amber {
-  background: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: #2B200B;
+  color: #FDE68A;
+  border: 1px solid #F59E0B;
 }
 
 .timer-red {
-  background: rgba(239, 68, 68, 0.2);
-  color: #F87171;
-  border: 1px solid rgba(239, 68, 68, 0.6);
+  background: #331217;
+  color: #FECACA;
+  border: 1px solid #EF4444;
   animation: pulse-red 1.5s infinite;
 }
 
@@ -332,8 +332,8 @@ body {
   font-family: var(--font-mono);
   font-size: 18px;
   font-weight: 800;
-  color: var(--kds-brand);
-  background: rgba(240, 90, 34, 0.12);
+  color: #FFFFFF;
+  background: #7C2D12;
   padding: 2px 8px;
   border-radius: 6px;
 }
@@ -346,9 +346,9 @@ body {
 }
 
 .kds-notes {
-  background: #252218;
+  background: #1F1A0E;
   border-left: 3px solid var(--kds-warning);
-  color: #FCD34D;
+  color: #FEF08A;
   font-size: 13px;
   font-weight: 500;
   padding: 6px 10px;
@@ -357,7 +357,7 @@ body {
 
 .kds-card-meta {
   font-size: 12px;
-  color: var(--kds-text-secondary);
+  color: #E5E7EB;
   display: flex;
   justify-content: space-between;
 }
@@ -398,8 +398,8 @@ body {
 }
 
 .btn-entregar {
-  background: #374151;
-  color: #F3F4F6;
+  background: #1F2937;
+  color: #FFFFFF;
   border: 1px solid #4B5563;
 }
 

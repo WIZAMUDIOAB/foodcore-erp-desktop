@@ -1734,3 +1734,19 @@ button:active,
     background-size: 200% 100%;
   }
 }
+
+/* ==========================================================================
+   D5: CONTRASTE AAA EN KDS (MINIMO 7:1 — TEXTO BLANCO PURO SOBRE FONDO OSCURO)
+   ========================================================================== */
+.kds-aaa-surface,
+.kds-board,
+.kds-card {
+  background-color: #090D16;
+  color: #FFFFFF;
+}
+
+.kds-card .kds-name,
+.kds-card .kds-mesa-badge,
+.kds-btn-action {
+  color: #FFFFFF;
+}
