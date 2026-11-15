@@ -135,6 +135,12 @@ public class MenuQrService {
             );
         }
 
+        java.util.LinkedHashSet<String> categorias = new java.util.LinkedHashSet<>();
+        categorias.add("Todos");
+        for (Producto p : productos) {
+            categorias.add(resolverCategoriaProducto(p));
+        }
+
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html>\n")
             .append("<html lang=\"es\">\n")
@@ -143,22 +149,31 @@ public class MenuQrService {
             .append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n")
             .append("  <title>FoodCore Gastronomía · Menú Digital</title>\n")
             .append("  <style>\n")
-            .append("    :root { --primary: #FF5A1F; --dark: #1E293B; --card-bg: #FFFFFF; --bg: #F8FAFC; --text: #334155; }\n")
-            .append("    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }\n")
-            .append("    body { background-color: var(--bg); color: var(--text); padding-bottom: 40px; }\n")
-            .append("    header { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white; padding: 32px 20px; text-align: center; border-bottom: 4px solid var(--primary); }\n")
+            .append("    :root { --primary: #FF5A1F; --dark: #1E293B; --card-bg: #FFFFFF; --bg: #F8FAFC; --text: #334155; --border: #E2E8F0; }\n")
+            .append("    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; touch-action: manipulation; }\n")
+            .append("    body { background-color: var(--bg); color: var(--text); padding-bottom: 64px; }\n")
+            .append("    header { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white; padding: 28px 20px; text-align: center; border-bottom: 4px solid var(--primary); }\n")
             .append("    header h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }\n")
             .append("    header p { font-size: 14px; color: #94A3B8; margin-top: 6px; }\n")
             .append("    .badge-live { display: inline-block; background: #10B981; color: white; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; margin-top: 10px; text-transform: uppercase; }\n")
-            .append("    .container { max-width: 800px; margin: 0 auto; padding: 20px; }\n")
-            .append("    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 20px; }\n")
-            .append("    .card { background: var(--card-bg); border-radius: 14px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #E2E8F0; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; }\n")
+            .append("    .container { max-width: 860px; margin: 0 auto; padding: 20px; }\n")
+            .append("    .category-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 18px; }\n")
+            .append("    .category-tab { min-width: 48px; min-height: 48px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--card-bg); color: var(--dark); font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s, transform 0.1s; }\n")
+            .append("    .category-tab.active { background: var(--primary); color: #FFFFFF; border-color: var(--primary); }\n")
+            .append("    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }\n")
+            .append("    .card { background: var(--card-bg); border-radius: 14px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #E2E8F0; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s; will-change: transform, opacity, filter; }\n")
             .append("    .card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }\n")
+            .append("    .card-hidden { display: none !important; }\n")
+            .append("    .card-cat-badge { display: inline-block; align-self: flex-start; font-size: 11px; font-weight: 700; color: var(--primary); background: rgba(255, 90, 31, 0.12); padding: 3px 9px; border-radius: 999px; margin-bottom: 8px; text-transform: uppercase; }\n")
             .append("    .card-title { font-size: 17px; font-weight: 700; color: var(--dark); margin-bottom: 6px; }\n")
             .append("    .card-desc { font-size: 13px; color: #64748B; line-height: 1.4; margin-bottom: 12px; flex-grow: 1; }\n")
             .append("    .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #F1F5F9; padding-top: 10px; }\n")
-            .append("    .price { font-size: 18px; font-weight: 800; color: var(--primary); }\n")
-            .append("    .btn-pedir { background: #EEF2F6; color: var(--dark); border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }\n")
+            .append("    .price { font-size: 18px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }\n")
+            .append("    .btn-pedir { min-width: 48px; min-height: 48px; background: #EEF2F6; color: var(--dark); border: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }\n")
+            .append("    @keyframes morphIn { 0% { opacity: 0; transform: scale(0.94) translateY(10px); filter: blur(4px); } 100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); } }\n")
+            .append("    @keyframes morphOut { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 100% { opacity: 0; transform: scale(0.94) translateY(-6px); filter: blur(4px); } }\n")
+            .append("    .card.morph-in { animation: morphIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }\n")
+            .append("    .card.morph-out { animation: morphOut 0.2s cubic-bezier(0.4, 0, 1, 1) both; pointer-events: none; }\n")
             .append("    footer { text-align: center; margin-top: 40px; font-size: 12px; color: #94A3B8; }\n")
             .append("  </style>\n")
             .append("</head>\n")
@@ -169,9 +184,20 @@ public class MenuQrService {
             .append("    <div class=\"badge-live\">● Disponible para Pedidos</div>\n")
             .append("  </header>\n")
             .append("  <div class=\"container\">\n")
-            .append("    <div class=\"grid\">\n");
+            .append("    <nav id=\"categoryTabs\" class=\"category-tabs\" aria-label=\"Categorías\">\n");
+
+        for (String cat : categorias) {
+            String activeCls = "Todos".equals(cat) ? "category-tab active" : "category-tab";
+            html.append("      <button type=\"button\" class=\"").append(activeCls)
+                .append("\" data-category=\"").append(escapeHtml(cat)).append("\">")
+                .append(escapeHtml(cat)).append("</button>\n");
+        }
+
+        html.append("    </nav>\n")
+            .append("    <div id=\"menuGrid\" class=\"grid\">\n");
 
         for (Producto p : productos) {
+            String catName = resolverCategoriaProducto(p);
             StringBuilder opcionesHtml = new StringBuilder();
             if (!p.getVariantes().isEmpty()) {
                 List<String> vars = new ArrayList<>();
@@ -183,27 +209,62 @@ public class MenuQrService {
             if (!p.getModificadores().isEmpty()) {
                 opcionesHtml.append(" · +Extras configurables");
             }
-            html.append("      <div class=\"card\">\n")
+            html.append("      <div class=\"card morph-in\" data-category=\"").append(escapeHtml(catName))
+                .append("\" data-base-price=\"").append(p.getPrecioVenta()).append("\">\n")
                 .append("        <div>\n")
+                .append("          <span class=\"card-cat-badge\">").append(escapeHtml(catName)).append("</span>\n")
                 .append("          <div class=\"card-title\">").append(escapeHtml(p.getNombre())).append("</div>\n")
                 .append("          <div class=\"card-desc\">")
                 .append(escapeHtml((p.getDescripcion() != null ? p.getDescripcion() : "Plato elaborado con ingredientes frescos") + opcionesHtml))
                 .append("</div>\n")
                 .append("        </div>\n")
                 .append("        <div class=\"card-footer\">\n")
-                .append("          <span class=\"price\">S/ ").append(p.getPrecioVenta()).append("</span>\n")
-                .append("          <button class=\"btn-pedir\">Especialidad</button>\n")
+                .append("          <span class=\"price\" data-value=\"").append(p.getPrecioVenta()).append("\">S/ ").append(p.getPrecioVenta()).append("</span>\n")
+                .append("          <button type=\"button\" class=\"btn-pedir\">Especialidad</button>\n")
                 .append("        </div>\n")
                 .append("      </div>\n");
         }
 
         html.append("    </div>\n")
             .append("  </div>\n")
-            .append("  <footer>FoodCore ERP v2.0 Enterprise · Todos los derechos reservados</footer>\n")
+            .append("  <footer>FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados</footer>\n")
+            .append("  <script>\n")
+            .append("    (function () {\n")
+            .append("      const tabs = document.querySelectorAll('.category-tab');\n")
+            .append("      const cards = Array.from(document.querySelectorAll('#menuGrid .card'));\n")
+            .append("      function switchCategory(cat) {\n")
+            .append("        tabs.forEach(t => t.classList.toggle('active', t.dataset.category === cat));\n")
+            .append("        cards.forEach(c => { c.classList.remove('morph-in'); c.classList.add('morph-out'); });\n")
+            .append("        window.setTimeout(() => {\n")
+            .append("          cards.forEach(c => {\n")
+            .append("            const show = cat === 'Todos' || c.dataset.category === cat;\n")
+            .append("            c.classList.toggle('card-hidden', !show);\n")
+            .append("            c.classList.remove('morph-out');\n")
+            .append("            if (show) { void c.offsetWidth; c.classList.add('morph-in'); }\n")
+            .append("          });\n")
+            .append("        }, 180);\n")
+            .append("      }\n")
+            .append("      tabs.forEach(t => t.addEventListener('click', () => switchCategory(t.dataset.category)));\n")
+            .append("      window.FoodCoreMenuQr = { switchCategory };\n")
+            .append("    })();\n")
+            .append("  </script>\n")
             .append("</body>\n")
             .append("</html>\n");
 
         return html.toString();
+    }
+
+    private String resolverCategoriaProducto(Producto p) {
+        if (p.getNombreCategoria() != null && !p.getNombreCategoria().isBlank()) {
+            return p.getNombreCategoria().trim();
+        }
+        return switch (p.getIdCategoria()) {
+            case 1 -> "Hamburguesas";
+            case 2 -> "Alitas & Pollo";
+            case 3 -> "Bebidas";
+            case 4 -> "Guarniciones";
+            default -> "Especialidades";
+        };
     }
 
     /**
