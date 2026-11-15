@@ -34,7 +34,7 @@
 body {
   background-color: var(--bg);
   color: var(--text);
-  padding-bottom: 84px;
+  padding-bottom: 24px;
   min-height: 100vh;
 }
 
@@ -142,20 +142,21 @@ header p {
 
 .hero-banner {
   position: relative;
-  max-width: 960px;
+  max-width: 920px;
   height: 150px;
   margin: 16px auto 4px;
   border-radius: 18px;
   overflow: hidden;
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 60%, #7C2D12 100%);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
 }
 
 .hero-parallax-layer {
   position: absolute;
-  top: -80px;
+  top: -110px;
   left: 0;
   width: 100%;
-  height: 320px;
+  height: 360px;
   object-fit: cover;
   will-change: transform;
 }
@@ -194,10 +195,10 @@ header p {
   background: #0F172A;
 }
 
-.parallax-img {
+.card-img-wrap .parallax-img {
   width: 100%;
-  height: 240px;
-  margin-top: -60px;
+  height: 210px;
+  margin-top: -40px;
   object-fit: cover;
   display: block;
   will-change: transform;
@@ -393,17 +394,17 @@ header p {
 .card.morph-in:nth-child(6) { animation-delay: 250ms; }
 
 .order-summary-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
+  width: min(884px, calc(100% - 36px));
+  margin: 12px auto 0;
+  border-radius: 16px;
   z-index: 95;
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: #FFFFFF;
-  padding: 10px 18px;
+  padding: 12px 18px;
 }
 
 .order-summary-inner {

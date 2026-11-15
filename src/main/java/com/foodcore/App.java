@@ -229,12 +229,35 @@ public class App extends Application {
             return;
         }
         String darkUrl = darkCss.toExternalForm();
+        actualizarStylesheetEnLista(scene.getStylesheets(), darkUrl, activo);
+        if (scene.getRoot() != null) {
+            actualizarDarkModeEnNodos(scene.getRoot(), darkUrl, activo, true);
+        }
+    }
+
+    private static void actualizarStylesheetEnLista(
+            javafx.collections.ObservableList<String> stylesheets, String darkUrl, boolean activo) {
         if (activo) {
-            if (!scene.getStylesheets().contains(darkUrl)) {
-                scene.getStylesheets().add(darkUrl);
+            if (!stylesheets.contains(darkUrl)) {
+                stylesheets.add(darkUrl);
             }
         } else {
-            scene.getStylesheets().remove(darkUrl);
+            stylesheets.remove(darkUrl);
+        }
+    }
+
+    private static void actualizarDarkModeEnNodos(
+            Parent parent, String darkUrl, boolean activo, boolean esRaizEscena) {
+        if (!parent.getStylesheets().isEmpty() || esRaizEscena) {
+            actualizarStylesheetEnLista(parent.getStylesheets(), darkUrl, activo);
+        }
+        if (parent instanceof javafx.scene.control.ScrollPane sp && sp.getContent() instanceof Parent content) {
+            actualizarDarkModeEnNodos(content, darkUrl, activo, false);
+        }
+        for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+            if (child instanceof Parent childParent) {
+                actualizarDarkModeEnNodos(childParent, darkUrl, activo, false);
+            }
         }
     }
 

@@ -48,7 +48,10 @@
 .app-canvas,
 .view-content,
 .pos-catalog-panel,
-.login-canvas {
+.login-canvas,
+.scroll-pane,
+.scroll-pane > .viewport,
+.caja-centered-column {
     -fx-background-color: #0B0F19;
 }
 

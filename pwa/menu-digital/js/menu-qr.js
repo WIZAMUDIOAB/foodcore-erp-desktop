@@ -244,19 +244,20 @@
   }
 
   function buildFallbackDishSvg(title, category) {
-    const label = encodeURIComponent((category || 'FoodCore').slice(0, 18));
-    const safeTitle = encodeURIComponent((title || 'Plato').slice(0, 22));
+    const isDrink = (category || '').toLowerCase().includes('bebida');
+    const c1 = isDrink ? '%230F172A' : '%231E293B';
+    const c2 = isDrink ? '%230EA5E9' : '%23FF5A1F';
+    const accent = isDrink ? '%2338BDF8' : '%23FDBA74';
     return "data:image/svg+xml;utf8,"
-      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 220'%3E"
+      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 220' preserveAspectRatio='none'%3E"
       + "%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E"
-      + "%3Cstop offset='0%25' stop-color='%231E293B'/%3E"
-      + "%3Cstop offset='100%25' stop-color='%23FF5A1F'/%3E%3C/linearGradient%3E%3C/defs%3E"
+      + "%3Cstop offset='0%25' stop-color='" + c1 + "'/%3E"
+      + "%3Cstop offset='100%25' stop-color='" + c2 + "'/%3E%3C/linearGradient%3E%3C/defs%3E"
       + "%3Crect width='400' height='220' fill='url(%23g)'/%3E"
-      + "%3Ccircle cx='330' cy='50' r='55' fill='rgba(255,255,255,0.12)'/%3E"
-      + "%3Ctext x='20' y='110' fill='%23FDBA74' font-family='sans-serif' font-size='14' font-weight='700'%3E"
-      + label + "%3C/text%3E"
-      + "%3Ctext x='20' y='140' fill='%23FFFFFF' font-family='sans-serif' font-size='20' font-weight='800'%3E"
-      + safeTitle + "%3C/text%3E%3C/svg%3E";
+      + "%3Ccircle cx='320' cy='110' r='64' fill='%23ffffff' fill-opacity='0.10'/%3E"
+      + "%3Ccircle cx='200' cy='110' r='44' fill='" + accent + "' fill-opacity='0.20'/%3E"
+      + "%3Ccircle cx='200' cy='110' r='28' fill='none' stroke='%23ffffff' stroke-opacity='0.35' stroke-width='2'/%3E"
+      + "%3Ccircle cx='200' cy='110' r='10' fill='%23ffffff' fill-opacity='0.45'/%3E%3C/svg%3E";
   }
 
   function createDishCard(producto, visibleIndex) {
@@ -275,7 +276,6 @@
     imgWrap.className = 'card-img-wrap';
     const img = document.createElement('img');
     img.className = 'parallax-img';
-    img.loading = 'lazy';
     img.alt = producto.nombre || 'Especialidad';
     const fallbackSrc = buildFallbackDishSvg(producto.nombre, category);
     img.src = (producto.imagen_url && producto.imagen_url.trim()) ? producto.imagen_url : fallbackSrc;
@@ -423,9 +423,13 @@
 
   function updateParallax() {
     const scrollY = window.scrollY || window.pageYOffset || 0;
-    const translateY = scrollY * 0.5;
-    document.querySelectorAll('.parallax-img, .hero-parallax-layer').forEach((img) => {
-      img.style.transform = 'translateY(' + translateY.toFixed(2) + 'px)';
+    const heroY = (scrollY * 0.5).toFixed(2);
+    const cardY = Math.max(-36, Math.min(36, scrollY * 0.5)).toFixed(2);
+    document.querySelectorAll('.hero-parallax-layer').forEach((el) => {
+      el.style.transform = 'translateY(' + heroY + 'px)';
+    });
+    document.querySelectorAll('.card-img-wrap .parallax-img').forEach((img) => {
+      img.style.transform = 'translateY(' + cardY + 'px)';
     });
   }
 
