@@ -158,11 +158,35 @@ html, body {
 }
 
 /* ==========================================================================
-   BOTONES TÁCTILES (MÍNIMO 48PX DE ALTO — SPEC §3)
+   BOTONES TÁCTILES (D1: TARGETS TÁCTILES >= 48px / KDS >= 56px)
    ========================================================================== */
-.btn-touch {
+button,
+.btn,
+.btn-touch,
+.card-clickable,
+.tab,
+.cat-tab,
+.auth-tab-btn,
+.quick-user-chip,
+.note-chip {
+  min-width: 48px;
   min-height: 48px;
-  padding: 0 18px;
+  padding: 10px 16px;
+}
+
+.kds-btn,
+.kds-btn-action,
+.kds-filter-btn,
+.btn-send-kds {
+  min-width: 56px;
+  min-height: 56px;
+  padding: 12px 18px;
+}
+
+.btn-touch {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 10px 18px;
   border-radius: var(--fc-radius-btn);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -737,6 +761,9 @@ html, body {
 .btn-qty {
   width: 48px;
   height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
   border-radius: 10px;
   border: 1px solid var(--fc-border-subtle);
   background: #FFFFFF;
@@ -777,7 +804,9 @@ html, body {
 }
 
 .note-chip {
-  padding: 5px 10px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--fc-border-subtle);
   background: #FFFFFF;
@@ -1329,8 +1358,9 @@ html, body {
   }
 
   .topbar-actions .btn-touch {
-    min-height: 44px;
-    padding: 0 10px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 8px 10px;
     font-size: 12.5px;
   }
 
@@ -1424,8 +1454,9 @@ html, body {
 
   .cat-tab {
     flex-shrink: 0;
-    min-height: 44px;
-    padding: 0 12px;
+    min-width: 48px;
+    min-height: 48px;
+    padding: 8px 14px;
     font-size: 13px;
     white-space: nowrap;
   }
@@ -1555,7 +1586,8 @@ html, body {
   }
 
   .btn-send-kds {
-    min-height: 48px;
+    min-width: 56px;
+    min-height: 56px;
     font-size: 15px;
   }
 
