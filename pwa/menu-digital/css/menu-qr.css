@@ -38,12 +38,19 @@ body {
   min-height: 100vh;
 }
 
-header {
-  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+header,
+header.glass-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #FFFFFF;
-  padding: 24px 20px;
+  padding: 20px;
   text-align: center;
-  border-bottom: 4px solid var(--primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.25);
 }
 
 .header-inner {
