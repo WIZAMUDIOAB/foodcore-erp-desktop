@@ -1604,4 +1604,26 @@
     -fx-font-size: 12px;
 }
 
+/* --------------------------------------------------------------------------
+   15. FoodCore v5.4.0 (Sub-Fase D - D3) — Skeletons de Carga Shimmer
+   -------------------------------------------------------------------------- */
+.skeleton-container {
+    -fx-background-color: transparent;
+}
+
+.skeleton-row {
+    -fx-background-color: -fc-bg-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -fc-border;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1px;
+}
+
+.skeleton-bar,
+.skeleton-shimmer {
+    -fx-background-color: linear-gradient(to right, #E5E7EB 0%, #F3F4F6 50%, #E5E7EB 100%);
+    -fx-background-radius: 6px;
+}
+
+
 
