@@ -2,6 +2,16 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.3.0] - Sub-Fase C: Infraestructura y Deploy (2026-11-15)
+
+- **Instalador MSI y paquete Linux (`.deb`)**: Empaquetado nativo con `jpackage` (`scripts/package-release.ps1` / `build-deb.sh`) generando `dist/FoodCoreERP-5.3.0.msi` con todos los módulos y recursos (`foodcore-erp.jar`, `pwa/`, `scripts/`, `keystore.jks.example`, `foodcore.cer` y `application.properties.example`), además de guía operativa en `README.md`.
+- **Backup y Restore Automático**:
+  - Scripts `scripts/backup-auto.ps1` y `scripts/backup-auto.sh` con `mysqldump --single-transaction`, compresión `.sql.gz`, permisos restringidos (`icacls` / `chmod 700`/`600`), retención de 30 días y tarea programada diaria a las 03:00 AM (`FoodCoreERP_Backup_3AM` / cron `0 3 * * *`).
+  - Scripts `scripts/restore-auto.ps1` y `scripts/restore-auto.sh` con validación de integridad GZip/SQL, parada y reinicio de servicios e integración en Backoffice (`ConfiguracionView.fxml` / `ConfiguracionController.java`) mediante el botón **"Restaurar desde Backup"** con diálogo de confirmación.
+- **Dashboard Estado del Sistema (`EstadoSistemaView.fxml` & `EstadoSistemaController.java`)**: Vista exclusiva para rol `ADMIN` con auto-refresh cada 5 segundos (`Timeline` + `UiAsyncExecutor`) monitoreando MySQL (`UP`/`DOWN`, versión, latencia ms), Javalin HTTP (`8080`), Javalin HTTPS (`8443`), Socket KDS (`9090` + clientes conectados), Cloudflare Tunnel (URL y estado), versión Flyway y Uptime del sistema (`SistemaMonitorService.java`).
+- **Métricas CPU / RAM / Disco en Tiempo Real**: Telemetría de carga de CPU (`OperatingSystemMXBean` con fallback `wmic`), memoria RAM usada/total y almacenamiento en disco libre/total con `ProgressBar` e indicadores de salud.
+- **Alertas de Fallo por Email SMTP (`AlertaService.java`)**: Notificaciones automáticas por correo vía SMTP estándar (`Socket`/`SSLSocketFactory`, `STARTTLS`/`AUTH LOGIN`) ante caída de MySQL (`> 1 min`), disco libre crítico (`< 5 GB`) o RAM crítica (`>= 90%` por `> 5 min`), configurables desde `application.properties` y `ConfiguracionView.fxml`.
+
 ## [2.0.0-SNAPSHOT] - Sub-Fase 4D: Crecimiento Comercial (2026-11-06)
 
 ### Hotfix 4C.1 (Correcciones Obligatorias Aprobadas)
