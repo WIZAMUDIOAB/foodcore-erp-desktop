@@ -1,0 +1,27 @@
+{
+  "lang": "en",
+  "pageTitle": "FoodCore Gastronomy · Digital Menu",
+  "subtitle": "Official Gastronomy Menu · Real-Time Updates",
+  "badgeLive": "● Available for Orders",
+  "heroKicker": "LIVE CULINARY EXPERIENCE",
+  "heroTitle": "Artisan Flame-Grilled Flavors",
+  "cardAction": "Specialty",
+  "summaryLabel": "Estimated total",
+  "resetLabel": "Clear",
+  "itemSingular": "item",
+  "itemPlural": "items",
+  "footerText": "FoodCore ERP v5.4.0 Enterprise · All rights reserved",
+  "categories": {
+    "Todos": "All",
+    "Hamburguesas": "Burgers",
+    "Alitas & Pollo": "Wings & Chicken",
+    "Bebidas": "Drinks",
+    "Guarniciones": "Sides",
+    "Especialidades": "Specialties"
+  },
+  "sizes": {
+    "Regular": "Regular",
+    "Grande": "Large (+S/ 5)",
+    "Doble": "Double (+S/ 9)"
+  }
+}

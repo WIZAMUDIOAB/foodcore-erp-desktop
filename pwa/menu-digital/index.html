@@ -9,9 +9,16 @@
 <body>
   <header class="glass-header">
     <div class="header-inner">
+      <div class="header-top-bar">
+        <span class="header-brand-tag">QR MENU</span>
+        <div class="lang-toggle" role="group" aria-label="Idioma / Language">
+          <button type="button" id="btnLangEs" class="lang-btn active" data-lang="es">ES</button>
+          <button type="button" id="btnLangEn" class="lang-btn" data-lang="en">EN</button>
+        </div>
+      </div>
       <h1>FOODCORE RESTOBAR &amp; GRILL</h1>
-      <p>Carta Gastronómica Oficial · Actualizada en Tiempo Real</p>
-      <div class="badge-live">&#9679; Disponible para Pedidos</div>
+      <p id="headerSubtitle">Carta Gastronómica Oficial · Actualizada en Tiempo Real</p>
+      <div id="badgeLive" class="badge-live">&#9679; Disponible para Pedidos</div>
     </div>
   </header>
 
@@ -22,8 +29,8 @@
       alt=""
     >
     <div class="hero-banner-overlay">
-      <span class="hero-kicker">EXPERIENCIA CULINARIA EN VIVO</span>
-      <h2>Sabores Artesanales a la Parrilla</h2>
+      <span id="heroKicker" class="hero-kicker">EXPERIENCIA CULINARIA EN VIVO</span>
+      <h2 id="heroTitle">Sabores Artesanales a la Parrilla</h2>
     </div>
   </section>
 
@@ -32,7 +39,7 @@
     <section id="menuGrid" class="grid" aria-live="polite"></section>
   </main>
 
-  <footer>FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados</footer>
+  <footer id="menuFooter">FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados</footer>
 
   <aside id="orderSummaryBar" class="order-summary-bar" aria-label="Resumen estimado del pedido">
     <div class="order-summary-inner">

@@ -53,10 +53,142 @@
     }
   ];
 
+  const LANG_STORAGE_KEY = 'fc_menu_qr_lang';
+  const DEFAULT_I18N = {
+    es: {
+      pageTitle: 'FoodCore Gastronomía · Menú Digital',
+      subtitle: 'Carta Gastronómica Oficial · Actualizada en Tiempo Real',
+      badgeLive: '● Disponible para Pedidos',
+      heroKicker: 'EXPERIENCIA CULINARIA EN VIVO',
+      heroTitle: 'Sabores Artesanales a la Parrilla',
+      cardAction: 'Especialidad',
+      summaryLabel: 'Total estimado',
+      resetLabel: 'Limpiar',
+      itemSingular: 'ítem',
+      itemPlural: 'ítems',
+      footerText: 'FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados',
+      categories: {
+        Todos: 'Todos',
+        Hamburguesas: 'Hamburguesas',
+        'Alitas & Pollo': 'Alitas & Pollo',
+        Bebidas: 'Bebidas',
+        Guarniciones: 'Guarniciones',
+        Especialidades: 'Especialidades'
+      },
+      sizes: {
+        Regular: 'Regular',
+        Grande: 'Grande (+S/ 5)',
+        Doble: 'Doble (+S/ 9)'
+      }
+    },
+    en: {
+      pageTitle: 'FoodCore Gastronomy · Digital Menu',
+      subtitle: 'Official Gastronomy Menu · Real-Time Updates',
+      badgeLive: '● Available for Orders',
+      heroKicker: 'LIVE CULINARY EXPERIENCE',
+      heroTitle: 'Artisan Flame-Grilled Flavors',
+      cardAction: 'Specialty',
+      summaryLabel: 'Estimated total',
+      resetLabel: 'Clear',
+      itemSingular: 'item',
+      itemPlural: 'items',
+      footerText: 'FoodCore ERP v5.4.0 Enterprise · All rights reserved',
+      categories: {
+        Todos: 'All',
+        Hamburguesas: 'Burgers',
+        'Alitas & Pollo': 'Wings & Chicken',
+        Bebidas: 'Drinks',
+        Guarniciones: 'Sides',
+        Especialidades: 'Specialties'
+      },
+      sizes: {
+        Regular: 'Regular',
+        Grande: 'Large (+S/ 5)',
+        Doble: 'Double (+S/ 9)'
+      }
+    }
+  };
+
   let activeCategory = 'Todos';
   let catalogProducts = [...FALLBACK_CATALOG];
   let previewCount = 0;
   let previewTotal = 0;
+  let activeLang = 'es';
+  let i18nDict = DEFAULT_I18N.es;
+
+  function translateCategory(cat) {
+    const map = (i18nDict && i18nDict.categories) || {};
+    return map[cat] || cat;
+  }
+
+  function updateSummaryCountText() {
+    const countEl = document.getElementById('orderTotalCount');
+    if (!countEl) return;
+    const unit = previewCount === 1
+      ? (i18nDict.itemSingular || 'ítem')
+      : (i18nDict.itemPlural || 'ítems');
+    countEl.textContent = previewCount + ' ' + unit;
+  }
+
+  function applyTranslations() {
+    document.documentElement.lang = activeLang;
+    if (i18nDict.pageTitle) document.title = i18nDict.pageTitle;
+    const setText = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val) el.textContent = val;
+    };
+    setText('headerSubtitle', i18nDict.subtitle);
+    setText('badgeLive', i18nDict.badgeLive);
+    setText('heroKicker', i18nDict.heroKicker);
+    setText('heroTitle', i18nDict.heroTitle);
+    setText('lblSummaryCaption', i18nDict.summaryLabel);
+    setText('btnResetPreview', i18nDict.resetLabel);
+    setText('menuFooter', i18nDict.footerText);
+    document.querySelectorAll('.lang-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.lang === activeLang);
+    });
+    document.querySelectorAll('.category-tab').forEach((btn) => {
+      btn.textContent = translateCategory(btn.dataset.category);
+    });
+    document.querySelectorAll('.card-cat-badge').forEach((badge) => {
+      if (badge.dataset.category) badge.textContent = translateCategory(badge.dataset.category);
+    });
+    document.querySelectorAll('.btn-pedir').forEach((btn) => {
+      btn.textContent = i18nDict.cardAction || 'Especialidad';
+    });
+    document.querySelectorAll('.size-pill').forEach((pill) => {
+      const key = pill.dataset.sizeKey;
+      if (key && i18nDict.sizes && i18nDict.sizes[key]) {
+        pill.textContent = i18nDict.sizes[key];
+      }
+    });
+    updateSummaryCountText();
+  }
+
+  async function setLanguage(lang) {
+    const normalized = lang === 'en' ? 'en' : 'es';
+    activeLang = normalized;
+    try {
+      window.localStorage.setItem(LANG_STORAGE_KEY, normalized);
+    } catch (_e) {
+      // Ignorar si localStorage no esta disponible
+    }
+
+    let loaded = null;
+    for (const candidate of [normalized + '.json', '/menu-digital/' + normalized + '.json']) {
+      try {
+        const res = await fetch(candidate, { headers: { Accept: 'application/json' } });
+        if (res.ok) {
+          loaded = await res.json();
+          break;
+        }
+      } catch (_err) {
+        // Fallback al siguiente origen o diccionario embebido
+      }
+    }
+    i18nDict = loaded && loaded.categories ? loaded : DEFAULT_I18N[normalized];
+    applyTranslations();
+  }
 
   function animatePrice(element, startValue, endValue, duration = 400) {
     if (!element) return;
@@ -105,7 +237,7 @@
       btn.type = 'button';
       btn.className = 'category-tab' + (cat === activeCategory ? ' active' : '');
       btn.dataset.category = cat;
-      btn.textContent = cat;
+      btn.textContent = translateCategory(cat);
       btn.addEventListener('click', () => switchCategory(cat));
       tabsContainer.appendChild(btn);
     });
@@ -154,7 +286,8 @@
 
     const badge = document.createElement('span');
     badge.className = 'card-cat-badge';
-    badge.textContent = category;
+    badge.dataset.category = category;
+    badge.textContent = translateCategory(category);
 
     const title = document.createElement('h2');
     title.className = 'card-title';
@@ -173,15 +306,16 @@
     const sizesWrap = document.createElement('div');
     sizesWrap.className = 'size-pills';
     const sizes = [
-      { label: 'Regular', delta: 0 },
-      { label: 'Grande (+S/ 5)', delta: 5 },
-      { label: 'Doble (+S/ 9)', delta: 9 }
+      { key: 'Regular', delta: 0 },
+      { key: 'Grande', delta: 5 },
+      { key: 'Doble', delta: 9 }
     ];
     sizes.forEach((sz, idx) => {
       const pill = document.createElement('button');
       pill.type = 'button';
       pill.className = 'size-pill' + (idx === 0 ? ' active' : '');
-      pill.textContent = sz.label;
+      pill.dataset.sizeKey = sz.key;
+      pill.textContent = (i18nDict.sizes && i18nDict.sizes[sz.key]) || sz.key;
       pill.dataset.price = (basePrice + sz.delta).toFixed(2);
       pill.addEventListener('click', () => {
         sizesWrap.querySelectorAll('.size-pill').forEach((p) => p.classList.remove('active'));
@@ -207,7 +341,7 @@
     const cta = document.createElement('button');
     cta.type = 'button';
     cta.className = 'btn-pedir';
-    cta.textContent = 'Especialidad';
+    cta.textContent = i18nDict.cardAction || 'Especialidad';
     cta.addEventListener('click', () => {
       const activePill = sizesWrap.querySelector('.size-pill.active');
       const unitPrice = Number(activePill ? activePill.dataset.price : basePrice);
@@ -215,13 +349,10 @@
       previewTotal += unitPrice;
       previewCount += 1;
       const totalEl = document.getElementById('orderPreviewTotal');
-      const countEl = document.getElementById('orderTotalCount');
       if (totalEl) {
         animatePrice(totalEl, prevTotal, previewTotal, 400);
       }
-      if (countEl) {
-        countEl.textContent = previewCount + (previewCount === 1 ? ' ítem' : ' ítems');
-      }
+      updateSummaryCountText();
     });
 
     footer.appendChild(price);
@@ -304,10 +435,29 @@
     switchCategory,
     loadCatalog,
     updateParallax,
-    animatePrice
+    animatePrice,
+    setLanguage
   };
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    let savedLang = 'es';
+    try {
+      const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
+      if (stored === 'en' || stored === 'es') {
+        savedLang = stored;
+      }
+    } catch (_e) {
+      // Ignorar si localStorage no esta disponible
+    }
+    if (savedLang === 'en') {
+      activeLang = 'en';
+      i18nDict = DEFAULT_I18N.en;
+    }
+
+    document.querySelectorAll('.lang-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+    });
+
     const resetBtn = document.getElementById('btnResetPreview');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
@@ -315,11 +465,13 @@
         previewTotal = 0;
         previewCount = 0;
         const totalEl = document.getElementById('orderPreviewTotal');
-        const countEl = document.getElementById('orderTotalCount');
         if (totalEl) animatePrice(totalEl, prev, 0, 400);
-        if (countEl) countEl.textContent = '0 ítems';
+        updateSummaryCountText();
       });
     }
-    loadCatalog().then(updateParallax);
+
+    await loadCatalog();
+    await setLanguage(savedLang);
+    updateParallax();
   });
 })();

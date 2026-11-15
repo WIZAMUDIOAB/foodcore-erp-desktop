@@ -66,6 +66,47 @@ header.glass-header {
   margin-bottom: 10px;
 }
 
+.header-brand-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #FDBA74;
+  background: rgba(255, 90, 31, 0.16);
+  border: 1px solid rgba(255, 90, 31, 0.35);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.lang-btn {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #E2E8F0;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease;
+}
+
+.lang-btn.active {
+  background: var(--primary);
+  color: #FFFFFF;
+  border-color: var(--primary);
+}
+
+.lang-btn:active {
+  transform: scale(0.98);
+  transition: transform 0.05s ease;
+}
+
 header h1 {
   font-size: 26px;
   font-weight: 800;
