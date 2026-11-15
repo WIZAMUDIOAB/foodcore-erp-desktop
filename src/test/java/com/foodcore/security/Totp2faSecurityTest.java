@@ -18,6 +18,8 @@ import com.foodcore.util.ConexionBD;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,19 @@ class Totp2faSecurityTest {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
         MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
         TestSecuritySupport.asegurarJwtSecretTest();
+    }
+
+    @AfterEach
+    void limpiarEstado2fa() {
+        try (Connection conn = ConexionBD.getConnection()) {
+            usuarioDAO.actualizarConfiguracion2FA(conn, 1, null, false);
+        } catch (Exception ignored) {
+        }
+    }
+
+    @AfterAll
+    static void restaurarEsquemaTrasTotp() {
+        MySqlIntegrationTestSupport.inicializarEntornoMySql();
     }
 
     @Test

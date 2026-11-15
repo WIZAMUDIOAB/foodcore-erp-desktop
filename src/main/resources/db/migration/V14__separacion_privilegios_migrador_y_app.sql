@@ -18,8 +18,6 @@
 
 DELIMITER $$
 
-DROP PROCEDURE IF EXISTS sp_aplicar_privilegios_dml_app_v14 $$
-
 CREATE PROCEDURE sp_aplicar_privilegios_dml_app_v14()
 BEGIN
     DECLARE schema_actual VARCHAR(64);

@@ -290,7 +290,8 @@ public final class PlaywrightE2ESupport {
                 resp = client.send(req, HttpResponse.BodyHandlers.ofString());
             }
             if (resp.statusCode() != 200) {
-                throw new IllegalStateException("Login fallido para rol " + rolNormalizado + ": HTTP " + resp.statusCode());
+                throw new IllegalStateException(
+                        "Login fallido para rol " + rolNormalizado + ": HTTP " + resp.statusCode() + " - " + resp.body());
             }
             JsonNode json = JSON_MAPPER.readTree(resp.body());
             String token = json.path("token").asText("");

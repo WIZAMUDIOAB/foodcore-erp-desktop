@@ -62,7 +62,7 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
                         rs.getString("entidad_afectada"),
                         rs.getString("datos_anteriores"),
                         rs.getString("datos_nuevos"),
-                        ts != null ? ts.toLocalDateTime() : null
+                        ts != null ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime() : null
                     );
                     lista.add(reg);
                 }
@@ -77,8 +77,8 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
             return ResumenSeguridadHoy.normal();
         }
         LocalDate hoy = LocalDate.now(ZONA_LIMA);
-        Timestamp inicio = Timestamp.valueOf(hoy.atStartOfDay());
-        Timestamp fin = Timestamp.valueOf(hoy.plusDays(1).atStartOfDay());
+        long inicioEpochSec = hoy.atStartOfDay(ZONA_LIMA).toEpochSecond();
+        long finEpochSec = hoy.plusDays(1).atStartOfDay(ZONA_LIMA).toEpochSecond();
 
         int intentosFallidos = 0;
         int anulaciones = 0;
@@ -89,10 +89,10 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
                 + "THEN 1 ELSE 0 END), 0) AS fallidos, "
                 + "COALESCE(SUM(CASE WHEN UPPER(accion) LIKE '%ANUL%' "
                 + "THEN 1 ELSE 0 END), 0) AS anulaciones "
-                + "FROM auditoria WHERE fecha >= ? AND fecha < ?";
+                + "FROM auditoria WHERE fecha >= FROM_UNIXTIME(?) AND fecha < FROM_UNIXTIME(?)";
         try (PreparedStatement ps = conn.prepareStatement(sqlConteo)) {
-            ps.setTimestamp(1, inicio);
-            ps.setTimestamp(2, fin);
+            ps.setLong(1, inicioEpochSec);
+            ps.setLong(2, finEpochSec);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     intentosFallidos = rs.getInt("fallidos");
@@ -112,7 +112,9 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 Timestamp ts = rs.getTimestamp("fecha");
-                String horaStr = ts != null ? ts.toLocalDateTime().format(FMT_SOSPECHOSO) : "--/-- --:--";
+                String horaStr = ts != null
+                        ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime().format(FMT_SOSPECHOSO)
+                        : "--/-- --:--";
                 String user = rs.getString("username");
                 String acc = rs.getString("accion");
                 String detalle = rs.getString("datos_nuevos");
