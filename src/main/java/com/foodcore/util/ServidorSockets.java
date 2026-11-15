@@ -114,6 +114,15 @@ public class ServidorSockets {
         return puertoActual;
     }
 
+    /**
+     * Retorna la cantidad de clientes/terminales KDS conectados actualmente al socket.
+     */
+    public int getCantidadClientesConectados() {
+        synchronized (clientesConectados) {
+            return clientesConectados.size();
+        }
+    }
+
     private void atenderCliente(Socket socket) {
         threadPool.execute(() -> {
             PrintWriter out = null;

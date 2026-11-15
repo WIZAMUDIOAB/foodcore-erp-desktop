@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="rootEstadoSistemaStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.EstadoSistemaController">
+    <children>
+        <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <VBox minWidth="980.0" spacing="20.0" styleClass="pos-catalog-panel">
+                    <children>
+                        <!-- Cabecera -->
+                        <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="14.0" styleClass="surface-card">
+                            <children>
+                                <VBox spacing="4.0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Estado del Sistema y Telemetría de Infraestructura" />
+                                                <Label styleClass="badge-pill-accent" text="SOLO ADMIN · AUTO-REFRESH 5s" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Salud en tiempo real de MySQL 8, servidores HTTP/HTTPS LAN, Socket KDS, Cloudflare Tunnel, Flyway y recursos de hardware" />
+                                    </children>
+                                </VBox>
+                                <Region HBox.hgrow="ALWAYS" />
+                                <VBox alignment="CENTER_RIGHT" spacing="4.0">
+                                    <children>
+                                        <Label fx:id="lblUltimaActualizacion" styleClass="text-caption" text="Actualizado: --:--:--" />
+                                        <Button fx:id="btnRefrescarAhora" mnemonicParsing="false" onAction="#handleRefrescarAhora" styleClass="btn-secondary" text="Actualizar Ahora" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </HBox>
+
+                        <!-- Servicios Críticos (Ítem 4) -->
+                        <GridPane hgap="16.0" vgap="16.0">
+                            <columnConstraints>
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
+                                <ColumnConstraints hgrow="ALWAYS" percentWidth="33.34" />
+                            </columnConstraints>
+                            <rowConstraints>
+                                <RowConstraints vgrow="SOMETIMES" />
+                                <RowConstraints vgrow="SOMETIMES" />
+                            </rowConstraints>
+                            <children>
+                                <!-- MySQL -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="BASE DE DATOS MYSQL" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblMysqlEstado" styleClass="badge-pill-neutral" text="--" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblMysqlVersion" styleClass="text-h2" text="Versión: N/D" />
+                                        <Label fx:id="lblMysqlLatencia" styleClass="text-caption" text="Tiempo de respuesta: -- ms" />
+                                    </children>
+                                </VBox>
+
+                                <!-- Javalin HTTP 8080 -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="JAVALIN API REST (HTTP)" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblHttpEstado" styleClass="badge-pill-neutral" text="--" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblHttpDetalle" styleClass="text-h2" text="Puerto 8080" />
+                                        <Label styleClass="text-caption" text="PWA Mozo, POS web y endpoints REST LAN" />
+                                    </children>
+                                </VBox>
+
+                                <!-- Javalin HTTPS 8443 -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="2" GridPane.rowIndex="0">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="JAVALIN TLS (HTTPS)" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblHttpsEstado" styleClass="badge-pill-neutral" text="--" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblHttpsDetalle" styleClass="text-h2" text="Puerto 8443" />
+                                        <Label styleClass="text-caption" text="Cifrado SSL LAN y certificado PKCS12" />
+                                    </children>
+                                </VBox>
+
+                                <!-- Socket KDS 9090 -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="SOCKET KDS COCINA (TCP)" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblKdsSocketEstado" styleClass="badge-pill-neutral" text="--" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblKdsSocketPuerto" styleClass="text-h2" text="Puerto 9090" />
+                                        <Label fx:id="lblKdsSocketClientes" styleClass="text-caption" text="Clientes conectados: 0" />
+                                    </children>
+                                </VBox>
+
+                                <!-- Cloudflare Tunnel -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="CLOUDFLARE TUNNEL" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblTunnelEstado" styleClass="badge-pill-neutral" text="--" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblTunnelUrl" styleClass="text-body-strong" text="Sin túnel activo" wrapText="true" />
+                                        <Label styleClass="text-caption" text="Acceso público temporal Menú Digital QR" />
+                                    </children>
+                                </VBox>
+
+                                <!-- Flyway + Uptime -->
+                                <VBox spacing="10.0" styleClass="surface-card" GridPane.columnIndex="2" GridPane.rowIndex="1">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                            <children>
+                                                <Label styleClass="text-overline" text="FLYWAY Y UPTIME" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Label fx:id="lblFlywayBadge" styleClass="badge-pill-success" text="SCHEMA" />
+                                            </children>
+                                        </HBox>
+                                        <Label fx:id="lblFlywayVersion" styleClass="text-h2" text="Versión: V23" wrapText="true" />
+                                        <Label fx:id="lblSistemaUptime" styleClass="text-caption" text="Uptime del sistema: 00h 00m 00s" />
+                                    </children>
+                                </VBox>
+                            </children>
+                        </GridPane>
+
+                        <!-- Métricas de Performance CPU / RAM / Disco (Ítem 5) -->
+                        <VBox spacing="14.0" styleClass="surface-card">
+                            <children>
+                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                    <children>
+                                        <Label styleClass="text-h2" text="Métricas de Performance del Servidor (CPU / RAM / Disco)" />
+                                        <Label fx:id="lblAlertaHardwareBadge" styleClass="badge-pill-success" text="SALUD ÓPTIMA" />
+                                    </children>
+                                </HBox>
+
+                                <GridPane hgap="18.0" vgap="12.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="33.33" />
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="33.34" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints vgrow="SOMETIMES" />
+                                    </rowConstraints>
+                                    <children>
+                                        <!-- CPU -->
+                                        <VBox spacing="8.0" styleClass="surface-card-subtle" GridPane.columnIndex="0">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="USO DE CPU" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label fx:id="lblCpuPorcentaje" styleClass="text-mono" text="0.0 %" />
+                                                    </children>
+                                                </HBox>
+                                                <ProgressBar fx:id="barCpuUso" maxWidth="1.7976931348623157E308" progress="0.0" />
+                                                <Label styleClass="text-caption" text="Carga agregada vía OperatingSystemMXBean / WMIC" />
+                                            </children>
+                                        </VBox>
+
+                                        <!-- RAM -->
+                                        <VBox spacing="8.0" styleClass="surface-card-subtle" GridPane.columnIndex="1">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="MEMORIA RAM" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label fx:id="lblRamPorcentaje" styleClass="text-mono" text="0.0 %" />
+                                                    </children>
+                                                </HBox>
+                                                <ProgressBar fx:id="barRamUso" maxWidth="1.7976931348623157E308" progress="0.0" />
+                                                <Label fx:id="lblRamDetalle" styleClass="text-caption" text="Usada: 0.00 GB / Total: 0.00 GB" />
+                                            </children>
+                                        </VBox>
+
+                                        <!-- Disco -->
+                                        <VBox spacing="8.0" styleClass="surface-card-subtle" GridPane.columnIndex="2">
+                                            <children>
+                                                <HBox alignment="CENTER_LEFT">
+                                                    <children>
+                                                        <Label styleClass="text-overline" text="ALMACENAMIENTO DISCO" />
+                                                        <Region HBox.hgrow="ALWAYS" />
+                                                        <Label fx:id="lblDiscoPorcentaje" styleClass="text-mono" text="0.0 %" />
+                                                    </children>
+                                                </HBox>
+                                                <ProgressBar fx:id="barDiscoUso" maxWidth="1.7976931348623157E308" progress="0.0" />
+                                                <Label fx:id="lblDiscoDetalle" styleClass="text-caption" text="Libre: 0.00 GB / Total: 0.00 GB" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+                            </children>
+                        </VBox>
+                    </children>
+                </VBox>
+            </content>
+        </ScrollPane>
+    </children>
+</StackPane>

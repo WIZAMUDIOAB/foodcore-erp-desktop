@@ -3,6 +3,9 @@ package com.foodcore.controller;
 import com.foodcore.dao.ConfiguracionImpresoraDAO;
 import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
 import com.foodcore.model.ConfiguracionImpresora;
+import com.foodcore.service.AlertaService;
+import com.foodcore.service.AlertaService.AlertaEmitida;
+import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImpresoraTermicaService;
@@ -12,31 +15,52 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
- * Controlador de Configuración del Restaurante y Múltiples Impresoras por Categoría (v5.2.0):
- * persiste datos generales del comprobante y asigna {@code Categoría -> Impresora Windows}.
+ * Controlador de Configuración del Restaurante, Múltiples Impresoras por Categoría (v5.2.0),
+ * Alertas SMTP y Respaldo/Restauración Automatizada de BD (v5.3.0 Sub-Fase C).
  */
 public class ConfiguracionController {
 
     private static final Logger LOGGER = Logger.getLogger(ConfiguracionController.class.getName());
+    private static final int SCRIPT_TIMEOUT_SECONDS = 120;
 
     public record CategoriaOpcion(int idCategoria, String nombre) {
         @Override
@@ -62,18 +86,48 @@ public class ConfiguracionController {
     @FXML private TableColumn<ConfiguracionImpresora, String> colImpWindows;
     @FXML private TableColumn<ConfiguracionImpresora, String> colImpEstado;
 
+    // Alertas SMTP (v5.3.0 Ítem 6)
+    @FXML private TextField txtEmailAlertas;
+    @FXML private CheckBox chkAlertasEmailHabilitadas;
+    @FXML private CheckBox chkSmtpTlsHabilitado;
+    @FXML private TextField txtSmtpHost;
+    @FXML private TextField txtSmtpPort;
+    @FXML private TextField txtSmtpUser;
+    @FXML private PasswordField txtSmtpPassword;
+    @FXML private Button btnGuardarAlertasEmail;
+    @FXML private Button btnProbarAlertaEmail;
+    @FXML private Label lblEstadoAlertasEmail;
+
+    // Respaldo y Restauración (v5.3.0 Ítem 3)
+    @FXML private TextField txtRutaBackupRestaurar;
+    @FXML private Button btnSeleccionarBackup;
+    @FXML private Button btnGenerarBackupAhora;
+    @FXML private Button btnRestaurarBackup;
+    @FXML private Label lblEstadoRestauracion;
+
     private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
     private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
+
+    private BooleanSupplier confirmacionRestauracionSupplier = this::solicitarConfirmacionRestauracionUi;
+    private Function<Path, Boolean> ejecutorRestauracion = ConfiguracionController::ejecutarScriptRestauracionSistema;
+    private Supplier<Path> ejecutorBackup = ConfiguracionController::ejecutarScriptBackupSistema;
 
     @FXML
     public void initialize() {
         AnimationUtils.attachTactileFeedback(btnGuardarConfig);
         AnimationUtils.attachTactileFeedback(btnAsignarImpresora);
         AnimationUtils.attachTactileFeedback(btnQuitarImpresora);
+        AnimationUtils.attachTactileFeedback(btnGuardarAlertasEmail);
+        AnimationUtils.attachTactileFeedback(btnProbarAlertaEmail);
+        AnimationUtils.attachTactileFeedback(btnSeleccionarBackup);
+        AnimationUtils.attachTactileFeedback(btnGenerarBackupAhora);
+        AnimationUtils.attachTactileFeedback(btnRestaurarBackup);
         configurarTablaImpresoras();
         poblarImpresorasDetectadas();
         cargarConfiguracion();
         cargarRuteoImpresorasAsync();
+        cargarConfiguracionAlertasEmailUi();
+        precargarUltimoBackupDisponible();
     }
 
     private void configurarTablaImpresoras() {
@@ -187,6 +241,405 @@ public class ConfiguracionController {
             ex -> AnimationUtils.mostrarToast(rootConfigStack,
                     "Error al quitar asignación: " + ex.getMessage(), true)
         );
+    }
+
+    // =========================================================================
+    // Alertas de Fallo por Email SMTP (v5.3.0 Ítem 6)
+    // =========================================================================
+
+    private void cargarConfiguracionAlertasEmailUi() {
+        ConfiguracionAlertaEmail cfg = AlertaService.getConfiguracionGlobal();
+        if (cfg == null) {
+            return;
+        }
+        if (txtEmailAlertas != null) {
+            txtEmailAlertas.setText(cfg.destinatario());
+        }
+        if (chkAlertasEmailHabilitadas != null) {
+            chkAlertasEmailHabilitadas.setSelected(cfg.habilitado());
+        }
+        if (chkSmtpTlsHabilitado != null) {
+            chkSmtpTlsHabilitado.setSelected(cfg.tlsEnabled());
+        }
+        if (txtSmtpHost != null) {
+            txtSmtpHost.setText(cfg.smtpHost());
+        }
+        if (txtSmtpPort != null) {
+            txtSmtpPort.setText(String.valueOf(cfg.smtpPort()));
+        }
+        if (txtSmtpUser != null) {
+            txtSmtpUser.setText(cfg.smtpUser());
+        }
+        if (txtSmtpPassword != null) {
+            txtSmtpPassword.setText(cfg.smtpPassword());
+        }
+        if (lblEstadoAlertasEmail != null) {
+            lblEstadoAlertasEmail.setText(cfg.habilitado()
+                    ? "Alertas activas → " + cfg.destinatario()
+                    : "Alertas deshabilitadas");
+        }
+    }
+
+    @FXML
+    public void handleGuardarConfiguracionAlertas(ActionEvent event) {
+        String emailDest = txtEmailAlertas != null ? txtEmailAlertas.getText().trim() : "";
+        String host = txtSmtpHost != null ? txtSmtpHost.getText().trim() : "";
+        String portRaw = txtSmtpPort != null ? txtSmtpPort.getText().trim() : "587";
+        String user = txtSmtpUser != null ? txtSmtpUser.getText().trim() : "";
+        String pass = txtSmtpPassword != null ? txtSmtpPassword.getText() : "";
+        boolean habilitado = chkAlertasEmailHabilitadas == null || chkAlertasEmailHabilitadas.isSelected();
+        boolean tls = chkSmtpTlsHabilitado == null || chkSmtpTlsHabilitado.isSelected();
+
+        if (emailDest.isBlank() || !emailDest.contains("@")) {
+            AnimationUtils.mostrarToast(rootConfigStack, "Ingrese un correo destinatario válido para alertas.", true);
+            return;
+        }
+        int puerto;
+        try {
+            puerto = Integer.parseInt(portRaw);
+            if (puerto <= 0 || puerto > 65535) {
+                throw new NumberFormatException("Puerto fuera de rango");
+            }
+        } catch (NumberFormatException ex) {
+            AnimationUtils.mostrarToast(rootConfigStack, "Puerto SMTP inválido (ej. 587 o 465).", true);
+            return;
+        }
+
+        ConfiguracionAlertaEmail nuevaCfg = new ConfiguracionAlertaEmail(
+                host.isBlank() ? "smtp.gmail.com" : host,
+                puerto,
+                user,
+                pass,
+                tls,
+                emailDest,
+                habilitado
+        );
+        AlertaService.actualizarConfiguracionGlobal(nuevaCfg, true);
+        if (lblEstadoAlertasEmail != null) {
+            lblEstadoAlertasEmail.setText("Guardado → " + emailDest);
+            lblEstadoAlertasEmail.getStyleClass().removeAll("badge-pill-danger", "badge-pill-warning", "badge-pill-neutral");
+            if (!lblEstadoAlertasEmail.getStyleClass().contains("badge-pill-success")) {
+                lblEstadoAlertasEmail.getStyleClass().add("badge-pill-success");
+            }
+        }
+        AnimationUtils.mostrarToast(rootConfigStack, "Configuración de alertas SMTP guardada para " + emailDest, false);
+    }
+
+    @FXML
+    public void handleProbarAlertaEmail(ActionEvent event) {
+        handleGuardarConfiguracionAlertas(event);
+        if (btnProbarAlertaEmail != null) {
+            btnProbarAlertaEmail.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            AlertaService::enviarAlertaPruebaGlobal,
+            emitida -> {
+                if (btnProbarAlertaEmail != null) {
+                    btnProbarAlertaEmail.setDisable(false);
+                }
+                boolean ok = emitida != null && emitida.enviadoPorRed();
+                if (lblEstadoAlertasEmail != null) {
+                    lblEstadoAlertasEmail.setText(ok
+                            ? "Prueba enviada a " + emitida.destinatario()
+                            : "Prueba registrada (verifique credenciales SMTP)");
+                }
+                AnimationUtils.mostrarToast(
+                        rootConfigStack,
+                        ok ? "Email de prueba enviado a " + emitida.destinatario()
+                                : "Alerta registrada; el servidor SMTP no confirmó envío de red.",
+                        !ok
+                );
+            },
+            ex -> {
+                if (btnProbarAlertaEmail != null) {
+                    btnProbarAlertaEmail.setDisable(false);
+                }
+                AnimationUtils.mostrarToast(rootConfigStack, "Error enviando prueba SMTP: " + ex.getMessage(), true);
+            }
+        );
+    }
+
+    // =========================================================================
+    // Respaldo y Restauración Automatizada (v5.3.0 Ítem 3)
+    // =========================================================================
+
+    private void precargarUltimoBackupDisponible() {
+        if (txtRutaBackupRestaurar == null || !txtRutaBackupRestaurar.getText().isBlank()) {
+            return;
+        }
+        Path backupsDir = Path.of("backups");
+        if (!Files.isDirectory(backupsDir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.list(backupsDir)) {
+            Optional<Path> reciente = walk
+                    .filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
+                        return n.endsWith(".sql.gz") || n.endsWith(".sql");
+                    })
+                    .max(Comparator.comparingLong(p -> p.toFile().lastModified()));
+            reciente.ifPresent(p -> txtRutaBackupRestaurar.setText(p.toString()));
+        } catch (IOException ignored) {
+            // Si no hay directorio legible se deja el campo editable vacío
+        }
+    }
+
+    @FXML
+    public void handleSeleccionarArchivoBackup(ActionEvent event) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Seleccionar Archivo de Backup FoodCore (.sql.gz / .sql)");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Backups MySQL comprimidos (*.sql.gz)", "*.sql.gz"),
+                new FileChooser.ExtensionFilter("Volcados SQL (*.sql)", "*.sql")
+        );
+        Path backupsDir = Path.of("backups");
+        if (Files.isDirectory(backupsDir)) {
+            chooser.setInitialDirectory(backupsDir.toFile());
+        }
+        Window window = rootConfigStack != null && rootConfigStack.getScene() != null
+                ? rootConfigStack.getScene().getWindow() : null;
+        File seleccionado = chooser.showOpenDialog(window);
+        if (seleccionado != null && txtRutaBackupRestaurar != null) {
+            txtRutaBackupRestaurar.setText(seleccionado.getAbsolutePath());
+        }
+    }
+
+    @FXML
+    public void handleEjecutarBackupAhora(ActionEvent event) {
+        if (btnGenerarBackupAhora != null) {
+            btnGenerarBackupAhora.setDisable(true);
+        }
+        actualizarEstadoRestauracion("Generando backup comprimido...", "badge-pill-warning");
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> ejecutorBackup.get(),
+            archivoGenerado -> {
+                if (btnGenerarBackupAhora != null) {
+                    btnGenerarBackupAhora.setDisable(false);
+                }
+                if (archivoGenerado != null) {
+                    if (txtRutaBackupRestaurar != null) {
+                        txtRutaBackupRestaurar.setText(archivoGenerado.toString());
+                    }
+                    actualizarEstadoRestauracion("Backup listo: " + archivoGenerado.getFileName(), "badge-pill-success");
+                    AnimationUtils.mostrarToast(rootConfigStack, "Backup generado: " + archivoGenerado.getFileName(), false);
+                } else {
+                    actualizarEstadoRestauracion("Backup falló al ejecutarse", "badge-pill-danger");
+                    AnimationUtils.mostrarToast(rootConfigStack, "No se pudo generar el backup automático.", true);
+                }
+            },
+            ex -> {
+                if (btnGenerarBackupAhora != null) {
+                    btnGenerarBackupAhora.setDisable(false);
+                }
+                actualizarEstadoRestauracion("Error en backup", "badge-pill-danger");
+                AnimationUtils.mostrarToast(rootConfigStack, "Error ejecutando backup: " + ex.getMessage(), true);
+            }
+        );
+    }
+
+    @FXML
+    public void handleRestaurarDesdeBackup(ActionEvent event) {
+        String rutaTexto = txtRutaBackupRestaurar != null ? txtRutaBackupRestaurar.getText().trim() : "";
+        if (rutaTexto.isBlank()) {
+            AnimationUtils.mostrarToast(rootConfigStack, "Seleccione o indique la ruta de un backup válido.", true);
+            return;
+        }
+        Path archivoBackup = Path.of(rutaTexto);
+        if (!Files.isRegularFile(archivoBackup)) {
+            actualizarEstadoRestauracion("Archivo no encontrado", "badge-pill-danger");
+            AnimationUtils.mostrarToast(rootConfigStack, "El archivo de backup especificado no existe.", true);
+            return;
+        }
+        if (!confirmacionRestauracionSupplier.getAsBoolean()) {
+            actualizarEstadoRestauracion("Restauración cancelada por el usuario", "badge-pill-neutral");
+            return;
+        }
+
+        if (btnRestaurarBackup != null) {
+            btnRestaurarBackup.setDisable(true);
+        }
+        actualizarEstadoRestauracion("Restaurando base de datos...", "badge-pill-warning");
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> Boolean.TRUE.equals(ejecutorRestauracion.apply(archivoBackup)),
+            exito -> {
+                if (btnRestaurarBackup != null) {
+                    btnRestaurarBackup.setDisable(false);
+                }
+                if (Boolean.TRUE.equals(exito)) {
+                    actualizarEstadoRestauracion("BD restaurada desde " + archivoBackup.getFileName(), "badge-pill-success");
+                    AnimationUtils.mostrarToast(rootConfigStack,
+                            "Restauración completada desde " + archivoBackup.getFileName(), false);
+                } else {
+                    actualizarEstadoRestauracion("Error al restaurar backup", "badge-pill-danger");
+                    AnimationUtils.mostrarToast(rootConfigStack,
+                            "No se pudo completar la restauración del backup.", true);
+                }
+            },
+            ex -> {
+                if (btnRestaurarBackup != null) {
+                    btnRestaurarBackup.setDisable(false);
+                }
+                actualizarEstadoRestauracion("Error en restauración", "badge-pill-danger");
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Error ejecutando restauración: " + ex.getMessage(), true);
+            }
+        );
+    }
+
+    private void actualizarEstadoRestauracion(String texto, String badgeClass) {
+        if (lblEstadoRestauracion == null) {
+            return;
+        }
+        lblEstadoRestauracion.setText(texto);
+        lblEstadoRestauracion.getStyleClass().removeAll(
+                "badge-pill-success", "badge-pill-danger", "badge-pill-warning", "badge-pill-neutral");
+        lblEstadoRestauracion.getStyleClass().add(badgeClass);
+    }
+
+    private boolean solicitarConfirmacionRestauracionUi() {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirmar Restauración de Base de Datos");
+        confirm.setHeaderText("Se restaurará la base de datos desde el archivo seleccionado");
+        confirm.setContentText("Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
+        if (rootConfigStack != null && rootConfigStack.getScene() != null) {
+            confirm.initOwner(rootConfigStack.getScene().getWindow());
+        }
+        Optional<ButtonType> result = confirm.showAndWait();
+        return result.isPresent() && result.get() == ButtonType.OK;
+    }
+
+    static boolean ejecutarScriptRestauracionSistema(Path backupFile) {
+        if (backupFile == null || !Files.isRegularFile(backupFile)) {
+            return false;
+        }
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        ProcessBuilder pb;
+        if (osName.contains("win")) {
+            Path script = Path.of("scripts", "restore-auto.ps1").toAbsolutePath().normalize();
+            if (!Files.isRegularFile(script)) {
+                return false;
+            }
+            pb = new ProcessBuilder(
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", script.toString(),
+                    "-BackupFile", backupFile.toAbsolutePath().normalize().toString(),
+                    "-SkipServiceRestart"
+            );
+        } else {
+            Path script = Path.of("scripts", "restore-auto.sh").toAbsolutePath().normalize();
+            if (!Files.isRegularFile(script)) {
+                return false;
+            }
+            pb = new ProcessBuilder("bash", script.toString(), backupFile.toAbsolutePath().normalize().toString());
+        }
+        pb.redirectErrorStream(true);
+        Process proc = null;
+        try {
+            proc = pb.start();
+            try (var reader = proc.getInputStream()) {
+                reader.readAllBytes();
+            }
+            boolean finished = proc.waitFor(SCRIPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return finished && proc.exitValue() == 0;
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            LOGGER.log(Level.WARNING, "Error ejecutando restore-auto: " + ex.getMessage(), ex);
+            return false;
+        } finally {
+            if (proc != null && proc.isAlive()) {
+                proc.destroyForcibly();
+            }
+        }
+    }
+
+    static Path ejecutarScriptBackupSistema() {
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        ProcessBuilder pb;
+        if (osName.contains("win")) {
+            Path script = Path.of("scripts", "backup-auto.ps1").toAbsolutePath().normalize();
+            if (!Files.isRegularFile(script)) {
+                return null;
+            }
+            pb = new ProcessBuilder(
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", script.toString()
+            );
+        } else {
+            Path script = Path.of("scripts", "backup-auto.sh").toAbsolutePath().normalize();
+            if (!Files.isRegularFile(script)) {
+                return null;
+            }
+            pb = new ProcessBuilder("bash", script.toString());
+        }
+        pb.redirectErrorStream(true);
+        Process proc = null;
+        try {
+            proc = pb.start();
+            String output = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            boolean finished = proc.waitFor(SCRIPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished || proc.exitValue() != 0) {
+                return null;
+            }
+            String[] lines = output.split("\\R");
+            for (int i = lines.length - 1; i >= 0; i--) {
+                String candidate = lines[i].trim();
+                if (!candidate.isEmpty() && Files.isRegularFile(Path.of(candidate))) {
+                    return Path.of(candidate);
+                }
+            }
+            return null;
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            LOGGER.log(Level.WARNING, "Error ejecutando backup-auto: " + ex.getMessage(), ex);
+            return null;
+        } finally {
+            if (proc != null && proc.isAlive()) {
+                proc.destroyForcibly();
+            }
+        }
+    }
+
+    public void setConfirmacionRestauracionSupplier(BooleanSupplier supplier) {
+        this.confirmacionRestauracionSupplier = supplier != null ? supplier : this::solicitarConfirmacionRestauracionUi;
+    }
+
+    public void setEjecutorRestauracion(Function<Path, Boolean> ejecutor) {
+        this.ejecutorRestauracion = ejecutor != null ? ejecutor : ConfiguracionController::ejecutarScriptRestauracionSistema;
+    }
+
+    public void setEjecutorBackup(Supplier<Path> ejecutor) {
+        this.ejecutorBackup = ejecutor != null ? ejecutor : ConfiguracionController::ejecutarScriptBackupSistema;
+    }
+
+    public TextField getTxtRutaBackupRestaurar() {
+        return txtRutaBackupRestaurar;
+    }
+
+    public Label getLblEstadoRestauracion() {
+        return lblEstadoRestauracion;
+    }
+
+    public TextField getTxtEmailAlertas() {
+        return txtEmailAlertas;
+    }
+
+    public TextField getTxtSmtpHost() {
+        return txtSmtpHost;
+    }
+
+    public TextField getTxtSmtpPort() {
+        return txtSmtpPort;
+    }
+
+    public Label getLblEstadoAlertasEmail() {
+        return lblEstadoAlertasEmail;
     }
 
     public ObservableList<ConfiguracionImpresora> getAsignaciones() {

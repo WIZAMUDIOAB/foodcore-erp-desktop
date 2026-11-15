@@ -92,6 +92,7 @@
                                     <Button fx:id="btnNavUsuarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavUsuarios" styleClass="sidebar-nav-button" text="👥 Gestión de Usuarios" />
                                     <Button fx:id="btnNavRoles" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRoles" styleClass="sidebar-nav-button" text="🔑 Roles y Permisos" />
                                     <Button fx:id="btnNavConfiguracion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavConfiguracion" styleClass="sidebar-nav-button" text="⚙️ Configuración del Sistema" />
+                                    <Button fx:id="btnNavEstadoSistema" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavEstadoSistema" styleClass="sidebar-nav-button" text="🖥️ Estado del Sistema" />
                                 </children>
                             </VBox>
                         </content>
