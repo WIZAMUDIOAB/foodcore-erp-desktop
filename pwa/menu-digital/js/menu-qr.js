@@ -84,6 +84,22 @@
     });
   }
 
+  function buildFallbackDishSvg(title, category) {
+    const label = encodeURIComponent((category || 'FoodCore').slice(0, 18));
+    const safeTitle = encodeURIComponent((title || 'Plato').slice(0, 22));
+    return "data:image/svg+xml;utf8,"
+      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 220'%3E"
+      + "%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E"
+      + "%3Cstop offset='0%25' stop-color='%231E293B'/%3E"
+      + "%3Cstop offset='100%25' stop-color='%23FF5A1F'/%3E%3C/linearGradient%3E%3C/defs%3E"
+      + "%3Crect width='400' height='220' fill='url(%23g)'/%3E"
+      + "%3Ccircle cx='330' cy='50' r='55' fill='rgba(255,255,255,0.12)'/%3E"
+      + "%3Ctext x='20' y='110' fill='%23FDBA74' font-family='sans-serif' font-size='14' font-weight='700'%3E"
+      + label + "%3C/text%3E"
+      + "%3Ctext x='20' y='140' fill='%23FFFFFF' font-family='sans-serif' font-size='20' font-weight='800'%3E"
+      + safeTitle + "%3C/text%3E%3C/svg%3E";
+  }
+
   function createDishCard(producto, visibleIndex) {
     const card = document.createElement('article');
     const category = normalizeCategory(producto.categoria);
@@ -95,6 +111,19 @@
     if (visibleIndex < 6) {
       card.style.animationDelay = (visibleIndex * 50) + 'ms';
     }
+
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'card-img-wrap';
+    const img = document.createElement('img');
+    img.className = 'parallax-img';
+    img.loading = 'lazy';
+    img.alt = producto.nombre || 'Especialidad';
+    const fallbackSrc = buildFallbackDishSvg(producto.nombre, category);
+    img.src = (producto.imagen_url && producto.imagen_url.trim()) ? producto.imagen_url : fallbackSrc;
+    img.addEventListener('error', () => {
+      if (img.src !== fallbackSrc) img.src = fallbackSrc;
+    });
+    imgWrap.appendChild(img);
 
     const badge = document.createElement('span');
     badge.className = 'card-cat-badge';
@@ -109,6 +138,7 @@
     desc.textContent = producto.descripcion || 'Plato elaborado con ingredientes frescos.';
 
     const topWrap = document.createElement('div');
+    topWrap.appendChild(imgWrap);
     topWrap.appendChild(badge);
     topWrap.appendChild(title);
     topWrap.appendChild(desc);
@@ -216,10 +246,23 @@
     renderGrid(activeCategory);
   }
 
+  function updateParallax() {
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const translateY = scrollY * 0.5;
+    document.querySelectorAll('.parallax-img, .hero-parallax-layer').forEach((img) => {
+      img.style.transform = 'translateY(' + translateY.toFixed(2) + 'px)';
+    });
+  }
+
+  window.addEventListener('scroll', updateParallax, { passive: true });
+
   window.FoodCoreMenuQr = {
     switchCategory,
-    loadCatalog
+    loadCatalog,
+    updateParallax
   };
 
-  document.addEventListener('DOMContentLoaded', loadCatalog);
+  document.addEventListener('DOMContentLoaded', () => {
+    loadCatalog().then(updateParallax);
+  });
 })();
