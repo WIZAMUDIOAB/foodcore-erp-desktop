@@ -1,0 +1,217 @@
+/* ==========================================================================
+   FOODCORE ERP v5.4.0 — MODO OSCURO JAVAFX (Sub-Fase D - D4)
+   Se aplica dinamicamente encima de PrimerLight y foodcore.css desde
+   ConfiguracionView y App.aplicarModoOscuro(Scene, boolean).
+   ========================================================================== */
+
+.root {
+    -fc-bg-canvas: #0B0F19;
+    -fc-bg-surface: #111827;
+    -fc-bg-subtle: #1F2937;
+    -fc-border: #374151;
+
+    -fc-text-primary: #F9FAFB;
+    -fc-text-secondary: #D1D5DB;
+    -fc-text-muted: #9CA3AF;
+    -fc-text-inverse: #FFFFFF;
+
+    -fc-accent: #FF6B35;
+    -fc-accent-hover: #F05A22;
+    -fc-accent-soft: rgba(240, 90, 34, 0.20);
+
+    -fc-neutral-soft: #1F2937;
+    -fc-neutral-text: #E5E7EB;
+
+    -color-bg-default: #0B0F19;
+    -color-bg-subtle: #111827;
+    -color-bg-inset: #1F2937;
+    -color-fg-default: #F9FAFB;
+    -color-fg-muted: #D1D5DB;
+    -color-fg-subtle: #9CA3AF;
+    -color-border-default: #374151;
+    -color-border-muted: #1F2937;
+
+    -color-bg-base: -fc-bg-canvas;
+    -color-bg-surface: -fc-bg-surface;
+    -color-bg-card: -fc-bg-surface;
+    -color-ink-primary: -fc-text-primary;
+    -color-ink-secondary: -fc-text-secondary;
+    -color-ink-muted: -fc-text-muted;
+    -color-border-subtle: -fc-border;
+    -color-border-card: -fc-border;
+
+    -fx-base: #111827;
+    -fx-background-color: #0B0F19;
+    -fx-text-fill: #F9FAFB;
+}
+
+.app-canvas,
+.view-content,
+.pos-catalog-panel,
+.login-canvas {
+    -fx-background-color: #0B0F19;
+}
+
+.surface-card,
+.pos-order-panel,
+.pos-menu-tile,
+.modal-dialog-surface,
+.kpi-card-secondary,
+.login-shell-card,
+.login-form-panel {
+    -fx-background-color: #111827;
+    -fx-border-color: #374151;
+}
+
+.surface-card-subtle,
+.pos-totals-card,
+.client-section-box {
+    -fx-background-color: #1F2937;
+    -fx-border-color: #374151;
+}
+
+.view-topbar,
+.topbar-search-box,
+.topbar-icon-button,
+.topbar-user-profile {
+    -fx-background-color: #111827;
+    -fx-border-color: #374151;
+}
+
+.text-h1,
+.view-heading,
+.text-h2,
+.text-body,
+.text-body-strong,
+.text-display,
+.text-mono,
+.text-mono-lg,
+.kpi-value-24,
+.label {
+    -fx-text-fill: #F9FAFB;
+}
+
+.text-body-secondary,
+.view-subheading,
+.text-caption,
+.text-caption-muted,
+.text-overline,
+.kpi-subtitle-muted {
+    -fx-text-fill: #D1D5DB;
+}
+
+.text-field,
+.password-field,
+.input-field,
+.combo-box,
+.date-picker,
+.topbar-search-input {
+    -fx-background-color: #1F2937;
+    -fx-border-color: #374151;
+    -fx-text-fill: #F9FAFB;
+    -fx-prompt-text-fill: #9CA3AF;
+}
+
+.combo-box .list-cell,
+.combo-box-popup .list-view,
+.combo-box-popup .list-cell {
+    -fx-background-color: #1F2937;
+    -fx-text-fill: #F9FAFB;
+}
+
+.btn-secondary,
+.btn-pos-action-secondary,
+.category-chip {
+    -fx-background-color: #1F2937;
+    -fx-border-color: #374151;
+    -fx-text-fill: #F9FAFB;
+}
+
+.btn-secondary:hover,
+.btn-pos-action-secondary:hover,
+.category-chip:hover {
+    -fx-background-color: #374151;
+    -fx-text-fill: #FFFFFF;
+}
+
+.check-box {
+    -fx-text-fill: #F9FAFB;
+}
+
+.check-box > .box {
+    -fx-background-color: #1F2937;
+    -fx-border-color: #4B5563;
+}
+
+.table-view {
+    -fx-background-color: #111827;
+    -fx-border-color: #374151;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #1F2937;
+    -fx-border-color: transparent transparent #374151 transparent;
+}
+
+.table-view .column-header,
+.table-view .column-header .label {
+    -fx-text-fill: #D1D5DB;
+}
+
+.table-view .table-row-cell {
+    -fx-background-color: #111827;
+    -fx-border-color: transparent transparent #1F2937 transparent;
+}
+
+.table-view .table-row-cell:odd {
+    -fx-background-color: #0F172A;
+}
+
+.table-view .table-row-cell:hover {
+    -fx-background-color: #1F2937;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: rgba(240, 90, 34, 0.25);
+}
+
+.table-view .table-cell {
+    -fx-text-fill: #F9FAFB;
+}
+
+.badge-pill-neutral {
+    -fx-background-color: #1F2937;
+    -fx-text-fill: #E5E7EB;
+    -fx-border-color: #374151;
+    -fx-border-radius: 20px;
+}
+
+.badge-pill-success {
+    -fx-background-color: rgba(16, 185, 129, 0.2);
+    -fx-text-fill: #6EE7B7;
+}
+
+.badge-pill-warning {
+    -fx-background-color: rgba(245, 158, 11, 0.2);
+    -fx-text-fill: #FCD34D;
+}
+
+.badge-pill-danger {
+    -fx-background-color: rgba(239, 68, 68, 0.2);
+    -fx-text-fill: #FCA5A5;
+}
+
+.badge-pill-accent {
+    -fx-background-color: rgba(240, 90, 34, 0.22);
+    -fx-text-fill: #FDBA74;
+}
+
+.skeleton-row {
+    -fx-background-color: #111827;
+    -fx-border-color: #374151;
+}
+
+.skeleton-bar,
+.skeleton-shimmer {
+    -fx-background-color: linear-gradient(to right, #1F2937 0%, #374151 50%, #1F2937 100%);
+}

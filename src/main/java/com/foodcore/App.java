@@ -36,6 +36,7 @@ public class App extends Application {
     private static final Logger LOGGER = Logger.getLogger(App.class.getName());
     private static final AtomicBoolean SHUTDOWN_HOOK_REGISTRADO = new AtomicBoolean(false);
     private static Stage primaryStage;
+    private static volatile boolean darkModeActivo = false;
 
     @Override
     public void start(Stage stage) {
@@ -199,7 +200,8 @@ public class App extends Application {
     }
 
     /**
-     * Extiende PrimerLight cargando foodcore.css después del tema base (§12.1).
+     * Extiende PrimerLight cargando foodcore.css después del tema base (§12.1)
+     * y opcionalmente dark-theme.css cuando el Modo Oscuro está habilitado (Sub-Fase D - D4).
      */
     public static void applyStylesheets(Scene scene) {
         if (scene == null) {
@@ -212,6 +214,36 @@ public class App extends Application {
                 scene.getStylesheets().add(url);
             }
         }
+        aplicarModoOscuro(scene, darkModeActivo);
+    }
+
+    /**
+     * Activa o desactiva {@code /css/dark-theme.css} sobre la escena indicada (D4).
+     */
+    public static void aplicarModoOscuro(Scene scene, boolean activo) {
+        if (scene == null) {
+            return;
+        }
+        URL darkCss = App.class.getResource("/css/dark-theme.css");
+        if (darkCss == null) {
+            return;
+        }
+        String darkUrl = darkCss.toExternalForm();
+        if (activo) {
+            if (!scene.getStylesheets().contains(darkUrl)) {
+                scene.getStylesheets().add(darkUrl);
+            }
+        } else {
+            scene.getStylesheets().remove(darkUrl);
+        }
+    }
+
+    public static boolean isDarkModeActivo() {
+        return darkModeActivo;
+    }
+
+    public static void setDarkModeActivo(boolean activo) {
+        darkModeActivo = activo;
     }
 
     public static void setRoot(String fxml) throws IOException {

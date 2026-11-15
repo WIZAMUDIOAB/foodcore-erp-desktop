@@ -1677,3 +1677,60 @@ button:active,
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ==========================================================================
+   D7: MODO OSCURO PWA (@media prefers-color-scheme: dark)
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fc-bg-canvas: #0B0F19;
+    --fc-bg-surface: #111827;
+    --fc-bg-dark: #030712;
+    --fc-bg-dark-elevated: #1F2937;
+    --fc-brand-primary-soft: rgba(240, 90, 34, 0.2);
+    --fc-text-primary: #F9FAFB;
+    --fc-text-secondary: #D1D5DB;
+    --fc-text-muted: #9CA3AF;
+    --fc-border-subtle: #374151;
+    --fc-success-soft: rgba(16, 185, 129, 0.18);
+    --fc-warning-soft: rgba(245, 158, 11, 0.18);
+    --fc-danger-soft: rgba(239, 68, 68, 0.18);
+    --fc-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --fc-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
+  }
+
+  .form-input,
+  .cart-item-note-input,
+  .search-box,
+  .btn-qty,
+  .note-chip,
+  .pin-login-container,
+  .modal-card-pin,
+  .pin-btn {
+    background-color: #1F2937;
+    color: var(--fc-text-primary);
+    border-color: var(--fc-border-subtle);
+  }
+
+  .quick-notes-bar,
+  .auth-tabs-toggle,
+  .pin-dots-display,
+  .pin-btn.pin-btn-action,
+  .mozo-card,
+  .mozo-chip-modal,
+  .target-mozo-chip {
+    background-color: #161E2E;
+    color: var(--fc-text-primary);
+    border-color: var(--fc-border-subtle);
+  }
+
+  .dish-card.dish-card-agotado {
+    background-color: #111827;
+  }
+
+  .skeleton-card,
+  .skeleton-line {
+    background: linear-gradient(90deg, #1F2937 25%, #374151 50%, #1F2937 75%);
+    background-size: 200% 100%;
+  }
+}

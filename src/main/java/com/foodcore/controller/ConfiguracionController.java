@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.App;
 import com.foodcore.dao.ConfiguracionImpresoraDAO;
 import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
 import com.foodcore.model.ConfiguracionImpresora;
@@ -15,6 +16,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -105,6 +107,10 @@ public class ConfiguracionController {
     @FXML private Button btnRestaurarBackup;
     @FXML private Label lblEstadoRestauracion;
 
+    // Apariencia / Modo Oscuro (v5.4.0 D4)
+    @FXML private CheckBox chkModoOscuro;
+    @FXML private Label lblEstadoModoOscuro;
+
     private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
     private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
 
@@ -128,6 +134,47 @@ public class ConfiguracionController {
         cargarRuteoImpresorasAsync();
         cargarConfiguracionAlertasEmailUi();
         precargarUltimoBackupDisponible();
+        inicializarToggleModoOscuroUi();
+    }
+
+    private void inicializarToggleModoOscuroUi() {
+        boolean activo = App.isDarkModeActivo();
+        if (chkModoOscuro != null) {
+            chkModoOscuro.setSelected(activo);
+        }
+        actualizarEstadoModoOscuroUi(activo);
+    }
+
+    /** Activa o desactiva {@code dark-theme.css} sobre la escena actual (Sub-Fase D - D4). */
+    @FXML
+    public void handleToggleModoOscuro(ActionEvent event) {
+        boolean activo = chkModoOscuro != null && chkModoOscuro.isSelected();
+        aplicarTemaOscuroUi(activo);
+    }
+
+    public void aplicarTemaOscuroUi(boolean activo) {
+        App.setDarkModeActivo(activo);
+        Scene scene = rootConfigStack != null ? rootConfigStack.getScene() : null;
+        if (scene != null) {
+            App.aplicarModoOscuro(scene, activo);
+        } else if (App.getPrimaryStage() != null && App.getPrimaryStage().getScene() != null) {
+            App.aplicarModoOscuro(App.getPrimaryStage().getScene(), activo);
+        }
+        actualizarEstadoModoOscuroUi(activo);
+    }
+
+    private void actualizarEstadoModoOscuroUi(boolean activo) {
+        if (lblEstadoModoOscuro != null) {
+            lblEstadoModoOscuro.setText(activo ? "Modo Oscuro activo" : "Tema Claro activo");
+        }
+    }
+
+    public CheckBox getChkModoOscuro() {
+        return chkModoOscuro;
+    }
+
+    public Label getLblEstadoModoOscuro() {
+        return lblEstadoModoOscuro;
     }
 
     private void configurarTablaImpresoras() {

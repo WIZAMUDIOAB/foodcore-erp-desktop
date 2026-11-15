@@ -36,6 +36,25 @@
                                     </children>
                                 </VBox>
 
+                                <!-- Apariencia y Modo Oscuro (v5.4.0 Sub-Fase D - D4) -->
+                                <VBox spacing="10.0" styleClass="surface-card">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Apariencia de Interfaz (Tema Visual)" />
+                                                <Label styleClass="badge-pill-neutral" text="CLARO / OSCURO" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Active el tema oscuro (dark-theme.css) para turnos nocturnos o entornos de baja iluminación." />
+                                        <HBox alignment="CENTER_LEFT" spacing="14.0">
+                                            <children>
+                                                <CheckBox fx:id="chkModoOscuro" mnemonicParsing="false" onAction="#handleToggleModoOscuro" text="Activar Modo Oscuro (dark-theme.css)" />
+                                                <Label fx:id="lblEstadoModoOscuro" styleClass="badge-pill-neutral" text="Tema Claro activo" />
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+
                                 <VBox spacing="14.0" styleClass="surface-card">
                                     <children>
                                         <VBox spacing="4.0">
