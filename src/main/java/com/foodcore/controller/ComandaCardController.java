@@ -18,6 +18,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.sql.Connection;
@@ -81,8 +83,23 @@ public class ComandaCardController {
         if (btnDespachar != null && (btnDespachar.getId() == null || btnDespachar.getId().isBlank())) {
             btnDespachar.setId("btnListo");
         }
+        aplicarEstiloCronometro(KitchenDisplayController.TIMER_FONT_FAMILY, KitchenDisplayController.TIMER_FONT_SIZE);
         configurarDragAndDrop();
         iniciarTemporizador();
+    }
+
+    /**
+     * Aplica la tipografía de alta legibilidad al cronómetro de comanda KDS (Sub-Fase D - D6).
+     */
+    public void aplicarEstiloCronometro(String fontFamily, double fontSize) {
+        if (lblTiempo == null) {
+            return;
+        }
+        String fam = (fontFamily == null || fontFamily.isBlank()) ? "JetBrains Mono" : fontFamily.trim();
+        double size = fontSize > 0 ? fontSize : 28.0;
+        lblTiempo.setFont(Font.font(fam, FontWeight.BOLD, size));
+        lblTiempo.setStyle("-fx-font-family: '" + fam + "', 'Consolas', monospace; "
+                + "-fx-font-size: " + Math.round(size) + "px; -fx-font-weight: bold;");
     }
 
     private void configurarDragAndDrop() {
@@ -468,6 +485,10 @@ public class ComandaCardController {
 
     public Label getLblEstado() {
         return lblEstado;
+    }
+
+    public Label getLblTiempo() {
+        return lblTiempo;
     }
 
     public Button getBtnIniciar() {

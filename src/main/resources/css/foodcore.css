@@ -926,8 +926,8 @@
 
 .kds-timer-green {
     -fx-font-family: "JetBrains Mono", "Consolas", monospace;
-    -fx-font-size: 16px;
-    -fx-font-weight: 700;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
     -fx-text-fill: #10B981;
     -fx-background-color: rgba(16, 185, 129, 0.16);
     -fx-padding: 4px 10px;
@@ -936,8 +936,8 @@
 
 .kds-timer-amber {
     -fx-font-family: "JetBrains Mono", "Consolas", monospace;
-    -fx-font-size: 16px;
-    -fx-font-weight: 700;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
     -fx-text-fill: #F59E0B;
     -fx-background-color: rgba(245, 158, 11, 0.16);
     -fx-padding: 4px 10px;
@@ -946,8 +946,8 @@
 
 .kds-timer-red {
     -fx-font-family: "JetBrains Mono", "Consolas", monospace;
-    -fx-font-size: 16px;
-    -fx-font-weight: 700;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
     -fx-text-fill: #EF4444;
     -fx-background-color: rgba(239, 68, 68, 0.18);
     -fx-padding: 4px 10px;
