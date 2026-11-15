@@ -10,11 +10,16 @@ import com.foodcore.support.UiScreenshotTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport.VistaCargada;
 import com.foodcore.util.ConexionBD;
 import javafx.scene.control.Label;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
+import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +39,11 @@ class DashboardSecurityAlertsTest {
     void setUp() {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
         MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
+    }
+
+    @AfterAll
+    static void limpiarAuditoriaSeguridad() {
+        MySqlIntegrationTestSupport.inicializarEntornoMySql();
     }
 
     @Test
@@ -101,5 +111,34 @@ class DashboardSecurityAlertsTest {
                 throw new RuntimeException(ex);
             }
         });
+    }
+
+    @Test
+    @DisplayName("Resumen de seguridad hoy funciona con JVM en UTC, sesión MySQL UTC y eventos después de las 19:00 Lima")
+    void resumenSeguridadHoyResisteDiferenciaUtcEntreJvmYMySql() throws Exception {
+        TimeZone zonaOriginal = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            long finDiaLimaMenosSegundos = LocalDate.now(ZoneId.of("America/Lima"))
+                    .atTime(23, 30)
+                    .atZone(ZoneId.of("America/Lima"))
+                    .toEpochSecond();
+
+            try (Connection conn = ConexionBD.getConnection();
+                 Statement st = conn.createStatement()) {
+                st.execute("SET SESSION time_zone = '+00:00'");
+                st.executeUpdate("INSERT INTO auditoria (id_usuario, accion, entidad_afectada, datos_nuevos, fecha) "
+                        + "VALUES (1, 'LOGIN_FALLIDO', 'USUARIO', 'Evento tardío UTC+1d', FROM_UNIXTIME(" + finDiaLimaMenosSegundos + ")), "
+                        + "(1, '2FA_FALLIDO', 'USUARIO', 'Evento tardío 2FA', FROM_UNIXTIME(" + (finDiaLimaMenosSegundos + 5) + ")), "
+                        + "(2, 'VENTA_ANULADA', 'VENTA', 'Anulación tardía', FROM_UNIXTIME(" + (finDiaLimaMenosSegundos + 10) + "))");
+
+                ResumenSeguridadHoy resumen = auditoriaDAO.obtenerResumenSeguridadHoy(conn);
+                assertEquals(2, resumen.intentosFallidosHoy());
+                assertEquals(1, resumen.anulacionesHoy());
+                assertTrue(resumen.requiereAtencion());
+            }
+        } finally {
+            TimeZone.setDefault(zonaOriginal);
+        }
     }
 }

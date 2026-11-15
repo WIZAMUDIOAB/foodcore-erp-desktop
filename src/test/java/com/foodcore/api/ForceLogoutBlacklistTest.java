@@ -7,6 +7,7 @@ import com.foodcore.api.security.TokenBlacklistService;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,12 @@ class ForceLogoutBlacklistTest {
         MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
         TestSecuritySupport.asegurarJwtSecretTest();
         TokenBlacklistService.getInstance().limpiarMemoria();
+    }
+
+    @AfterAll
+    static void limpiarBlacklistTrasPruebas() {
+        TokenBlacklistService.getInstance().limpiarMemoria();
+        MySqlIntegrationTestSupport.inicializarEntornoMySql();
     }
 
     @Test
