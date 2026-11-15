@@ -55,6 +55,33 @@
 
   let activeCategory = 'Todos';
   let catalogProducts = [...FALLBACK_CATALOG];
+  let previewCount = 0;
+  let previewTotal = 0;
+
+  function animatePrice(element, startValue, endValue, duration = 400) {
+    if (!element) return;
+    const from = Number.isFinite(Number(startValue)) ? Number(startValue) : 0;
+    const to = Number.isFinite(Number(endValue)) ? Number(endValue) : 0;
+    const totalDuration = Number(duration) > 0 ? Number(duration) : 400;
+    const startTime = performance.now();
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / totalDuration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = from + (to - from) * eased;
+      element.dataset.value = current.toFixed(2);
+      element.textContent = 'S/ ' + current.toFixed(2);
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        element.dataset.value = to.toFixed(2);
+        element.textContent = 'S/ ' + to.toFixed(2);
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
 
   function normalizeCategory(cat) {
     return (cat || 'Especialidades').trim();
@@ -161,7 +188,9 @@
         pill.classList.add('active');
         const priceEl = card.querySelector('.price');
         if (priceEl) {
-          priceEl.textContent = 'S/ ' + Number(pill.dataset.price).toFixed(2);
+          const prevVal = Number(priceEl.dataset.value || basePrice);
+          const nextVal = Number(pill.dataset.price);
+          animatePrice(priceEl, prevVal, nextVal, 400);
         }
       });
       sizesWrap.appendChild(pill);
@@ -179,6 +208,21 @@
     cta.type = 'button';
     cta.className = 'btn-pedir';
     cta.textContent = 'Especialidad';
+    cta.addEventListener('click', () => {
+      const activePill = sizesWrap.querySelector('.size-pill.active');
+      const unitPrice = Number(activePill ? activePill.dataset.price : basePrice);
+      const prevTotal = previewTotal;
+      previewTotal += unitPrice;
+      previewCount += 1;
+      const totalEl = document.getElementById('orderPreviewTotal');
+      const countEl = document.getElementById('orderTotalCount');
+      if (totalEl) {
+        animatePrice(totalEl, prevTotal, previewTotal, 400);
+      }
+      if (countEl) {
+        countEl.textContent = previewCount + (previewCount === 1 ? ' ítem' : ' ítems');
+      }
+    });
 
     footer.appendChild(price);
     footer.appendChild(cta);
@@ -259,10 +303,23 @@
   window.FoodCoreMenuQr = {
     switchCategory,
     loadCatalog,
-    updateParallax
+    updateParallax,
+    animatePrice
   };
 
   document.addEventListener('DOMContentLoaded', () => {
+    const resetBtn = document.getElementById('btnResetPreview');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        const prev = previewTotal;
+        previewTotal = 0;
+        previewCount = 0;
+        const totalEl = document.getElementById('orderPreviewTotal');
+        const countEl = document.getElementById('orderTotalCount');
+        if (totalEl) animatePrice(totalEl, prev, 0, 400);
+        if (countEl) countEl.textContent = '0 ítems';
+      });
+    }
     loadCatalog().then(updateParallax);
   });
 })();

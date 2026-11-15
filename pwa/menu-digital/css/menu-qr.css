@@ -351,6 +351,61 @@ header p {
 .card.morph-in:nth-child(5) { animation-delay: 200ms; }
 .card.morph-in:nth-child(6) { animation-delay: 250ms; }
 
+.order-summary-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 95;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  padding: 10px 18px;
+}
+
+.order-summary-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-summary-label {
+  display: block;
+  font-size: 11px;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.order-summary-count {
+  font-size: 14px;
+  color: #FFFFFF;
+}
+
+.order-summary-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-reset-preview {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 footer {
   text-align: center;
   margin-top: 40px;
