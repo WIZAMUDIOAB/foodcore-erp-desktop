@@ -37,6 +37,7 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 html, body {
@@ -47,6 +48,7 @@ html, body {
   font-size: 15px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
 }
 
 /* ==========================================================================
@@ -183,6 +185,44 @@ button,
   padding: 12px 18px;
 }
 
+/* ==========================================================================
+   D2: FEEDBACK TÁCTIL INMEDIATO (scale(0.98) 0.05s + touch-action: manipulation)
+   ========================================================================== */
+button,
+.btn,
+.btn-touch,
+.card-clickable,
+.tab,
+.cat-tab,
+.mesa-card,
+.dish-card,
+.btn-add-dish,
+.btn-qty,
+.note-chip,
+.kds-btn,
+.kds-btn-action,
+.kds-filter-btn {
+  touch-action: manipulation;
+  transition: transform 0.05s, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:active,
+.btn:active,
+.btn-touch:active,
+.card-clickable:active,
+.tab:active,
+.cat-tab:active,
+.mesa-card:active,
+.btn-add-dish:active,
+.btn-qty:active,
+.note-chip:active,
+.kds-btn:active,
+.kds-btn-action:active,
+.kds-filter-btn:active {
+  transform: scale(0.98);
+  transition: transform 0.05s;
+}
+
 .btn-touch {
   min-width: 48px;
   min-height: 48px;
@@ -197,13 +237,14 @@ button,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.05s, background-color 0.15s ease, box-shadow 0.15s ease;
   text-decoration: none;
   user-select: none;
 }
 
 .btn-touch:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
+  transition: transform 0.05s;
 }
 
 .btn-primary {

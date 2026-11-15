@@ -31,6 +31,7 @@
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 body {
@@ -42,6 +43,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   user-select: none;
+  touch-action: manipulation;
 }
 
 /* TOPBAR KDS */
@@ -374,11 +376,15 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: filter 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  transition: filter 0.15s ease, transform 0.05s;
 }
 
-.kds-btn-action:active {
+.kds-btn-action:active,
+.kds-filter-btn:active,
+.btn-nav-touch:active {
   transform: scale(0.98);
+  transition: transform 0.05s;
 }
 
 .btn-iniciar {
