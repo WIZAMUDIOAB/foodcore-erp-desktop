@@ -133,7 +133,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-accent">
                                                     <children>
-                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-coins" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-dollar-sign" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -150,7 +150,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-blue">
                                                     <children>
-                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-chart-line" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-trending-up" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -167,7 +167,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-success">
                                                     <children>
-                                                        <FontIcon iconColor="#059669" iconLiteral="fas-trophy" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-award" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>

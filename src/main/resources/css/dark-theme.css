@@ -1,48 +1,76 @@
 /* ==========================================================================
-   FOODCORE ERP v5.4.0 — MODO OSCURO JAVAFX (Sub-Fase D - D4)
-   Se aplica dinamicamente encima de PrimerLight y foodcore.css desde
-   ConfiguracionView y App.aplicarModoOscuro(Scene, boolean).
+   FOODCORE ERP v5.4.0 — MODO OSCURO JAVAFX (Carbon Calido #121211 / #1E1D1B)
+   Redefine unicamente tokens semanticos en .root; ningun hex hardcodeado fuera.
    ========================================================================== */
 
 .root {
-    -fc-bg-canvas: #0B0F19;
-    -fc-bg-surface: #111827;
-    -fc-bg-subtle: #1F2937;
-    -fc-border: #374151;
+    -bg-canvas: #121211;
+    -bg-sidebar: #161615;
+    -bg-surface: #1E1D1B;
+    -bg-surface-hover: #292825;
 
-    -fc-text-primary: #F9FAFB;
-    -fc-text-secondary: #D1D5DB;
-    -fc-text-muted: #9CA3AF;
-    -fc-text-inverse: #FFFFFF;
+    -border-subtle: #2E2D2A;
+    -border-strong: #44403C;
 
-    -fc-accent: #FF6B35;
-    -fc-accent-hover: #F05A22;
-    -fc-accent-soft: rgba(240, 90, 34, 0.20);
+    -text-primary: #F5F5F4;
+    -text-secondary: #A8A29E;
+    -text-muted: #78716C;
+    -text-inverse: #FFFFFF;
 
-    -fc-neutral-soft: #1F2937;
-    -fc-neutral-text: #E5E7EB;
+    -brand-primary: #FB923C;
+    -brand-hover: #F97316;
+    -brand-soft: rgba(251, 146, 60, 0.15);
 
-    -color-bg-default: #0B0F19;
-    -color-bg-subtle: #111827;
-    -color-bg-inset: #1F2937;
-    -color-fg-default: #F9FAFB;
-    -color-fg-muted: #D1D5DB;
-    -color-fg-subtle: #9CA3AF;
-    -color-border-default: #374151;
-    -color-border-muted: #1F2937;
+    -status-success: #34D399;
+    -status-success-bg: rgba(52, 211, 153, 0.12);
+    -status-warning: #FBBF24;
+    -status-warning-bg: rgba(251, 191, 36, 0.12);
+    -status-danger: #F87171;
+    -status-danger-bg: rgba(248, 113, 113, 0.12);
 
-    -color-bg-base: -fc-bg-canvas;
-    -color-bg-surface: -fc-bg-surface;
-    -color-bg-card: -fc-bg-surface;
-    -color-ink-primary: -fc-text-primary;
-    -color-ink-secondary: -fc-text-secondary;
-    -color-ink-muted: -fc-text-muted;
-    -color-border-subtle: -fc-border;
-    -color-border-card: -fc-border;
+    -fc-kds-bg: #121211;
+    -fc-kds-surface: #1E1D1B;
+    -fc-kds-surface-hover: #292825;
+    -fc-kds-border: #2E2D2A;
+    -fc-kds-text: #F5F5F4;
+    -fc-kds-text-secondary: #A8A29E;
 
-    -fx-base: #111827;
-    -fx-background-color: #0B0F19;
-    -fx-text-fill: #F9FAFB;
+    -fc-bg-canvas: -bg-canvas;
+    -fc-bg-sidebar: -bg-sidebar;
+    -fc-bg-surface: -bg-surface;
+    -fc-bg-subtle: -bg-surface-hover;
+    -fc-border: -border-subtle;
+    -fc-border-strong: -border-strong;
+    -fc-text-primary: -text-primary;
+    -fc-text-secondary: -text-secondary;
+    -fc-text-muted: -text-muted;
+    -fc-accent: -brand-primary;
+    -fc-accent-hover: -brand-hover;
+    -fc-accent-soft: -brand-soft;
+
+    -color-bg-default: -bg-canvas;
+    -color-bg-subtle: -bg-sidebar;
+    -color-bg-inset: -bg-surface-hover;
+    -color-bg-base: -bg-canvas;
+    -color-bg-surface: -bg-surface;
+    -color-bg-card: -bg-surface;
+    -color-bg-sidebar: -bg-sidebar;
+    -color-bg-sidebar-hover: -bg-surface-hover;
+    -color-bg-sidebar-active: -brand-soft;
+    -color-fg-default: -text-primary;
+    -color-fg-muted: -text-secondary;
+    -color-fg-subtle: -text-muted;
+    -color-border-default: -border-subtle;
+    -color-border-muted: -border-subtle;
+    -color-ink-primary: -text-primary;
+    -color-ink-secondary: -text-secondary;
+    -color-ink-muted: -text-muted;
+    -color-border-subtle: -border-subtle;
+    -color-border-card: -border-subtle;
+
+    -fx-base: -bg-surface;
+    -fx-background-color: -bg-canvas;
+    -fx-text-fill: -text-primary;
 }
 
 .app-canvas,
@@ -52,33 +80,57 @@
 .scroll-pane,
 .scroll-pane > .viewport,
 .caja-centered-column {
-    -fx-background-color: #0B0F19;
+    -fx-background-color: -bg-canvas;
+}
+
+.sidebar-container {
+    -fx-background-color: -bg-sidebar;
+    -fx-border-color: transparent -border-subtle transparent transparent;
+}
+
+.sidebar-nav-button {
+    -fx-text-fill: -text-secondary;
+}
+
+.sidebar-nav-button:hover {
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-primary;
+}
+
+.sidebar-nav-button-active,
+.sidebar-nav-button-active:focused,
+.sidebar-nav-button-active:hover {
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-primary;
 }
 
 .surface-card,
 .pos-order-panel,
 .pos-menu-tile,
 .modal-dialog-surface,
+.kpi-card,
 .kpi-card-secondary,
 .login-shell-card,
-.login-form-panel {
-    -fx-background-color: #111827;
-    -fx-border-color: #374151;
+.login-form-panel,
+.sidebar-user-card {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.30), 6, 0, 0, 2);
 }
 
 .surface-card-subtle,
 .pos-totals-card,
 .client-section-box {
-    -fx-background-color: #1F2937;
-    -fx-border-color: #374151;
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
 }
 
 .view-topbar,
 .topbar-search-box,
 .topbar-icon-button,
 .topbar-user-profile {
-    -fx-background-color: #111827;
-    -fx-border-color: #374151;
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
 }
 
 .text-h1,
@@ -89,9 +141,12 @@
 .text-display,
 .text-mono,
 .text-mono-lg,
+.text-mono-lg-accent,
 .kpi-value-24,
+.kpi-value-24-blue,
+.sidebar-brand-title,
 .label {
-    -fx-text-fill: #F9FAFB;
+    -fx-text-fill: -text-primary;
 }
 
 .text-body-secondary,
@@ -99,8 +154,9 @@
 .text-caption,
 .text-caption-muted,
 .text-overline,
-.kpi-subtitle-muted {
-    -fx-text-fill: #D1D5DB;
+.kpi-subtitle-muted,
+.sidebar-section-header {
+    -fx-text-fill: -text-secondary;
 }
 
 .text-field,
@@ -108,113 +164,123 @@
 .input-field,
 .combo-box,
 .date-picker,
-.topbar-search-input {
-    -fx-background-color: #1F2937;
-    -fx-border-color: #374151;
-    -fx-text-fill: #F9FAFB;
-    -fx-prompt-text-fill: #9CA3AF;
+.topbar-search-input,
+.sidebar-search-input {
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
+    -fx-text-fill: -text-primary;
+    -fx-prompt-text-fill: -text-muted;
 }
 
 .combo-box .list-cell,
 .combo-box-popup .list-view,
 .combo-box-popup .list-cell {
-    -fx-background-color: #1F2937;
-    -fx-text-fill: #F9FAFB;
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-primary;
+}
+
+.btn-primary,
+.btn-pos-action-primary {
+    -fx-background-color: -brand-primary;
+    -fx-text-fill: -text-inverse;
+}
+
+.btn-primary:hover,
+.btn-pos-action-primary:hover {
+    -fx-background-color: -brand-hover;
 }
 
 .btn-secondary,
 .btn-pos-action-secondary,
 .category-chip {
-    -fx-background-color: #1F2937;
-    -fx-border-color: #374151;
-    -fx-text-fill: #F9FAFB;
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
+    -fx-text-fill: -text-primary;
 }
 
 .btn-secondary:hover,
 .btn-pos-action-secondary:hover,
 .category-chip:hover {
-    -fx-background-color: #374151;
-    -fx-text-fill: #FFFFFF;
+    -fx-background-color: -border-strong;
+    -fx-text-fill: -text-primary;
 }
 
 .check-box {
-    -fx-text-fill: #F9FAFB;
+    -fx-text-fill: -text-primary;
 }
 
 .check-box > .box {
-    -fx-background-color: #1F2937;
-    -fx-border-color: #4B5563;
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-strong;
 }
 
 .table-view {
-    -fx-background-color: #111827;
-    -fx-border-color: #374151;
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
 }
 
 .table-view .column-header-background {
-    -fx-background-color: #1F2937;
-    -fx-border-color: transparent transparent #374151 transparent;
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: transparent transparent -border-subtle transparent;
 }
 
 .table-view .column-header,
 .table-view .column-header .label {
-    -fx-text-fill: #D1D5DB;
+    -fx-text-fill: -text-secondary;
 }
 
 .table-view .table-row-cell {
-    -fx-background-color: #111827;
-    -fx-border-color: transparent transparent #1F2937 transparent;
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
 }
 
 .table-view .table-row-cell:odd {
-    -fx-background-color: #0F172A;
+    -fx-background-color: -bg-canvas;
 }
 
 .table-view .table-row-cell:hover {
-    -fx-background-color: #1F2937;
+    -fx-background-color: -bg-surface-hover;
 }
 
 .table-view .table-row-cell:selected {
-    -fx-background-color: rgba(240, 90, 34, 0.25);
+    -fx-background-color: -brand-soft;
 }
 
 .table-view .table-cell {
-    -fx-text-fill: #F9FAFB;
+    -fx-text-fill: -text-primary;
 }
 
 .badge-pill-neutral {
-    -fx-background-color: #1F2937;
-    -fx-text-fill: #E5E7EB;
-    -fx-border-color: #374151;
-    -fx-border-radius: 20px;
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-secondary;
 }
 
 .badge-pill-success {
-    -fx-background-color: rgba(16, 185, 129, 0.2);
-    -fx-text-fill: #6EE7B7;
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
 }
 
 .badge-pill-warning {
-    -fx-background-color: rgba(245, 158, 11, 0.2);
-    -fx-text-fill: #FCD34D;
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
 }
 
 .badge-pill-danger {
-    -fx-background-color: rgba(239, 68, 68, 0.2);
-    -fx-text-fill: #FCA5A5;
+    -fx-background-color: -status-danger-bg;
+    -fx-text-fill: -status-danger;
 }
 
 .badge-pill-accent {
-    -fx-background-color: rgba(240, 90, 34, 0.22);
-    -fx-text-fill: #FDBA74;
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-primary;
 }
 
 .skeleton-row {
-    -fx-background-color: #111827;
-    -fx-border-color: #374151;
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
 }
 
 .skeleton-bar,
 .skeleton-shimmer {
-    -fx-background-color: linear-gradient(to right, #1F2937 0%, #374151 50%, #1F2937 100%);
+    -fx-background-color: linear-gradient(to right, -bg-surface-hover 0%, -border-subtle 50%, -bg-surface-hover 100%);
 }

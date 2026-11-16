@@ -57,7 +57,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-blue">
                                                     <children>
-                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-calendar-alt" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-calendar" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -74,7 +74,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-success">
                                                     <children>
-                                                        <FontIcon iconColor="#059669" iconLiteral="fas-users" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-users" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -91,7 +91,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-amber">
                                                     <children>
-                                                        <FontIcon iconColor="#D97706" iconLiteral="fas-chair" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-layers" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -108,7 +108,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-accent">
                                                     <children>
-                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-check-double" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-check-circle" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
