@@ -15,6 +15,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -42,33 +43,148 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
         }
     }
 
+    private static final String FILTRO_WHERE_SQL =
+            "WHERE (? = '' OR UPPER(COALESCE(u.username, 'admin')) = UPPER(?)) "
+            + "AND (? = '' "
+            + "     OR (? = 'ANULACION' AND UPPER(a.accion) LIKE '%ANUL%') "
+            + "     OR (? IN ('LOGIN', 'VENTA', 'DESCUENTO', 'DEVOLUCION') "
+            + "         AND (UPPER(a.accion) = ? OR UPPER(a.accion) LIKE CONCAT('%', ?, '%'))) "
+            + "     OR UPPER(a.accion) = ?) "
+            + "AND (? = 0 OR a.fecha >= FROM_UNIXTIME(?)) "
+            + "AND (? = 0 OR a.fecha < FROM_UNIXTIME(?)) ";
+
+    private static final String SQL_LISTAR_FILTRADO =
+            "SELECT a.id_auditoria, a.id_usuario, COALESCE(u.username, 'admin') AS username, "
+            + "a.accion, a.entidad_afectada, a.datos_anteriores, a.datos_nuevos, a.fecha "
+            + "FROM auditoria a LEFT JOIN usuario u ON a.id_usuario = u.id_usuario "
+            + FILTRO_WHERE_SQL
+            + "ORDER BY a.fecha DESC, a.id_auditoria DESC LIMIT ? OFFSET ?";
+
+    private static final String SQL_CONTAR_FILTRADO =
+            "SELECT COUNT(*) FROM auditoria a LEFT JOIN usuario u ON a.id_usuario = u.id_usuario "
+            + FILTRO_WHERE_SQL;
+
     @Override
     public List<RegistroAuditoria> listarUltimosEventos(Connection conn, int limite) throws SQLException {
+        return listarEventosFiltrados(conn, null, null, null, null, 0, limite > 0 ? limite : 100);
+    }
+
+    @Override
+    public List<RegistroAuditoria> listarEventosFiltrados(Connection conn, String usuario, String accion,
+                                                          LocalDate desde, LocalDate hasta,
+                                                          int offset, int limit) throws SQLException {
         List<RegistroAuditoria> lista = new ArrayList<>();
-        String sql = "SELECT a.id_auditoria, a.id_usuario, COALESCE(u.username, 'admin') as username, " +
-                     "a.accion, a.entidad_afectada, a.datos_anteriores, a.datos_nuevos, a.fecha " +
-                     "FROM auditoria a LEFT JOIN usuario u ON a.id_usuario = u.id_usuario " +
-                     "ORDER BY a.fecha DESC, a.id_auditoria DESC LIMIT ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limite > 0 ? limite : 100);
+        if (conn == null) {
+            return lista;
+        }
+        try (PreparedStatement ps = conn.prepareStatement(SQL_LISTAR_FILTRADO)) {
+            int idx = asignarParametrosFiltro(ps, usuario, accion, desde, hasta);
+            ps.setInt(idx++, limit > 0 ? limit : 50);
+            ps.setInt(idx, Math.max(0, offset));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    Timestamp ts = rs.getTimestamp("fecha");
-                    RegistroAuditoria reg = new RegistroAuditoria(
-                        rs.getLong("id_auditoria"),
-                        rs.getInt("id_usuario"),
-                        rs.getString("username"),
-                        rs.getString("accion"),
-                        rs.getString("entidad_afectada"),
-                        rs.getString("datos_anteriores"),
-                        rs.getString("datos_nuevos"),
-                        ts != null ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime() : null
-                    );
-                    lista.add(reg);
+                    lista.add(mapearRegistro(rs));
                 }
             }
         }
         return lista;
+    }
+
+    @Override
+    public int contarEventosFiltrados(Connection conn, String usuario, String accion,
+                                      LocalDate desde, LocalDate hasta) throws SQLException {
+        if (conn == null) {
+            return 0;
+        }
+        try (PreparedStatement ps = conn.prepareStatement(SQL_CONTAR_FILTRADO)) {
+            asignarParametrosFiltro(ps, usuario, accion, desde, hasta);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    @Override
+    public List<String> listarUsuariosDistinct(Connection conn) throws SQLException {
+        List<String> usuarios = new ArrayList<>();
+        if (conn == null) {
+            return usuarios;
+        }
+        String sql = "SELECT DISTINCT COALESCE(u.username, 'admin') AS username "
+                + "FROM auditoria a LEFT JOIN usuario u ON a.id_usuario = u.id_usuario "
+                + "ORDER BY username ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String u = rs.getString("username");
+                if (u != null && !u.isBlank()) {
+                    usuarios.add(u);
+                }
+            }
+        }
+        return usuarios;
+    }
+
+    @Override
+    public List<String> listarAccionesDistinct(Connection conn) throws SQLException {
+        List<String> acciones = new ArrayList<>();
+        if (conn == null) {
+            return acciones;
+        }
+        String sql = "SELECT DISTINCT a.accion FROM auditoria a WHERE a.accion IS NOT NULL ORDER BY a.accion ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String acc = rs.getString("accion");
+                if (acc != null && !acc.isBlank()) {
+                    acciones.add(acc);
+                }
+            }
+        }
+        return acciones;
+    }
+
+    private static RegistroAuditoria mapearRegistro(ResultSet rs) throws SQLException {
+        Timestamp ts = rs.getTimestamp("fecha");
+        return new RegistroAuditoria(
+            rs.getLong("id_auditoria"),
+            rs.getInt("id_usuario"),
+            rs.getString("username"),
+            rs.getString("accion"),
+            rs.getString("entidad_afectada"),
+            rs.getString("datos_anteriores"),
+            rs.getString("datos_nuevos"),
+            ts != null ? ts.toInstant().atZone(ZONA_LIMA).toLocalDateTime() : null
+        );
+    }
+
+    private static int asignarParametrosFiltro(PreparedStatement ps, String usuario, String accion,
+                                               LocalDate desde, LocalDate hasta) throws SQLException {
+        String filtroUser = (usuario != null && !usuario.isBlank()
+                && !usuario.trim().toLowerCase(Locale.ROOT).startsWith("todos"))
+                ? usuario.trim() : "";
+        String filtroAccion = (accion != null && !accion.isBlank()
+                && !accion.trim().toLowerCase(Locale.ROOT).startsWith("todas"))
+                ? accion.trim().toUpperCase(Locale.ROOT) : "";
+        int usaDesde = desde != null ? 1 : 0;
+        long epochDesde = desde != null ? desde.atStartOfDay(ZONA_LIMA).toEpochSecond() : 0L;
+        int usaHasta = hasta != null ? 1 : 0;
+        long epochHasta = hasta != null ? hasta.plusDays(1).atStartOfDay(ZONA_LIMA).toEpochSecond() : 0L;
+
+        int i = 1;
+        ps.setString(i++, filtroUser);
+        ps.setString(i++, filtroUser);
+        ps.setString(i++, filtroAccion);
+        ps.setString(i++, filtroAccion);
+        ps.setString(i++, filtroAccion);
+        ps.setString(i++, filtroAccion);
+        ps.setString(i++, filtroAccion);
+        ps.setString(i++, filtroAccion);
+        ps.setInt(i++, usaDesde);
+        ps.setLong(i++, epochDesde);
+        ps.setInt(i++, usaHasta);
+        ps.setLong(i++, epochHasta);
+        return i;
     }
 
     @Override

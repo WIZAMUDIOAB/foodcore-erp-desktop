@@ -107,6 +107,7 @@ public class MainDashboardController {
     private Parent dialogoPasswordActivo;
     private boolean sidebarColapsado = false;
     private Object controladorActivo;
+    private Usuario usuarioAccesoActual;
 
     @FXML
     public void initialize() {
@@ -167,9 +168,12 @@ public class MainDashboardController {
      * Aplica las reglas RBAC del Sidebar según SPEC-FOODCORE-v1.2, v1.3 (§5) y v4.4.0.
      */
     public void aplicarControlAcceso(Usuario user) {
+        this.usuarioAccesoActual = user;
         mostrarTodosLosNodos();
 
         if (user == null || user.getNombreRol() == null) {
+            ocultarNodo(btnNavEstadoSistema);
+            ocultarNodo(btnNavAuditoria);
             cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
             return;
         }
@@ -177,6 +181,7 @@ public class MainDashboardController {
         String rol = user.getNombreRol().toUpperCase(Locale.ROOT);
         if (!rol.contains("ADMIN")) {
             ocultarNodo(btnNavEstadoSistema);
+            ocultarNodo(btnNavAuditoria);
         }
 
         if (rol.contains("MOZO") || rol.contains("MESERO")) {
@@ -352,7 +357,18 @@ public class MainDashboardController {
 
     @FXML
     public void handleNavAuditoria(ActionEvent event) {
+        Usuario act = AuthService.getUsuarioSesionActual() != null
+                ? AuthService.getUsuarioSesionActual()
+                : usuarioAccesoActual;
+        if (!AuditoriaController.esUsuarioAdmin(act)) {
+            AnimationUtils.mostrarToast(rootDashboardStack,
+                    "Acceso restringido: Bitácora de Auditoría es exclusiva para ADMIN.", true);
+            return;
+        }
         cargarVista("/com/foodcore/view/AuditoriaView.fxml", btnNavAuditoria);
+        if (controladorActivo instanceof AuditoriaController audCtrl) {
+            audCtrl.validarAcceso(act);
+        }
     }
 
     @FXML
