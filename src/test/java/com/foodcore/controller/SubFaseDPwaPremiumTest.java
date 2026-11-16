@@ -73,10 +73,10 @@ class SubFaseDPwaPremiumTest {
         assertTrue(kdsCss.contains("min-height: 56px"), "KDS styles deben definir min-height: 56px");
         assertTrue(kdsCss.contains("touch-action: manipulation"), "KDS debe eliminar delay táctil de 300ms");
         assertTrue(kdsCss.contains("transform: scale(0.98)"), "KDS debe dar feedback visual :active");
-        assertTrue(kdsCss.contains("#121211") && kdsCss.contains("#1E1D1B"),
-                "KDS alto contraste debe usar carbón cálido #121211 y superficie #1E1D1B");
-        assertTrue(kdsCss.contains("#F5F5F4") && kdsCss.contains("#FFFFFF"),
-                "KDS alto contraste debe usar texto #F5F5F4 y #FFFFFF en tokens");
+        assertTrue(kdsCss.contains("#09090B") && kdsCss.contains("#18181B"),
+                "KDS alto contraste debe usar fondo OLED #09090B y superficie #18181B");
+        assertTrue(kdsCss.contains("#FAFAFA") && kdsCss.contains("#FFFFFF"),
+                "KDS alto contraste debe usar texto #FAFAFA y #FFFFFF en tokens");
     }
 
     @Test

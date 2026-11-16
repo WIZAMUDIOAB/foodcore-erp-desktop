@@ -1,92 +1,96 @@
-# Reporte Final — Rediseño Visual Premium UI/UX (Sub-Fase D)
+# Reporte Final — Sistema de Diseño Cerrado FoodCore v2.0 (Sub-Fase D)
 
 **Rama:** `feature/subfase-d-pwa-premium`  
+**Especificación:** MD MAESTRO — Sistema de Diseño Cerrado FoodCore (`v2.0`)  
 **Fecha:** 2026-11-16  
-**Estado:** Aprobado · `mvnw.cmd -B clean verify` en verde (`0` fallos)
+**Estado:** Aprobado · `mvnw.cmd -B clean verify` en verde (`289 / 289` tests, `0` fallos)
 
 ---
 
-## 1. Resumen Ejecutivo de Fases Ejecutadas
+## 1. Resumen de Commits Atómicos (`v2.0`)
 
-| Commit | Fase | Alcance |
+| Commit | Alcance | Descripción Verificada |
 |---|---|---|
-| `de61fed` | Fase 1 · Tokens & Iconografía | Incorporación de `ikonli-feather-pack` (`12.3.1`), migración de iconos a `fth-*` (`iconSize="20"`), reescritura de `foodcore.css` y `dark-theme.css` con tokens cálidos cerrados en `.root`. |
-| `103aad2` | Fase 2 · JavaFX ERP | Sidebar claro `#F3F2EE` en `MainLayout.fxml` / `MainDashboardView.fxml`, eliminación de hexadecimales inline en FXML, curva `#EA580C`/`#FB923C` (gradiente `0.20` -> `0.00`) en `DashboardController.java`, persistencia `Preferences` de modo oscuro en `App.java`. |
-| `4e5f0d3` | Fase 3 · PWA Base & PIN Login | Tokens `:root` / `.dark` y `fc_theme` en `pwa/css/styles.css` y `pwa/js/app.js`; eliminación total de `#txtPinInput` visible en `pwa/pin-login.html` (`4` puntos circulares + teclado `3x4` `64px`); rediseño de `index.html`, `mesas.html`, `catalogo.html` con `#btnThemeToggle` e iconos SVG. |
-| `45e2644` | Fase 4 · Menú Digital QR | Rediseño de `pwa/menu-digital/*` y `MenuQrService.java`: header translúcido `backdrop-filter: blur(12px)`, tabs horizontales sin wrap, cards `4:3`, barra fija inferior `#orderSummaryBar` (`border-radius: 16px 16px 0 0`), `#btnThemeToggle` persistente (`fc_theme`). |
-| `7dc33f4` | Fase 5 · KDS & Dashboard Móvil | KDS (`pwa/kds/*`) en carbón `#121211`/`#1E1D1B` con bordes izquierdos semánticos (`4px` `.state-green`/`.state-amber`/`.state-red`), cronómetro `28px` `JetBrains Mono` (`tabular-nums`), `#btnThemeToggle`; Dashboard móvil (`pwa/dashboard/*`) con KPI cards (`14px` / `20px`) y gráficos Chart.js/Canvas 2D leyendo tokens CSS dinámicamente vía `getComputedStyle`. |
-| *Actual* | Fase 6 · Suite Visual & Reporte | `RedisenoPremiumVisualE2ETest.java` (`toHaveScreenshot` `<= 2%`), actualización de `SubFaseDPwaPremiumTest.java`, baselines en `src/test/resources/visual-baselines/` y reporte final. |
+| `00c59dd` | Fuentes locales + JavaFX ERP | Incorporación de `Inter` local (`font-1..13.woff2` + `fonts.css`) en `src/main/resources/fonts/` y `pwa/fonts/`; migración de `foodcore.css`, `dark-theme.css` y `DashboardController.java` a tokens `v2.0` (`#F9F7F4` / `#F2EFEA` / `#FFFFFF` / `#EA580C` en claro; `#09090B` / `#121214` / `#18181B` / `#F97316` OLED Zinc en oscuro), sombras tight `--shadow-sm`/`md`/`lg`, radios `6/8/12/16px`, filas `44px` y eliminación de `"Segoe UI"`. |
+| `425b6bd` | PWA Base & Login PIN | Migración de `pwa/css/styles.css`, `pwa/js/app.js` y `meta[name="theme-color"]` en `pwa/{pin-login,index,mesas,catalogo}.html` a tokens `v2.0`, `../fonts/fonts.css`, grid `--space-*` (`4px`), `--ease-out` (`<= 300ms`) y teclado PIN `3x4` (`64px`, `4` puntos `12px`, cero inputs visibles). |
+| `c930fba` | Menú Digital QR | Reescritura de `pwa/menu-digital/{css/menu-qr.css,index.html,js/menu-qr.js}` y `MenuQrService.java` a tokens `v2.0` con `/fonts/fonts.css`, hero `200px` `radius-xl`, tarjetas sólidas `.card` (`padding: 16px`, sin borde), placeholders degradados neutros (`--bg-sidebar` -> `--bg-canvas`) con iconos SVG Feather (`createDishPlaceholder`, sin círculos SVG marrones), barra fija inferior `glass-panel` y animación `morphIn 300ms`. |
+| `63b8b9d` | PWA KDS & Dashboard Móvil | Reescritura de `pwa/kds/{css/kds.css,index.html,js/kds.js}` a modo OLED Zinc por defecto (`#09090B` / `#121214` / `#18181B` / `#F97316`) con toggle claro (`#F9F7F4`), `radius-md: 8px`, bordes semánticos `4px` y cronómetros `28px` `JetBrains Mono`; migración de `pwa/dashboard/{css/dashboard.css,index.html,js/dashboard.js}` a tarjetas KPI `12px`/`20px`, `tabular-nums` y gráficos leyendo tokens vía `getComputedStyle`. |
+| *Actual* | Baselines v2.0 & Reporte | Actualización de `SubFaseDPwaPremiumTest.java`, `RedisenoPremiumVisualE2ETest.java`, regeneración de las 8 baselines en `src/test/resources/visual-baselines/` y reporte final tras `mvnw.cmd -B clean verify`. |
 
 ---
 
-## 2. Sistema de Tokens Cerrados Implementado
+## 2. Sistema de Tokens Cerrados `v2.0`
 
-| Token | Modo Claro (`:root` / `.root`) | Modo Oscuro (`.dark` / `dark-theme.css`) |
+| Token | Modo Claro (`:root` / `.root`) | Modo Oscuro OLED Zinc (`.dark` / `dark-theme.css`) |
 |---|---|---|
-| `--bg-canvas` / `-bg-canvas` | `#FAF9F6` | `#121211` |
-| `--bg-sidebar` / `-bg-sidebar` | `#F3F2EE` | `#161615` |
-| `--bg-surface` / `-bg-surface` | `#FFFFFF` | `#1E1D1B` |
-| `--bg-surface-hover` / `-bg-surface-hover` | `#F5F4F0` | `#292825` |
-| `--border-subtle` / `-border-subtle` | `#E7E5E4` | `#2E2D2A` |
-| `--border-strong` / `-border-strong` | `#D6D3D1` | `#44403C` |
-| `--text-primary` / `-text-primary` | `#1C1917` | `#F5F5F4` |
-| `--text-secondary` / `-text-secondary` | `#57534E` | `#A8A29E` |
-| `--text-muted` / `-text-muted` | `#A8A29E` | `#78716C` |
-| `--brand-primary` / `-brand-primary` | `#EA580C` | `#FB923C` |
-| `--brand-hover` / `-brand-hover` | `#C2410C` | `#F97316` |
-| `--brand-soft` / `-brand-soft` | `rgba(234, 88, 12, 0.10)` | `rgba(251, 146, 60, 0.15)` |
-| `--status-success` / `-status-success` | `#059669` | `#34D399` |
-| `--status-warning` / `-status-warning` | `#D97706` | `#FBBF24` |
-| `--status-danger` / `-status-danger` | `#DC2626` | `#F87171` |
+| `--bg-canvas` / `-bg-canvas` | `#F9F7F4` | `#09090B` |
+| `--bg-sidebar` / `-bg-sidebar` | `#F2EFEA` | `#121214` |
+| `--bg-surface` / `-bg-surface` | `#FFFFFF` | `#18181B` |
+| `--bg-surface-hover` / `-bg-surface-hover` | `#F7F5F1` | `#27272A` |
+| `--border-subtle` / `-border-subtle` | `#E5E0D8` | `#27272A` |
+| `--border-strong` / `-border-strong` | `#D1CCC2` | `#3F3F46` |
+| `--text-primary` / `-text-primary` | `#1A1817` | `#FAFAFA` |
+| `--text-secondary` / `-text-secondary` | `#5C5650` | `#A1A1AA` |
+| `--text-muted` / `-text-muted` | `#A39D94` | `#71717A` |
+| `--brand-primary` / `-brand-primary` | `#EA580C` | `#F97316` |
+| `--brand-hover` / `-brand-hover` | `#C2410C` | `#FB923C` |
+| `--brand-soft` / `-brand-soft` | `rgba(234, 88, 12, 0.10)` | `rgba(249, 115, 22, 0.15)` |
+| `--status-success` / `--status-success-bg` | `#059669` / `#ECFDF5` | `#34D399` / `rgba(52, 211, 153, 0.12)` |
+| `--status-warning` / `--status-warning-bg` | `#D97706` / `#FFFBEB` | `#FBBF24` / `rgba(251, 191, 36, 0.12)` |
+| `--status-danger` / `--status-danger-bg` | `#DC2626` / `#FEF2F2` | `#F87171` / `rgba(248, 113, 113, 0.12)` |
+| `--shadow-sm` / `--shadow-md` / `--shadow-lg` | Tight low-spread (`0 1px 2px rgba(..., 0.06)` / `0 2px 4px` / `0 4px 8px`) | Elevación por luminosidad (`0 1px 2px rgba(0,0,0,0.4)` / `0.5` / `0.6`) |
+| `--radius-sm/md/lg/xl` | `6px` / `8px` / `12px` / `16px` | `6px` / `8px` / `12px` / `16px` |
 
 ---
 
-## 3. Verificación del Checklist de Aprobación (§11)
+## 3. Checklist de Aceptación (§9)
 
-Todos los puntos fueron validados programáticamente en `RedisenoPremiumVisualE2ETest#verificarChecklistAprobacionTokensYComponentes`:
-
-1. **Cero colores hexadecimales hardcodeados fuera de `:root`/`.dark`/`.root`:** Verificado sobre `foodcore.css`, `dark-theme.css`, `pwa/css/styles.css`, `pwa/kds/css/kds.css`, `pwa/dashboard/css/dashboard.css`, `pwa/menu-digital/css/menu-qr.css`, `MenuQrService.java`, todos los `*.fxml` y todos los `pwa/**/*.html`.
-2. **Sidebar en claro usa `--bg-sidebar` (`#F3F2EE`) sin panel negro:** Verificado en CSS y render JavaFX (`javafx-cockpit-light.png`).
-3. **KPI cards con `border-radius: 14px` y `padding: 20px`:** Verificado por CSS y `getComputedStyle` en Playwright (`/dashboard/index.html`) y JavaFX.
-4. **Acento `--brand-primary` (`#EA580C` / `#FB923C`) y estados `:hover`/`:active` (`scale(0.98)`):** Verificado.
-5. **Modos Claro y Oscuro reales y consistentes (`#FAF9F6` vs `#121211`):** Verificado en Playwright (PIN Login, Menú QR, KDS, Dashboard Móvil) y JavaFX (Cockpit, Dashboard, Configuración).
-6. **PIN Login sin caja de entrada de texto encima del teclado numérico:** Verificado (`0` `<input>` visibles; `4` `.pin-dot`; teclado `3x4` `>= 48px`).
-7. **Gráficos con línea `3px` en `--brand-primary` y gradiente `20%` -> `0%`:** Verificado en `DashboardController.java` y `pwa/dashboard/js/dashboard.js` sin hexadecimales hardcodeados ni colores no autorizados (`#8B5CF6`).
-8. **Regresión visual `toHaveScreenshot` (`<= 2.00%` diff):** Las 8 capturas baseline en `src/test/resources/visual-baselines/` pasaron en `mvnw.cmd -B clean verify`.
+- [x] **¿El modo oscuro usa `#09090B` de fondo y `#18181B` en tarjetas? (No marrón, no `#000`):** Verificado en `dark-theme.css`, `pwa/css/styles.css`, `pwa/menu-digital/css/menu-qr.css`, `pwa/kds/css/kds.css`, `pwa/dashboard/css/dashboard.css`, `MenuQrService.java` y aserciones `getComputedStyle` en `RedisenoPremiumVisualE2ETest` y `SubFaseDPwaPremiumTest`.
+- [x] **¿El modo claro usa `#F9F7F4` de fondo y `#FFFFFF` en tarjetas con `box-shadow: var(--shadow-sm)`?:** Verificado en CSS claro, `foodcore.css`, `getComputedStyle("body", "backgroundColor") == rgb(249, 247, 244)` y renders JavaFX/Playwright.
+- [x] **¿La fuente es `Inter` en todo el proyecto (no Arial, no `system-ui` como fuente principal)?:** Verificado mediante `fonts.css` (`font-1..13.woff2`) en `src/main/resources/fonts/` y `pwa/fonts/`, carga de fuentes en `App.java` y ausencia de `"Segoe UI"` / Google Fonts CDN (`system-ui, sans-serif` únicamente como último fallback).
+- [x] **¿Los números de precios y KPIs tienen `font-variant-numeric: tabular-nums`?:** Aplicado en KPIs de `dashboard.css`, precios del carrito/catálogo en `styles.css`, precios y carrito de `menu-qr.css` / `MenuQrService.java`, cronómetros/contadores en `kds.css` y tablas/KPIs JavaFX.
+- [x] **¿Los márgenes y paddings son múltiplos de `4px`?:** Estandarizado mediante variables `--space-1` (`4px`) a `--space-12` (`48px`) del grid de `4px` (incluyendo `padding: 20px` en `.kpi-card`, `16px` en cards de Menú QR, `12px`/`8px` en inputs y botones).
+- [x] **¿El glassmorphism solo se usa en header, sidebar y modales (NO en tablas ni tarjetas de producto)?:** `.glass-panel` restringido a barra de navegación/resumen inferior fija y chrome superior; tarjetas de producto, KPIs y tablas utilizan superficies sólidas (`--bg-surface`).
+- [x] **¿Las animaciones duran `<= 300ms` y usan `ease-out`?:** Definido `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` con transiciones `150ms`–`300ms` y animación `morphIn` (`300ms`).
+- [x] **¿El Login PIN no tiene inputs de texto visibles?:** Verificado en `pwa/pin-login.html` (`0` `<input>` visibles, `4` `.pin-dot` `12px`, teclado `3x4` táctil `64px`).
+- [x] **¿Las imágenes del Menú QR son reales o degradados neutros con icono (NO círculos marrones)?:** Eliminado `buildFallbackDishSvg`; reemplazado por degradado neutro `var(--bg-sidebar)` -> `var(--bg-canvas)` con icono SVG Feather (`createDishPlaceholder`) y verificado por `RedisenoPremiumVisualE2ETest` (`0` `<circle>` en SVGs fallback).
+- [x] **¿Se actualizaron todas las baselines en `src/test/resources/visual-baselines/`?:** Las 8 baselines fueron regeneradas bajo `v2.0` y verificadas en ejecuciones posteriores dentro del umbral `2.00%`.
+- [x] **¿`mvn clean verify` pasa con `0` fallos y los `289` tests en verde?:** Ejecutado completo tras las ediciones finales (`221` Surefire + `68` Failsafe = `289`, `0` fallos).
 
 ---
 
 ## 4. Resultados de Regresión Visual Playwright (`toHaveScreenshot`)
 
-Umbral máximo permitido: `2.00%` (`0.02`). Resultados observados durante `mvnw.cmd -B clean verify`:
+Umbral máximo configurado (`MAX_DIFF_PIXEL_RATIO`): `2.00%` (`0.02`). Resultados registrados durante `mvnw.cmd -B clean verify`:
 
 | Vista / Baseline | Resolución | Píxeles Totales | Diferencia Observada | Estado |
-|---|---:|---:|---:|---|
+|---|---|---:|---:|---|
 | `pin-login-light.png` | `390x844` | `329,160` | `0.0000%` (`0 px`) | PASS |
 | `pin-login-dark.png` | `390x844` | `329,160` | `0.0000%` (`0 px`) | PASS |
 | `menu-qr-light.png` | `430x932` | `400,760` | `0.0000%` (`0 px`) | PASS |
 | `menu-qr-dark.png` | `430x932` | `400,760` | `0.0000%` (`0 px`) | PASS |
 | `kds-timers-states.png` | `1280x800` | `1,024,000` | `0.0000%` (`0 px`) | PASS |
 | `kds-timers-light.png` | `1280x800` | `1,024,000` | `0.0000%` (`0 px`) | PASS |
-| `dashboard-mobile-light.png` | `390x1677` (fullPage) | `654,030` | `0.1812%` (`1,185 px`) | PASS |
-| `dashboard-mobile-dark.png` | `390x1677` (fullPage) | `654,030` | `0.1821%` (`1,191 px`) | PASS |
+| `dashboard-mobile-light.png` | `390x1631` (fullPage) | `636,090` | `0.2162%` (`1,375 px`) | PASS |
+| `dashboard-mobile-dark.png` | `390x1631` (fullPage) | `636,090` | `0.2963%` (`1,885 px`) | PASS |
 
 ---
 
 ## 5. Resultados de Verificación Completa (`mvnw.cmd -B clean verify`)
 
-Ejecutado contra MySQL 8.0 local (`127.0.0.1:3306/foodcore_test`, `sslMode=REQUIRED`) con JavaFX Monocle headless (`-Dtestfx.headless=true`):
+Ejecutado contra MySQL 8.0 local (`127.0.0.1:3306/foodcore_test`, `sslMode=REQUIRED`) con JavaFX Monocle headless (`-Dtestfx.headless=true`, tiempo total `35:36 min`, código de salida `0`):
 
-- **Surefire (Unit + UI/FX + Playwright Visual E2E):** `Tests run: 221, Failures: 0, Errors: 0, Skipped: 0`
+- **Surefire (Unit + JavaFX + Playwright Visual E2E):** `Tests run: 221, Failures: 0, Errors: 0, Skipped: 0`
 - **Failsafe (`*IT` Integration Tests):** `Tests run: 68, Failures: 0, Errors: 0, Skipped: 0`
+- **Total de pruebas:** `289 / 289` aprobadas (`0` fallos, `0` errores, `0` omitidas)
 - **JaCoCo (`jacoco:check`):** `Analyzed bundle 'foodcore-desktop' with 369 classes. All coverage checks have been met.`
-- **Checkstyle (`checkstyle:check`):** `0` violaciones.
-- **SpotBugs (`spotbugs:check`):** `0` bugs, `0` errores.
-- **OWASP Dependency-Check (`dependency-check:check`):** Exitoso (`BUILD SUCCESS`).
+- **Checkstyle (`checkstyle:check`):** `0` violaciones (`You have 0 Checkstyle violations.`)
+- **SpotBugs (`spotbugs:check`):** `0` bugs, `0` errores (`BugInstance size is 0`)
+- **OWASP Dependency-Check (`12.1.0`):** Análisis completado (`BUILD SUCCESS`)
 
 ---
 
 ## 6. Evidencias Visuales Generadas (`target/rediseno-premium-evidence/`)
 
-- **JavaFX Modo Claro y Oscuro:** `javafx-cockpit-light.png`, `javafx-cockpit-dark.png`, `javafx-dashboard-light.png`, `javafx-dashboard-dark.png`, `javafx-config-light.png`, `javafx-config-dark.png`
-- **PWA Modo Claro y Oscuro:** `pin-login-light.png`, `pin-login-dark.png`, `menu-qr-light.png`, `menu-qr-dark.png`, `kds-timers-states.png`, `kds-timers-light.png`, `dashboard-mobile-light.png`, `dashboard-mobile-dark.png`
+- **JavaFX Modo Claro y Oscuro OLED Zinc:** `javafx-cockpit-light.png`, `javafx-cockpit-dark.png`, `javafx-dashboard-light.png`, `javafx-dashboard-dark.png`, `javafx-config-light.png`, `javafx-config-dark.png`
+- **PWA y Menú Digital QR Modo Claro y Oscuro:** `pin-login-light.png`, `pin-login-dark.png`, `menu-qr-light.png`, `menu-qr-dark.png`, `kds-timers-states.png`, `kds-timers-light.png`, `dashboard-mobile-light.png`, `dashboard-mobile-dark.png`

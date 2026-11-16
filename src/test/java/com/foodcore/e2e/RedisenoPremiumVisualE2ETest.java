@@ -97,7 +97,7 @@ public class RedisenoPremiumVisualE2ETest {
                         "Debe mostrar exactamente 4 indicadores circulares");
 
                 String bgLightPin = evaluarComputedStyle(pinPage, "body", "backgroundColor");
-                assertEquals("rgb(250, 249, 246)", bgLightPin, "Fondo claro PIN Login debe ser #FAF9F6");
+                assertEquals("rgb(249, 247, 244)", bgLightPin, "Fondo claro PIN Login debe ser #F9F7F4");
                 assertMinTouchTarget(pinPage, ".pin-btn", 48.0);
                 toHaveScreenshot(pinPage, "pin-login-light.png", MAX_DIFF_PIXEL_RATIO, false);
 
@@ -106,23 +106,25 @@ public class RedisenoPremiumVisualE2ETest {
                         pinPage.evaluate("() => document.documentElement.classList.contains('dark')")));
                 String bgDarkPin = evaluarComputedStyle(pinPage, "body", "backgroundColor");
                 String cardDarkPin = evaluarComputedStyle(pinPage, ".pin-login-container", "backgroundColor");
-                assertEquals("rgb(18, 18, 17)", bgDarkPin, "Fondo oscuro PIN Login debe ser #121211");
-                assertEquals("rgb(30, 29, 27)", cardDarkPin, "Superficie oscura PIN Card debe ser #1E1D1B");
+                assertEquals("rgb(9, 9, 11)", bgDarkPin, "Fondo oscuro PIN Login debe ser #09090B");
+                assertEquals("rgb(24, 24, 27)", cardDarkPin, "Superficie oscura PIN Card debe ser #18181B");
                 toHaveScreenshot(pinPage, "pin-login-dark.png", MAX_DIFF_PIXEL_RATIO, false);
             }
 
-            // 2. Menú Digital QR — Claro & Oscuro (4:3, barra fija, backdrop blur)
+            // 2. Menú Digital QR — Claro & Oscuro (4:3 neutral Feather placeholder, glass-panel)
             try (BrowserContext ctxQr = PlaywrightE2ESupport.crearContexto(browser, 430, 932)) {
                 Page qrPage = ctxQr.newPage();
                 qrPage.addInitScript("() => localStorage.setItem('fc_theme', 'light')");
                 qrPage.navigate(PlaywrightE2ESupport.HTTP_BASE_URL + "/menu-digital/index.html");
                 qrPage.waitForSelector("#menuGrid .card");
-                qrPage.waitForTimeout(700);
+                qrPage.waitForTimeout(450);
 
                 String summaryPos = evaluarComputedStyle(qrPage, "#orderSummaryBar", "position");
                 assertEquals("fixed", summaryPos, "La barra de resumen QR debe estar fija en bottom: 0");
                 String cardBgLight = evaluarComputedStyle(qrPage, "#menuGrid .card", "backgroundColor");
                 assertEquals("rgb(255, 255, 255)", cardBgLight, "Card QR claro debe ser #FFFFFF");
+                assertEquals(0, qrPage.locator("#menuGrid .card-img-wrap circle").count(),
+                        "Placeholders QR v2.0 no deben usar círculos marrones");
                 assertMinTouchTarget(qrPage, ".category-tab", 48.0);
                 toHaveScreenshot(qrPage, "menu-qr-light.png", MAX_DIFF_PIXEL_RATIO, false);
 
@@ -131,8 +133,8 @@ public class RedisenoPremiumVisualE2ETest {
                         qrPage.evaluate("() => document.documentElement.classList.contains('dark')")));
                 String bgDarkQr = evaluarComputedStyle(qrPage, "body", "backgroundColor");
                 String cardBgDark = evaluarComputedStyle(qrPage, "#menuGrid .card", "backgroundColor");
-                assertEquals("rgb(18, 18, 17)", bgDarkQr, "Fondo oscuro Menú QR debe ser #121211");
-                assertEquals("rgb(30, 29, 27)", cardBgDark, "Card QR oscuro debe ser #1E1D1B");
+                assertEquals("rgb(9, 9, 11)", bgDarkQr, "Fondo oscuro Menú QR debe ser #09090B");
+                assertEquals("rgb(24, 24, 27)", cardBgDark, "Card QR oscuro debe ser #18181B");
                 toHaveScreenshot(qrPage, "menu-qr-dark.png", MAX_DIFF_PIXEL_RATIO, false);
             }
 
@@ -146,10 +148,10 @@ public class RedisenoPremiumVisualE2ETest {
                 congelarRelojYTimersKds(kdsPage);
                 kdsPage.waitForSelector(".kds-card.state-red");
 
-                assertEquals("rgb(18, 18, 17)", evaluarComputedStyle(kdsPage, "body", "backgroundColor"),
-                        "KDS debe iniciar en carbón cálido #121211");
-                assertEquals("rgb(30, 29, 27)", evaluarComputedStyle(kdsPage, ".kds-card", "backgroundColor"),
-                        "Tarjetas KDS deben usar superficie #1E1D1B");
+                assertEquals("rgb(9, 9, 11)", evaluarComputedStyle(kdsPage, "body", "backgroundColor"),
+                        "KDS debe iniciar en OLED Zinc #09090B");
+                assertEquals("rgb(24, 24, 27)", evaluarComputedStyle(kdsPage, ".kds-card", "backgroundColor"),
+                        "Tarjetas KDS deben usar superficie #18181B");
                 assertEquals("28px", evaluarComputedStyle(kdsPage, ".kds-timer-badge", "fontSize"),
                         "Cronómetro KDS debe medir 28px");
                 assertTrue(evaluarComputedStyle(kdsPage, ".kds-timer-badge", "fontFamily")
@@ -164,8 +166,8 @@ public class RedisenoPremiumVisualE2ETest {
                 kdsPage.click("#btnThemeToggle");
                 kdsPage.waitForCondition(() -> Boolean.FALSE.equals(
                         kdsPage.evaluate("() => document.documentElement.classList.contains('dark')")));
-                assertEquals("rgb(250, 249, 246)", evaluarComputedStyle(kdsPage, "body", "backgroundColor"),
-                        "KDS en modo claro debe usar #FAF9F6");
+                assertEquals("rgb(249, 247, 244)", evaluarComputedStyle(kdsPage, "body", "backgroundColor"),
+                        "KDS en modo claro debe usar #F9F7F4");
                 toHaveScreenshot(kdsPage, "kds-timers-light.png", MAX_DIFF_PIXEL_RATIO, false);
             }
 
@@ -179,12 +181,12 @@ public class RedisenoPremiumVisualE2ETest {
                         "() => document.getElementById('lblVentasDia').innerText.includes('2,410.50')")));
                 dashPage.waitForTimeout(300);
 
-                assertEquals("14px", evaluarComputedStyle(dashPage, ".kpi-card", "borderRadius"),
-                        "KPI cards deben tener border-radius 14px");
+                assertEquals("12px", evaluarComputedStyle(dashPage, ".kpi-card", "borderRadius"),
+                        "KPI cards deben tener border-radius 12px (v2.0 --radius-lg)");
                 assertEquals("20px", evaluarComputedStyle(dashPage, ".kpi-card", "paddingTop"),
-                        "KPI cards deben tener padding 20px");
-                assertEquals("rgb(250, 249, 246)", evaluarComputedStyle(dashPage, "body", "backgroundColor"),
-                        "Dashboard claro debe usar #FAF9F6");
+                        "KPI cards deben tener padding 20px (--space-5)");
+                assertEquals("rgb(249, 247, 244)", evaluarComputedStyle(dashPage, "body", "backgroundColor"),
+                        "Dashboard claro debe usar #F9F7F4");
                 assertMinTouchTarget(dashPage, "#btnOpenDrawer", 48.0);
                 toHaveScreenshot(dashPage, "dashboard-mobile-light.png", MAX_DIFF_PIXEL_RATIO, true);
 
@@ -192,17 +194,17 @@ public class RedisenoPremiumVisualE2ETest {
                 dashPage.waitForCondition(() -> Boolean.TRUE.equals(
                         dashPage.evaluate("() => document.documentElement.classList.contains('dark')")));
                 dashPage.waitForTimeout(250);
-                assertEquals("rgb(18, 18, 17)", evaluarComputedStyle(dashPage, "body", "backgroundColor"),
-                        "Dashboard oscuro debe usar #121211");
-                assertEquals("rgb(30, 29, 27)", evaluarComputedStyle(dashPage, ".kpi-card", "backgroundColor"),
-                        "KPI cards oscuras deben usar #1E1D1B");
+                assertEquals("rgb(9, 9, 11)", evaluarComputedStyle(dashPage, "body", "backgroundColor"),
+                        "Dashboard oscuro debe usar #09090B");
+                assertEquals("rgb(24, 24, 27)", evaluarComputedStyle(dashPage, ".kpi-card", "backgroundColor"),
+                        "KPI cards oscuras deben usar #18181B");
                 toHaveScreenshot(dashPage, "dashboard-mobile-dark.png", MAX_DIFF_PIXEL_RATIO, true);
             }
         }
     }
 
     @Test
-    @DisplayName("Evidencias JavaFX en Modo Claro (#FAF9F6 / #F3F2EE) y Modo Oscuro (#121211 / #1E1D1B)")
+    @DisplayName("Evidencias JavaFX en Modo Claro (#F9F7F4 / #F2EFEA) y Modo Oscuro (#09090B / #18181B Zinc)")
     void capturarEvidenciaJavaFxLightYDark() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
@@ -285,14 +287,23 @@ public class RedisenoPremiumVisualE2ETest {
         assertFalse(INLINE_STYLE_HEX.matcher(dynamicQr).find(),
                 "Menú QR dinámico no debe usar hex en atributos style=");
 
-        // 4. Sidebar claro #F3F2EE y cero colores no autorizados (#8B5CF6 morado, #0F172A sidebar negro)
+        // 4. Sidebar claro #F2EFEA, fuentes locales Inter y cero colores no autorizados (#8B5CF6 morado)
         String fxCss = Files.readString(Path.of("src", "main", "resources", "css", "foodcore.css"), StandardCharsets.UTF_8);
-        assertTrue(fxCss.contains("-bg-sidebar: #F3F2EE"), "Sidebar JavaFX claro debe definir #F3F2EE");
+        assertTrue(fxCss.contains("-bg-sidebar: #F2EFEA"), "Sidebar JavaFX claro debe definir #F2EFEA");
+        assertTrue(fxCss.contains("-bg-canvas: #F9F7F4"), "Canvas JavaFX claro debe definir #F9F7F4");
         assertFalse(fxCss.contains("#8B5CF6"), "Prohibido usar morado #8B5CF6");
-        assertTrue(fxCss.contains(".kpi-card") && fxCss.contains("20px") && fxCss.contains("14px"),
-                "JavaFX KPI cards deben definir 14px radius y 20px padding");
+        assertFalse(fxCss.contains("\"Segoe UI\""), "CSS no debe declarar Segoe UI como fuente");
+        assertTrue(fxCss.contains(".kpi-card") && fxCss.contains("20px") && fxCss.contains("12px"),
+                "JavaFX KPI cards deben definir 12px radius (v2.0) y 20px padding");
 
-        // 5. Dashboard JS lee variables CSS sin hex hardcodeados en gráficos y PIN Login sin input
+        String darkFxCss = Files.readString(
+                Path.of("src", "main", "resources", "css", "dark-theme.css"), StandardCharsets.UTF_8);
+        assertTrue(darkFxCss.contains("-bg-canvas: #09090B") && darkFxCss.contains("-bg-surface: #18181B"),
+                "JavaFX modo oscuro v2.0 debe usar #09090B / #18181B Zinc");
+        assertTrue(Files.isRegularFile(Path.of("src", "main", "resources", "fonts", "font-7.woff2")));
+        assertTrue(Files.isRegularFile(Path.of("pwa", "fonts", "font-7.woff2")));
+
+        // 5. Dashboard JS lee variables CSS sin hex hardcodeados y PIN Login sin input
         String dashJs = Files.readString(Path.of("pwa", "dashboard", "js", "dashboard.js"), StandardCharsets.UTF_8);
         assertTrue(dashJs.contains("getComputedStyle"), "Dashboard chart debe leer tokens con getComputedStyle");
         assertFalse(dashJs.contains("#F05A22"), "Dashboard JS no debe hardcodear #F05A22");
@@ -301,12 +312,16 @@ public class RedisenoPremiumVisualE2ETest {
         String pinHtml = Files.readString(Path.of("pwa", "pin-login.html"), StandardCharsets.UTF_8);
         assertFalse(pinHtml.contains("id=\"txtPinInput\""), "PIN Login no debe renderizar input de dígitos");
 
-        // 6. Gráficos JavaFX en DashboardController usan 0.20 y paleta cálida (#EA580C/#FB923C)
+        String qrJs = Files.readString(Path.of("pwa", "menu-digital", "js", "menu-qr.js"), StandardCharsets.UTF_8);
+        assertFalse(qrJs.contains("buildFallbackDishSvg"),
+                "Menú QR v2.0 debe usar placeholder neutro con icono Feather, sin círculos SVG");
+
+        // 6. Gráficos JavaFX en DashboardController usan 0.20 y paleta v2.0 (#EA580C/#F97316)
         String dashCtrl = Files.readString(
                 Path.of("src", "main", "java", "com", "foodcore", "controller", "DashboardController.java"),
                 StandardCharsets.UTF_8);
-        assertTrue(dashCtrl.contains("#EA580C") && dashCtrl.contains("#FB923C") && dashCtrl.contains("0.20"),
-                "DashboardController chart debe usar tokens #EA580C/#FB923C con gradiente al 20%");
+        assertTrue(dashCtrl.contains("#EA580C") && dashCtrl.contains("#F97316") && dashCtrl.contains("0.20"),
+                "DashboardController chart debe usar tokens #EA580C/#F97316 con gradiente al 20%");
     }
 
     private static List<String> encontrarHexFueraDeBloquesToken(String cssConComentarios) {
