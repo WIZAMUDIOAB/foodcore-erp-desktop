@@ -2,6 +2,16 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.4.0] - Sub-Fase D: PWA y Menú QR Premium (2026-11-16)
+
+- **Sistema de Diseño Cerrado `v2.0` (Warm Neutral & OLED Zinc)**: Migración integral de JavaFX Desktop (`foodcore.css`, `dark-theme.css`), PWA Base y Login PIN, Menú Digital QR (`MenuQrService`), KDS y Dashboard móvil a tokens semánticos cerrados: modo claro `#F9F7F4` / `#F2EFEA` / `#FFFFFF` con acento `#EA580C` y modo oscuro OLED Zinc `#09090B` / `#121214` / `#18181B` con acento `#F97316`, sombras compactas, radios `6/8/12/16px`, targets táctiles (`>= 48px` PWA) y teclado PIN `3x4` sin inputs visibles.
+- **Tipografía `Inter` Local y Placeholders Neutros**: Empaquetado offline de `Inter` (`font-1..13.woff2` + `fonts.css`) en `src/main/resources/fonts/` y `pwa/fonts/`, eliminación de `"Segoe UI"` / CDNs externos, cifras `tabular-nums`, grid espacial de `4px` y sustitución de SVGs antiguos en Menú QR por degradados neutros con iconos Feather y barra fija `glass-panel`.
+- **Correcciones Estructurales UX/UI `v2.2`**:
+  - **Modales §2.1 y Diálogos Estilizados**: Estandarización de los 14 modales FXML y modales dinámicos con estructura Header / `ScrollPane.edge-to-edge` / Footer, además de `DialogService` para inyectar CSS contextual (claro/oscuro) y clase `card` en todas las alertas y diálogos nativos.
+  - **Empty States, Etiquetas Estáticas e Iconos Feather**: Implementación de `EmptyStateHelper` (`fth-inbox` 48px, *"No hay registros"*) en todas las tablas (`TableView`), `<Label styleClass="label-form">` encima de cada input FXML y sustitución de prefijos emoji en botones por `FontIcon` (`fth-*`) con `graphicTextGap="8.0"`.
+  - **Tarjetas Comanda §2.4 y Gráficos Donut de 4 Colores**: Unificación de tarjetas de catálogo/comanda en POS, Mozo y Kiosco (`HBox` `.card` + `+ Agregar`) y restricción de gráficos Donut (`AnalisisMermasController`, `ReportesAvanzadosController`, `ReportesController`) a la paleta aprobada (`#EA580C`, `#D97706`, `#DC2626`, `#A39D94`).
+- **Regresión Visual Automatizada y Verificación Integral**: Suite `RedisenoPremiumVisualE2ETest` + `SubFaseDPwaPremiumTest` con Playwright `toHaveScreenshot` (`8 / 8` baselines `<= 0.34%` diff, límite `2.00%`) y validación de Checklist §5; `mvnw.cmd -B clean verify` en verde (`290 / 290` tests, `0` violaciones Checkstyle, `0` bugs SpotBugs, JaCoCo y OWASP superados).
+
 ## [5.3.0] - Sub-Fase C: Infraestructura y Deploy (2026-11-15)
 
 - **Instalador MSI y paquete Linux (`.deb`)**: Empaquetado nativo con `jpackage` (`scripts/package-release.ps1` / `build-deb.sh`) generando `dist/FoodCoreERP-5.3.0.msi` con todos los módulos y recursos (`foodcore-erp.jar`, `pwa/`, `scripts/`, `keystore.jks.example`, `foodcore.cer` y `application.properties.example`), además de guía operativa en `README.md`.
