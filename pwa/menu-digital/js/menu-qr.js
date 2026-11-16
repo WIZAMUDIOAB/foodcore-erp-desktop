@@ -243,21 +243,58 @@
     });
   }
 
+  const THEME_STORAGE_KEY = 'fc_theme';
+  const ICON_SUN_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+  const ICON_MOON_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+
+  function resolverTemaInicial() {
+    try {
+      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'dark') return true;
+      if (saved === 'light') return false;
+    } catch (_e) {}
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+
+  function aplicarTemaMenuQr(esOscuro) {
+    const root = document.documentElement;
+    root.classList.toggle('dark', Boolean(esOscuro));
+    root.setAttribute('data-theme', esOscuro ? 'dark' : 'light');
+    if (document.body) {
+      document.body.classList.toggle('dark', Boolean(esOscuro));
+    }
+    const btn = document.getElementById('btnThemeToggle');
+    if (btn) {
+      btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;
+      btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
+    }
+  }
+
+  function toggleTheme() {
+    const siguiente = !document.documentElement.classList.contains('dark');
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, siguiente ? 'dark' : 'light');
+    } catch (_e) {}
+    aplicarTemaMenuQr(siguiente);
+  }
+
+  aplicarTemaMenuQr(resolverTemaInicial());
+
   function buildFallbackDishSvg(title, category) {
     const isDrink = (category || '').toLowerCase().includes('bebida');
-    const c1 = isDrink ? '%230F172A' : '%231E293B';
-    const c2 = isDrink ? '%230EA5E9' : '%23FF5A1F';
-    const accent = isDrink ? '%2338BDF8' : '%23FDBA74';
+    const c1 = isDrink ? '%231E1D1B' : '%23121211';
+    const c2 = isDrink ? '%23D97706' : '%23EA580C';
+    const accent = isDrink ? '%23FBBF24' : '%23FB923C';
     return "data:image/svg+xml;utf8,"
-      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 220' preserveAspectRatio='none'%3E"
+      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300' preserveAspectRatio='none'%3E"
       + "%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E"
       + "%3Cstop offset='0%25' stop-color='" + c1 + "'/%3E"
       + "%3Cstop offset='100%25' stop-color='" + c2 + "'/%3E%3C/linearGradient%3E%3C/defs%3E"
-      + "%3Crect width='400' height='220' fill='url(%23g)'/%3E"
-      + "%3Ccircle cx='320' cy='110' r='64' fill='%23ffffff' fill-opacity='0.10'/%3E"
-      + "%3Ccircle cx='200' cy='110' r='44' fill='" + accent + "' fill-opacity='0.20'/%3E"
-      + "%3Ccircle cx='200' cy='110' r='28' fill='none' stroke='%23ffffff' stroke-opacity='0.35' stroke-width='2'/%3E"
-      + "%3Ccircle cx='200' cy='110' r='10' fill='%23ffffff' fill-opacity='0.45'/%3E%3C/svg%3E";
+      + "%3Crect width='400' height='300' fill='url(%23g)'/%3E"
+      + "%3Ccircle cx='320' cy='150' r='74' fill='%23ffffff' fill-opacity='0.10'/%3E"
+      + "%3Ccircle cx='200' cy='150' r='54' fill='" + accent + "' fill-opacity='0.22'/%3E"
+      + "%3Ccircle cx='200' cy='150' r='34' fill='none' stroke='%23ffffff' stroke-opacity='0.35' stroke-width='2'/%3E"
+      + "%3Ccircle cx='200' cy='150' r='12' fill='%23ffffff' fill-opacity='0.45'/%3E%3C/svg%3E";
   }
 
   function createDishCard(producto, visibleIndex) {
@@ -440,10 +477,16 @@
     loadCatalog,
     updateParallax,
     animatePrice,
-    setLanguage
+    setLanguage,
+    toggleTheme
   };
 
   document.addEventListener('DOMContentLoaded', async () => {
+    aplicarTemaMenuQr(resolverTemaInicial());
+    const themeBtn = document.getElementById('btnThemeToggle');
+    if (themeBtn) {
+      themeBtn.addEventListener('click', toggleTheme);
+    }
     let savedLang = 'es';
     try {
       const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
