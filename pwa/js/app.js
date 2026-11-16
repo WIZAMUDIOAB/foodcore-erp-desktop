@@ -28,6 +28,10 @@ const FoodCorePWA = (() => {
     if (document.body) {
       document.body.classList.toggle('dark', Boolean(esOscuro));
     }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
+    }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
       btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;

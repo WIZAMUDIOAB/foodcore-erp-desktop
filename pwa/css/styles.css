@@ -1,34 +1,34 @@
 /* ==========================================================================
-   FOODCORE ERP v5.4.0 — PWA BASE & LOGIN PIN (Tokens Calidos Cerrados)
+   FOODCORE ERP v2.0 — PWA BASE & LOGIN PIN (Sistema de Diseno Cerrado)
    Unica fuente de verdad: variables CSS en :root, .dark y prefers-color-scheme.
    Prohibido usar colores hexadecimales hardcodeados fuera de definicion de tema.
    ========================================================================== */
 
-@import url('../vendor/fonts/fonts.css');
+@import url('../fonts/fonts.css');
 
 :root {
-  /* Fondos y Superficies - MODO CLARO */
-  --bg-canvas: #FAF9F6;
-  --bg-sidebar: #F3F2EE;
+  /* Superficies - MODO CLARO (Warm Neutral) */
+  --bg-canvas: #F9F7F4;
+  --bg-sidebar: #F2EFEA;
   --bg-surface: #FFFFFF;
-  --bg-surface-hover: #F5F4F0;
+  --bg-surface-hover: #F7F5F1;
 
-  /* Bordes y Divisores */
-  --border-subtle: #E7E5E4;
-  --border-strong: #D6D3D1;
+  /* Bordes */
+  --border-subtle: #E5E0D8;
+  --border-strong: #D1CCC2;
 
-  /* Tipografía */
-  --text-primary: #1C1917;
-  --text-secondary: #57534E;
-  --text-muted: #A8A29E;
+  /* Tipografia */
+  --text-primary: #1A1817;
+  --text-secondary: #5C5650;
+  --text-muted: #A39D94;
   --text-on-brand: #FFFFFF;
 
-  /* Marca y Acento Gastronómico */
+  /* Marca (Terracota) */
   --brand-primary: #EA580C;
   --brand-hover: #C2410C;
   --brand-soft: rgba(234, 88, 12, 0.10);
 
-  /* Estados Semánticos */
+  /* Semantica */
   --status-success: #059669;
   --status-success-bg: #ECFDF5;
   --status-warning: #D97706;
@@ -36,17 +36,34 @@
   --status-danger: #DC2626;
   --status-danger-bg: #FEF2F2;
 
-  /* Sombras */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-backdrop: rgba(18, 18, 17, 0.55);
+  /* Sombras tight v2.0 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-backdrop: rgba(9, 9, 11, 0.62);
 
   /* Radios */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 9999px;
+
+  /* Espaciado (grid de 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 300ms;
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -54,56 +71,57 @@
 
 .dark,
 [data-theme="dark"] {
-  --bg-canvas: #121211;
-  --bg-sidebar: #161615;
-  --bg-surface: #1E1D1B;
-  --bg-surface-hover: #292825;
-  --border-subtle: #2E2D2A;
-  --border-strong: #44403C;
-  --text-primary: #F5F5F4;
-  --text-secondary: #A8A29E;
-  --text-muted: #78716C;
+  /* Modo Oscuro OLED-Aware (Zinc, cero marron/sepia) */
+  --bg-canvas: #09090B;
+  --bg-sidebar: #121214;
+  --bg-surface: #18181B;
+  --bg-surface-hover: #27272A;
+  --border-subtle: #27272A;
+  --border-strong: #3F3F46;
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
   --text-on-brand: #FFFFFF;
-  --brand-primary: #FB923C;
-  --brand-hover: #F97316;
-  --brand-soft: rgba(251, 146, 60, 0.15);
+  --brand-primary: #F97316;
+  --brand-hover: #FB923C;
+  --brand-soft: rgba(249, 115, 22, 0.15);
   --status-success: #34D399;
   --status-success-bg: rgba(52, 211, 153, 0.12);
   --status-warning: #FBBF24;
   --status-warning-bg: rgba(251, 191, 36, 0.12);
   --status-danger: #F87171;
   --status-danger-bg: rgba(248, 113, 113, 0.12);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --shadow-backdrop: rgba(0, 0, 0, 0.72);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.6);
+  --shadow-backdrop: rgba(0, 0, 0, 0.78);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg-canvas: #121211;
-    --bg-sidebar: #161615;
-    --bg-surface: #1E1D1B;
-    --bg-surface-hover: #292825;
-    --border-subtle: #2E2D2A;
-    --border-strong: #44403C;
-    --text-primary: #F5F5F4;
-    --text-secondary: #A8A29E;
-    --text-muted: #78716C;
+    --bg-canvas: #09090B;
+    --bg-sidebar: #121214;
+    --bg-surface: #18181B;
+    --bg-surface-hover: #27272A;
+    --border-subtle: #27272A;
+    --border-strong: #3F3F46;
+    --text-primary: #FAFAFA;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
     --text-on-brand: #FFFFFF;
-    --brand-primary: #FB923C;
-    --brand-hover: #F97316;
-    --brand-soft: rgba(251, 146, 60, 0.15);
+    --brand-primary: #F97316;
+    --brand-hover: #FB923C;
+    --brand-soft: rgba(249, 115, 22, 0.15);
     --status-success: #34D399;
     --status-success-bg: rgba(52, 211, 153, 0.12);
     --status-warning: #FBBF24;
     --status-warning-bg: rgba(251, 191, 36, 0.12);
     --status-danger: #F87171;
     --status-danger-bg: rgba(248, 113, 113, 0.12);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    --shadow-backdrop: rgba(0, 0, 0, 0.72);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.6);
+    --shadow-backdrop: rgba(0, 0, 0, 0.78);
   }
 }
 
@@ -1287,44 +1305,43 @@ button:active,
   font-weight: 600;
 }
 
-/* Indicador de PIN: 4 circulos centrados */
+/* Indicador de PIN: 4 circulos centrados 12px (v2.0 §8.4) */
 .pin-dots-display {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 18px;
-  margin: 12px 0 22px;
-  padding: 16px;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 var(--space-5);
+  padding: var(--space-4);
   background: var(--bg-canvas);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
 }
 
 .pin-dot {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: var(--radius-pill);
-  background: var(--border-strong);
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  background: var(--border-subtle);
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
 .pin-dot.filled {
   background: var(--brand-primary);
-  transform: scale(1.15);
   box-shadow: 0 0 0 4px var(--brand-soft);
 }
 
-/* Teclado numerico 3x4, teclas 64px de alto */
+/* Teclado numerico 3x4, teclas 64px de alto, gap space-2 (8px) */
 .pin-keypad-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .pin-keypad-grid.compact {
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .pin-btn {
@@ -1335,7 +1352,7 @@ button:active,
   border: 1px solid var(--border-subtle);
   font-family: var(--font-sans);
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   cursor: pointer;
@@ -1351,6 +1368,7 @@ button:active,
 }
 
 .pin-btn:active {
+  background: var(--bg-surface-hover);
   transform: scale(0.98);
 }
 
@@ -1370,8 +1388,10 @@ button:active,
 .btn-submit-pin {
   width: 100%;
   min-height: 48px;
+  padding: var(--space-4);
   background: var(--brand-primary);
   color: var(--text-on-brand);
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 600;
 }
