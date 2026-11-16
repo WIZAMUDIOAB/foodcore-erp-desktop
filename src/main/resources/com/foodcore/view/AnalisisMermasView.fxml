@@ -51,10 +51,10 @@
                         </HBox>
 
                         <!-- Banner de Alertas si hay insumos críticos (§10.2) -->
-                        <HBox fx:id="bannerAlertasMermas" alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: #FEF3C7; -fx-padding: 8 16; -fx-background-radius: 8; -fx-border-color: #FCD34D; -fx-border-radius: 8;" visible="false">
+                        <HBox fx:id="bannerAlertasMermas" alignment="CENTER_LEFT" spacing="12.0" styleClass="alert-expiry-soon" visible="false">
                             <children>
                                 <Label style="-fx-font-size: 16px;" text="⚠" />
-                                <Label fx:id="lblTextoAlertaMermas" style="-fx-text-fill: #92400E; -fx-font-weight: bold;" text="Alerta de Mermas Reincidentes" HBox.hgrow="ALWAYS" />
+                                <Label fx:id="lblTextoAlertaMermas" styleClass="text-body-strong" text="Alerta de Mermas Reincidentes" HBox.hgrow="ALWAYS" />
                             </children>
                         </HBox>
 

@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.prefs.Preferences;
 
 /**
  * Punto de entrada principal para el ERP de Escritorio FoodCore v1.1.
@@ -34,9 +35,10 @@ import java.util.logging.Logger;
 public class App extends Application {
 
     private static final Logger LOGGER = Logger.getLogger(App.class.getName());
+    private static final String PREF_KEY_DARK_MODE = "foodcore.ui.darkMode";
     private static final AtomicBoolean SHUTDOWN_HOOK_REGISTRADO = new AtomicBoolean(false);
     private static Stage primaryStage;
-    private static volatile boolean darkModeActivo = false;
+    private static volatile boolean darkModeActivo = leerPreferenciaModoOscuro();
 
     @Override
     public void start(Stage stage) {
@@ -267,6 +269,24 @@ public class App extends Application {
 
     public static void setDarkModeActivo(boolean activo) {
         darkModeActivo = activo;
+        guardarPreferenciaModoOscuro(activo);
+    }
+
+    private static boolean leerPreferenciaModoOscuro() {
+        try {
+            return Preferences.userNodeForPackage(App.class).getBoolean(PREF_KEY_DARK_MODE, false);
+        } catch (SecurityException ex) {
+            LOGGER.log(Level.FINE, "No se pudo leer preferencia de modo oscuro", ex);
+            return false;
+        }
+    }
+
+    private static void guardarPreferenciaModoOscuro(boolean activo) {
+        try {
+            Preferences.userNodeForPackage(App.class).putBoolean(PREF_KEY_DARK_MODE, activo);
+        } catch (SecurityException ex) {
+            LOGGER.log(Level.FINE, "No se pudo persistir preferencia de modo oscuro", ex);
+        }
     }
 
     public static void setRoot(String fxml) throws IOException {

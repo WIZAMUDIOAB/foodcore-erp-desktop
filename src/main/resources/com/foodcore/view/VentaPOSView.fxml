@@ -112,7 +112,7 @@
                                     <children>
                                         <Label fx:id="lblClientePosNombre" maxWidth="1.7976931348623157E308" minWidth="0.0" styleClass="text-body-strong" text="Cliente asociado" HBox.hgrow="ALWAYS" />
                                         <Label fx:id="lblClientePosPuntos" minWidth="-Infinity" style="-fx-padding: 3px 9px;" styleClass="badge-pill-accent" text="0 pts" />
-                                        <Button fx:id="btnCanjearPuntosPos" managed="false" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCanjearPuntosPos" style="-fx-padding: 4px 10px; -fx-font-size: 11.5px; -fx-border-color: #F05A22; -fx-text-fill: #F05A22;" styleClass="category-chip" text="Canjear Puntos" visible="false" />
+                                        <Button fx:id="btnCanjearPuntosPos" managed="false" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCanjearPuntosPos" styleClass="category-chip, btn-pos-points-chip" text="Canjear Puntos" visible="false" />
                                     </children>
                                 </HBox>
                                 <HBox fx:id="rowAlertaCumplePos" alignment="CENTER_LEFT" managed="false" spacing="6.0" visible="false">

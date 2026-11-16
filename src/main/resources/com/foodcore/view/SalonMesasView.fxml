@@ -51,7 +51,7 @@
                                         </HBox>
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Region style="-fx-background-color: #8B5CF6; -fx-pref-width: 10px; -fx-pref-height: 10px; -fx-background-radius: 5;" />
+                                                <Region styleClass="legend-dot-neutral" />
                                                 <Label styleClass="text-caption" text="Reservada" />
                                             </children>
                                         </HBox>

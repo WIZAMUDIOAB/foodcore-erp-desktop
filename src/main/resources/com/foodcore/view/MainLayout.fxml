@@ -29,11 +29,11 @@
                                 <Label fx:id="lblNetworkStatus" styleClass="badge-pill-success" text="ONLINE" />
                             </HBox>
                         </VBox>
-                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-kds-outline" text="«" />
+                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-secondary" text="«" />
                     </HBox>
 
-                    <!-- Buscador Global Integrado en Sidebar (220px, #1F2937, Texto Blanco) -->
-                    <TextField fx:id="txtBuscarSidebar" maxWidth="220.0" prefWidth="220.0" promptText="Buscar (Ctrl+K)..." style="-fx-background-color: #1F2937; -fx-text-fill: #FFFFFF; -fx-prompt-text-fill: #9CA3AF; -fx-background-radius: 8px; -fx-border-color: #374151; -fx-border-radius: 8px; -fx-padding: 8px 12px;" styleClass="sidebar-search-input" />
+                    <!-- Buscador Global Integrado en Sidebar -->
+                    <TextField fx:id="txtBuscarSidebar" maxWidth="220.0" prefWidth="220.0" promptText="Buscar (Ctrl+K)..." styleClass="sidebar-search-input" />
 
                     <!-- ScrollPane de Navegación -->
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" style="-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
@@ -103,13 +103,13 @@
                         <HBox alignment="CENTER_LEFT" spacing="8.0">
                             <Region styleClass="status-dot-online" />
                             <VBox spacing="1.0" HBox.hgrow="ALWAYS">
-                                <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong-inverse" text="admin · Administrador" />
-                                <Label styleClass="text-caption-muted" text="Sesión autorizada RBAC" />
+                                <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong" text="admin · Administrador" />
+                                <Label styleClass="text-caption" text="Sesión autorizada RBAC" />
                             </VBox>
                         </HBox>
                         <HBox spacing="6.0">
-                            <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-kds-outline" text="Clave" HBox.hgrow="ALWAYS" />
-                            <Button fx:id="btnCerrarSesion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCerrarSesion" styleClass="btn-kds-delivered" text="Salir" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-secondary" text="Clave" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="btnCerrarSesion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCerrarSesion" styleClass="btn-secondary" text="Salir" HBox.hgrow="ALWAYS" />
                         </HBox>
                     </VBox>
                 </VBox>

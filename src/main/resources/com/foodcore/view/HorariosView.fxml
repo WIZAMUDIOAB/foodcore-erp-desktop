@@ -46,10 +46,10 @@
                                 </HBox>
 
                                 <!-- Banner de Alertas de Cobertura -->
-                                <HBox fx:id="bannerAlertasCobertura" alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: #FEF3C7; -fx-padding: 10 16; -fx-background-radius: 8; -fx-border-color: #FCD34D; -fx-border-radius: 8;">
+                                <HBox fx:id="bannerAlertasCobertura" alignment="CENTER_LEFT" spacing="12.0" styleClass="alert-expiry-soon">
                                     <children>
                                         <Label style="-fx-font-size: 16px;" text="⚠" />
-                                        <Label fx:id="lblTextoAlerta" style="-fx-text-fill: #92400E; -fx-font-weight: bold;" text="Evaluando cobertura de personal para el fin de semana..." wrapText="true" HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblTextoAlerta" styleClass="text-body-strong" text="Evaluando cobertura de personal para el fin de semana..." wrapText="true" HBox.hgrow="ALWAYS" />
                                     </children>
                                 </HBox>
                             </children>
