@@ -586,6 +586,10 @@
     -fx-effect: dropshadow(gaussian, -brand-soft, 6, 0.5, 0, 0);
 }
 
+.button {
+    -fx-graphic-text-gap: 8px;
+}
+
 .btn-primary {
     -fx-background-color: -brand-primary;
     -fx-text-fill: -text-inverse;
@@ -598,7 +602,12 @@
     -fx-min-width: 44px;
     -fx-padding: 10px 20px;
     -fx-cursor: hand;
+    -fx-graphic-text-gap: 8px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 2, 0, 0, 1);
+}
+
+.btn-primary .ikonli-font-icon {
+    -fx-icon-color: -text-inverse;
 }
 
 .btn-primary:hover {
@@ -629,6 +638,11 @@
     -fx-min-width: 44px;
     -fx-padding: 8px 16px;
     -fx-cursor: hand;
+    -fx-graphic-text-gap: 8px;
+}
+
+.btn-secondary .ikonli-font-icon {
+    -fx-icon-color: -text-secondary;
 }
 
 .menu-button.btn-secondary {
@@ -663,6 +677,11 @@
     -fx-pref-height: 40px;
     -fx-padding: 8px 14px;
     -fx-cursor: hand;
+    -fx-graphic-text-gap: 8px;
+}
+
+.btn-ghost .ikonli-font-icon {
+    -fx-icon-color: -text-secondary;
 }
 
 .btn-ghost:hover {
@@ -915,7 +934,6 @@
     -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-min-height: 96px;
-    -fx-pref-height: 104px;
     -fx-padding: 16px;
     -fx-cursor: hand;
     -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
@@ -1167,6 +1185,11 @@
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
     -fx-background-insets: 0;
+    -fx-graphic-text-gap: 8px;
+}
+
+.sidebar-nav-button .ikonli-font-icon {
+    -fx-icon-color: -text-secondary;
 }
 
 .sidebar-nav-button:focused {
@@ -1179,6 +1202,10 @@
     -fx-text-fill: -text-primary;
 }
 
+.sidebar-nav-button:hover .ikonli-font-icon {
+    -fx-icon-color: -text-primary;
+}
+
 .sidebar-nav-button-active,
 .sidebar-nav-button-active:focused,
 .sidebar-nav-button-active:hover {
@@ -1189,6 +1216,10 @@
     -fx-border-radius: 8px;
     -fx-text-fill: -brand-primary;
     -fx-font-weight: 600;
+}
+
+.sidebar-nav-button-active .ikonli-font-icon {
+    -fx-icon-color: -brand-primary;
 }
 
 .sidebar-search-input {
@@ -1319,7 +1350,7 @@
 .default-color1.chart-pie { -fx-pie-color: -status-warning; }
 .default-color2.chart-pie { -fx-pie-color: -status-danger; }
 .default-color3.chart-pie { -fx-pie-color: -text-muted; }
-.default-color4.chart-pie { -fx-pie-color: -border-strong; }
+.default-color4.chart-pie { -fx-pie-color: -brand-primary; }
 
 .chart-bar {
     -fx-background-radius: 6 6 0 0;
@@ -1730,4 +1761,255 @@
     -fx-font-size: 12px;
     -fx-border-color: -brand-primary;
     -fx-text-fill: -brand-primary;
+}
+
+/* --------------------------------------------------------------------------
+   16. Componentes Estructurales v2.2 (Cards, Modales §2.1, Tipografia §4, DialogPane)
+   -------------------------------------------------------------------------- */
+.card,
+.stat-card,
+.metric-card {
+    -fx-background-color: -bg-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-padding: 20px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
+}
+
+.modal-card,
+.card.modal-card,
+.card.modal-dialog-surface,
+.modal-shell {
+    -fx-background-color: -bg-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-padding: 0;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.08), 8, 0, 0, 4);
+}
+
+.stat-card-accent {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -brand-primary;
+}
+
+.modal-header {
+    -fx-padding: 24px 24px 16px 24px;
+    -fx-spacing: 4px;
+}
+
+.modal-body {
+    -fx-padding: 0 24px 24px 24px;
+    -fx-spacing: 16px;
+}
+
+.modal-footer {
+    -fx-padding: 16px 24px 24px 24px;
+    -fx-border-color: -border-subtle transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.edge-to-edge,
+.edge-to-edge > .viewport {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.label-form,
+.form-field-label {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -text-secondary;
+}
+
+.h2,
+.modal-title {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 20px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-primary;
+}
+
+.h3,
+.text-h3 {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 15px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -text-primary;
+}
+
+.text-h4 {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-primary;
+}
+
+.price {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -brand-primary;
+}
+
+.text-secondary {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 13px;
+    -fx-font-weight: 400;
+    -fx-text-fill: -text-secondary;
+}
+
+.text-muted,
+.text-muted.ikonli-font-icon {
+    -fx-text-fill: -text-muted;
+    -fx-fill: -text-muted;
+    -fx-icon-color: -text-muted;
+}
+
+.text-danger {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -status-danger;
+}
+
+.text-body-caption,
+.stat-card-title,
+.metric-label {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -text-secondary;
+}
+
+.stat-card-value,
+.metric-value {
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-primary;
+}
+
+.stat-card-accent .stat-card-value,
+.metric-value-primary {
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -brand-primary;
+}
+
+.stat-card-subtitle {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-muted;
+}
+
+.form-text-field,
+.search-box {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-padding: 10px 14px;
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-font-size: 14px;
+    -fx-text-fill: -text-primary;
+    -fx-prompt-text-fill: -text-muted;
+}
+
+.form-text-field:focused,
+.search-box:focused {
+    -fx-border-color: -brand-primary;
+    -fx-border-width: 1px;
+}
+
+.form-combo-box,
+.form-date-picker {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-border-width: 1px;
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-font-size: 14px;
+}
+
+.btn-danger {
+    -fx-background-color: -status-danger;
+    -fx-text-fill: -text-inverse;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-weight: 600;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+    -fx-graphic-text-gap: 8px;
+}
+
+.btn-danger .ikonli-font-icon,
+.btn-destructive .ikonli-font-icon,
+.btn-success .ikonli-font-icon {
+    -fx-icon-color: -text-inverse;
+}
+
+.btn-danger:hover {
+    -fx-opacity: 0.92;
+}
+
+.btn-warning {
+    -fx-background-color: -status-warning;
+    -fx-text-fill: -text-inverse;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-weight: 600;
+    -fx-font-size: 14px;
+    -fx-background-radius: 8px;
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-padding: 8px 16px;
+    -fx-cursor: hand;
+    -fx-graphic-text-gap: 8px;
+}
+
+.btn-warning .ikonli-font-icon {
+    -fx-icon-color: -text-inverse;
+}
+
+.kardex-table-wrapper {
+    -fx-padding: 16px 24px 24px 24px;
+}
+
+.dialog-pane,
+.dialog-pane.card {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+    -fx-padding: 16px;
+}
+
+.dialog-pane > .content.label,
+.dialog-pane .label {
+    -fx-text-fill: -text-primary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+}
+
+.dialog-pane:header .header-panel {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.card > .btn-primary {
+    -fx-min-width: 112px;
 }

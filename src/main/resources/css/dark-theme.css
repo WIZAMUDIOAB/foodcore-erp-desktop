@@ -90,11 +90,20 @@
 
 .sidebar-nav-button {
     -fx-text-fill: -text-secondary;
+    -fx-graphic-text-gap: 8px;
+}
+
+.sidebar-nav-button .ikonli-font-icon {
+    -fx-icon-color: -text-secondary;
 }
 
 .sidebar-nav-button:hover {
     -fx-background-color: -bg-surface-hover;
     -fx-text-fill: -text-primary;
+}
+
+.sidebar-nav-button:hover .ikonli-font-icon {
+    -fx-icon-color: -text-primary;
 }
 
 .sidebar-nav-button-active,
@@ -104,6 +113,16 @@
     -fx-text-fill: -brand-primary;
 }
 
+.sidebar-nav-button-active .ikonli-font-icon {
+    -fx-icon-color: -brand-primary;
+}
+
+.card,
+.modal-card,
+.stat-card,
+.metric-card,
+.dialog-pane,
+.dialog-pane.card,
 .surface-card,
 .pos-order-panel,
 .pos-menu-tile,
@@ -116,6 +135,16 @@
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.40), 2, 0, 0, 1);
+}
+
+.dialog-pane > .content.label,
+.dialog-pane .label {
+    -fx-text-fill: -text-primary;
+}
+
+.dialog-pane:header .header-panel {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
 }
 
 .surface-card-subtle,
@@ -133,6 +162,13 @@
     -fx-border-color: -border-subtle;
 }
 
+.h2,
+.modal-title,
+.h3,
+.text-h3,
+.text-h4,
+.stat-card-value,
+.metric-value,
 .text-h1,
 .view-heading,
 .text-h2,
@@ -149,6 +185,16 @@
     -fx-text-fill: -text-primary;
 }
 
+.price {
+    -fx-text-fill: -brand-primary;
+}
+
+.label-form,
+.form-field-label,
+.text-secondary,
+.text-body-caption,
+.stat-card-title,
+.metric-label,
 .text-body-secondary,
 .view-subheading,
 .text-caption,
@@ -159,6 +205,18 @@
     -fx-text-fill: -text-secondary;
 }
 
+.text-muted,
+.stat-card-subtitle,
+.text-muted.ikonli-font-icon {
+    -fx-text-fill: -text-muted;
+    -fx-fill: -text-muted;
+    -fx-icon-color: -text-muted;
+}
+
+.form-text-field,
+.search-box,
+.form-combo-box,
+.form-date-picker,
 .text-field,
 .password-field,
 .input-field,
@@ -196,6 +254,17 @@
     -fx-background-color: -bg-surface-hover;
     -fx-border-color: -border-subtle;
     -fx-text-fill: -text-primary;
+}
+
+.btn-secondary .ikonli-font-icon,
+.btn-ghost .ikonli-font-icon {
+    -fx-icon-color: -text-secondary;
+}
+
+.btn-primary .ikonli-font-icon,
+.btn-danger .ikonli-font-icon,
+.btn-destructive .ikonli-font-icon {
+    -fx-icon-color: -text-inverse;
 }
 
 .btn-secondary:hover,
