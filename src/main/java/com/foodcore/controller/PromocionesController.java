@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.model.Promocion;
 import com.foodcore.service.PromocionService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.DialogService;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -10,7 +11,6 @@ import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
@@ -20,7 +20,6 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
@@ -86,11 +85,11 @@ public class PromocionesController {
                     Label badge = new Label(item);
                     badge.getStyleClass().add("badge-pill-accent");
                     if (item.contains("2x1") || item.contains("3x2")) {
-                        badge.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-font-weight: 700;");
+                        badge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: 700;");
                     } else if (item.contains("%")) {
-                        badge.setStyle("-fx-background-color: #DEF7EC; -fx-text-fill: #03543F; -fx-font-weight: 700;");
+                        badge.setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: 700;");
                     } else {
-                        badge.setStyle("-fx-background-color: #E1EFFE; -fx-text-fill: #1E429F; -fx-font-weight: 700;");
+                        badge.setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #EA580C; -fx-font-weight: 700;");
                     }
                     HBox box = new HBox(badge);
                     box.setAlignment(Pos.CENTER_LEFT);
@@ -279,14 +278,9 @@ public class PromocionesController {
 
     @FXML
     public void handleNuevaPromocion() {
-        Dialog<Promocion> dialog = new Dialog<>();
-        dialog.setTitle("Nueva Regla de Promoción");
-        dialog.setHeaderText("Configuración de Descuento Automático");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(12);
-        grid.setPadding(new Insets(20));
+        Dialog<Promocion> dialog = DialogService.crearDialogo(
+                "Nueva Regla de Promoción",
+                "Configuración de Descuento Automático");
 
         TextField txtCod = new TextField("PROMO-" + (System.currentTimeMillis() % 10000));
         TextField txtNom = new TextField();
@@ -300,20 +294,21 @@ public class PromocionesController {
         cmbAplica.setValue("PRODUCTO");
         TextField txtMinimo = new TextField("0.00");
 
-        grid.add(new Label("Código:"), 0, 0);
-        grid.add(txtCod, 1, 0);
-        grid.add(new Label("Nombre:"), 0, 1);
-        grid.add(txtNom, 1, 1);
-        grid.add(new Label("Tipo:"), 0, 2);
-        grid.add(cmbTipo, 1, 2);
-        grid.add(new Label("Valor Descuento:"), 0, 3);
-        grid.add(txtValor, 1, 3);
-        grid.add(new Label("Aplica a:"), 0, 4);
-        grid.add(cmbAplica, 1, 4);
-        grid.add(new Label("Monto Mínimo:"), 0, 5);
-        grid.add(txtMinimo, 1, 5);
+        VBox form = new VBox(16.0);
+        form.setPadding(new Insets(16.0, 24.0, 24.0, 24.0));
+        form.setPrefWidth(460.0);
+        form.getChildren().addAll(
+                DialogService.construirFilaDobleModal(
+                        DialogService.construirCampoModal("Código:", txtCod),
+                        DialogService.construirCampoModal("Tipo:", cmbTipo)),
+                DialogService.construirCampoModal("Nombre:", txtNom),
+                DialogService.construirFilaDobleModal(
+                        DialogService.construirCampoModal("Valor Descuento:", txtValor),
+                        DialogService.construirCampoModal("Monto Mínimo:", txtMinimo)),
+                DialogService.construirCampoModal("Aplica a:", cmbAplica)
+        );
 
-        dialog.getDialogPane().setContent(grid);
+        dialog.getDialogPane().setContent(form);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
         dialog.setResultConverter(btn -> {

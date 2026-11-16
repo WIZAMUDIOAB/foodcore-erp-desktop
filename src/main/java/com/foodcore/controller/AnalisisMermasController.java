@@ -7,12 +7,14 @@ import com.foodcore.model.Merma;
 import com.foodcore.service.AnalisisMermasService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Side;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.chart.AreaChart;
@@ -59,7 +61,7 @@ public class AnalisisMermasController {
 
     private static final Logger LOGGER = Logger.getLogger(AnalisisMermasController.class.getName());
     private static final String[] PALETA_SAAS = {
-        "#F05A22", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#06B6D4"
+        "#EA580C", "#D97706", "#DC2626", "#A39D94"
     };
 
     @FXML private StackPane rootMermasStack;
@@ -82,6 +84,7 @@ public class AnalisisMermasController {
     @FXML private TableColumn<Merma, String> colTopPerdida;
 
     @FXML private TableView<Merma> tblMermasDetalle;
+    @FXML private VBox emptyState;
     @FXML private TableColumn<Merma, String> colDetFecha;
     @FXML private TableColumn<Merma, String> colDetInsumo;
     @FXML private TableColumn<Merma, String> colDetCantidad;
@@ -122,6 +125,7 @@ public class AnalisisMermasController {
         if (chartMermasMotivo != null) {
             chartMermasMotivo.setAnimated(false);
             chartMermasMotivo.setLabelsVisible(false);
+            chartMermasMotivo.setLegendSide(Side.BOTTOM);
             chartMermasMotivo.needsLayoutProperty().addListener((obs, oldVal, needsLayout) -> {
                 if (!needsLayout) {
                     aplicarEstilosPieMotivos();
@@ -187,7 +191,7 @@ public class AnalisisMermasController {
                         setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; "
                                 + "-fx-font-weight: bold; -fx-background-radius: 8; -fx-alignment: CENTER;");
                     } else {
-                        setStyle("-fx-background-color: #EDE9FE; -fx-text-fill: #6D28D9; "
+                        setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #5C5650; "
                                 + "-fx-font-weight: bold; -fx-background-radius: 8; -fx-alignment: CENTER;");
                     }
                 }
@@ -202,6 +206,9 @@ public class AnalisisMermasController {
                 c.getValue().getObservacion() != null ? c.getValue().getObservacion() : "-"));
 
         tblMermasDetalle.setItems(listaDetalleMermas);
+        EmptyStateHelper.aplicarPlaceholder(tblTopInsumos);
+        EmptyStateHelper.aplicarPlaceholder(tblMermasDetalle);
+        EmptyStateHelper.vincularATabla(tblMermasDetalle, emptyState);
     }
 
     public void cargarDatosAsync() {
@@ -374,7 +381,7 @@ public class AnalisisMermasController {
                 continue;
             }
 
-            linePath.setStroke(Color.web("#F05A22"));
+            linePath.setStroke(Color.web("#EA580C"));
             linePath.setStrokeWidth(3.0);
             linePath.setStrokeLineCap(StrokeLineCap.ROUND);
             linePath.setStrokeLineJoin(StrokeLineJoin.ROUND);
@@ -382,8 +389,8 @@ public class AnalisisMermasController {
             fillPath.setStroke(Color.TRANSPARENT);
             fillPath.setFill(new LinearGradient(
                     0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, Color.rgb(240, 90, 34, 0.30)),
-                    new Stop(1.0, Color.rgb(240, 90, 34, 0.00))
+                    new Stop(0.0, Color.rgb(234, 88, 12, 0.30)),
+                    new Stop(1.0, Color.rgb(234, 88, 12, 0.00))
             ));
 
             boolean yaSuavizado = linePath.getElements().stream().anyMatch(e -> e instanceof CubicCurveTo);

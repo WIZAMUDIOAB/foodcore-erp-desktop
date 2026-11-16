@@ -12,6 +12,8 @@ import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
+import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -21,6 +23,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -153,9 +156,7 @@ public class MozoOrderController {
             lblMozo.setText("Mozo: Turno Activo (Mateo Quispe)");
         }
 
-        Label lblPlaceholder = new Label("Aún no hay platos en la comanda");
-        lblPlaceholder.getStyleClass().add("text-body-secondary");
-        tblItems.setPlaceholder(lblPlaceholder);
+        EmptyStateHelper.aplicarPlaceholder(tblItems);
 
         colPlato.setCellValueFactory(c -> new SimpleStringProperty(
                 FormatoPersonalizacionUtil.formatearDescripcionItem(c.getValue())));
@@ -224,44 +225,52 @@ public class MozoOrderController {
         }
         tilePlatos.getChildren().clear();
         for (Producto p : productos) {
-            HBox card = new HBox(10.0);
+            HBox card = new HBox(16.0);
             card.setAlignment(Pos.CENTER_LEFT);
-            card.setPrefWidth(225.0);
-            card.setMinHeight(86.0);
-            card.getStyleClass().add("surface-card-interactive");
-            card.setStyle("-fx-padding: 12 14;");
+            card.setMinWidth(320.0);
+            card.setPrefWidth(340.0);
+            card.getStyleClass().add("card");
+            card.setPadding(new Insets(16.0));
 
-            VBox infoBox = new VBox(6.0);
+            VBox infoBox = new VBox(4.0);
+            infoBox.setMinWidth(0.0);
+            infoBox.setPrefWidth(150.0);
             infoBox.setAlignment(Pos.CENTER_LEFT);
             HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             Label lblNombre = new Label(p.getNombre());
+            lblNombre.setMinWidth(0.0);
             lblNombre.setWrapText(true);
-            lblNombre.setMaxWidth(155.0);
-            lblNombre.setStyle("-fx-font-family: 'Inter', 'Segoe UI', sans-serif; -fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #111827;");
+            lblNombre.getStyleClass().add("h3");
 
-            BigDecimal precioVal = p.getPrecioVenta() != null ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-            Label lblPrecio = new Label("S/ " + precioVal);
-            lblPrecio.setStyle("-fx-font-family: 'JetBrains Mono', 'Consolas', monospace; -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #F05A22;");
-
+            String descTexto;
             if (p.isEsCombo()) {
-                Label lblCombo = new Label("COMBO");
-                lblCombo.setStyle("-fx-background-color: #EEF2FF; -fx-text-fill: #4338CA; "
-                        + "-fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
-                infoBox.getChildren().addAll(lblNombre, lblCombo, lblPrecio);
+                descTexto = "COMBO · " + (p.getDescripcion() != null && !p.getDescripcion().isBlank()
+                        ? p.getDescripcion() : "Paquete promocional");
             } else if (p.tieneOpcionesPersonalizacion()) {
-                Label lblOpciones = new Label(FormatoPersonalizacionUtil.construirResumenOpciones(p));
-                lblOpciones.setStyle("-fx-background-color: #FFF4EC; -fx-text-fill: #C2410C; "
-                        + "-fx-font-size: 10px; -fx-font-weight: 700; -fx-padding: 2 6; -fx-background-radius: 6;");
-                infoBox.getChildren().addAll(lblNombre, lblOpciones, lblPrecio);
+                descTexto = FormatoPersonalizacionUtil.construirResumenOpciones(p);
+            } else if (p.getDescripcion() != null && !p.getDescripcion().isBlank()) {
+                descTexto = p.getDescripcion();
             } else {
-                infoBox.getChildren().addAll(lblNombre, lblPrecio);
+                descTexto = p.getCodigo() != null ? p.getCodigo() : "Plato de carta";
             }
+            Label lblDesc = new Label(descTexto);
+            lblDesc.setMinWidth(0.0);
+            lblDesc.setWrapText(true);
+            lblDesc.getStyleClass().add("text-secondary");
 
-            Button btnMas = new Button("+");
+            BigDecimal precioVal = p.getPrecioVenta() != null
+                    ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            Label lblPrecio = new Label("S/ " + precioVal);
+            lblPrecio.getStyleClass().add("price");
+
+            infoBox.getChildren().addAll(lblNombre, lblDesc, lblPrecio);
+
+            Button btnMas = new Button("+ Agregar");
+            btnMas.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
             btnMas.setFocusTraversable(false);
-            btnMas.setStyle("-fx-background-color: #F05A22; -fx-text-fill: #FFFFFF; -fx-font-weight: 800; -fx-font-size: 16px; "
-                    + "-fx-min-width: 38px; -fx-pref-width: 38px; -fx-min-height: 38px; -fx-pref-height: 38px; -fx-padding: 0; -fx-background-radius: 8px; -fx-cursor: hand;");
+            btnMas.getStyleClass().add("btn-primary");
+            btnMas.setGraphicTextGap(8.0);
             AnimationUtils.attachTactileFeedback(btnMas);
             btnMas.setOnAction(e -> {
                 e.consume();
@@ -557,10 +566,6 @@ public class MozoOrderController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert a = new Alert(tipo);
-        a.setTitle(titulo);
-        a.setHeaderText(null);
-        a.setContentText(mensaje);
-        a.showAndWait();
+        DialogService.mostrarAlerta(tipo, titulo, mensaje);
     }
 }

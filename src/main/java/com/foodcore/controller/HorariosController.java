@@ -154,11 +154,11 @@ public class HorariosController {
             VBox colContent = new VBox(8);
             colContent.setMinWidth(140);
             colContent.setPadding(new Insets(6, 0, 6, 0));
-            colContent.setStyle("-fx-background-color: #F8FAFC; -fx-padding: 8; -fx-background-radius: 8;");
+            colContent.setStyle("-fx-background-color: #F7F5F1; -fx-padding: 8; -fx-background-radius: 8;");
 
             if (turnosDia.isEmpty()) {
                 Label lblVacio = new Label("Sin asignación");
-                lblVacio.setStyle("-fx-text-fill: #94A3B8; -fx-font-style: italic; -fx-font-size: 11px;");
+                lblVacio.setStyle("-fx-text-fill: #A39D94; -fx-font-style: italic; -fx-font-size: 11px;");
                 colContent.getChildren().add(lblVacio);
             } else {
                 for (TurnoProgramado tp : turnosDia) {
@@ -177,7 +177,7 @@ public class HorariosController {
     private VBox crearTarjetaTurno(TurnoProgramado tp) {
         VBox card = new VBox(4);
         card.setPadding(new Insets(8, 10, 8, 10));
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 8; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.03), 4, 0, 0, 1);");
+        card.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 8; -fx-border-color: #E5E0D8; -fx-border-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.03), 4, 0, 0, 1);");
 
         HBox topH = new HBox(4);
         topH.setAlignment(Pos.CENTER_LEFT);
@@ -186,18 +186,18 @@ public class HorariosController {
         Label lblTurnoBadge = new Label(textoTurno);
         lblTurnoBadge.setMinWidth(Region.USE_PREF_SIZE);
         if ("MANANA".equalsIgnoreCase(tp.getTurno())) {
-            lblTurnoBadge.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #92400E; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+            lblTurnoBadge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
         } else if ("TARDE".equalsIgnoreCase(tp.getTurno())) {
-            lblTurnoBadge.setStyle("-fx-background-color: #E0E7FF; -fx-text-fill: #3730A3; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+            lblTurnoBadge.setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
         } else {
-            lblTurnoBadge.setStyle("-fx-background-color: #F1F5F9; -fx-text-fill: #334155; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+            lblTurnoBadge.setStyle("-fx-background-color: #F2EFEA; -fx-text-fill: #5C5650; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
         }
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button btnEliminar = new Button("✕");
-        btnEliminar.setStyle("-fx-background-color: transparent; -fx-text-fill: #94A3B8; -fx-font-size: 10px; -fx-cursor: hand; -fx-padding: 0 4;");
+        btnEliminar.setStyle("-fx-background-color: transparent; -fx-text-fill: #A39D94; -fx-font-size: 10px; -fx-cursor: hand; -fx-padding: 0 4;");
         btnEliminar.setOnAction(e -> handleEliminarTurno(tp.getIdTurnoProg()));
 
         topH.getChildren().addAll(lblTurnoBadge, spacer, btnEliminar);
