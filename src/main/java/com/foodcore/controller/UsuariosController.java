@@ -9,6 +9,7 @@ import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -26,7 +27,6 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.TableCell;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -320,12 +320,11 @@ public class UsuariosController {
             return;
         }
 
-        TextInputDialog dialog = new TextInputDialog("1234");
-        dialog.setTitle("Configurar PIN Tablet");
-        dialog.setHeaderText("Configurar PIN de 4 a 6 dígitos para: " + sel.username());
-        dialog.setContentText("Nuevo PIN numérico:");
-
-        Optional<String> res = dialog.showAndWait();
+        Optional<String> res = DialogService.crearTextInputDialog(
+                "1234",
+                "Configurar PIN Tablet",
+                "Configurar PIN de 4 a 6 dígitos para: " + sel.username(),
+                "Nuevo PIN numérico:").showAndWait();
         if (res.isPresent()) {
             String pin = res.get().trim();
             if (!pin.matches("^\\d{4,6}$")) {

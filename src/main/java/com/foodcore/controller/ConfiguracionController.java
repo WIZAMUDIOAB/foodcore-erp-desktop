@@ -9,6 +9,7 @@ import com.foodcore.service.AlertaService.AlertaEmitida;
 import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -547,10 +548,11 @@ public class ConfiguracionController {
     }
 
     private boolean solicitarConfirmacionRestauracionUi() {
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Confirmar Restauración de Base de Datos");
-        confirm.setHeaderText("Se restaurará la base de datos desde el archivo seleccionado");
-        confirm.setContentText("Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
+        Alert confirm = DialogService.crearAlerta(
+                Alert.AlertType.CONFIRMATION,
+                "Confirmar Restauración de Base de Datos",
+                "Se restaurará la base de datos desde el archivo seleccionado",
+                "Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
         if (rootConfigStack != null && rootConfigStack.getScene() != null) {
             confirm.initOwner(rootConfigStack.getScene().getWindow());
         }

@@ -10,6 +10,7 @@ import com.foodcore.service.CierreContableService;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -298,11 +299,12 @@ public class EstadoResultadosController {
         YearMonth ym = YearMonth.from(ref);
         String periodoTxt = String.format("%04d-%02d", ym.getYear(), ym.getMonthValue());
 
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+        Alert confirm = DialogService.crearAlerta(
+                Alert.AlertType.CONFIRMATION,
+                "Cerrar Mes Contable — " + periodoTxt,
                 "¿Desea ejecutar el Cierre Contable definitivo del período " + periodoTxt + "?\n"
                         + "No se podrán registrar ventas, devoluciones parciales ni gastos operativos en ese mes.",
                 ButtonType.YES, ButtonType.NO);
-        confirm.setTitle("Cerrar Mes Contable — " + periodoTxt);
         confirm.setHeaderText("Bloqueo contable irreversible del período");
         Optional<ButtonType> ans = confirm.showAndWait();
         if (ans.isEmpty() || ans.get() != ButtonType.YES) {

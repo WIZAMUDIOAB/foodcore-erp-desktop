@@ -14,6 +14,7 @@ import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.VentaService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -330,9 +331,11 @@ public class CobroModalController {
         sb.append("         Insumos descontados de inventario\n");
         sb.append("====================================================\n");
 
-        Alert ticketAlert = new Alert(Alert.AlertType.INFORMATION);
-        ticketAlert.setTitle("Comprobante Electrónico Emitido");
-        ticketAlert.setHeaderText("Venta Exitosa #" + venta.getIdVenta() + " - " + comp.getNumeroCompleto());
+        Alert ticketAlert = DialogService.crearAlerta(
+                Alert.AlertType.INFORMATION,
+                "Comprobante Electrónico Emitido",
+                "Venta Exitosa #" + venta.getIdVenta() + " - " + comp.getNumeroCompleto(),
+                "");
 
         TextArea textArea = new TextArea(sb.toString());
         textArea.setEditable(false);
@@ -346,10 +349,6 @@ public class CobroModalController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert a = new Alert(tipo);
-        a.setTitle(titulo);
-        a.setHeaderText(null);
-        a.setContentText(mensaje);
-        a.showAndWait();
+        DialogService.mostrarAlerta(tipo, titulo, mensaje);
     }
 }
