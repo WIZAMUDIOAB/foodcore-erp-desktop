@@ -26,7 +26,7 @@ const FoodCoreKDS = (() => {
     document.documentElement.setAttribute('data-theme', esOscuro ? 'dark' : 'light');
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      meta.setAttribute('content', esOscuro ? '#121211' : '#FAF9F6');
+      meta.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
     }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {

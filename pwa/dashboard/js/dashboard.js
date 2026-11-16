@@ -25,7 +25,7 @@ const FoodCoreDashboard = (() => {
     document.documentElement.setAttribute('data-theme', esOscuro ? 'dark' : 'light');
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      meta.setAttribute('content', esOscuro ? '#121211' : '#FAF9F6');
+      meta.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
     }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
@@ -327,14 +327,14 @@ const FoodCoreDashboard = (() => {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: tokens.tick, font: { family: 'Inter', size: 12 } }
+              ticks: { color: tokens.muted || tokens.tick, font: { family: 'Inter', size: 11 } }
             },
             y: {
               beginAtZero: true,
               grid: { color: tokens.grid },
               ticks: {
-                color: tokens.tick,
-                font: { family: 'Inter', size: 12 },
+                color: tokens.muted || tokens.tick,
+                font: { family: 'Inter', size: 11 },
                 callback: (v) => `S/${v}`
               }
             }
