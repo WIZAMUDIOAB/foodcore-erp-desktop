@@ -1,9 +1,14 @@
 package com.foodcore.e2e;
 
 import com.foodcore.App;
+import com.foodcore.controller.AnalisisMermasController;
 import com.foodcore.controller.ConfiguracionController;
 import com.foodcore.controller.DashboardController;
 import com.foodcore.controller.MainDashboardController;
+import com.foodcore.controller.MozoOrderController;
+import com.foodcore.controller.ReportesAvanzadosController;
+import com.foodcore.controller.VentaController;
+import com.foodcore.controller.VentaController.ModalModoSupervisorHandle;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.MenuQrService;
@@ -11,11 +16,19 @@ import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport.VistaCargada;
+import com.foodcore.util.DialogService;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Route;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.DialogPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -237,8 +250,173 @@ public class RedisenoPremiumVisualE2ETest {
                 UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, config.root(), "javafx-config-light.png");
                 App.aplicarModoOscuro(config.scene(), true);
                 UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, config.root(), "javafx-config-dark.png");
+
+                // 4. POS Catálogo y Comanda Cards v2.2 (§2.4)
+                VistaCargada<VentaController> pos = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/VentaPOSView.fxml", 1280, 800);
+                pos.controller().cargarCatalogoProductosSincrono();
+                App.aplicarModoOscuro(pos.scene(), false);
+                pos.root().applyCss();
+                pos.root().layout();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, pos.root(), "javafx-pos-light.png");
+
+                // 5. Modal Modo Supervisor estilizado vía DialogService (§2.2)
+                ModalModoSupervisorHandle modalSup = pos.controller().construirModalModoSupervisor(1024);
+                DialogPane dpSup = modalSup.dialog().getDialogPane();
+                dpSup.applyCss();
+                dpSup.layout();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, dpSup, "javafx-modal-supervisor-light.png");
+                modalSup.dialog().close();
+
+                // 6. Mozo Comanda Cards v2.2 + EmptyState (§2.3, §2.4)
+                VistaCargada<MozoOrderController> mozo = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/MozoOrderView.fxml", 1180, 760);
+                mozo.controller().cargarPlatosDisponiblesSincrono();
+                App.aplicarModoOscuro(mozo.scene(), false);
+                mozo.root().applyCss();
+                mozo.root().layout();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, mozo.root(), "javafx-mozo-comanda-light.png");
+
+                // 7. Análisis de Mermas Donut 4 colores + Modal §2.1
+                VistaCargada<AnalisisMermasController> mermas = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/AnalisisMermasView.fxml", 1280, 800);
+                mermas.controller().cargarDatos();
+                App.aplicarModoOscuro(mermas.scene(), false);
+                mermas.root().applyCss();
+                mermas.root().layout();
+                mermas.controller().aplicarEstilosPieMotivos();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, mermas.root(), "javafx-mermas-light.png");
+
+                mermas.controller().handleAbrirModal();
+                mermas.root().applyCss();
+                mermas.root().layout();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, mermas.root(), "javafx-modal-merma-light.png");
+
+                // 8. Reportes Avanzados Donut 4 colores (§3)
+                VistaCargada<ReportesAvanzadosController> rep = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/ReportesAvanzadosView.fxml", 1280, 800);
+                rep.controller().cargarAnalisisSincrono();
+                App.aplicarModoOscuro(rep.scene(), false);
+                rep.root().applyCss();
+                rep.root().layout();
+                rep.controller().aplicarEstilosDonut();
+                UiScreenshotTestSupport.capturarEvidencia(EVIDENCE_DIR, rep.root(), "javafx-reportes-light.png");
             } catch (IOException ex) {
                 throw new IllegalStateException("Error generando capturas JavaFX Light/Dark", ex);
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("Checklist v2.2 (§5): layouts, labels estáticos, DialogService, Donut 4 colores, EmptyState, Modales y gap 8px")
+    void verificarChecklistV22LayoutsYComponentes() throws Exception {
+        // Checklist §5.1 y §5.2: Cero AnchorPane/layoutX/layoutY y todos los inputs FXML con Label estático encima
+        Pattern inputPattern = Pattern.compile("<(TextField|PasswordField|ComboBox|DatePicker)\\b");
+        try (Stream<Path> fxmls = Files.walk(Path.of("src", "main", "resources", "com", "foodcore", "view"))) {
+            List<Path> rutas = fxmls.filter(p -> p.toString().endsWith(".fxml")).toList();
+            assertFalse(rutas.isEmpty());
+            for (Path p : rutas) {
+                String contenido = Files.readString(p, StandardCharsets.UTF_8);
+                assertFalse(contenido.contains("AnchorPane"), p + " no debe usar AnchorPane");
+                assertFalse(contenido.contains("layoutX="), p + " no debe usar layoutX");
+                assertFalse(contenido.contains("layoutY="), p + " no debe usar layoutY");
+
+                List<String> lineas = Files.readAllLines(p, StandardCharsets.UTF_8);
+                for (int i = 0; i < lineas.size(); i++) {
+                    String l = lineas.get(i);
+                    if (inputPattern.matcher(l).find() && !l.contains("fx:constant")) {
+                        boolean tieneLabel = false;
+                        for (int j = i - 1; j >= Math.max(0, i - 4); j--) {
+                            String prev = lineas.get(j);
+                            if (prev.contains("<Label")) {
+                                tieneLabel = true;
+                                break;
+                            }
+                            if (prev.contains("</VBox>") || prev.contains("</HBox>")
+                                    || prev.contains("</GridPane>") || prev.contains("<Button")) {
+                                break;
+                            }
+                        }
+                        assertTrue(tieneLabel, "Input sin Label estático encima en " + p + ":" + (i + 1));
+                    }
+                    assertFalse(l.contains("Tabla sin contenido"), p + " contiene 'Tabla sin contenido'");
+                }
+            }
+        }
+
+        // Checklist §5.3 y §5.5: Cero Alert/Dialog nativos directos ni 'Tabla sin contenido' en src/main/java
+        Pattern dialogDirecto = Pattern.compile("\\bnew\\s+(?:Alert|Dialog|TextInputDialog|ChoiceDialog)\\b");
+        try (Stream<Path> javaFiles = Files.walk(Path.of("src", "main", "java"))) {
+            for (Path jf : javaFiles.filter(p -> p.toString().endsWith(".java")).toList()) {
+                if (jf.getFileName().toString().equals("DialogService.java")) {
+                    continue;
+                }
+                String src = Files.readString(jf, StandardCharsets.UTF_8);
+                assertFalse(dialogDirecto.matcher(src).find(),
+                        "Controlador/clase instanciando diálogo nativo sin DialogService: " + jf);
+                assertFalse(src.contains("Tabla sin contenido"),
+                        "No se debe usar texto 'Tabla sin contenido' en " + jf);
+            }
+        }
+
+        // Checklist §5.4: Gráficos Donut usan solo 4 colores aprobados (#EA580C, #D97706, #DC2626, #A39D94)
+        for (String ctrlName : List.of(
+                "AnalisisMermasController.java",
+                "ReportesAvanzadosController.java",
+                "ReportesController.java")) {
+            String src = Files.readString(
+                    Path.of("src", "main", "java", "com", "foodcore", "controller", ctrlName),
+                    StandardCharsets.UTF_8);
+            assertTrue(src.contains("#EA580C") && src.contains("#D97706")
+                    && src.contains("#DC2626") && src.contains("#A39D94"),
+                    ctrlName + " debe definir la paleta Donut de 4 colores aprobados");
+            assertFalse(src.contains("#8B5CF6") || src.contains("#3B82F6")
+                    || src.contains("#10B981") || src.contains("#06B6D4"),
+                    ctrlName + " aún contiene colores prohibidos de gráfico");
+        }
+
+        // Checklist §5.3, §5.5, §5.6, §5.7 en runtime JavaFX
+        String css = Files.readString(Path.of("src", "main", "resources", "css", "foodcore.css"), StandardCharsets.UTF_8);
+        assertTrue(css.contains("-fx-graphic-text-gap: 8px"), "CSS debe definir -fx-graphic-text-gap: 8px");
+        assertTrue(css.contains(".card") && css.contains(".edge-to-edge") && css.contains(".modal-footer"),
+                "CSS debe definir clases estructurales §2.1");
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            Alert alerta = DialogService.crearAlerta(Alert.AlertType.INFORMATION, "Test", "Contenido");
+            DialogPane pane = alerta.getDialogPane();
+            assertTrue(pane.getStyleClass().contains("card"), "Alert DialogPane debe tener clase .card");
+            assertTrue(pane.getStylesheets().stream().anyMatch(s -> s.contains("foodcore.css")),
+                    "Alert DialogPane debe inyectar foodcore.css");
+
+            try {
+                VistaCargada<Object> mermasV = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/MermasView.fxml", 1120, 720);
+                javafx.scene.control.TableView<?> tblMermas =
+                        (javafx.scene.control.TableView<?>) mermasV.root().lookup("#tblMermas");
+                tblMermas.getItems().clear();
+                Node emptyBox = mermasV.root().lookup("#emptyState");
+                assertNotNull(emptyBox, "MermasView debe contener #emptyState");
+                assertTrue(emptyBox.isVisible(), "#emptyState debe estar visible con tblMermas vacía");
+
+                VistaCargada<VentaController> posV = UiScreenshotTestSupport.cargarVista(
+                        "/com/foodcore/view/VentaPOSView.fxml", 1280, 800);
+                posV.controller().cargarCatalogoProductosSincrono();
+                assertTrue(posV.root().lookupAll(".pos-menu-tile").stream()
+                        .allMatch(n -> n instanceof HBox h && h.getStyleClass().contains("card")),
+                        "Tarjetas de producto POS deben seguir patrón HBox .card (§2.4)");
+
+                VBox modalTest = DialogService.construirModalFormulario(
+                        500, "Título Test", "Subtítulo Test",
+                        List.of(DialogService.construirCampoModal("Campo", new javafx.scene.control.TextField())),
+                        DialogService.construirFooterModal(new Button("Cancelar"), new Button("Guardar")));
+                Scene modalScene = new Scene(modalTest);
+                App.applyStylesheets(modalScene);
+                assertTrue(modalTest.getStyleClass().contains("card"), "Modal §2.1 debe tener clase .card");
+                assertNotNull(modalTest.lookup(".modal-header"), "Modal §2.1 debe tener .modal-header");
+                assertNotNull(modalTest.lookup(".edge-to-edge"), "Modal §2.1 debe tener ScrollPane .edge-to-edge");
+                assertNotNull(modalTest.lookup(".modal-footer"), "Modal §2.1 debe tener .modal-footer");
+            } catch (IOException ex) {
+                throw new IllegalStateException("Error validando Checklist v2.2 en FX", ex);
             }
         });
     }
