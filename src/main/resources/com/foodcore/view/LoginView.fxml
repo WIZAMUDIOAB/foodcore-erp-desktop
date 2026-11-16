@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
@@ -114,18 +116,33 @@
       <!-- Modal Verificación en Dos Pasos 2FA TOTP (v5.1.0 ÍTEM 7) -->
       <VBox fx:id="overlayTotp" alignment="CENTER" managed="false" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" styleClass="modal-backdrop" visible="false">
          <children>
-            <VBox maxWidth="420.0" spacing="14.0" styleClass="modal-dialog-surface">
+            <VBox maxHeight="480.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-dialog-surface">
                <children>
-                  <Label styleClass="text-h2" text="Verificación en Dos Pasos (2FA)" />
-                  <Label fx:id="lblTotpSubtitulo" styleClass="text-body-secondary" text="Ingrese el código TOTP de 6 dígitos generado por su aplicación autenticadora." wrapText="true" />
-                  <VBox spacing="6.0">
+                  <VBox spacing="4.0" styleClass="modal-header">
+                     <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                      <children>
-                        <Label styleClass="text-body-strong" text="Código 2FA (6 dígitos)" />
-                        <TextField fx:id="txtTotpCodigo" onAction="#handleVerificarTotp" promptText="Ej. 123456" styleClass="input-field" />
+                        <Label styleClass="h2" text="Verificación en Dos Pasos (2FA)" />
+                        <Label fx:id="lblTotpSubtitulo" styleClass="text-secondary" text="Ingrese el código TOTP de 6 dígitos generado por su aplicación autenticadora." wrapText="true" />
                      </children>
                   </VBox>
-                  <Label fx:id="lblTotpError" managed="false" styleClass="text-error" text="" visible="false" wrapText="true" />
-                  <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                  <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                     <content>
+                        <VBox spacing="16.0" styleClass="modal-body">
+                           <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                           <children>
+                              <VBox spacing="8.0">
+                                 <children>
+                                    <Label styleClass="label-form" text="Código 2FA (6 dígitos)" />
+                                    <TextField fx:id="txtTotpCodigo" onAction="#handleVerificarTotp" promptText="Ej. 123456" styleClass="input-field" />
+                                 </children>
+                              </VBox>
+                              <Label fx:id="lblTotpError" managed="false" styleClass="text-danger" text="" visible="false" wrapText="true" />
+                           </children>
+                        </VBox>
+                     </content>
+                  </ScrollPane>
+                  <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                     <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                      <children>
                         <Button fx:id="btnCancelarTotp" mnemonicParsing="false" onAction="#handleCancelarTotp" styleClass="btn-secondary" text="Cancelar" />
                         <Button fx:id="btnVerificarTotp" mnemonicParsing="false" onAction="#handleVerificarTotp" styleClass="btn-primary" text="Verificar y Entrar" />

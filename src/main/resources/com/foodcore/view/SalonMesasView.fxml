@@ -9,6 +9,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.SalonMesasController">
     <content>
@@ -33,25 +34,25 @@
                                     <children>
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Region styleClass="status-dot-neutral" />
+                                                <Region maxHeight="10.0" maxWidth="10.0" minHeight="10.0" minWidth="10.0" prefHeight="10.0" prefWidth="10.0" styleClass="status-dot-neutral" />
                                                 <Label styleClass="text-caption" text="Libre" />
                                             </children>
                                         </HBox>
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Region styleClass="status-dot-danger" />
+                                                <Region maxHeight="10.0" maxWidth="10.0" minHeight="10.0" minWidth="10.0" prefHeight="10.0" prefWidth="10.0" styleClass="status-dot-danger" />
                                                 <Label styleClass="text-caption" text="Ocupada" />
                                             </children>
                                         </HBox>
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Region styleClass="status-dot-warning" />
+                                                <Region maxHeight="10.0" maxWidth="10.0" minHeight="10.0" minWidth="10.0" prefHeight="10.0" prefWidth="10.0" styleClass="status-dot-warning" />
                                                 <Label styleClass="text-caption" text="Por cobrar" />
                                             </children>
                                         </HBox>
                                         <HBox alignment="CENTER_LEFT" spacing="6.0">
                                             <children>
-                                                <Region styleClass="legend-dot-neutral" />
+                                                <Region maxHeight="10.0" maxWidth="10.0" minHeight="10.0" minWidth="10.0" prefHeight="10.0" prefWidth="10.0" styleClass="legend-dot-neutral" />
                                                 <Label styleClass="text-caption" text="Reservada" />
                                             </children>
                                         </HBox>
@@ -67,7 +68,9 @@
                                 </MenuButton>
                                 <Button fx:id="btnParaLlevar" mnemonicParsing="false" onAction="#handleNuevoTakeaway" styleClass="btn-secondary" text="Mostrador / Llevar" />
                                 <Button fx:id="btnNuevoDelivery" mnemonicParsing="false" onAction="#handleNuevoDelivery" styleClass="btn-primary" text="+ Delivery" />
-                                <Button mnemonicParsing="false" onAction="#cargarMesas" styleClass="btn-secondary" text="↻" />
+                                <Button graphicTextGap="8.0" mnemonicParsing="false" onAction="#cargarMesas" styleClass="btn-secondary" text="">
+                                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+                                </Button>
                             </children>
                         </HBox>
                     </children>

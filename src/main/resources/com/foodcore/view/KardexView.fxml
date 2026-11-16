@@ -9,6 +9,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <VBox prefHeight="720.0" prefWidth="1120.0" spacing="20.0" styleClass="pos-catalog-panel" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.KardexController">
 
@@ -70,6 +71,15 @@
 
     <!-- TableView con filas alternas, sin bordes verticales, solo horizontales (§10) -->
     <TableView fx:id="tblKardex" VBox.vgrow="ALWAYS">
+        <placeholder>
+            <VBox alignment="CENTER" spacing="12.0">
+                <children>
+                    <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                    <Label styleClass="h3" text="No hay registros" />
+                    <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                </children>
+            </VBox>
+        </placeholder>
         <columns>
             <TableColumn fx:id="colFecha" prefWidth="175.0" text="Fecha" />
             <TableColumn fx:id="colTipo" prefWidth="150.0" text="Tipo" />

@@ -6,6 +6,7 @@ import com.foodcore.model.CumplimientoTurnoFila;
 import com.foodcore.model.ReporteCumplimientoTurno;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.UiAsyncExecutor;
@@ -323,6 +324,7 @@ public class AsistenciaController {
         kpis.getStyleClass().add("badge-pill-accent");
 
         TableView<CumplimientoTurnoFila> tbl = new TableView<>();
+        EmptyStateHelper.aplicarPlaceholder(tbl);
         VBox.setVgrow(tbl, Priority.ALWAYS);
 
         TableColumn<CumplimientoTurnoFila, String> cFecha = new TableColumn<>("Fecha");

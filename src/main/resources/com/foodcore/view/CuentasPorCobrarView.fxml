@@ -13,6 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootCxcStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.CuentasPorCobrarController">
     <children>
@@ -74,6 +75,15 @@
                                 </HBox>
 
                                 <TableView fx:id="tblCuentasPorCobrar" VBox.vgrow="ALWAYS">
+                                    <placeholder>
+                                        <VBox alignment="CENTER" spacing="12.0">
+                                            <children>
+                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                <Label styleClass="h3" text="No hay registros" />
+                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                            </children>
+                                        </VBox>
+                                    </placeholder>
                                     <columns>
                                         <TableColumn fx:id="colCliente" prefWidth="250.0" text="Cliente / Razón Social" />
                                         <TableColumn fx:id="colComprobante" prefWidth="130.0" text="Comprobante #" />
@@ -100,31 +110,67 @@
         <!-- Modal Registrar Cobro -->
         <VBox fx:id="modalCobro" alignment="CENTER" styleClass="modal-backdrop" visible="false">
             <children>
-                <VBox maxWidth="440.0" spacing="16.0" styleClass="modal-card">
+                <VBox maxHeight="680.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-card">
                     <children>
-                        <Label styleClass="modal-title" text="Registrar Cobro a Cliente Corporativo" />
-                        <VBox spacing="10.0">
+                        <!-- HEADER -->
+                        <VBox spacing="4.0" styleClass="modal-header">
+                            <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                             <children>
-                                <Label styleClass="text-body-caption" text="CLIENTE Y COMPROBANTE" />
-                                <Label fx:id="lblModalDocInfo" styleClass="text-body-strong" text="-" wrapText="true" />
-
-                                <Label styleClass="text-body-caption" text="SALDO DEUDOR PENDIENTE" />
-                                <Label fx:id="lblModalSaldoPendiente" styleClass="text-h4" text="S/ 0.00" />
-
-                                <Label styleClass="form-field-label" text="Monto a Cobrar (S/):" />
-                                <TextField fx:id="txtModalMontoCobrar" promptText="0.00" styleClass="form-text-field" />
-
-                                <Label styleClass="form-field-label" text="Medio de Pago:" />
-                                <ComboBox fx:id="cbModalMetodoPago" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
-
-                                <Label styleClass="form-field-label" text="Nota / Glosa del Cobro:" />
-                                <TextField fx:id="txtModalNota" promptText="Cobro transferencia corporativa" styleClass="form-text-field" />
+                                <Label styleClass="h2" text="Registrar Cobro a Cliente Corporativo" />
+                                <Label styleClass="text-secondary" text="Ingrese el monto abonado y el medio de pago" />
                             </children>
                         </VBox>
 
-                        <Label fx:id="lblModalCobroError" styleClass="text-danger" text="" wrapText="true" />
+                        <!-- BODY -->
+                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox spacing="16.0" styleClass="modal-body">
+                                    <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                                    <children>
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="CLIENTE Y COMPROBANTE" />
+                                                <Label fx:id="lblModalDocInfo" styleClass="text-body-strong" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
 
-                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="SALDO DEUDOR PENDIENTE" />
+                                                <Label fx:id="lblModalSaldoPendiente" styleClass="price" text="S/ 0.00" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Monto a Cobrar (S/)" />
+                                                <TextField fx:id="txtModalMontoCobrar" promptText="0.00" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Medio de Pago" />
+                                                <ComboBox fx:id="cbModalMetodoPago" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Nota / Glosa del Cobro" />
+                                                <TextField fx:id="txtModalNota" promptText="Cobro transferencia corporativa" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <Label fx:id="lblModalCobroError" styleClass="text-danger" text="" wrapText="true" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </ScrollPane>
+
+                        <!-- FOOTER -->
+                        <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                            <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                             <children>
                                 <Button mnemonicParsing="false" onAction="#handleCerrarModalCobro" styleClass="btn-secondary" text="Cancelar" />
                                 <Button mnemonicParsing="false" onAction="#handleConfirmarCobro" styleClass="btn-primary" text="Confirmar Cobro" />

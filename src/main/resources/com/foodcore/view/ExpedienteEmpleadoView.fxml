@@ -18,6 +18,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootExpedienteStack" prefHeight="768.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ExpedienteEmpleadoController">
     <children>
@@ -42,7 +43,9 @@
                                         </VBox>
                                         <HBox alignment="CENTER_RIGHT" spacing="10.0">
                                             <children>
-                                                <Button fx:id="btnRefrescarExpedientes" mnemonicParsing="false" onAction="#handleRefrescar" styleClass="btn-secondary" text="🔄 Actualizar" />
+                                                <Button fx:id="btnRefrescarExpedientes" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleRefrescar" styleClass="btn-secondary" text="Actualizar">
+                                                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+                                                </Button>
                                             </children>
                                         </HBox>
                                     </children>
@@ -94,6 +97,15 @@
                                         <Label styleClass="text-h2" text="Directorio de Personal" />
                                         <TextField fx:id="txtBuscarColaborador" promptText="Buscar por nombre, DNI o cargo..." styleClass="form-text-field" />
                                         <TableView fx:id="tblColaboradores" prefHeight="460.0" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columnResizePolicy>
                                                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                             </columnResizePolicy>
@@ -169,7 +181,9 @@
                                                                 </GridPane>
                                                                 <HBox alignment="CENTER_RIGHT">
                                                                     <children>
-                                                                        <Button fx:id="btnGuardarPersonales" mnemonicParsing="false" onAction="#handleGuardarDatosPersonales" styleClass="btn-primary" text="💾 Guardar Datos Personales" />
+                                                                        <Button fx:id="btnGuardarPersonales" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleGuardarDatosPersonales" styleClass="btn-primary" text="Guardar Datos Personales">
+                                                                            <graphic><FontIcon iconLiteral="fth-save" iconSize="16" /></graphic>
+                                                                        </Button>
                                                                     </children>
                                                                 </HBox>
                                                             </children>
@@ -212,11 +226,21 @@
                                                                             <TextField fx:id="txtHorarioLaboral" promptText="Ej. Lunes a Sábado 09:00 - 18:00" styleClass="form-text-field" />
                                                                         </VBox>
                                                                         <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
-                                                                            <Label styleClass="text-body-strong" text="Hora Entrada / Salida (HH:mm):" />
+                                                                            <Label styleClass="text-body-strong" text="Horario de Jornada (HH:mm):" />
                                                                             <HBox spacing="8.0">
                                                                                 <children>
-                                                                                    <TextField fx:id="txtHoraEntrada" promptText="09:00" styleClass="form-text-field" HBox.hgrow="ALWAYS" />
-                                                                                    <TextField fx:id="txtHoraSalida" promptText="18:00" styleClass="form-text-field" HBox.hgrow="ALWAYS" />
+                                                                                    <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                                                        <children>
+                                                                                            <Label styleClass="label-form" text="Hora Entrada" />
+                                                                                            <TextField fx:id="txtHoraEntrada" promptText="09:00" styleClass="form-text-field" />
+                                                                                        </children>
+                                                                                    </VBox>
+                                                                                    <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                                                                        <children>
+                                                                                            <Label styleClass="label-form" text="Hora Salida" />
+                                                                                            <TextField fx:id="txtHoraSalida" promptText="18:00" styleClass="form-text-field" />
+                                                                                        </children>
+                                                                                    </VBox>
                                                                                 </children>
                                                                             </HBox>
                                                                         </VBox>
@@ -232,7 +256,9 @@
                                                                 </GridPane>
                                                                 <HBox alignment="CENTER_RIGHT">
                                                                     <children>
-                                                                        <Button fx:id="btnGuardarLaborales" mnemonicParsing="false" onAction="#handleGuardarDatosLaborales" styleClass="btn-primary" text="💾 Guardar Datos Laborales" />
+                                                                        <Button fx:id="btnGuardarLaborales" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleGuardarDatosLaborales" styleClass="btn-primary" text="Guardar Datos Laborales">
+                                                                            <graphic><FontIcon iconLiteral="fth-save" iconSize="16" /></graphic>
+                                                                        </Button>
                                                                     </children>
                                                                 </HBox>
                                                             </children>
@@ -270,15 +296,33 @@
                                                                     </children>
                                                                 </GridPane>
 
-                                                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                                                <HBox alignment="BOTTOM_LEFT" spacing="10.0">
                                                                     <children>
-                                                                        <TextField fx:id="txtDocObservaciones" promptText="Observaciones del documento (opcional)" styleClass="form-text-field" HBox.hgrow="ALWAYS" />
-                                                                        <Button fx:id="btnSubirPdf" mnemonicParsing="false" onAction="#handleSubirPdf" styleClass="btn-primary" text="📄 Subir Documento PDF" />
-                                                                        <Button fx:id="btnEliminarDoc" mnemonicParsing="false" onAction="#handleEliminarDocumento" styleClass="btn-danger" text="🗑️ Eliminar" />
+                                                                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                                            <children>
+                                                                                <Label styleClass="label-form" text="Observaciones del documento" />
+                                                                                <TextField fx:id="txtDocObservaciones" promptText="Observaciones del documento (opcional)" styleClass="form-text-field" />
+                                                                            </children>
+                                                                        </VBox>
+                                                                        <Button fx:id="btnSubirPdf" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleSubirPdf" styleClass="btn-primary" text="Subir Documento PDF">
+                                                                            <graphic><FontIcon iconLiteral="fth-file-text" iconSize="16" /></graphic>
+                                                                        </Button>
+                                                                        <Button fx:id="btnEliminarDoc" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleEliminarDocumento" styleClass="btn-danger" text="Eliminar">
+                                                                            <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="16" /></graphic>
+                                                                        </Button>
                                                                     </children>
                                                                 </HBox>
 
                                                                 <TableView fx:id="tblDocumentos" prefHeight="290.0" VBox.vgrow="ALWAYS">
+                                                                    <placeholder>
+                                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                                            <children>
+                                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                                            </children>
+                                                                        </VBox>
+                                                                    </placeholder>
                                                                     <columnResizePolicy>
                                                                         <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
                                                                     </columnResizePolicy>

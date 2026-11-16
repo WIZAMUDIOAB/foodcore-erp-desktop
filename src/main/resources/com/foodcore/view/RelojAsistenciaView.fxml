@@ -10,6 +10,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootRelojStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.RelojAsistenciaController">
     <children>
@@ -76,7 +77,9 @@
 
                                 <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClearKey" styleClass="btn-kds-outline" text="C" GridPane.columnIndex="0" GridPane.rowIndex="3" />
                                 <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNumKey" styleClass="btn-secondary" text="0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleBackspaceKey" styleClass="btn-kds-outline" text="⌫" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                                <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleBackspaceKey" styleClass="btn-kds-outline" text="" GridPane.columnIndex="2" GridPane.rowIndex="3">
+                                    <graphic><FontIcon iconLiteral="fth-delete" iconSize="16" /></graphic>
+                                </Button>
                             </children>
                         </GridPane>
 
@@ -104,8 +107,12 @@
                 <Insets right="28.0" top="24.0" />
             </StackPane.margin>
             <children>
-                <Button fx:id="btnExpandirVentana" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-secondary" text="⤢" />
-                <Button fx:id="btnSalirKiosco" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="✕ Salir del Kiosco" />
+                <Button fx:id="btnExpandirVentana" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-secondary" text="">
+                    <graphic><FontIcon iconLiteral="fth-maximize-2" iconSize="16" /></graphic>
+                </Button>
+                <Button fx:id="btnSalirKiosco" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="Salir del Kiosco">
+                    <graphic><FontIcon iconLiteral="fth-log-out" iconSize="16" /></graphic>
+                </Button>
             </children>
         </HBox>
     </children>

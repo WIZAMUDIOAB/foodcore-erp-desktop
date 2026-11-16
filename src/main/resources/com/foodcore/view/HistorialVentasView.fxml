@@ -12,6 +12,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootHistorialVentasStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.HistorialVentasController">
     <children>
@@ -39,13 +40,26 @@
 
                                 <Region styleClass="divider-horizontal" />
 
-                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                <HBox alignment="BOTTOM_LEFT" spacing="10.0">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="Desde:" />
-                                        <DatePicker fx:id="dpDesde" prefWidth="140.0" styleClass="form-date-picker" />
-                                        <Label styleClass="text-body-strong" text="Hasta:" />
-                                        <DatePicker fx:id="dpHasta" prefWidth="140.0" styleClass="form-date-picker" />
-                                        <TextField fx:id="txtBuscarVenta" promptText="Buscar por # venta, mesa, cliente o método..." styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Desde" />
+                                                <DatePicker fx:id="dpDesde" prefWidth="140.0" styleClass="form-date-picker" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Hasta" />
+                                                <DatePicker fx:id="dpHasta" prefWidth="140.0" styleClass="form-date-picker" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="label-form" text="Buscar venta" />
+                                                <TextField fx:id="txtBuscarVenta" promptText="Buscar por # venta, mesa, cliente o método..." styleClass="input-field" />
+                                            </children>
+                                        </VBox>
                                         <Button fx:id="btnBuscarHistorial" mnemonicParsing="false" onAction="#handleBuscarVentas" styleClass="btn-primary" text="Buscar Ventas" />
                                     </children>
                                 </HBox>
@@ -60,6 +74,15 @@
                                     <children>
                                         <Label styleClass="text-h2" text="Tickets / Ventas Registradas" />
                                         <TableView fx:id="tblVentas" minHeight="420.0" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="colVentaId" prefWidth="72.0" text="# Venta" />
                                                 <TableColumn fx:id="colVentaFecha" prefWidth="122.0" text="Fecha / Hora" />
@@ -85,6 +108,15 @@
                                         <Label styleClass="text-caption" text="Marque los platillos o ítems a devolver de forma parcial:" />
 
                                         <TableView fx:id="tblDetallesVenta" minHeight="290.0" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="colDetSeleccion" prefWidth="48.0" text="Sel." />
                                                 <TableColumn fx:id="colDetProducto" prefWidth="175.0" text="Producto" />
@@ -97,7 +129,12 @@
                                             </columnResizePolicy>
                                         </TableView>
 
-                                        <TextField fx:id="txtMotivoDevolucion" promptText="Motivo de devolución (ej. Plato no entregado / cambio)" styleClass="input-field" />
+                                        <VBox spacing="6.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Motivo de devolución" />
+                                                <TextField fx:id="txtMotivoDevolucion" promptText="Motivo de devolución (ej. Plato no entregado / cambio)" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
 
                                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                                             <children>

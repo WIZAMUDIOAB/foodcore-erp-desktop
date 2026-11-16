@@ -15,6 +15,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootConfigStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ConfiguracionController">
     <children>
@@ -111,16 +112,35 @@
                                         </HBox>
                                         <Label styleClass="text-caption" text="Asigne cada categoría de platillos a una impresora de Windows o cola de impresión diferente. Al enviar comanda se imprimirán en paralelo." />
 
-                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                        <HBox alignment="BOTTOM_LEFT" spacing="10.0">
                                             <children>
-                                                <ComboBox fx:id="cmbCategoriaImpresora" prefWidth="195.0" promptText="Categoría de menú" />
-                                                <ComboBox fx:id="cmbNombreImpresoraWindows" editable="true" prefWidth="215.0" promptText="Impresora Windows (ej. Cocina, Barra)" HBox.hgrow="ALWAYS" />
+                                                <VBox spacing="6.0">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Categoría de menú" />
+                                                        <ComboBox fx:id="cmbCategoriaImpresora" prefWidth="195.0" promptText="Categoría de menú" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Impresora Windows" />
+                                                        <ComboBox fx:id="cmbNombreImpresoraWindows" editable="true" maxWidth="1.7976931348623157E308" prefWidth="215.0" promptText="Impresora Windows (ej. Cocina, Barra)" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
                                                 <Button fx:id="btnAsignarImpresora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAsignarImpresoraCategoria" styleClass="btn-primary" text="Asignar Impresora" />
                                                 <Button fx:id="btnQuitarImpresora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleEliminarImpresoraCategoria" styleClass="btn-secondary" text="Quitar" />
                                             </children>
                                         </HBox>
 
                                         <TableView fx:id="tblRuteoImpresoras" prefHeight="190.0">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="colCatNombre" prefWidth="240.0" text="Categoría de Producto" />
                                                 <TableColumn fx:id="colImpWindows" prefWidth="360.0" text="Impresora Windows Destino" />
@@ -217,9 +237,14 @@
                                         </HBox>
                                         <Label styleClass="text-caption" text="Ejecuta backups comprimidos (.sql.gz) con retención de 30 días o restaura un respaldo validando su integridad previa confirmación." />
 
-                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                        <HBox alignment="BOTTOM_LEFT" spacing="10.0">
                                             <children>
-                                                <TextField fx:id="txtRutaBackupRestaurar" promptText="Ruta de backup (ej. backups/foodcore_20261115.sql.gz)" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Archivo de respaldo (.sql.gz)" />
+                                                        <TextField fx:id="txtRutaBackupRestaurar" promptText="Ruta de backup (ej. backups/foodcore_20261115.sql.gz)" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
                                                 <Button fx:id="btnSeleccionarBackup" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleSeleccionarArchivoBackup" styleClass="btn-secondary" text="Examinar..." />
                                             </children>
                                         </HBox>

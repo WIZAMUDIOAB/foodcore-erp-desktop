@@ -12,6 +12,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.TilePane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="720.0" prefWidth="1060.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MozoOrderController">
 
@@ -63,7 +64,13 @@
                         <!-- Tabla de Ítems de Comanda con 5 Columnas y Placeholder Centrado -->
                         <TableView fx:id="tblItems" VBox.vgrow="ALWAYS">
                             <placeholder>
-                                <Label styleClass="text-body-secondary" text="Aún no hay platos en la comanda" />
+                                <VBox alignment="CENTER" spacing="12.0">
+                                    <children>
+                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                        <Label styleClass="h3" text="No hay registros" />
+                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                    </children>
+                                </VBox>
                             </placeholder>
                             <columns>
                                 <TableColumn fx:id="colPlato" minWidth="180.0" prefWidth="210.0" text="Producto" />
@@ -89,9 +96,14 @@
                                         <Button focusTraversable="false" onAction="#handleNotaRapida" styleClass="category-chip" text="Para llevar" />
                                     </children>
                                 </HBox>
-                                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                                <HBox alignment="BOTTOM_LEFT" spacing="8.0">
                                     <children>
-                                        <TextField fx:id="txtNotaEspecial" promptText="Indicación especial para el plato seleccionado..." styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="label-form" text="Indicación especial" />
+                                                <TextField fx:id="txtNotaEspecial" promptText="Indicación especial para el plato seleccionado..." styleClass="input-field" />
+                                            </children>
+                                        </VBox>
                                         <Button focusTraversable="false" onAction="#handleAplicarNota" styleClass="btn-secondary" text="Aplicar Nota" />
                                     </children>
                                 </HBox>

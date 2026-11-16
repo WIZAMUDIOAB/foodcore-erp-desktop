@@ -17,6 +17,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootSolicitudesStack" prefHeight="768.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.SolicitudesController">
     <children>
@@ -42,7 +43,9 @@
                                         </VBox>
                                         <HBox alignment="CENTER_RIGHT" spacing="10.0">
                                             <children>
-                                                <Button fx:id="btnActualizar" mnemonicParsing="false" onAction="#handleRefrescar" styleClass="btn-secondary" text="🔄 Actualizar" />
+                                                <Button fx:id="btnActualizar" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleRefrescar" styleClass="btn-secondary" text="Actualizar">
+                                                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+                                                </Button>
                                             </children>
                                         </HBox>
                                     </children>
@@ -117,7 +120,9 @@
 
                                         <Region VBox.vgrow="ALWAYS" />
 
-                                        <Button fx:id="btnEnviarSolicitud" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEnviarSolicitud" prefHeight="44.0" styleClass="btn-primary" text="✉️ Enviar a Aprobación" />
+                                        <Button fx:id="btnEnviarSolicitud" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEnviarSolicitud" prefHeight="44.0" styleClass="btn-primary" text="Enviar a Aprobación">
+                                            <graphic><FontIcon iconLiteral="fth-send" iconSize="16" /></graphic>
+                                        </Button>
                                     </children>
                                 </VBox>
 
@@ -133,6 +138,15 @@
                                         </HBox>
 
                                         <TableView fx:id="tblSolicitudes" minHeight="420.0" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="colEmpleado" minWidth="105.0" prefWidth="130.0" text="Colaborador" />
                                                 <TableColumn fx:id="colTipo" minWidth="90.0" prefWidth="105.0" text="Tipo" />

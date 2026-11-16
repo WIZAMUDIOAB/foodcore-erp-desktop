@@ -175,6 +175,15 @@
                                                     </children>
                                                 </HBox>
                                                 <TableView fx:id="tblEstadoResultados" prefHeight="340.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colPnlCodigo" prefWidth="75.0" text="Código" />
                                                         <TableColumn fx:id="colPnlConcepto" prefWidth="255.0" text="Concepto Contable" />
@@ -198,6 +207,15 @@
                                                     </children>
                                                 </HBox>
                                                 <TableView fx:id="tblGastosCategoria" prefHeight="340.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colGastoCategoria" prefWidth="185.0" text="Categoría" />
                                                         <TableColumn fx:id="colGastoOps" prefWidth="75.0" text="Movs." />

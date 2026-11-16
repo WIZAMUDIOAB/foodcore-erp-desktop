@@ -9,6 +9,7 @@ import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.beans.property.SimpleStringProperty;
@@ -22,6 +23,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -50,6 +52,7 @@ public class MermasController {
     @FXML private Button btnRegistrarMerma;
 
     @FXML private TableView<FilaMerma> tblMermas;
+    @FXML private VBox emptyState;
     @FXML private TableColumn<FilaMerma, String> colFecha;
     @FXML private TableColumn<FilaMerma, String> colInsumo;
     @FXML private TableColumn<FilaMerma, String> colCantidad;
@@ -72,6 +75,8 @@ public class MermasController {
 
         cmbInsumoMerma.setItems(listaInsumos);
         tblMermas.setItems(listaMermas);
+        EmptyStateHelper.aplicarPlaceholder(tblMermas);
+        EmptyStateHelper.vincularATabla(tblMermas, emptyState);
 
         cargarDatosMermas();
     }
