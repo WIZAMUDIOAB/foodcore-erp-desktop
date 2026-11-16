@@ -1,25 +1,25 @@
 /* ==========================================================================
-   FOODCORE ERP v5.4.0 — MODO OSCURO JAVAFX (Carbon Calido #121211 / #1E1D1B)
+   FOODCORE ERP v2.0 — MODO OSCURO JAVAFX (OLED-Aware Zinc #09090B / #18181B)
    Redefine unicamente tokens semanticos en .root; ningun hex hardcodeado fuera.
    ========================================================================== */
 
 .root {
-    -bg-canvas: #121211;
-    -bg-sidebar: #161615;
-    -bg-surface: #1E1D1B;
-    -bg-surface-hover: #292825;
+    -bg-canvas: #09090B;
+    -bg-sidebar: #121214;
+    -bg-surface: #18181B;
+    -bg-surface-hover: #27272A;
 
-    -border-subtle: #2E2D2A;
-    -border-strong: #44403C;
+    -border-subtle: #27272A;
+    -border-strong: #3F3F46;
 
-    -text-primary: #F5F5F4;
-    -text-secondary: #A8A29E;
-    -text-muted: #78716C;
+    -text-primary: #FAFAFA;
+    -text-secondary: #A1A1AA;
+    -text-muted: #71717A;
     -text-inverse: #FFFFFF;
 
-    -brand-primary: #FB923C;
-    -brand-hover: #F97316;
-    -brand-soft: rgba(251, 146, 60, 0.15);
+    -brand-primary: #F97316;
+    -brand-hover: #FB923C;
+    -brand-soft: rgba(249, 115, 22, 0.15);
 
     -status-success: #34D399;
     -status-success-bg: rgba(52, 211, 153, 0.12);
@@ -28,12 +28,12 @@
     -status-danger: #F87171;
     -status-danger-bg: rgba(248, 113, 113, 0.12);
 
-    -fc-kds-bg: #121211;
-    -fc-kds-surface: #1E1D1B;
-    -fc-kds-surface-hover: #292825;
-    -fc-kds-border: #2E2D2A;
-    -fc-kds-text: #F5F5F4;
-    -fc-kds-text-secondary: #A8A29E;
+    -fc-kds-bg: #09090B;
+    -fc-kds-surface: #18181B;
+    -fc-kds-surface-hover: #27272A;
+    -fc-kds-border: #27272A;
+    -fc-kds-text: #FAFAFA;
+    -fc-kds-text-secondary: #A1A1AA;
 
     -fc-bg-canvas: -bg-canvas;
     -fc-bg-sidebar: -bg-sidebar;
@@ -115,7 +115,7 @@
 .sidebar-user-card {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.30), 6, 0, 0, 2);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.40), 2, 0, 0, 1);
 }
 
 .surface-card-subtle,
@@ -220,7 +220,7 @@
 }
 
 .table-view .column-header-background {
-    -fx-background-color: -bg-surface-hover;
+    -fx-background-color: -bg-sidebar;
     -fx-border-color: transparent transparent -border-subtle transparent;
 }
 

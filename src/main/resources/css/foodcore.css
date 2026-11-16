@@ -1,24 +1,24 @@
 /* ==========================================================================
-   FOODCORE ERP v5.4.0 — DESIGN SYSTEM & TOKENS (Rediseño Premium Calido)
+   FOODCORE ERP v2.0 — SISTEMA DE DISENO CERRADO
    Extiende AtlantaFX PrimerLight. Unica fuente de verdad cromatica en .root.
    Prohibido usar valores hexadecimales hardcodeados fuera de .root.
    ========================================================================== */
 
 .root {
     /* ----------------------------------------------------------------------
-       TOKENS DE DISENO OFICIALES — MODO CLARO
+       TOKENS DE DISENO OFICIALES — MODO CLARO (Warm Neutral)
        ---------------------------------------------------------------------- */
-    -bg-canvas: #FAF9F6;
-    -bg-sidebar: #F3F2EE;
+    -bg-canvas: #F9F7F4;
+    -bg-sidebar: #F2EFEA;
     -bg-surface: #FFFFFF;
-    -bg-surface-hover: #F5F4F0;
+    -bg-surface-hover: #F7F5F1;
 
-    -border-subtle: #E7E5E4;
-    -border-strong: #D6D3D1;
+    -border-subtle: #E5E0D8;
+    -border-strong: #D1CCC2;
 
-    -text-primary: #1C1917;
-    -text-secondary: #57534E;
-    -text-muted: #A8A29E;
+    -text-primary: #1A1817;
+    -text-secondary: #5C5650;
+    -text-muted: #A39D94;
     -text-inverse: #FFFFFF;
 
     -brand-primary: #EA580C;
@@ -32,13 +32,13 @@
     -status-danger: #DC2626;
     -status-danger-bg: #FEF2F2;
 
-    /* Tokens fijos para estacion KDS siempre oscura (carbon calido) */
-    -fc-kds-bg: #121211;
-    -fc-kds-surface: #1E1D1B;
-    -fc-kds-surface-hover: #292825;
-    -fc-kds-border: #2E2D2A;
-    -fc-kds-text: #F5F5F4;
-    -fc-kds-text-secondary: #A8A29E;
+    /* Tokens fijos para estacion KDS siempre oscura (OLED-Aware Zinc) */
+    -fc-kds-bg: #09090B;
+    -fc-kds-surface: #18181B;
+    -fc-kds-surface-hover: #27272A;
+    -fc-kds-border: #27272A;
+    -fc-kds-text: #FAFAFA;
+    -fc-kds-text-secondary: #A1A1AA;
     -fc-kds-success: #34D399;
     -fc-kds-success-bg: rgba(52, 211, 153, 0.12);
     -fc-kds-warning: #FBBF24;
@@ -106,7 +106,7 @@
     -fx-base: -bg-surface;
     -fx-background-color: -bg-canvas;
     -fx-text-fill: -text-primary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
 }
 
@@ -114,119 +114,119 @@
    2. Escala Tipografica (Inter local, jerarquia fuerte y tabular-nums)
    -------------------------------------------------------------------------- */
 .text-display {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 32px;
     -fx-font-weight: 700;
     -fx-text-fill: -text-primary;
 }
 
 .text-display-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 32px;
     -fx-font-weight: 700;
     -fx-text-fill: -text-inverse;
 }
 
 .text-h1, .view-heading {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 24px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-primary;
 }
 
 .text-h1-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 24px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-inverse;
 }
 
 .text-h2 {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 16px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-primary;
 }
 
 .text-h2-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 16px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-inverse;
 }
 
 .text-body {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 400;
     -fx-text-fill: -text-primary;
 }
 
 .text-body-secondary, .view-subheading {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 400;
     -fx-text-fill: -text-secondary;
 }
 
 .text-body-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 400;
     -fx-text-fill: -text-inverse;
 }
 
 .text-body-inverse-muted {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 400;
     -fx-text-fill: -fc-kds-text-secondary;
 }
 
 .text-body-strong {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-primary;
 }
 
 .text-body-strong-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-font-weight: 600;
     -fx-text-fill: -text-inverse;
 }
 
 .text-caption {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 500;
     -fx-text-fill: -text-secondary;
 }
 
 .text-caption-muted {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 500;
     -fx-text-fill: -text-muted;
 }
 
 .text-caption-inverse {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 500;
     -fx-text-fill: -text-inverse;
 }
 
 .text-error {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 13px;
     -fx-font-weight: 600;
     -fx-text-fill: -status-danger;
 }
 
 .text-overline {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 500;
     -fx-text-fill: -text-secondary;
@@ -297,52 +297,52 @@
 
 .surface-card {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
-    -fx-padding: 20px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-padding: 24px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .surface-card-subtle {
     -fx-background-color: -bg-surface-hover;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
-    -fx-padding: 20px;
+    -fx-padding: 24px;
 }
 
 .surface-card-interactive {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
-    -fx-padding: 20px;
+    -fx-padding: 24px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .surface-card-interactive:hover {
     -fx-border-color: -brand-primary;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 8, 0, 0, 4);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 5, 0, 0, 2);
 }
 
 .modal-backdrop {
-    -fx-background-color: rgba(18, 18, 17, 0.55);
+    -fx-background-color: rgba(9, 9, 11, 0.65);
     -fx-padding: 24px;
 }
 
 .modal-dialog-surface {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 16px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 16px;
     -fx-border-width: 1px;
     -fx-padding: 24px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 16, 0, 0, 6);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.08), 8, 0, 0, 4);
 }
 
 .caja-centered-column {
@@ -364,9 +364,9 @@
 
 .topbar-search-box {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-padding: 4px 12px;
     -fx-pref-height: 40px;
@@ -390,8 +390,8 @@
 .topbar-icon-button {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-border-width: 1px;
     -fx-min-width: 40px;
     -fx-pref-width: 40px;
@@ -408,9 +408,9 @@
 
 .topbar-user-profile {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-padding: 4px 10px;
 }
@@ -471,16 +471,16 @@
 
 .login-shell-card {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 16, 0, 0, 6);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.08), 8, 0, 0, 4);
 }
 
 .login-brand-panel {
     -fx-background-color: -fc-kds-bg;
-    -fx-background-radius: 14px 0 0 14px;
+    -fx-background-radius: 12px 0 0 14px;
     -fx-padding: 48px 40px;
 }
 
@@ -493,7 +493,7 @@
 .login-version-badge {
     -fx-background-color: -brand-soft;
     -fx-text-fill: -brand-primary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-padding: 2px 10px;
@@ -551,13 +551,13 @@
 .text-field, .password-field, .input-field {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-border-width: 1px;
     -fx-padding: 10px 14px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 14px;
     -fx-text-fill: -text-primary;
     -fx-prompt-text-fill: -text-muted;
@@ -572,8 +572,8 @@
 .combo-box, .date-picker {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-border-width: 1px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
@@ -589,10 +589,10 @@
 .btn-primary {
     -fx-background-color: -brand-primary;
     -fx-text-fill: -text-inverse;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 14px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 48px;
     -fx-pref-height: 48px;
     -fx-min-width: 44px;
@@ -617,12 +617,12 @@
 .btn-secondary {
     -fx-background-color: -bg-surface;
     -fx-text-fill: -text-primary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 14px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
@@ -654,10 +654,10 @@
 .btn-ghost {
     -fx-background-color: transparent;
     -fx-text-fill: -text-secondary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 14px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: transparent;
     -fx-min-height: 40px;
     -fx-pref-height: 40px;
@@ -702,10 +702,10 @@
 .btn-emerald, .btn-success {
     -fx-background-color: -status-success;
     -fx-text-fill: -text-inverse;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 14px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 48px;
     -fx-pref-height: 48px;
     -fx-min-width: 44px;
@@ -725,10 +725,10 @@
 .btn-rose, .btn-destructive {
     -fx-background-color: -status-danger;
     -fx-text-fill: -text-inverse;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 14px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 48px;
     -fx-pref-height: 48px;
     -fx-min-width: 44px;
@@ -744,10 +744,10 @@
 .btn-pos-action-primary {
     -fx-background-color: -brand-primary;
     -fx-text-fill: -text-inverse;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 700;
     -fx-font-size: 15px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 56px;
     -fx-pref-height: 56px;
     -fx-cursor: hand;
@@ -765,12 +765,12 @@
 .btn-pos-action-secondary {
     -fx-background-color: -bg-surface;
     -fx-text-fill: -text-primary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-weight: 600;
     -fx-font-size: 15px;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-min-height: 56px;
     -fx-pref-height: 56px;
@@ -790,7 +790,7 @@
 .category-chip {
     -fx-background-color: -bg-surface;
     -fx-text-fill: -text-secondary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 13px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -832,7 +832,7 @@
 .badge-pill-success {
     -fx-background-color: -status-success-bg;
     -fx-text-fill: -status-success;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -843,7 +843,7 @@
 .badge-pill-warning {
     -fx-background-color: -status-warning-bg;
     -fx-text-fill: -status-warning;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -854,7 +854,7 @@
 .badge-pill-danger {
     -fx-background-color: -status-danger-bg;
     -fx-text-fill: -status-danger;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -865,7 +865,7 @@
 .badge-pill-accent {
     -fx-background-color: -brand-soft;
     -fx-text-fill: -brand-primary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -876,7 +876,7 @@
 .badge-pill-neutral {
     -fx-background-color: -bg-surface-hover;
     -fx-text-fill: -text-secondary;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-background-radius: 9999px;
@@ -901,29 +901,29 @@
 
 .pos-totals-card {
     -fx-background-color: -bg-surface-hover;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-padding: 20px;
 }
 
 .pos-menu-tile {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-min-height: 96px;
     -fx-pref-height: 104px;
     -fx-padding: 16px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .pos-menu-tile:hover {
     -fx-border-color: -brand-primary;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 8, 0, 0, 4);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 5, 0, 0, 2);
 }
 
 /* --------------------------------------------------------------------------
@@ -954,15 +954,15 @@
 
 .kds-kanban-column {
     -fx-background-color: -fc-kds-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -fc-kds-border;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-padding: 16px;
 }
 
 .kds-column-overline {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 600;
     -fx-text-fill: -fc-kds-text-secondary;
@@ -980,8 +980,8 @@
 
 .kds-item-card, .kds-card-green, .kds-card-amber, .kds-card-red {
     -fx-background-color: -fc-kds-surface;
-    -fx-background-radius: 14px;
-    -fx-border-radius: 14px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-padding: 20px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 6, 0, 0, 2);
@@ -1038,8 +1038,8 @@
     -fx-text-fill: -fc-kds-text;
     -fx-border-color: -fc-kds-border;
     -fx-border-width: 1px;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
     -fx-font-weight: 600;
@@ -1054,7 +1054,7 @@
 .btn-kds-ready {
     -fx-background-color: -status-success;
     -fx-text-fill: -text-inverse;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
     -fx-font-weight: 600;
@@ -1069,7 +1069,7 @@
 .btn-kds-delivered {
     -fx-background-color: -fc-kds-surface-hover;
     -fx-text-fill: -fc-kds-text;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-min-height: 44px;
     -fx-pref-height: 44px;
     -fx-font-weight: 600;
@@ -1086,8 +1086,8 @@
    -------------------------------------------------------------------------- */
 .mesa-card-libre, .mesa-card-ocupada, .mesa-card-cobrar, .mesa-card-reservada {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
-    -fx-border-radius: 14px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-min-width: 160px;
     -fx-min-height: 140px;
@@ -1095,7 +1095,7 @@
     -fx-pref-height: 145px;
     -fx-padding: 20px;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .mesa-card-libre {
@@ -1132,7 +1132,7 @@
     -fx-text-fill: -text-primary;
     -fx-font-weight: 700;
     -fx-font-size: 20px;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
 }
 
 .sidebar-brand-badge {
@@ -1161,8 +1161,8 @@
     -fx-min-height: 40px;
     -fx-pref-height: 40px;
     -fx-padding: 8px 12px;
-    -fx-background-radius: 10px;
-    -fx-border-radius: 10px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
     -fx-cursor: hand;
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
@@ -1185,8 +1185,8 @@
     -fx-background-color: -brand-soft;
     -fx-border-color: transparent;
     -fx-border-width: 0;
-    -fx-background-radius: 10px;
-    -fx-border-radius: 10px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
     -fx-text-fill: -brand-primary;
     -fx-font-weight: 600;
 }
@@ -1195,9 +1195,9 @@
     -fx-background-color: -bg-surface;
     -fx-text-fill: -text-primary;
     -fx-prompt-text-fill: -text-muted;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-min-height: 40px;
     -fx-pref-height: 40px;
@@ -1213,10 +1213,10 @@
 
 .sidebar-user-card {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-padding: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
 }
 
@@ -1226,16 +1226,16 @@
 .table-view {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
-    -fx-background-radius: 14px;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
     -fx-border-width: 1px;
     -fx-table-cell-border-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .table-view .column-header-background {
     -fx-background-color: -bg-surface-hover;
-    -fx-background-radius: 14px 14px 0 0;
+    -fx-background-radius: 12px 14px 0 0;
     -fx-border-color: transparent transparent -border-subtle transparent;
     -fx-border-width: 0 0 1px 0;
 }
@@ -1259,7 +1259,7 @@
     -fx-background-color: -bg-surface;
     -fx-border-color: transparent transparent -border-subtle transparent;
     -fx-border-width: 0 0 1px 0;
-    -fx-cell-size: 46px;
+    -fx-cell-size: 44px;
 }
 
 .table-view .table-row-cell:odd {
@@ -1332,14 +1332,14 @@
 
 .chart-legend {
     -fx-font-size: 11px;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-background-color: transparent;
     -fx-padding: 8px 4px 4px 4px;
 }
 
 .chart-legend-item {
     -fx-font-size: 11px;
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-text-fill: -text-secondary;
 }
 
@@ -1353,7 +1353,7 @@
 .toast-container {
     -fx-background-color: -fc-kds-surface;
     -fx-text-fill: -fc-kds-text;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-padding: 12px 18px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.20), 20, 0, 0, 6);
 }
@@ -1387,11 +1387,11 @@
 .kpi-card {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
-    -fx-background-radius: 14px;
-    -fx-border-radius: 14px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-padding: 20px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .kpi-card-sales,
@@ -1511,8 +1511,8 @@
     -fx-background-color: -status-success-bg;
     -fx-border-color: -status-success;
     -fx-border-width: 1px;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-padding: 12px;
     -fx-cursor: hand;
 }
@@ -1524,8 +1524,8 @@
     -fx-background-color: -brand-soft;
     -fx-border-color: -brand-primary;
     -fx-border-width: 1px;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-padding: 12px;
     -fx-cursor: hand;
 }
@@ -1537,8 +1537,8 @@
     -fx-background-color: -status-danger-bg;
     -fx-border-color: -border-subtle;
     -fx-border-width: 1px;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-padding: 10px 14px;
 }
 
@@ -1546,8 +1546,8 @@
     -fx-background-color: -status-warning-bg;
     -fx-border-color: -border-subtle;
     -fx-border-width: 1px;
-    -fx-border-radius: 10px;
-    -fx-background-radius: 10px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
     -fx-padding: 10px 14px;
 }
 
@@ -1556,12 +1556,12 @@
    ========================================================================== */
 .kpi-card-secondary {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-padding: 20px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.06), 3, 0, 0, 1);
 }
 
 .kpi-value-24 {
@@ -1600,7 +1600,7 @@
 }
 
 .kpi-subtitle-muted {
-    -fx-font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    -fx-font-family: "Inter", system-ui, sans-serif;
     -fx-font-size: 12px;
     -fx-font-weight: 500;
     -fx-text-fill: -text-secondary;
@@ -1608,18 +1608,18 @@
 
 .client-section-box {
     -fx-background-color: -bg-surface-hover;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-padding: 8px 12px;
 }
 
 .client-debt-box {
     -fx-background-color: -status-warning-bg;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
     -fx-padding: 8px 12px;
 }
@@ -1669,9 +1669,9 @@
 
 .skeleton-row {
     -fx-background-color: -bg-surface;
-    -fx-background-radius: 10px;
+    -fx-background-radius: 8px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 10px;
+    -fx-border-radius: 8px;
     -fx-border-width: 1px;
 }
 
@@ -1705,9 +1705,9 @@
 .qr-modal-box {
     -fx-background-color: -bg-surface;
     -fx-padding: 16px;
-    -fx-background-radius: 14px;
+    -fx-background-radius: 12px;
     -fx-border-color: -border-subtle;
-    -fx-border-radius: 14px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 12, 0, 0, 4);
 }
@@ -1715,7 +1715,7 @@
 .reloj-hero-card {
     -fx-background-color: -fc-kds-bg;
     -fx-padding: 20px 32px;
-    -fx-background-radius: 14px 14px 0 0;
+    -fx-background-radius: 12px 14px 0 0;
 }
 
 .legend-dot-neutral {
