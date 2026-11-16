@@ -280,6 +280,8 @@ public class DeliveryController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootDeliveryStack.getChildren().add(backdrop);
+        rootDeliveryStack.applyCss();
+        rootDeliveryStack.layout();
     }
 
     @FXML

@@ -466,6 +466,8 @@ public class ArqueoCajaController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);
+        rootCajaStack.applyCss();
+        rootCajaStack.layout();
     }
 
     @FXML
@@ -570,6 +572,8 @@ public class ArqueoCajaController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);
+        rootCajaStack.applyCss();
+        rootCajaStack.layout();
     }
 
     private void ejecutarCierreEfectivo(BigDecimal fisico, String responsableEntrante) {

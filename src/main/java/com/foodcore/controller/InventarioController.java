@@ -326,6 +326,8 @@ public class InventarioController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootInventarioStack.getChildren().add(backdrop);
+        rootInventarioStack.applyCss();
+        rootInventarioStack.layout();
     }
 
     @FXML
@@ -407,6 +409,8 @@ public class InventarioController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootInventarioStack.getChildren().add(backdrop);
+        rootInventarioStack.applyCss();
+        rootInventarioStack.layout();
     }
 
     @FXML

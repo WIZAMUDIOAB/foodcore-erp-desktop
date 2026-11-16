@@ -330,6 +330,8 @@ public class RolesController {
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootRolesStack.getChildren().add(backdrop);
+        rootRolesStack.applyCss();
+        rootRolesStack.layout();
     }
 
     public ObservableList<Rol> getListaRoles() {
