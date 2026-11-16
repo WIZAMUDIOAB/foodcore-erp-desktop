@@ -1,28 +1,76 @@
 /* ==========================================================================
    FOODCORE ERP v5.4.0 — PWA KDS (KITCHEN DISPLAY SYSTEM)
-   Contraste WCAG AAA (>= 7:1): Texto blanco puro #FFFFFF sobre fondo #090D16
+   Tokens cerrados cálidos (Dark default #121211 + Light #FAF9F6)
    ========================================================================== */
 
 :root {
-  --kds-bg-canvas: #090D16;
-  --kds-bg-surface: #111622;
-  --kds-bg-elevated: #1A2233;
-  --kds-border: #2D3748;
-  --kds-border-light: #4A5568;
-  --kds-text-primary: #FFFFFF;
-  --kds-text-secondary: #E5E7EB;
-  --kds-text-muted: #CBD5E1;
+  --bg-canvas: #FAF9F6;
+  --bg-sidebar: #F3F2EE;
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F5F4F0;
 
-  --kds-brand: #F05A22;
-  --kds-brand-hover: #D94E1B;
-  --kds-success: #065F46;
-  --kds-warning: #F59E0B;
-  --kds-danger: #B91C1C;
-  --kds-info: #1E40AF;
+  --border-subtle: #E7E5E4;
+  --border-strong: #D6D3D1;
 
-  --kds-radius: 12px;
+  --text-primary: #1C1917;
+  --text-secondary: #57534E;
+  --text-muted: #A8A29E;
+  --text-on-brand: #FFFFFF;
+  --text-on-status: #FFFFFF;
+
+  --brand-primary: #EA580C;
+  --brand-hover: #C2410C;
+  --brand-soft: rgba(234, 88, 12, 0.10);
+
+  --status-success: #059669;
+  --status-success-soft: rgba(5, 150, 105, 0.12);
+  --status-warning: #D97706;
+  --status-warning-soft: rgba(217, 119, 6, 0.12);
+  --status-danger: #DC2626;
+  --status-danger-soft: rgba(220, 38, 38, 0.12);
+
+  --overlay-backdrop: rgba(28, 25, 23, 0.68);
+  --shadow-sm: 0 1px 3px rgba(28, 25, 23, 0.06);
+  --shadow-md: 0 6px 18px rgba(28, 25, 23, 0.08);
+  --shadow-modal: 0 20px 50px rgba(28, 25, 23, 0.25);
+
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+.dark,
+[data-theme="dark"] {
+  --bg-canvas: #121211;
+  --bg-sidebar: #161615;
+  --bg-surface: #1E1D1B;
+  --bg-surface-hover: #292825;
+
+  --border-subtle: #2E2D2A;
+  --border-strong: #44403C;
+
+  --text-primary: #F5F5F4;
+  --text-secondary: #A8A29E;
+  --text-muted: #78716C;
+  --text-on-brand: #FFFFFF;
+  --text-on-status: #121211;
+
+  --brand-primary: #FB923C;
+  --brand-hover: #F97316;
+  --brand-soft: rgba(251, 146, 60, 0.15);
+
+  --status-success: #34D399;
+  --status-success-soft: rgba(52, 211, 153, 0.15);
+  --status-warning: #FBBF24;
+  --status-warning-soft: rgba(251, 191, 36, 0.15);
+  --status-danger: #F87171;
+  --status-danger-soft: rgba(248, 113, 113, 0.16);
+
+  --overlay-backdrop: rgba(18, 18, 17, 0.85);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.36);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -34,26 +82,29 @@
 }
 
 body {
-  background-color: var(--kds-bg-canvas);
-  color: var(--kds-text-primary);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  min-height: 100vh;
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   user-select: none;
   touch-action: manipulation;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* TOPBAR KDS */
 .kds-topbar {
-  height: 64px;
-  background-color: #050811;
-  border-bottom: 1px solid var(--kds-border);
+  min-height: 68px;
+  background-color: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  gap: 12px;
+  padding: 6px 20px;
   flex-shrink: 0;
 }
 
@@ -64,28 +115,29 @@ body {
 }
 
 .kds-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--kds-brand);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--brand-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 16px;
-  color: #FFFFFF;
+  font-size: 15px;
+  color: var(--text-on-brand);
+  letter-spacing: -0.02em;
 }
 
 .kds-title-wrap h1 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.3px;
-  color: #FFFFFF;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 .kds-title-wrap span {
   font-size: 12px;
-  color: var(--kds-text-secondary);
+  color: var(--text-secondary);
 }
 
 .kds-topbar-center {
@@ -97,113 +149,137 @@ body {
 .kds-filter-btn {
   min-width: 56px;
   min-height: 56px;
-  background: #111622;
-  border: 1px solid var(--kds-border);
-  color: #FFFFFF;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.05s;
 }
 
-.kds-filter-btn.active, .kds-filter-btn:hover {
-  background: var(--kds-brand);
-  color: #FFFFFF;
-  border-color: var(--kds-brand);
+.kds-filter-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.kds-filter-btn.active {
+  background: var(--brand-primary);
+  color: var(--text-on-brand);
+  border-color: var(--brand-primary);
 }
 
 .kds-topbar-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 .kds-clock {
   font-family: var(--font-mono);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
-  color: #FFFFFF;
-  background: #111622;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--kds-border);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
 }
 
 .kds-status-pill {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #6EE7B7;
-  background: #062C22;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid #10B981;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--status-success);
+  background: var(--status-success-soft);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--status-success);
+}
+
+.kds-status-pill.offline {
+  color: var(--status-warning);
+  background: var(--status-warning-soft);
+  border-color: var(--status-warning);
 }
 
 .kds-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--kds-success);
-  box-shadow: 0 0 8px var(--kds-success);
+  background: var(--status-success);
   animation: pulse-dot 2s infinite;
 }
 
 @keyframes pulse-dot {
-  0% { transform: scale(0.95); opacity: 0.8; }
+  0% { transform: scale(0.95); opacity: 0.75; }
   50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
+  100% { transform: scale(0.95); opacity: 0.75; }
 }
 
-.btn-nav-touch {
+.btn-nav-touch,
+.kds-theme-btn {
   min-width: 56px;
   min-height: 56px;
-  background: transparent;
-  border: 1px solid var(--kds-border);
-  color: #FFFFFF;
-  padding: 10px 16px;
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s;
 }
 
-.btn-nav-touch:hover {
-  background: #1F2937;
-  color: #FFFFFF;
+.btn-nav-touch:hover,
+.kds-theme-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-strong);
 }
 
 /* KANBAN BOARD */
 .kds-board {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   padding: 16px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .kds-column {
-  background: #0C101B;
-  border: 1px solid var(--kds-border);
-  border-radius: var(--kds-radius);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 .kds-col-header {
   padding: 14px 18px;
-  background: #111622;
-  border-bottom: 2px solid var(--kds-border);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -221,26 +297,28 @@ body {
   border-radius: 50%;
 }
 
-.ind-pendiente { background: var(--kds-warning); box-shadow: 0 0 8px var(--kds-warning); }
-.ind-preparando { background: var(--kds-info); box-shadow: 0 0 8px var(--kds-info); }
-.ind-listo { background: var(--kds-success); box-shadow: 0 0 8px var(--kds-success); }
+.ind-pendiente { background: var(--status-warning); }
+.ind-preparando { background: var(--brand-primary); }
+.ind-listo { background: var(--status-success); }
 
 .kds-col-header h2 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 .kds-badge-count {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 12px;
-  background: #1A2233;
-  color: #FFFFFF;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
 }
 
 .kds-cards-container {
@@ -254,112 +332,132 @@ body {
 
 /* TARJETA KDS */
 .kds-card {
-  background: var(--kds-bg-surface);
-  border: 1px solid var(--kds-border);
-  border-radius: 10px;
-  padding: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.kds-card.state-green {
+  border-left: 4px solid var(--status-success);
+}
+
+.kds-card.state-amber {
+  border-left: 4px solid var(--status-warning);
+}
+
+.kds-card.state-red {
+  border-left: 4px solid var(--status-danger);
 }
 
 .kds-card:hover {
-  border-color: var(--kds-border-light);
+  box-shadow: var(--shadow-md);
 }
 
 .kds-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .kds-mesa-badge {
   font-size: 14px;
-  font-weight: 800;
-  color: #FFFFFF;
-  background: #1A2233;
-  padding: 4px 10px;
-  border-radius: 6px;
-  letter-spacing: -0.2px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  padding: 5px 11px;
+  border-radius: var(--radius-md);
+  letter-spacing: -0.01em;
 }
 
 .kds-timer-badge {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 28px;
   font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 6px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
-/* Semáforo Cronómetro AAA (>= 7:1) */
+/* Semáforo Cronómetro */
 .timer-green {
-  background: #062C22;
-  color: #A7F3D0;
-  border: 1px solid #10B981;
+  background: var(--status-success-soft);
+  color: var(--status-success);
+  border: 1px solid var(--status-success);
 }
 
 .timer-amber {
-  background: #2B200B;
-  color: #FDE68A;
-  border: 1px solid #F59E0B;
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  border: 1px solid var(--status-warning);
 }
 
 .timer-red {
-  background: #331217;
-  color: #FECACA;
-  border: 1px solid #EF4444;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+  border: 1px solid var(--status-danger);
   animation: pulse-red 1.5s infinite;
 }
 
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
-  50% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
-  100% { box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  0% { opacity: 1; }
+  50% { opacity: 0.78; }
+  100% { opacity: 1; }
 }
 
 .kds-dish-title {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
 }
 
 .kds-qty {
   font-family: var(--font-mono);
   font-size: 18px;
   font-weight: 800;
-  color: #FFFFFF;
-  background: #7C2D12;
-  padding: 2px 8px;
-  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-primary);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-primary);
+  padding: 3px 9px;
+  border-radius: var(--radius-md);
 }
 
 .kds-name {
   font-size: 17px;
   font-weight: 700;
-  color: #FFFFFF;
-  line-height: 1.25;
+  color: var(--text-primary);
+  line-height: 1.3;
 }
 
 .kds-notes {
-  background: #1F1A0E;
-  border-left: 3px solid var(--kds-warning);
-  color: #FEF08A;
+  background: var(--status-warning-soft);
+  border-left: 3px solid var(--status-warning);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
 }
 
 .kds-card-meta {
   font-size: 12px;
-  color: #E5E7EB;
+  color: var(--text-secondary);
   display: flex;
   justify-content: space-between;
+  font-variant-numeric: tabular-nums;
 }
 
 .kds-btn-action {
@@ -368,7 +466,7 @@ body {
   min-height: 56px;
   padding: 12px 18px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -377,43 +475,136 @@ body {
   justify-content: center;
   gap: 8px;
   touch-action: manipulation;
-  transition: filter 0.15s ease, transform 0.05s;
+  transition: background-color 0.15s ease, transform 0.05s;
 }
 
 .kds-btn-action:active,
 .kds-filter-btn:active,
-.btn-nav-touch:active {
+.btn-nav-touch:active,
+.kds-theme-btn:active,
+.kds-btn-auth:active {
   transform: scale(0.98);
   transition: transform 0.05s;
 }
 
 .btn-iniciar {
-  background: var(--kds-info);
-  color: #FFFFFF;
+  background: var(--brand-primary);
+  color: var(--text-on-brand);
+}
+
+.btn-iniciar:hover {
+  background: var(--brand-hover);
 }
 
 .btn-listo {
-  background: var(--kds-success);
-  color: #FFFFFF;
+  background: var(--status-success);
+  color: var(--text-on-status);
+}
+
+.btn-listo:hover {
+  opacity: 0.92;
 }
 
 .btn-entregar {
-  background: #1F2937;
-  color: #FFFFFF;
-  border: 1px solid #4B5563;
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .btn-entregar:hover {
-  background: #4B5563;
-  color: #FFFFFF;
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 /* Empty State */
 .kds-empty-col {
   padding: 36px 16px;
   text-align: center;
-  color: var(--kds-text-muted);
+  color: var(--text-muted);
   font-size: 14px;
+}
+
+/* Modal Auth KDS */
+.kds-auth-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.kds-auth-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-modal);
+}
+
+.kds-auth-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.kds-auth-sub {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.kds-auth-error {
+  display: none;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.kds-auth-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.kds-auth-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.kds-btn-auth {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--brand-primary);
+  color: var(--text-on-brand);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kds-btn-auth:hover {
+  background: var(--brand-hover);
 }
 
 @media (max-width: 900px) {
@@ -426,12 +617,13 @@ body {
   }
 }
 
-
-/* ==========================================================================
-   HOTFIX v4.3.1 — KDS EN CELULAR (<= 768px)
-   Las tablets horizontales (1024px) conservan el tablero Kanban de 3 columnas.
-   ========================================================================== */
 @media (max-width: 768px) {
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
   .kds-topbar {
     height: auto;
     flex-wrap: wrap;
@@ -466,8 +658,8 @@ body {
   }
 
   .kds-clock {
-    font-size: 15px;
-    padding: 4px 8px;
+    font-size: 14px;
+    padding: 6px 8px;
   }
 
   .kanban-board,
@@ -476,7 +668,7 @@ body {
     flex-direction: column !important;
     gap: 12px;
     padding: 12px;
-    overflow-y: auto;
+    overflow-y: visible;
   }
 
   .kanban-column,
