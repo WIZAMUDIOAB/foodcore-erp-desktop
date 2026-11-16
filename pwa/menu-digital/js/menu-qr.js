@@ -263,6 +263,10 @@
     if (document.body) {
       document.body.classList.toggle('dark', Boolean(esOscuro));
     }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
+    }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
       btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;
@@ -280,21 +284,15 @@
 
   aplicarTemaMenuQr(resolverTemaInicial());
 
-  function buildFallbackDishSvg(title, category) {
+  function createDishPlaceholder(category) {
     const isDrink = (category || '').toLowerCase().includes('bebida');
-    const c1 = isDrink ? '%231E1D1B' : '%23121211';
-    const c2 = isDrink ? '%23D97706' : '%23EA580C';
-    const accent = isDrink ? '%23FBBF24' : '%23FB923C';
-    return "data:image/svg+xml;utf8,"
-      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300' preserveAspectRatio='none'%3E"
-      + "%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E"
-      + "%3Cstop offset='0%25' stop-color='" + c1 + "'/%3E"
-      + "%3Cstop offset='100%25' stop-color='" + c2 + "'/%3E%3C/linearGradient%3E%3C/defs%3E"
-      + "%3Crect width='400' height='300' fill='url(%23g)'/%3E"
-      + "%3Ccircle cx='320' cy='150' r='74' fill='%23ffffff' fill-opacity='0.10'/%3E"
-      + "%3Ccircle cx='200' cy='150' r='54' fill='" + accent + "' fill-opacity='0.22'/%3E"
-      + "%3Ccircle cx='200' cy='150' r='34' fill='none' stroke='%23ffffff' stroke-opacity='0.35' stroke-width='2'/%3E"
-      + "%3Ccircle cx='200' cy='150' r='12' fill='%23ffffff' fill-opacity='0.45'/%3E%3C/svg%3E";
+    const holder = document.createElement('div');
+    holder.className = 'card-img-placeholder parallax-img';
+    holder.setAttribute('aria-hidden', 'true');
+    holder.innerHTML = isDrink
+      ? '<svg class="dish-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>'
+      : '<svg class="dish-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+    return holder;
   }
 
   function createDishCard(producto, visibleIndex) {
@@ -311,15 +309,19 @@
 
     const imgWrap = document.createElement('div');
     imgWrap.className = 'card-img-wrap';
-    const img = document.createElement('img');
-    img.className = 'parallax-img';
-    img.alt = producto.nombre || 'Especialidad';
-    const fallbackSrc = buildFallbackDishSvg(producto.nombre, category);
-    img.src = (producto.imagen_url && producto.imagen_url.trim()) ? producto.imagen_url : fallbackSrc;
-    img.addEventListener('error', () => {
-      if (img.src !== fallbackSrc) img.src = fallbackSrc;
-    });
-    imgWrap.appendChild(img);
+    if (producto.imagen_url && producto.imagen_url.trim()) {
+      const img = document.createElement('img');
+      img.className = 'parallax-img dish-photo';
+      img.alt = producto.nombre || 'Especialidad';
+      img.src = producto.imagen_url.trim();
+      img.addEventListener('error', () => {
+        imgWrap.innerHTML = '';
+        imgWrap.appendChild(createDishPlaceholder(category));
+      });
+      imgWrap.appendChild(img);
+    } else {
+      imgWrap.appendChild(createDishPlaceholder(category));
+    }
 
     const badge = document.createElement('span');
     badge.className = 'card-cat-badge';
