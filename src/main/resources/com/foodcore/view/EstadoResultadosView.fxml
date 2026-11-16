@@ -89,7 +89,7 @@
                                                         <Region HBox.hgrow="ALWAYS" />
                                                         <StackPane styleClass="kpi-icon-circle-blue">
                                                             <children>
-                                                                <FontIcon iconColor="#2563EB" iconLiteral="fas-cash-register" iconSize="16" />
+                                                                <FontIcon iconLiteral="fth-credit-card" iconSize="20" />
                                                             </children>
                                                         </StackPane>
                                                     </children>
@@ -107,7 +107,7 @@
                                                         <Region HBox.hgrow="ALWAYS" />
                                                         <StackPane styleClass="kpi-icon-circle-amber">
                                                             <children>
-                                                                <FontIcon iconColor="#D97706" iconLiteral="fas-utensils" iconSize="16" />
+                                                                <FontIcon iconLiteral="fth-coffee" iconSize="20" />
                                                             </children>
                                                         </StackPane>
                                                     </children>
@@ -125,7 +125,7 @@
                                                         <Region HBox.hgrow="ALWAYS" />
                                                         <StackPane styleClass="kpi-icon-circle-accent">
                                                             <children>
-                                                                <FontIcon iconColor="#F05A22" iconLiteral="fas-chart-line" iconSize="16" />
+                                                                <FontIcon iconLiteral="fth-trending-up" iconSize="20" />
                                                             </children>
                                                         </StackPane>
                                                     </children>
@@ -143,7 +143,7 @@
                                                         <Region HBox.hgrow="ALWAYS" />
                                                         <StackPane styleClass="kpi-icon-circle-success">
                                                             <children>
-                                                                <FontIcon iconColor="#059669" iconLiteral="fas-balance-scale" iconSize="16" />
+                                                                <FontIcon iconLiteral="fth-bar-chart-2" iconSize="20" />
                                                             </children>
                                                         </StackPane>
                                                     </children>
@@ -175,6 +175,15 @@
                                                     </children>
                                                 </HBox>
                                                 <TableView fx:id="tblEstadoResultados" prefHeight="340.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colPnlCodigo" prefWidth="75.0" text="Código" />
                                                         <TableColumn fx:id="colPnlConcepto" prefWidth="255.0" text="Concepto Contable" />
@@ -198,6 +207,15 @@
                                                     </children>
                                                 </HBox>
                                                 <TableView fx:id="tblGastosCategoria" prefHeight="340.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colGastoCategoria" prefWidth="185.0" text="Categoría" />
                                                         <TableColumn fx:id="colGastoOps" prefWidth="75.0" text="Movs." />

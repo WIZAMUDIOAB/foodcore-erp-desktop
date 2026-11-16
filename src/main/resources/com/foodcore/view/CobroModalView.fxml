@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleGroup?>
@@ -11,82 +13,91 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox prefWidth="520.0" spacing="12.0" styleClass="pos-catalog-panel" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.CobroModalController">
+<VBox prefWidth="520.0" maxHeight="720.0" spacing="0.0" styleClass="card, modal-card" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.CobroModalController">
 
     <!-- Encabezado de Cobro -->
-    <VBox spacing="2.0">
-        <Label styleClass="view-heading" text="Liquidación y Cobro" />
-        <Label styleClass="view-subheading" text="Seleccione el comprobante, método de pago y calcule el cambio" />
+    <VBox spacing="4.0" styleClass="modal-header">
+        <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
+        <Label styleClass="h2" text="Liquidación y Cobro" />
+        <Label styleClass="text-secondary" text="Seleccione el comprobante, método de pago y calcule el cambio" />
     </VBox>
 
-    <Separator />
+    <!-- BODY -->
+    <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+        <content>
+            <VBox spacing="16.0" styleClass="modal-body">
+                <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
 
-    <!-- Cuadro de Total a Cobrar -->
-    <VBox spacing="4.0" styleClass="pos-totals-card">
-        <Label styleClass="text-overline" text="TOTAL A COBRAR" />
-        <Label fx:id="lblTotalCobro" styleClass="text-mono-lg-accent" text="S/ 0.00" />
-    </VBox>
+                <!-- Cuadro de Total a Cobrar -->
+                <VBox spacing="4.0" styleClass="pos-totals-card">
+                    <Label styleClass="text-overline" text="TOTAL A COBRAR" />
+                    <Label fx:id="lblTotalCobro" styleClass="price, text-mono-lg-accent" text="S/ 0.00" />
+                </VBox>
 
-    <!-- Tipo de Comprobante -->
-    <VBox spacing="6.0">
-        <Label styleClass="text-body-strong" text="Comprobante de Pago:" />
-        <HBox spacing="14.0">
-            <RadioButton fx:id="rbTicket" selected="true" text="Ticket de Venta">
-                <toggleGroup>
-                    <ToggleGroup fx:id="tgComprobante" />
-                </toggleGroup>
-            </RadioButton>
-            <RadioButton fx:id="rbBoleta" text="Boleta (DNI)" toggleGroup="$tgComprobante" />
-            <RadioButton fx:id="rbFactura" text="Factura (RUC)" toggleGroup="$tgComprobante" />
-        </HBox>
-    </VBox>
+                <!-- Tipo de Comprobante -->
+                <VBox spacing="8.0">
+                    <Label styleClass="label-form" text="Comprobante de Pago" />
+                    <HBox spacing="14.0">
+                        <RadioButton fx:id="rbTicket" selected="true" text="Ticket de Venta">
+                            <toggleGroup>
+                                <ToggleGroup fx:id="tgComprobante" />
+                            </toggleGroup>
+                        </RadioButton>
+                        <RadioButton fx:id="rbBoleta" text="Boleta (DNI)" toggleGroup="$tgComprobante" />
+                        <RadioButton fx:id="rbFactura" text="Factura (RUC)" toggleGroup="$tgComprobante" />
+                    </HBox>
+                </VBox>
 
-    <!-- Datos del Cliente -->
-    <HBox spacing="10.0">
-        <VBox prefWidth="160.0" spacing="4.0">
-            <Label styleClass="text-caption" text="Documento:" />
-            <TextField fx:id="txtDocCliente" promptText="00000000" styleClass="input-field" text="00000000" />
-        </VBox>
-        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-            <Label styleClass="text-caption" text="Razón Social / Nombre:" />
-            <TextField fx:id="txtNombreCliente" promptText="CLIENTES VARIOS" styleClass="input-field" text="CLIENTES VARIOS" />
-        </VBox>
+                <!-- Datos del Cliente -->
+                <HBox spacing="16.0">
+                    <VBox prefWidth="160.0" spacing="8.0">
+                        <Label styleClass="label-form" text="Documento" />
+                        <TextField fx:id="txtDocCliente" promptText="00000000" styleClass="input-field" text="00000000" />
+                    </VBox>
+                    <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                        <Label styleClass="label-form" text="Razón Social / Nombre" />
+                        <TextField fx:id="txtNombreCliente" promptText="CLIENTES VARIOS" styleClass="input-field" text="CLIENTES VARIOS" />
+                    </VBox>
+                </HBox>
+
+                <!-- Método de Pago -->
+                <VBox spacing="8.0">
+                    <Label styleClass="label-form" text="Canal de Cobro" />
+                    <ComboBox fx:id="cmbMetodoPago" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                </VBox>
+
+                <!-- Cálculo de Efectivo y Vuelto -->
+                <VBox fx:id="boxEfectivo" spacing="12.0" styleClass="card">
+                    <Label styleClass="h3" text="Cálculo de Efectivo y Cambio" />
+
+                    <!-- Chips de Efectivo Rápido -->
+                    <HBox spacing="8.0">
+                        <Button onAction="#handleMontoExacto" styleClass="category-chip" text="Exacto" />
+                        <Button onAction="#handleMontoRapido20" styleClass="category-chip" text="S/ 20" />
+                        <Button onAction="#handleMontoRapido50" styleClass="category-chip" text="S/ 50" />
+                        <Button onAction="#handleMontoRapido100" styleClass="category-chip" text="S/ 100" />
+                    </HBox>
+
+                    <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <VBox spacing="8.0">
+                            <Label styleClass="label-form" text="Monto Recibido" />
+                            <TextField fx:id="txtMontoRecibido" onKeyReleased="#handleCalcularVuelto" prefWidth="150.0" promptText="0.00" styleClass="input-field" />
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <VBox alignment="CENTER_RIGHT" spacing="4.0">
+                            <Label styleClass="label-form" text="Vuelto" />
+                            <Label fx:id="lblVuelto" styleClass="text-mono-lg-success" text="S/ 0.00" />
+                        </VBox>
+                    </HBox>
+                </VBox>
+            </VBox>
+        </content>
+    </ScrollPane>
+
+    <!-- Footer Confirmar Cobro -->
+    <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+        <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+        <Button maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS" onAction="#handleConfirmarCobro" styleClass="btn-primary" text="Confirmar Cobro y Emitir Comprobante" />
     </HBox>
-
-    <!-- Método de Pago -->
-    <VBox spacing="4.0">
-        <Label styleClass="text-body-strong" text="Canal de Cobro:" />
-        <ComboBox fx:id="cmbMetodoPago" maxWidth="1.7976931348623157E308" />
-    </VBox>
-
-    <!-- Cálculo de Efectivo y Vuelto -->
-    <VBox fx:id="boxEfectivo" spacing="8.0" styleClass="surface-card">
-        <Label styleClass="text-body-strong" text="Cálculo de Efectivo y Cambio" />
-
-        <!-- Chips de Efectivo Rápido -->
-        <HBox spacing="8.0">
-            <Button onAction="#handleMontoExacto" styleClass="category-chip" text="Exacto" />
-            <Button onAction="#handleMontoRapido20" styleClass="category-chip" text="S/ 20" />
-            <Button onAction="#handleMontoRapido50" styleClass="category-chip" text="S/ 50" />
-            <Button onAction="#handleMontoRapido100" styleClass="category-chip" text="S/ 100" />
-        </HBox>
-
-        <HBox alignment="CENTER_LEFT" spacing="12.0">
-            <VBox spacing="4.0">
-                <Label styleClass="text-caption" text="Monto Recibido:" />
-                <TextField fx:id="txtMontoRecibido" onKeyReleased="#handleCalcularVuelto" prefWidth="150.0" promptText="0.00" styleClass="input-field" />
-            </VBox>
-            <Region HBox.hgrow="ALWAYS" />
-            <VBox alignment="CENTER_RIGHT" spacing="4.0">
-                <Label styleClass="text-caption" text="Vuelto:" />
-                <Label fx:id="lblVuelto" styleClass="text-mono-lg-success" text="S/ 0.00" />
-            </VBox>
-        </HBox>
-    </VBox>
-
-    <Region minHeight="6.0" VBox.vgrow="ALWAYS" />
-
-    <!-- Botón Confirmar Cobro -->
-    <Button maxWidth="1.7976931348623157E308" onAction="#handleConfirmarCobro" styleClass="btn-primary" text="Confirmar Cobro y Emitir Comprobante" />
 
 </VBox>

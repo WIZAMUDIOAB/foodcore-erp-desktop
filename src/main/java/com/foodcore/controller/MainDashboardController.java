@@ -45,6 +45,7 @@ public class MainDashboardController {
     @FXML private VBox sidebarBox;
     @FXML private VBox boxBrandHeader;
     @FXML private Button btnToggleSidebar;
+    @FXML private Label lblBuscarSidebar;
     @FXML private javafx.scene.control.TextField txtBuscarSidebar;
     @FXML private StackPane contentArea;
     @FXML private Label lblUsuarioLogueado;
@@ -270,6 +271,10 @@ public class MainDashboardController {
         if (boxBrandHeader != null) {
             boxBrandHeader.setVisible(!sidebarColapsado);
             boxBrandHeader.setManaged(!sidebarColapsado);
+        }
+        if (lblBuscarSidebar != null) {
+            lblBuscarSidebar.setVisible(!sidebarColapsado);
+            lblBuscarSidebar.setManaged(!sidebarColapsado);
         }
         if (txtBuscarSidebar != null) {
             txtBuscarSidebar.setVisible(!sidebarColapsado);

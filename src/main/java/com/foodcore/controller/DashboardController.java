@@ -215,7 +215,8 @@ public class DashboardController {
                 continue;
             }
 
-            linePath.setStroke(Color.web("#F05A22"));
+            boolean oscuro = App.isDarkModeActivo();
+            linePath.setStroke(Color.web(oscuro ? "#F97316" : "#EA580C"));
             linePath.setStrokeWidth(3.0);
             linePath.setStrokeLineCap(StrokeLineCap.ROUND);
             linePath.setStrokeLineJoin(StrokeLineJoin.ROUND);
@@ -223,8 +224,8 @@ public class DashboardController {
             fillPath.setStroke(Color.TRANSPARENT);
             fillPath.setFill(new LinearGradient(
                     0.0, 0.0, 0.0, 1.0, true, CycleMethod.NO_CYCLE,
-                    new Stop(0.0, Color.rgb(240, 90, 34, 0.30)),
-                    new Stop(1.0, Color.rgb(240, 90, 34, 0.00))
+                    new Stop(0.0, oscuro ? Color.rgb(249, 115, 22, 0.20) : Color.rgb(234, 88, 12, 0.20)),
+                    new Stop(1.0, oscuro ? Color.rgb(249, 115, 22, 0.00) : Color.rgb(234, 88, 12, 0.00))
             ));
 
             boolean yaSuavizado = linePath.getElements().stream().anyMatch(e -> e instanceof CubicCurveTo);

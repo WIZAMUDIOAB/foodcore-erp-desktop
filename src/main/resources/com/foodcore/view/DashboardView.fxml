@@ -15,6 +15,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootGerencialStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.DashboardController">
     <children>
@@ -38,8 +39,12 @@
                                     </children>
                                 </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
-                                <Button fx:id="btnActualizarDashboard" mnemonicParsing="false" onAction="#handleActualizarDashboard" styleClass="btn-secondary" text="Actualizar KPIs" />
-                                <Button fx:id="btnExpandirVentana" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-secondary" text="⤢" />
+                                <Button fx:id="btnActualizarDashboard" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleActualizarDashboard" styleClass="btn-secondary" text="Actualizar KPIs">
+                                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+                                </Button>
+                                <Button fx:id="btnExpandirVentana" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-secondary" text="">
+                                    <graphic><FontIcon iconLiteral="fth-maximize-2" iconSize="16" /></graphic>
+                                </Button>
                             </children>
                         </HBox>
 
@@ -64,7 +69,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-accent">
                                                     <children>
-                                                        <Label text="💰" />
+                                                        <FontIcon iconLiteral="fth-dollar-sign" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -88,7 +93,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-blue">
                                                     <children>
-                                                        <Label text="💳" />
+                                                        <FontIcon iconLiteral="fth-credit-card" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -112,7 +117,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-success">
                                                     <children>
-                                                        <Label text="🧾" />
+                                                        <FontIcon iconLiteral="fth-bar-chart-2" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -136,7 +141,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-amber">
                                                     <children>
-                                                        <Label text="⭐" />
+                                                        <FontIcon iconLiteral="fth-award" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -239,6 +244,15 @@
                                             </children>
                                         </HBox>
                                         <TableView fx:id="tblVentasMozo" prefHeight="260.0">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="colMozoUsuario" prefWidth="150.0" text="Usuario / Rol" />
                                                 <TableColumn fx:id="colMozoVentas" prefWidth="120.0" text="Ventas Totales" />
@@ -266,6 +280,15 @@
                                     </children>
                                 </HBox>
                                 <TableView fx:id="tblRentabilidad" prefHeight="220.0">
+                                    <placeholder>
+                                        <VBox alignment="CENTER" spacing="12.0">
+                                            <children>
+                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                <Label styleClass="h3" text="No hay registros" />
+                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                            </children>
+                                        </VBox>
+                                    </placeholder>
                                     <columns>
                                         <TableColumn fx:id="colRentPlatillo" prefWidth="340.0" text="Platillo" />
                                         <TableColumn fx:id="colRentCosto" prefWidth="210.0" text="Costo de Receta" />

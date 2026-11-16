@@ -121,13 +121,13 @@ public class ReservasController {
                 } else {
                     setText(estado);
                     if ("CONFIRMADA".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #E8F6EE; -fx-text-fill: #1F9D55; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
                     } else if ("PENDIENTE".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
                     } else if ("SENTADA".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #EDE9FE; -fx-text-fill: #6D28D9; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #EA580C; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
                     } else {
-                        setStyle("-fx-background-color: #FEE2E2; -fx-text-fill: #DC2626; -fx-alignment: CENTER; -fx-background-radius: 12;");
+                        setStyle("-fx-background-color: #FEF2F2; -fx-text-fill: #DC2626; -fx-alignment: CENTER; -fx-background-radius: 12;");
                     }
                 }
             }

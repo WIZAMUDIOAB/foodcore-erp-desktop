@@ -16,6 +16,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootClientesStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ClientesController">
     <children>
@@ -45,9 +46,14 @@
                             </children>
                         </HBox>
 
-                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <HBox alignment="BOTTOM_LEFT" spacing="12.0">
                             <children>
-                                <TextField fx:id="txtBuscar" prefWidth="340.0" promptText="Buscar por DNI, RUC, Teléfono o Nombre..." styleClass="form-text-field" />
+                                <VBox spacing="6.0">
+                                    <children>
+                                        <Label styleClass="label-form" text="Buscar cliente" />
+                                        <TextField fx:id="txtBuscar" prefWidth="340.0" promptText="Buscar por DNI, RUC, Teléfono o Nombre..." styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Label fx:id="lblTotalClientes" styleClass="badge-pill-success" text="0 Clientes" />
                             </children>
@@ -70,6 +76,15 @@
                                                 <VBox spacing="8.0" style="-fx-padding: 10 0 0 0;">
                                                     <children>
                                                         <TableView fx:id="tblClientes" VBox.vgrow="ALWAYS">
+                                                            <placeholder>
+                                                                <VBox alignment="CENTER" spacing="12.0">
+                                                                    <children>
+                                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                        <Label styleClass="h3" text="No hay registros" />
+                                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                                    </children>
+                                                                </VBox>
+                                                            </placeholder>
                                                             <columns>
                                                                 <TableColumn fx:id="colTipoDoc" prefWidth="65.0" text="Tipo" />
                                                                 <TableColumn fx:id="colDocumento" prefWidth="110.0" text="Documento" />
@@ -101,6 +116,15 @@
                                                 <VBox spacing="8.0" style="-fx-padding: 10 0 0 0;">
                                                     <children>
                                                         <TableView fx:id="tblClientesMinoristas" VBox.vgrow="ALWAYS">
+                                                            <placeholder>
+                                                                <VBox alignment="CENTER" spacing="12.0">
+                                                                    <children>
+                                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                        <Label styleClass="h3" text="No hay registros" />
+                                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                                    </children>
+                                                                </VBox>
+                                                            </placeholder>
                                                             <columns>
                                                                 <TableColumn fx:id="colMinDni" minWidth="84.0" prefWidth="86.0" text="DNI" />
                                                                 <TableColumn fx:id="colMinNombre" minWidth="135.0" prefWidth="144.0" text="Nombre Completo" />
@@ -225,6 +249,15 @@
                                                         <Label fx:id="lblDetalleReglaFidelizacion" styleClass="text-caption-muted" text="S/ 1.00 = 1 pt · 100 pts = S/ 5.00 desc." />
                                                         <Label styleClass="text-caption" text="ÚLTIMAS 10 COMPRAS" />
                                                         <TableView fx:id="tblHistorialCompras" minHeight="96.0" prefHeight="104.0" styleClass="compact-table">
+                                                            <placeholder>
+                                                                <VBox alignment="CENTER" spacing="12.0">
+                                                                    <children>
+                                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                        <Label styleClass="h3" text="No hay registros" />
+                                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                                    </children>
+                                                                </VBox>
+                                                            </placeholder>
                                                             <columns>
                                                                 <TableColumn fx:id="colCompraFecha" minWidth="74.0" prefWidth="76.0" text="Fecha" />
                                                                 <TableColumn fx:id="colCompraMonto" minWidth="68.0" prefWidth="70.0" text="Monto" />
@@ -265,93 +298,113 @@
         <!-- Modal Crear/Editar Cliente (Corporativo & Minorista) -->
         <VBox fx:id="modalCliente" alignment="CENTER" styleClass="modal-backdrop" visible="false">
             <children>
-                <VBox maxWidth="470.0" spacing="12.0" styleClass="modal-card">
+                <VBox maxHeight="680.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-card">
                     <children>
-                        <Label fx:id="lblModalTitulo" styleClass="modal-title" text="Registrar Cliente" />
-                        <VBox spacing="8.0">
+                        <!-- HEADER -->
+                        <VBox spacing="4.0" styleClass="modal-header">
+                            <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                             <children>
-                                <HBox spacing="10.0">
-                                    <children>
-                                        <VBox prefWidth="145.0" spacing="4.0">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Segmento:" />
-                                                <ComboBox fx:id="cbModalTipoCliente" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
-                                            </children>
-                                        </VBox>
-                                        <VBox prefWidth="105.0" spacing="4.0">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Tipo Doc:" />
-                                                <ComboBox fx:id="cbModalTipoDoc" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Número Doc:" />
-                                                <TextField fx:id="txtModalNumeroDoc" promptText="DNI 8d o RUC 11d" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
-
-                                <Label styleClass="form-field-label" text="Nombre Completo / Razón Social:" />
-                                <TextField fx:id="txtModalRazonSocial" promptText="Nombre completo o empresa" styleClass="form-text-field" />
-
-                                <HBox spacing="10.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Teléfono:" />
-                                                <TextField fx:id="txtModalTelefono" promptText="987654321" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Fecha Nacimiento:" />
-                                                <DatePicker fx:id="dpModalFechaNacimiento" maxWidth="1.7976931348623157E308" promptText="dd/mm/aaaa" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
-
-                                <HBox spacing="10.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Contacto:" />
-                                                <TextField fx:id="txtModalContacto" promptText="Persona contacto" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Correo Electrónico:" />
-                                                <TextField fx:id="txtModalEmail" promptText="correo@cliente.pe" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
-
-                                <HBox fx:id="boxModalCredito" spacing="10.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Límite Crédito (S/):" />
-                                                <TextField fx:id="txtModalLimite" promptText="5000.00" styleClass="form-text-field" text="5000.00" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Días Crédito:" />
-                                                <TextField fx:id="txtModalDiasCredito" promptText="30" styleClass="form-text-field" text="30" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
+                                <Label fx:id="lblModalTitulo" styleClass="h2" text="Registrar Cliente" />
+                                <Label styleClass="text-secondary" text="Complete los datos de identificación y contacto del cliente" />
                             </children>
                         </VBox>
 
-                        <Label fx:id="lblModalError" styleClass="text-danger" text="" wrapText="true" />
+                        <!-- BODY -->
+                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox spacing="16.0" styleClass="modal-body">
+                                    <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                                    <children>
+                                        <HBox spacing="12.0">
+                                            <children>
+                                                <VBox prefWidth="145.0" spacing="8.0">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Segmento" />
+                                                        <ComboBox fx:id="cbModalTipoCliente" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox prefWidth="105.0" spacing="8.0">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Tipo Doc" />
+                                                        <ComboBox fx:id="cbModalTipoDoc" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Número Doc" />
+                                                        <TextField fx:id="txtModalNumeroDoc" promptText="DNI 8d o RUC 11d" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
 
-                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Nombre Completo / Razón Social" />
+                                                <TextField fx:id="txtModalRazonSocial" promptText="Nombre completo o empresa" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <HBox spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Teléfono" />
+                                                        <TextField fx:id="txtModalTelefono" promptText="987654321" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Fecha Nacimiento" />
+                                                        <DatePicker fx:id="dpModalFechaNacimiento" maxWidth="1.7976931348623157E308" promptText="dd/mm/aaaa" styleClass="form-date-picker" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+
+                                        <HBox spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Contacto" />
+                                                        <TextField fx:id="txtModalContacto" promptText="Persona contacto" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Correo Electrónico" />
+                                                        <TextField fx:id="txtModalEmail" promptText="correo@cliente.pe" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+
+                                        <HBox fx:id="boxModalCredito" spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Límite Crédito (S/)" />
+                                                        <TextField fx:id="txtModalLimite" promptText="5000.00" styleClass="input-field" text="5000.00" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Días Crédito" />
+                                                        <TextField fx:id="txtModalDiasCredito" promptText="30" styleClass="input-field" text="30" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+
+                                        <Label fx:id="lblModalError" styleClass="text-danger" text="" wrapText="true" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </ScrollPane>
+
+                        <!-- FOOTER -->
+                        <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                            <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                             <children>
                                 <Button mnemonicParsing="false" onAction="#handleCerrarModal" styleClass="btn-secondary" text="Cancelar" />
                                 <Button mnemonicParsing="false" onAction="#handleGuardarCliente" styleClass="btn-primary" text="Guardar Cliente" />

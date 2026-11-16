@@ -17,6 +17,7 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.TilePane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.VentaController">
 
@@ -32,12 +33,14 @@
                 <Label styleClass="view-subheading" text="Facturación multicanal (Salón 12 Mesas, Kiosco, Delivery), envío a cocina y cobro multimedio" />
             </VBox>
             <Region HBox.hgrow="ALWAYS" />
-            <HBox alignment="CENTER_RIGHT" spacing="10.0">
-                <Button fx:id="btnFidelizacion" mnemonicParsing="false" onAction="#handleFidelizacionCanje" styleClass="btn-secondary" text="🎁 Fidelización" />
-                <Button fx:id="btnDividirCuenta" mnemonicParsing="false" onAction="#handleDividirCuenta" styleClass="btn-secondary" text="Dividir Cuenta" />
-                <Button fx:id="btnDescuento" mnemonicParsing="false" onAction="#handleAplicarDescuento" styleClass="btn-secondary" text="Descuento" />
-                <Button fx:id="btnAnularVenta" mnemonicParsing="false" onAction="#handleAnularVenta" styleClass="btn-secondary" text="Anular Venta" />
-                <Button mnemonicParsing="false" onAction="#handleAbrirArqueo" styleClass="btn-secondary" text="Arqueo y Cierre" />
+            <HBox alignment="CENTER_RIGHT" spacing="8.0">
+                <Button fx:id="btnFidelizacion" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleFidelizacionCanje" styleClass="btn-secondary" text="Fidelización">
+                    <graphic><FontIcon iconLiteral="fth-gift" iconSize="16" /></graphic>
+                </Button>
+                <Button fx:id="btnDividirCuenta" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleDividirCuenta" styleClass="btn-secondary" text="Dividir Cuenta" />
+                <Button fx:id="btnDescuento" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAplicarDescuento" styleClass="btn-secondary" text="Descuento" />
+                <Button fx:id="btnAnularVenta" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAnularVenta" styleClass="btn-secondary" text="Anular Venta" />
+                <Button graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAbrirArqueo" styleClass="btn-secondary" text="Arqueo y Cierre" />
             </HBox>
         </HBox>
     </top>
@@ -86,6 +89,15 @@
 
                         <!-- Lista de ítems de la orden -->
                         <TableView fx:id="tblDetalle" minHeight="115.0" prefHeight="155.0" VBox.vgrow="ALWAYS">
+                            <placeholder>
+                                <VBox alignment="CENTER" spacing="12.0">
+                                    <children>
+                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                        <Label styleClass="h3" text="No hay registros" />
+                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                    </children>
+                                </VBox>
+                            </placeholder>
                             <columns>
                                 <TableColumn fx:id="colProducto" minWidth="128.0" prefWidth="154.0" text="Ítem" />
                                 <TableColumn fx:id="colCantidad" minWidth="58.0" prefWidth="60.0" text="Cant." />
@@ -100,9 +112,14 @@
                         <!-- CRM Minorista y Fidelización POS (SPEC v5.0.0) -->
                         <VBox fx:id="boxClienteFidelizacionPos" spacing="5.0" style="-fx-padding: 7px 10px;" styleClass="surface-card-subtle">
                             <children>
-                                <HBox alignment="CENTER_LEFT" spacing="6.0">
+                                <HBox alignment="BOTTOM_LEFT" spacing="6.0">
                                     <children>
-                                        <TextField fx:id="txtBuscarClientePos" onAction="#handleBuscarClientePos" promptText="DNI o Teléfono..." style="-fx-padding: 6px 10px;" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                                            <children>
+                                                <Label styleClass="label-form" text="Cliente DNI / Teléfono" />
+                                                <TextField fx:id="txtBuscarClientePos" onAction="#handleBuscarClientePos" promptText="DNI o Teléfono..." style="-fx-padding: 6px 10px;" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
                                         <Button fx:id="btnBuscarClientePos" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleBuscarClientePos" style="-fx-padding: 5px 10px; -fx-font-size: 12px;" styleClass="category-chip" text="Buscar" />
                                         <Button fx:id="btnNuevoClientePos" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleRegistroRapidoClientePos" style="-fx-padding: 5px 10px; -fx-font-size: 12px;" styleClass="category-chip" text="+ DNI" />
                                         <Button fx:id="btnLimpiarClientePos" managed="false" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleLimpiarClientePos" style="-fx-padding: 5px 8px; -fx-font-size: 12px;" styleClass="category-chip" text="X" visible="false" />
@@ -112,7 +129,7 @@
                                     <children>
                                         <Label fx:id="lblClientePosNombre" maxWidth="1.7976931348623157E308" minWidth="0.0" styleClass="text-body-strong" text="Cliente asociado" HBox.hgrow="ALWAYS" />
                                         <Label fx:id="lblClientePosPuntos" minWidth="-Infinity" style="-fx-padding: 3px 9px;" styleClass="badge-pill-accent" text="0 pts" />
-                                        <Button fx:id="btnCanjearPuntosPos" managed="false" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCanjearPuntosPos" style="-fx-padding: 4px 10px; -fx-font-size: 11.5px; -fx-border-color: #F05A22; -fx-text-fill: #F05A22;" styleClass="category-chip" text="Canjear Puntos" visible="false" />
+                                        <Button fx:id="btnCanjearPuntosPos" managed="false" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCanjearPuntosPos" styleClass="category-chip, btn-pos-points-chip" text="Canjear Puntos" visible="false" />
                                     </children>
                                 </HBox>
                                 <HBox fx:id="rowAlertaCumplePos" alignment="CENTER_LEFT" managed="false" spacing="6.0" visible="false">
@@ -199,15 +216,20 @@
                 <TabPane fx:id="tabPanePosCatalogo" tabClosingPolicy="UNAVAILABLE" GridPane.columnIndex="1">
                     <tabs>
                         <!-- Pestaña 1: Catálogo de Platillos -->
-                        <Tab fx:id="tabCatalogo" text="🛒 Catálogo de Platillos">
+                        <Tab fx:id="tabCatalogo" text="Catálogo de Platillos">
                             <content>
                                 <VBox spacing="16.0" styleClass="pos-catalog-panel">
                                     <children>
                                         <VBox spacing="12.0">
                                             <children>
-                                                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                                                <HBox alignment="BOTTOM_LEFT" spacing="12.0">
                                                     <children>
-                                                        <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código SKU..." styleClass="input-field" HBox.hgrow="ALWAYS" />
+                                                        <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                            <children>
+                                                                <Label styleClass="label-form" text="Buscar platillo o SKU" />
+                                                                <TextField fx:id="txtBuscar" promptText="Buscar plato, bebida o código SKU..." styleClass="input-field" />
+                                                            </children>
+                                                        </VBox>
                                                     </children>
                                                 </HBox>
                                                 <ScrollPane fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="NEVER">
@@ -229,7 +251,7 @@
                         </Tab>
 
                         <!-- Pestaña 2: Vista de 12 Mesas y Pedidos Multicanal (v4.4.0 §2) -->
-                        <Tab fx:id="tabMesas" text="🪑 Mesas (12) y Pedidos Multicanal">
+                        <Tab fx:id="tabMesas" text="Mesas (12) y Pedidos Multicanal">
                             <content>
                                 <VBox spacing="14.0" styleClass="pos-catalog-panel">
                                     <children>
@@ -238,7 +260,9 @@
                                                 <Label styleClass="text-h3" text="Salón Principal (12 Mesas) y Pedidos Multicanal" />
                                                 <Label fx:id="lblResumenMesasPos" styleClass="badge-pill-accent" text="0 Ocupadas · 12 Libres" />
                                                 <Region HBox.hgrow="ALWAYS" />
-                                                <Button fx:id="btnRefrescarMesasPos" mnemonicParsing="false" onAction="#handleRefrescarMesasPos" styleClass="btn-secondary" text="🔄 Actualizar" />
+                                                <Button fx:id="btnRefrescarMesasPos" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleRefrescarMesasPos" styleClass="btn-secondary" text="Actualizar">
+                                                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+                                                </Button>
                                             </children>
                                         </HBox>
 

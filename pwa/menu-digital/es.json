@@ -1,0 +1,27 @@
+{
+  "lang": "es",
+  "pageTitle": "FoodCore Gastronomía · Menú Digital",
+  "subtitle": "Carta Gastronómica Oficial · Actualizada en Tiempo Real",
+  "badgeLive": "● Disponible para Pedidos",
+  "heroKicker": "EXPERIENCIA CULINARIA EN VIVO",
+  "heroTitle": "Sabores Artesanales a la Parrilla",
+  "cardAction": "Especialidad",
+  "summaryLabel": "Total estimado",
+  "resetLabel": "Limpiar",
+  "itemSingular": "ítem",
+  "itemPlural": "ítems",
+  "footerText": "FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados",
+  "categories": {
+    "Todos": "Todos",
+    "Hamburguesas": "Hamburguesas",
+    "Alitas & Pollo": "Alitas & Pollo",
+    "Bebidas": "Bebidas",
+    "Guarniciones": "Guarniciones",
+    "Especialidades": "Especialidades"
+  },
+  "sizes": {
+    "Regular": "Regular",
+    "Grande": "Grande (+S/ 5)",
+    "Doble": "Doble (+S/ 9)"
+  }
+}

@@ -10,11 +10,13 @@ import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -246,35 +248,42 @@ public class KioscoController {
                 continue;
             }
 
-            VBox card = new VBox(8.0);
-            card.setPrefSize(180, 160);
-            card.setStyle("-fx-background-color: white; -fx-padding: 12; -fx-background-radius: 12; -fx-border-color: #E2E8F0; -fx-border-radius: 12;");
+            HBox card = new HBox(16.0);
+            card.setAlignment(Pos.CENTER_LEFT);
+            card.setMinWidth(300.0);
+            card.setPrefWidth(320.0);
+            card.getStyleClass().add("card");
+            card.setPadding(new Insets(16.0));
+
+            VBox infoBox = new VBox(4.0);
+            infoBox.setMinWidth(0.0);
+            infoBox.setPrefWidth(150.0);
+            infoBox.setAlignment(Pos.CENTER_LEFT);
+            HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             Label lblNom = new Label(p.getNombre());
+            lblNom.setMinWidth(0.0);
             lblNom.setWrapText(true);
-            lblNom.setStyle("-fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #1E293B;");
+            lblNom.getStyleClass().add("h3");
 
             Label lblDesc = new Label(p.getDescripcion() != null && !p.getDescripcion().isBlank() ? p.getDescripcion() : "Especialidad de la casa");
+            lblDesc.setMinWidth(0.0);
             lblDesc.setWrapText(true);
-            lblDesc.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
-            VBox.setVgrow(lblDesc, Priority.ALWAYS);
-
-            HBox footer = new HBox(8.0);
-            footer.setAlignment(Pos.CENTER_LEFT);
+            lblDesc.getStyleClass().add("text-secondary");
 
             Label lblPrecio = new Label("S/ " + p.getPrecioVenta());
-            lblPrecio.setStyle("-fx-font-weight: 800; -fx-font-size: 14px; -fx-text-fill: #FF5A1F; -fx-font-family: monospace;");
-            Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS);
+            lblPrecio.getStyleClass().add("price");
+
+            infoBox.getChildren().addAll(lblNom, lblDesc, lblPrecio);
 
             Button btnAdd = new Button("+ Agregar");
+            btnAdd.setMinWidth(Region.USE_PREF_SIZE);
             btnAdd.getStyleClass().add("btn-primary");
-            btnAdd.setStyle("-fx-font-size: 11px; -fx-padding: 5 10 5 10;");
+            btnAdd.setGraphicTextGap(8.0);
             AnimationUtils.attachTactileFeedback(btnAdd);
             btnAdd.setOnAction(e -> agregarAlCarrito(p));
 
-            footer.getChildren().addAll(lblPrecio, spacer, btnAdd);
-            card.getChildren().addAll(lblNom, lblDesc, footer);
+            card.getChildren().addAll(infoBox, btnAdd);
             flowProductosKiosco.getChildren().add(card);
         }
     }
@@ -391,13 +400,14 @@ public class KioscoController {
                 }
                 LOGGER.log(Level.INFO, "Ticket emitido exitosamente para turno #{0}. Orden despachada a cocina.", turnoPedido);
 
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("FoodCore Kiosco · Pedido Confirmado");
-                alert.setHeaderText("¡Su orden ha sido enviada a Cocina!");
-                alert.setContentText("TURNO ASIGNADO: #T-" + turnoPedido + "\n\n"
-                        + "Total Pagado: S/ " + totalFinal + "\n"
-                        + "Su ticket térmico se está imprimiendo en la bandeja inferior.\n"
-                        + "Por favor tome su ticket y espere su turno en pantalla.");
+                Alert alert = DialogService.crearAlerta(
+                        Alert.AlertType.INFORMATION,
+                        "FoodCore Kiosco · Pedido Confirmado",
+                        "¡Su orden ha sido enviada a Cocina!",
+                        "TURNO ASIGNADO: #T-" + turnoPedido + "\n\n"
+                                + "Total Pagado: S/ " + totalFinal + "\n"
+                                + "Su ticket térmico se está imprimiendo en la bandeja inferior.\n"
+                                + "Por favor tome su ticket y espere su turno en pantalla.");
                 alert.showAndWait();
 
                 carritoItems.clear();

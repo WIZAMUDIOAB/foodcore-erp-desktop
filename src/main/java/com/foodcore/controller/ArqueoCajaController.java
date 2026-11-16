@@ -10,6 +10,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -17,7 +18,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -395,26 +395,9 @@ public class ArqueoCajaController {
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(12);
-        card.setMaxWidth(440);
-        card.setMaxHeight(410);
-        card.getStyleClass().add("modal-dialog-surface");
-
-        Label lblTitle = new Label("Registrar Gasto Operativo");
-        lblTitle.getStyleClass().add("text-h1");
-
-        Label lblSub = new Label("Salida de efectivo categorizada para Cierre Z y Estado de Resultados (P&L).");
-        lblSub.getStyleClass().add("text-body-secondary");
-        lblSub.setWrapText(true);
-
-        Label lblCat = new Label("Categoría de gasto");
-        lblCat.getStyleClass().add("text-body-strong");
-
         ComboBox<CategoriaGasto> cbCategoriaGasto = new ComboBox<>(FXCollections.observableArrayList(categorias));
         cbCategoriaGasto.setId("cbCategoriaGasto");
         cbCategoriaGasto.setPromptText("Seleccione categoría (ej. Pago de Luz)");
-        cbCategoriaGasto.setMaxWidth(Double.MAX_VALUE);
-        cbCategoriaGasto.getStyleClass().add("form-combo-box");
         cbCategoriaGasto.setCellFactory(lv -> new ListCell<>() {
             @Override
             protected void updateItem(CategoriaGasto item, boolean empty) {
@@ -432,21 +415,17 @@ public class ArqueoCajaController {
 
         TextField txtMontoGasto = new TextField();
         txtMontoGasto.setId("txtMontoGasto");
-        txtMontoGasto.setPromptText("Monto en S/ (ej. 180.00)");
-        txtMontoGasto.getStyleClass().add("input-field");
+        txtMontoGasto.setPromptText("Ej. 180.00");
 
         TextField txtConceptoGasto = new TextField();
         txtConceptoGasto.setId("txtConceptoGasto");
-        txtConceptoGasto.setPromptText("Motivo / Nro. recibo (ej. Recibo Luz Enel Noviembre)");
-        txtConceptoGasto.getStyleClass().add("input-field");
+        txtConceptoGasto.setPromptText("Ej. Recibo Luz Enel Noviembre");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootCajaStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Registrar Egreso");
         btnGuardar.setId("btnConfirmarRegistroGasto");
-        btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             try {
                 CategoriaGasto seleccionada = cbCategoriaGasto.getValue();
@@ -474,13 +453,21 @@ public class ArqueoCajaController {
             }
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnGuardar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        card.getChildren().addAll(lblTitle, lblSub, lblCat, cbCategoriaGasto, txtMontoGasto, txtConceptoGasto, actions);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnGuardar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Registrar Gasto Operativo",
+                "Salida de efectivo categorizada para Cierre Z y Estado de Resultados (P&L).",
+                List.of(
+                        DialogService.construirCampoModal("Categoría de gasto", cbCategoriaGasto),
+                        DialogService.construirCampoModal("Monto del egreso (S/)", txtMontoGasto),
+                        DialogService.construirCampoModal("Motivo / Nro. recibo", txtConceptoGasto)),
+                footer);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);
+        rootCajaStack.applyCss();
+        rootCajaStack.layout();
     }
 
     @FXML
@@ -553,19 +540,6 @@ public class ArqueoCajaController {
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(14);
-        card.setMaxWidth(480);
-        card.setMaxHeight(340);
-        card.getStyleClass().add("modal-dialog-surface");
-
-        Label lblTitle = new Label("Confirmar Cierre de Turno y Relevo");
-        lblTitle.getStyleClass().add("text-h1");
-
-        Label lblSub = new Label("Se emitirá el Cierre Z para " + cajaActual.getNombreCaja()
-            + " con efectivo S/ " + fisico + " (Diferencia: S/ " + dif + ").");
-        lblSub.getStyleClass().add("text-body-secondary");
-        lblSub.setWrapText(true);
-
         Label lblAlertaInv = new Label(itemsStockCritico.isEmpty()
             ? "Inventario OK: sin insumos agotados ni en stock mínimo. Se generará Acta de Entrega PDF."
             : String.format("Alerta de relevo: %d insumo(s) agotado(s) y %d en mínimo se incluirán en el Acta PDF.",
@@ -574,27 +548,32 @@ public class ArqueoCajaController {
         lblAlertaInv.setWrapText(true);
 
         TextField txtRelevo = new TextField();
-        txtRelevo.setPromptText("Nombre del cajero entrante (relevo opcional)");
-        txtRelevo.getStyleClass().add("input-field");
+        txtRelevo.setPromptText("Ej. María Cajera");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootCajaStack.getChildren().remove(backdrop));
 
         Button btnConfirmar = new Button("Confirmar Cierre Z y Generar Acta PDF");
-        btnConfirmar.getStyleClass().add("btn-primary");
         btnConfirmar.setOnAction(ev -> {
             rootCajaStack.getChildren().remove(backdrop);
             ejecutarCierreEfectivo(fisico, txtRelevo.getText());
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnConfirmar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        card.getChildren().addAll(lblTitle, lblSub, lblAlertaInv, txtRelevo, actions);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnConfirmar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Confirmar Cierre de Turno y Relevo",
+                "Se emitirá el Cierre Z para " + cajaActual.getNombreCaja()
+                        + " con efectivo S/ " + fisico + " (Diferencia: S/ " + dif + ").",
+                List.of(
+                        lblAlertaInv,
+                        DialogService.construirCampoModal("Nombre del cajero entrante (relevo opcional)", txtRelevo)),
+                footer);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootCajaStack.getChildren().add(backdrop);
+        rootCajaStack.applyCss();
+        rootCajaStack.layout();
     }
 
     private void ejecutarCierreEfectivo(BigDecimal fisico, String responsableEntrante) {

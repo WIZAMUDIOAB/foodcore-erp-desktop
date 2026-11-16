@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.prefs.Preferences;
 
 /**
  * Punto de entrada principal para el ERP de Escritorio FoodCore v1.1.
@@ -34,8 +35,10 @@ import java.util.logging.Logger;
 public class App extends Application {
 
     private static final Logger LOGGER = Logger.getLogger(App.class.getName());
+    private static final String PREF_KEY_DARK_MODE = "foodcore.ui.darkMode";
     private static final AtomicBoolean SHUTDOWN_HOOK_REGISTRADO = new AtomicBoolean(false);
     private static Stage primaryStage;
+    private static volatile boolean darkModeActivo = leerPreferenciaModoOscuro();
 
     @Override
     public void start(Stage stage) {
@@ -199,7 +202,8 @@ public class App extends Application {
     }
 
     /**
-     * Extiende PrimerLight cargando foodcore.css después del tema base (§12.1).
+     * Extiende PrimerLight cargando foodcore.css después del tema base (§12.1)
+     * y opcionalmente dark-theme.css cuando el Modo Oscuro está habilitado (Sub-Fase D - D4).
      */
     public static void applyStylesheets(Scene scene) {
         if (scene == null) {
@@ -211,6 +215,77 @@ public class App extends Application {
             if (!scene.getStylesheets().contains(url)) {
                 scene.getStylesheets().add(url);
             }
+        }
+        aplicarModoOscuro(scene, darkModeActivo);
+    }
+
+    /**
+     * Activa o desactiva {@code /css/dark-theme.css} sobre la escena indicada (D4).
+     */
+    public static void aplicarModoOscuro(Scene scene, boolean activo) {
+        if (scene == null) {
+            return;
+        }
+        URL darkCss = App.class.getResource("/css/dark-theme.css");
+        if (darkCss == null) {
+            return;
+        }
+        String darkUrl = darkCss.toExternalForm();
+        actualizarStylesheetEnLista(scene.getStylesheets(), darkUrl, activo);
+        if (scene.getRoot() != null) {
+            actualizarDarkModeEnNodos(scene.getRoot(), darkUrl, activo, true);
+        }
+    }
+
+    private static void actualizarStylesheetEnLista(
+            javafx.collections.ObservableList<String> stylesheets, String darkUrl, boolean activo) {
+        if (activo) {
+            if (!stylesheets.contains(darkUrl)) {
+                stylesheets.add(darkUrl);
+            }
+        } else {
+            stylesheets.remove(darkUrl);
+        }
+    }
+
+    private static void actualizarDarkModeEnNodos(
+            Parent parent, String darkUrl, boolean activo, boolean esRaizEscena) {
+        if (!parent.getStylesheets().isEmpty() || esRaizEscena) {
+            actualizarStylesheetEnLista(parent.getStylesheets(), darkUrl, activo);
+        }
+        if (parent instanceof javafx.scene.control.ScrollPane sp && sp.getContent() instanceof Parent content) {
+            actualizarDarkModeEnNodos(content, darkUrl, activo, false);
+        }
+        for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+            if (child instanceof Parent childParent) {
+                actualizarDarkModeEnNodos(childParent, darkUrl, activo, false);
+            }
+        }
+    }
+
+    public static boolean isDarkModeActivo() {
+        return darkModeActivo;
+    }
+
+    public static void setDarkModeActivo(boolean activo) {
+        darkModeActivo = activo;
+        guardarPreferenciaModoOscuro(activo);
+    }
+
+    private static boolean leerPreferenciaModoOscuro() {
+        try {
+            return Preferences.userNodeForPackage(App.class).getBoolean(PREF_KEY_DARK_MODE, false);
+        } catch (SecurityException ex) {
+            LOGGER.log(Level.FINE, "No se pudo leer preferencia de modo oscuro", ex);
+            return false;
+        }
+    }
+
+    private static void guardarPreferenciaModoOscuro(boolean activo) {
+        try {
+            Preferences.userNodeForPackage(App.class).putBoolean(PREF_KEY_DARK_MODE, activo);
+        } catch (SecurityException ex) {
+            LOGGER.log(Level.FINE, "No se pudo persistir preferencia de modo oscuro", ex);
         }
     }
 

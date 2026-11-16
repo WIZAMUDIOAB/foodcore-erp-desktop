@@ -33,6 +33,7 @@ import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ConfiguracionFidelizacion;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -55,7 +56,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
@@ -68,7 +68,6 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -857,61 +856,65 @@ public class VentaController {
                 || (p.getCodigo() != null && p.getCodigo().toLowerCase().contains(filtroTexto));
 
             if (coincideCategoria && coincideTexto) {
-                Button btn = new Button();
-                btn.setId("btnProd_" + p.getIdProducto());
-                btn.setPrefSize(162, 114);
-                btn.setMinHeight(112);
-                btn.getStyleClass().add("pos-menu-tile");
+                HBox card = new HBox(16.0);
+                card.setId("btnProd_" + p.getIdProducto());
+                card.setAlignment(Pos.CENTER_LEFT);
+                card.setMinWidth(295.0);
+                card.setPrefWidth(310.0);
+                card.getStyleClass().addAll("card", "pos-menu-tile");
+                card.setPadding(new Insets(16.0));
 
-                VBox content = new VBox(3.0);
-                content.setAlignment(Pos.TOP_LEFT);
-                content.setPrefWidth(134);
-                content.setMinHeight(86);
+                VBox content = new VBox(4.0);
+                content.setMinWidth(0.0);
+                content.setPrefWidth(150.0);
+                content.setAlignment(Pos.CENTER_LEFT);
+                HBox.setHgrow(content, Priority.ALWAYS);
 
-                Label lblNombre = new Label(p.getNombre());
-                lblNombre.setWrapText(true);
-                lblNombre.getStyleClass().add("text-body-strong");
-
-                // §2.2: Si el ítem tiene foto en imagen_url, mostrarla en la tarjeta en lugar del placeholder de texto SKU
                 ImageView fotoView = crearThumbnailSiExiste(p.getImagenUrl());
                 if (fotoView != null) {
-                    content.getChildren().addAll(fotoView, lblNombre);
-                } else {
-                    Label lblCodigo = new Label(p.getCodigo() != null ? p.getCodigo() : "SKU");
-                    lblCodigo.getStyleClass().add("text-caption-muted");
-                    content.getChildren().addAll(lblNombre, lblCodigo);
+                    content.getChildren().add(fotoView);
                 }
 
+                Label lblNombre = new Label(p.getNombre());
+                lblNombre.setMinWidth(0.0);
+                lblNombre.setWrapText(true);
+                lblNombre.getStyleClass().add("h3");
+
+                String descTexto;
                 if (p.isEsCombo()) {
-                    Label lblComboBadge = new Label("COMBO");
-                    lblComboBadge.setStyle("-fx-background-color: #EEF2FF; -fx-text-fill: #4338CA; "
-                            + "-fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2 7; "
-                            + "-fx-background-radius: 6; -fx-border-color: #A5B4FC; -fx-border-radius: 6;");
-                    content.getChildren().add(lblComboBadge);
+                    descTexto = "COMBO · " + (p.getCodigo() != null ? p.getCodigo() : "Paquete");
                 } else if (p.tieneOpcionesPersonalizacion()) {
-                    Label lblOpciones = new Label(FormatoPersonalizacionUtil.construirResumenOpciones(p));
-                    lblOpciones.setStyle("-fx-background-color: #FFF4EC; -fx-text-fill: #C2410C; "
-                            + "-fx-font-size: 10px; -fx-font-weight: 700; -fx-padding: 2 6; "
-                            + "-fx-background-radius: 6; -fx-border-color: #FDBA74; -fx-border-radius: 6;");
-                    content.getChildren().add(lblOpciones);
+                    descTexto = FormatoPersonalizacionUtil.construirResumenOpciones(p);
+                } else if (p.getDescripcion() != null && !p.getDescripcion().isBlank()) {
+                    descTexto = p.getDescripcion();
+                } else {
+                    descTexto = p.getCodigo() != null ? p.getCodigo() : "Platillo";
                 }
-
-                Region spacer = new Region();
-                VBox.setVgrow(spacer, Priority.ALWAYS);
+                Label lblDesc = new Label(descTexto);
+                lblDesc.setMinWidth(0.0);
+                lblDesc.setWrapText(true);
+                lblDesc.getStyleClass().add("text-secondary");
 
                 Label lblPrecio = new Label("S/ " + p.getPrecioVenta());
-                lblPrecio.getStyleClass().add("text-mono-accent");
+                lblPrecio.setMinWidth(Region.USE_PREF_SIZE);
+                lblPrecio.getStyleClass().add("price");
 
-                HBox priceRow = new HBox(lblPrecio);
-                priceRow.setAlignment(Pos.BOTTOM_RIGHT);
+                content.getChildren().addAll(lblNombre, lblDesc, lblPrecio);
 
-                content.getChildren().addAll(spacer, priceRow);
-                btn.setGraphic(content);
-                btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                Button btnAdd = new Button("+ Agregar");
+                btnAdd.setMinWidth(Region.USE_PREF_SIZE);
+                btnAdd.getStyleClass().add("btn-primary");
+                btnAdd.setGraphicTextGap(8.0);
+                AnimationUtils.attachTactileFeedback(btnAdd);
+                btnAdd.setOnAction(e -> {
+                    e.consume();
+                    agregarProductoAVenta(p);
+                });
 
-                AnimationUtils.attachTactileFeedback(btn);
-                btn.setOnAction(e -> agregarProductoAVenta(p));
-                tileProductos.getChildren().add(btn);
+                card.getChildren().addAll(content, btnAdd);
+                AnimationUtils.attachTactileFeedback(card);
+                card.setOnMouseClicked(e -> agregarProductoAVenta(p));
+                tileProductos.getChildren().add(card);
             }
         }
     }
@@ -1160,16 +1163,15 @@ public class VentaController {
             mostrarAlerta("Atención", "Agregue ítems a la orden antes de dividir la cuenta.", Alert.AlertType.WARNING);
             return;
         }
-        ChoiceDialog<String> dlg = new ChoiceDialog<>(
-            "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
-            "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
-            "Dividir en 4 partes iguales (25% c/u)",
-            "Dividir por ítems (Subcuenta A y Subcuenta B)"
-        );
-        dlg.setTitle("División de Cuenta (Split)");
-        dlg.setHeaderText("Seleccione la modalidad de división de cuenta");
-        dlg.setContentText("Modalidad:");
-        Optional<String> res = dlg.showAndWait();
+        Optional<String> res = DialogService.crearChoiceDialog(
+                "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
+                List.of(
+                        "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
+                        "Dividir en 4 partes iguales (25% c/u)",
+                        "Dividir por ítems (Subcuenta A y Subcuenta B)"),
+                "División de Cuenta (Split)",
+                "Seleccione la modalidad de división de cuenta",
+                "Modalidad:").showAndWait();
         if (res.isPresent()) {
             try {
                 BigDecimal totalNeto = obtenerTotalNetoActual();
@@ -1227,11 +1229,12 @@ public class VentaController {
             mostrarAlerta("Atención", "Agregue productos antes de aplicar un descuento.", Alert.AlertType.WARNING);
             return;
         }
-        ChoiceDialog<String> dlg = new ChoiceDialog<>("10%", "10%", "20%", "Monto fijo S/ 5.00");
-        dlg.setTitle("Aplicar Descuento Autorizado");
-        dlg.setHeaderText("Requiere permiso VENTA_DESCUENTO (Solo Administrador/Supervisor)");
-        dlg.setContentText("Seleccione el descuento:");
-        Optional<String> opt = dlg.showAndWait();
+        Optional<String> opt = DialogService.crearChoiceDialog(
+                "10%",
+                List.of("10%", "20%", "Monto fijo S/ 5.00"),
+                "Aplicar Descuento Autorizado",
+                "Requiere permiso VENTA_DESCUENTO (Solo Administrador/Supervisor)",
+                "Seleccione el descuento:").showAndWait();
         if (opt.isPresent()) {
             try {
                 String sel = opt.get();
@@ -1275,35 +1278,29 @@ public class VentaController {
 
     /** Construye el modal de Modo Supervisor sin bloquear el hilo UI para uso interactivo y pruebas FX. */
     public ModalModoSupervisorHandle construirModalModoSupervisor(int idVentaPrellenado) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Modo Supervisor — Autorización de Anulación");
-        dialog.setHeaderText(null);
+        Dialog<ButtonType> dialog = DialogService.crearDialogo(
+                "Modo Supervisor — Autorización de Anulación",
+                null);
         dialog.initModality(Modality.APPLICATION_MODAL);
 
-        VBox root = new VBox(12);
-        root.setPadding(new Insets(18));
-        root.setPrefWidth(430);
-        root.setStyle("-fx-background-color: #FFFFFF;");
+        VBox root = new VBox(16);
+        root.setPadding(new Insets(16, 20, 16, 20));
+        root.setPrefWidth(460);
 
         Label badge = new Label("AUTORIZACIÓN DE SUPERVISOR / ADMIN REQUERIDA");
-        badge.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #92400E; "
-                + "-fx-font-weight: bold; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 6;");
+        badge.getStyleClass().add("badge-pill-warning");
 
         Label lblSub = new Label("Su rol actual no tiene permiso directo para anular ventas. "
                 + "Solicite a un Supervisor o Administrador ingresar su PIN para autorizar y auditar la operación.");
         lblSub.setWrapText(true);
-        lblSub.setStyle("-fx-text-fill: #4B5563; -fx-font-size: 12px;");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
+        lblSub.getStyleClass().add("text-secondary");
 
         TextField txtId = new TextField(idVentaPrellenado > 0 ? String.valueOf(idVentaPrellenado) : "");
         txtId.setPromptText("Ej. 1024");
         txtId.setId("txtIdVentaSupervisor");
 
         PasswordField txtPin = new PasswordField();
-        txtPin.setPromptText("PIN secreto de SUPERVISOR / ADMIN");
+        txtPin.setPromptText("PIN secreto");
         txtPin.setId("txtPinSupervisor");
 
         TextField txtMotivo = new TextField();
@@ -1312,17 +1309,14 @@ public class VentaController {
 
         CheckBox chkMerma = new CheckBox("Plato ya preparado en cocina (registrar MERMA)");
 
-        grid.add(new Label("ID de Venta:"), 0, 0);
-        grid.add(txtId, 1, 0);
-        grid.add(new Label("PIN Supervisor:"), 0, 1);
-        grid.add(txtPin, 1, 1);
-        grid.add(new Label("Motivo:"), 0, 2);
-        grid.add(txtMotivo, 1, 2);
-        GridPane.setHgrow(txtId, Priority.ALWAYS);
-        GridPane.setHgrow(txtPin, Priority.ALWAYS);
-        GridPane.setHgrow(txtMotivo, Priority.ALWAYS);
-
-        root.getChildren().addAll(badge, lblSub, grid, chkMerma);
+        root.getChildren().addAll(
+                badge,
+                lblSub,
+                DialogService.construirFilaDobleModal(
+                        DialogService.construirCampoModal("ID de Venta:", txtId),
+                        DialogService.construirCampoModal("PIN Supervisor:", txtPin)),
+                DialogService.construirCampoModal("Motivo:", txtMotivo),
+                chkMerma);
 
         ButtonType btnConfirmar = new ButtonType("Autorizar y Anular Venta", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().setContent(root);
@@ -1368,11 +1362,11 @@ public class VentaController {
             }
             return;
         }
-        TextInputDialog dlg = new TextInputDialog();
-        dlg.setTitle("Anular Venta Registrada");
-        dlg.setHeaderText("Requiere permiso VENTA_ANULAR");
-        dlg.setContentText("Ingrese el ID de la venta a anular:");
-        Optional<String> opt = dlg.showAndWait();
+        Optional<String> opt = DialogService.crearTextInputDialog(
+                "",
+                "Anular Venta Registrada",
+                "Requiere permiso VENTA_ANULAR",
+                "Ingrese el ID de la venta a anular:").showAndWait();
         if (opt.isPresent() && !opt.get().isBlank()) {
             try {
                 int idVenta = Integer.parseInt(opt.get().trim());
@@ -1397,9 +1391,11 @@ public class VentaController {
             recalcularTotales();
             return;
         }
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "¿Desea limpiar los ítems de la venta actual?", ButtonType.YES, ButtonType.NO);
-        confirm.setTitle("Confirmar limpieza (Esc)");
-        confirm.setHeaderText(null);
+        Alert confirm = DialogService.crearAlerta(
+                Alert.AlertType.CONFIRMATION,
+                "Confirmar limpieza (Esc)",
+                "¿Desea limpiar los ítems de la venta actual?",
+                ButtonType.YES, ButtonType.NO);
         Optional<ButtonType> res = confirm.showAndWait();
         if (res.isPresent() && res.get() == ButtonType.YES) {
             itemsVenta.clear();
@@ -1725,11 +1721,7 @@ public class VentaController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert alert = new Alert(tipo);
-        alert.setTitle(titulo);
-        alert.setHeaderText(null);
-        alert.setContentText(mensaje);
-        alert.showAndWait();
+        DialogService.mostrarAlerta(tipo, titulo, mensaje);
     }
 
     @FXML
@@ -1785,11 +1777,11 @@ public class VentaController {
             return;
         }
 
-        TextInputDialog dialog = new TextInputDialog(sel.getNotasPreparacion() != null ? sel.getNotasPreparacion() : "");
-        dialog.setTitle("Indicación de Cocina");
-        dialog.setHeaderText("Nota para: " + sel.getNombreProducto());
-        dialog.setContentText("Indicación especial (ej. sin cebolla, término medio):");
-        dialog.showAndWait().ifPresent(nota -> {
+        DialogService.crearTextInputDialog(
+                sel.getNotasPreparacion() != null ? sel.getNotasPreparacion() : "",
+                "Indicación de Cocina",
+                "Nota para: " + sel.getNombreProducto(),
+                "Indicación especial (ej. sin cebolla, término medio):").showAndWait().ifPresent(nota -> {
             sel.setNotasPreparacion(nota);
             tblDetalle.refresh();
         });
@@ -1815,10 +1807,11 @@ public class VentaController {
                 if (cli != null) {
                     asociarClientePos(cli, null);
                 } else {
-                    Alert noEncontrado = new Alert(Alert.AlertType.CONFIRMATION);
-                    noEncontrado.setTitle("Cliente no encontrado");
-                    noEncontrado.setHeaderText("No existe cliente con DNI o teléfono \"" + criterio + "\"");
-                    noEncontrado.setContentText("¿Desea registrar rápidamente un cliente minorista (Nombre y DNI)?");
+                    Alert noEncontrado = DialogService.crearAlerta(
+                            Alert.AlertType.CONFIRMATION,
+                            "Cliente no encontrado",
+                            "No existe cliente con DNI o teléfono \"" + criterio + "\"",
+                            "¿Desea registrar rápidamente un cliente minorista (Nombre y DNI)?");
                     Optional<ButtonType> r = noEncontrado.showAndWait();
                     if (r.isPresent() && r.get() == ButtonType.OK) {
                         abrirDialogoRegistroRapidoCliente(criterio);
@@ -1843,16 +1836,11 @@ public class VentaController {
     }
 
     private void abrirDialogoRegistroRapidoCliente(String prefill) {
-        Dialog<Cliente> dialog = new Dialog<>();
-        dialog.setTitle("Registro Rápido Cliente Minorista (POS)");
-        dialog.setHeaderText("Asociar cliente por DNI para acumulación y canje de puntos");
+        Dialog<Cliente> dialog = DialogService.crearDialogo(
+                "Registro Rápido Cliente Minorista (POS)",
+                "Asociar cliente por DNI para acumulación y canje de puntos");
         ButtonType btnRegistrar = new ButtonType("Registrar y Asociar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(btnRegistrar, ButtonType.CANCEL);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(16, 16, 8, 16));
 
         TextField txtDni = new TextField(prefill != null && prefill.matches("\\d{8}") ? prefill : "");
         txtDni.setPromptText("8 dígitos (ej. 70112233)");
@@ -1863,15 +1851,16 @@ public class VentaController {
         DatePicker dpNacimiento = new DatePicker();
         dpNacimiento.setPromptText("Opcional (cumpleaños)");
 
-        grid.add(new Label("DNI *:"), 0, 0);
-        grid.add(txtDni, 1, 0);
-        grid.add(new Label("Nombre Completo *:"), 0, 1);
-        grid.add(txtNombre, 1, 1);
-        grid.add(new Label("Teléfono:"), 0, 2);
-        grid.add(txtTel, 1, 2);
-        grid.add(new Label("Fecha Nacimiento:"), 0, 3);
-        grid.add(dpNacimiento, 1, 3);
-        dialog.getDialogPane().setContent(grid);
+        VBox form = new VBox(16.0);
+        form.setPadding(new Insets(16, 24, 24, 24));
+        form.setPrefWidth(460.0);
+        form.getChildren().addAll(
+                DialogService.construirFilaDobleModal(
+                        DialogService.construirCampoModal("DNI *:", txtDni),
+                        DialogService.construirCampoModal("Teléfono:", txtTel)),
+                DialogService.construirCampoModal("Nombre Completo *:", txtNombre),
+                DialogService.construirCampoModal("Fecha Nacimiento:", dpNacimiento));
+        dialog.getDialogPane().setContent(form);
 
         dialog.setResultConverter(btn -> {
             if (btn != btnRegistrar) {
@@ -2009,8 +1998,11 @@ public class VentaController {
             }
             Boolean decision = confirmarCumpleanosOverride != null ? confirmarCumpleanosOverride : respuestaAutomaticaCumpleanosTest;
             if (decision == null && !itemsVenta.isEmpty()) {
-                Alert alertCumple = new Alert(Alert.AlertType.CONFIRMATION, msg, ButtonType.YES, ButtonType.NO);
-                alertCumple.setTitle("Cupón de Cumpleaños");
+                Alert alertCumple = DialogService.crearAlerta(
+                        Alert.AlertType.CONFIRMATION,
+                        "Cupón de Cumpleaños",
+                        msg,
+                        ButtonType.YES, ButtonType.NO);
                 alertCumple.setHeaderText("Cliente de Cumpleaños");
                 Optional<ButtonType> opt = alertCumple.showAndWait();
                 if (opt.isPresent() && opt.get() == ButtonType.YES) {
@@ -2081,11 +2073,12 @@ public class VentaController {
             BigDecimal desc = check.descuentoPorBloqueSoles().multiply(BigDecimal.valueOf(b)).setScale(2, RoundingMode.HALF_UP);
             opciones.add(b + " bloque(s): " + pts + " pts -> -S/ " + desc);
         }
-        ChoiceDialog<String> dlg = new ChoiceDialog<>(opciones.get(0), opciones);
-        dlg.setTitle("Canjear Puntos de Fidelización");
-        dlg.setHeaderText(clienteSeleccionadoPos.getRazonSocial() + " · Saldo: " + clienteSeleccionadoPos.getPuntosAcumulados() + " pts");
-        dlg.setContentText("Seleccione el canje (no altera IGV):");
-        Optional<String> sel = dlg.showAndWait();
+        Optional<String> sel = DialogService.crearChoiceDialog(
+                opciones.get(0),
+                opciones,
+                "Canjear Puntos de Fidelización",
+                clienteSeleccionadoPos.getRazonSocial() + " · Saldo: " + clienteSeleccionadoPos.getPuntosAcumulados() + " pts",
+                "Seleccione el canje (no altera IGV):").showAndWait();
         if (sel.isPresent()) {
             int idx = Math.max(0, opciones.indexOf(sel.get()));
             aplicarCanjePuntosPos(idx + 1);
@@ -2173,11 +2166,11 @@ public class VentaController {
         String inicial = clienteSeleccionadoPos != null
                 ? clienteSeleccionadoPos.getNumeroDocumento()
                 : (txtBuscarClientePos != null && !txtBuscarClientePos.getText().isBlank() ? txtBuscarClientePos.getText().trim() : "71234567");
-        TextInputDialog dlg = new TextInputDialog(inicial);
-        dlg.setTitle("Programa de Fidelización");
-        dlg.setHeaderText("Búsqueda de Cliente por DNI / Teléfono / RUC");
-        dlg.setContentText("Ingrese DNI, Teléfono o RUC:");
-        Optional<String> res = dlg.showAndWait();
+        Optional<String> res = DialogService.crearTextInputDialog(
+                inicial,
+                "Programa de Fidelización",
+                "Búsqueda de Cliente por DNI / Teléfono / RUC",
+                "Ingrese DNI, Teléfono o RUC:").showAndWait();
         if (res.isPresent() && !res.get().isBlank()) {
             String doc = res.get().trim();
             UiAsyncExecutor.ejecutarAsync(

@@ -7,6 +7,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
 import com.foodcore.service.MantenimientoService;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -363,10 +364,6 @@ public class MantenimientoBDController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert a = new Alert(tipo);
-        a.setTitle(titulo);
-        a.setHeaderText(null);
-        a.setContentText(mensaje);
-        a.showAndWait();
+        DialogService.mostrarAlerta(tipo, titulo, mensaje);
     }
 }

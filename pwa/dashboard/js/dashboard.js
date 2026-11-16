@@ -5,6 +5,60 @@
 const FoodCoreDashboard = (() => {
   let chartInstance = null;
   let pollInterval = null;
+  let ultimosPuntosGrafico = [];
+  const THEME_STORAGE_KEY = 'fc_theme';
+
+  function resolverTemaInicial() {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'dark' || saved === 'light') {
+        return saved;
+      }
+    } catch (_e) {}
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function aplicarTemaDashboard(tema) {
+    const esOscuro = tema === 'dark';
+    document.documentElement.classList.toggle('dark', esOscuro);
+    document.documentElement.classList.toggle('light', !esOscuro);
+    document.documentElement.setAttribute('data-theme', esOscuro ? 'dark' : 'light');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
+    }
+    const btn = document.getElementById('btnThemeToggle');
+    if (btn) {
+      btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
+      btn.innerHTML = esOscuro
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    }
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch (_e) {}
+    aplicarTemaDashboard(next);
+    if (ultimosPuntosGrafico.length > 0) {
+      renderizarGrafico(ultimosPuntosGrafico);
+    }
+    return next;
+  }
+
+  function leerTokensGrafico() {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      brand: cs.getPropertyValue('--brand-primary').trim() || 'currentColor',
+      fillStart: cs.getPropertyValue('--brand-chart-fill-start').trim(),
+      fillEnd: cs.getPropertyValue('--brand-chart-fill-end').trim(),
+      grid: cs.getPropertyValue('--border-subtle').trim(),
+      tick: cs.getPropertyValue('--text-secondary').trim(),
+      muted: cs.getPropertyValue('--text-muted').trim()
+    };
+  }
 
   function getAuthHeaders(extra = {}) {
     const token = localStorage.getItem('fc_pwa_token');
@@ -70,6 +124,11 @@ const FoodCoreDashboard = (() => {
   }
 
   function init() {
+    aplicarTemaDashboard(resolverTemaInicial());
+    const btnTheme = document.getElementById('btnThemeToggle');
+    if (btnTheme) {
+      btnTheme.addEventListener('click', toggleTheme);
+    }
     registrarServiceWorker();
     configurarDrawer();
     configurarAuthModal();
@@ -223,11 +282,13 @@ const FoodCoreDashboard = (() => {
   }
 
   function renderizarGrafico(puntos) {
+    ultimosPuntosGrafico = Array.isArray(puntos) ? puntos : [];
     const canvas = document.getElementById('chartVentasHora');
     if (!canvas) return;
 
-    const labels = puntos.map((p) => p.hora);
-    const dataValues = puntos.map((p) => p.monto);
+    const tokens = leerTokensGrafico();
+    const labels = ultimosPuntosGrafico.map((p) => p.hora);
+    const dataValues = ultimosPuntosGrafico.map((p) => p.monto);
 
     // Si Chart.js está cargado (online), usar Chart.js
     if (typeof Chart !== 'undefined') {
@@ -236,9 +297,9 @@ const FoodCoreDashboard = (() => {
         chartInstance.destroy();
       }
 
-      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-      gradient.addColorStop(0, 'rgba(240, 90, 34, 0.35)');
-      gradient.addColorStop(1, 'rgba(240, 90, 34, 0.00)');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+      gradient.addColorStop(0, tokens.fillStart);
+      gradient.addColorStop(1, tokens.fillEnd);
 
       chartInstance = new Chart(ctx, {
         type: 'line',
@@ -247,12 +308,12 @@ const FoodCoreDashboard = (() => {
           datasets: [{
             label: 'Ventas (S/)',
             data: dataValues,
-            borderColor: '#F05A22',
+            borderColor: tokens.brand,
             backgroundColor: gradient,
             borderWidth: 3,
             fill: true,
-            tension: 0.4, // Suavizado Bézier
-            pointBackgroundColor: '#F05A22',
+            tension: 0.4,
+            pointBackgroundColor: tokens.brand,
             pointRadius: 4,
             pointHoverRadius: 6
           }]
@@ -266,14 +327,14 @@ const FoodCoreDashboard = (() => {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: '#6B7280', font: { family: 'Inter', size: 12 } }
+              ticks: { color: tokens.muted || tokens.tick, font: { family: 'Inter', size: 11 } }
             },
             y: {
               beginAtZero: true,
-              grid: { color: '#F3F4F6' },
+              grid: { color: tokens.grid },
               ticks: {
-                color: '#6B7280',
-                font: { family: 'Inter', size: 12 },
+                color: tokens.muted || tokens.tick,
+                font: { family: 'Inter', size: 11 },
                 callback: (v) => `S/${v}`
               }
             }
@@ -283,11 +344,11 @@ const FoodCoreDashboard = (() => {
       return;
     }
 
-    // Fallback nativo Canvas 2D Bézier si Chart.js CDN está offline
-    renderizarCanvasFallback(canvas, labels, dataValues);
+    // Fallback nativo Canvas 2D Bézier si Chart.js está offline
+    renderizarCanvasFallback(canvas, labels, dataValues, tokens);
   }
 
-  function renderizarCanvasFallback(canvas, labels, dataValues) {
+  function renderizarCanvasFallback(canvas, labels, dataValues, tokens = leerTokensGrafico()) {
     const ctx = canvas.getContext('2d');
     const w = canvas.parentElement.clientWidth || 340;
     const h = 220;
@@ -305,8 +366,8 @@ const FoodCoreDashboard = (() => {
 
     const maxVal = Math.max(...dataValues, 100);
 
-    // Fondo y líneas de guía
-    ctx.strokeStyle = '#F3F4F6';
+    // Líneas de guía horizontales
+    ctx.strokeStyle = tokens.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = padTop + (plotH / 4) * i;
@@ -316,7 +377,7 @@ const FoodCoreDashboard = (() => {
       ctx.stroke();
 
       const labelVal = Math.round(maxVal - (maxVal / 4) * i);
-      ctx.fillStyle = '#9CA3AF';
+      ctx.fillStyle = tokens.muted || tokens.tick;
       ctx.font = '11px Inter, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(`S/${labelVal}`, padLeft - 6, y + 4);
@@ -324,14 +385,14 @@ const FoodCoreDashboard = (() => {
 
     // Curva suavizada
     const points = dataValues.map((val, idx) => ({
-      x: padLeft + (plotW / (dataValues.length - 1)) * idx,
+      x: padLeft + (plotW / Math.max(1, dataValues.length - 1)) * idx,
       y: padTop + plotH - (val / maxVal) * plotH
     }));
 
-    // Relleno gradiente
+    // Relleno gradiente 20% a transparente
     const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
-    grad.addColorStop(0, 'rgba(240, 90, 34, 0.3)');
-    grad.addColorStop(1, 'rgba(240, 90, 34, 0.0)');
+    grad.addColorStop(0, tokens.fillStart);
+    grad.addColorStop(1, tokens.fillEnd);
 
     ctx.beginPath();
     ctx.moveTo(points[0].x, padTop + plotH);
@@ -347,7 +408,7 @@ const FoodCoreDashboard = (() => {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Línea principal
+    // Línea principal 3px en --brand-primary
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 0; i < points.length - 1; i++) {
@@ -356,7 +417,7 @@ const FoodCoreDashboard = (() => {
       ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
     }
     ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.strokeStyle = '#F05A22';
+    ctx.strokeStyle = tokens.brand;
     ctx.lineWidth = 3;
     ctx.stroke();
 
@@ -364,10 +425,10 @@ const FoodCoreDashboard = (() => {
     points.forEach((pt, idx) => {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#F05A22';
+      ctx.fillStyle = tokens.brand;
       ctx.fill();
 
-      ctx.fillStyle = '#6B7280';
+      ctx.fillStyle = tokens.tick;
       ctx.font = '11px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(labels[idx] || '', pt.x, h - 12);
@@ -460,6 +521,7 @@ const FoodCoreDashboard = (() => {
 
   return {
     init,
-    cargarDashboardData
+    cargarDashboardData,
+    toggleTheme
   };
 })();

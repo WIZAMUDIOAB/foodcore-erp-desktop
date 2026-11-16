@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.foodcore.model.Pedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -10,7 +11,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
@@ -197,29 +197,26 @@ public class DeliveryController {
 
     @FXML
     public void handleCrearDelivery(ActionEvent event) {
-        // Modal directo para registrar delivery desde la vista
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
-        VBox card = new VBox(12);
-        card.getStyleClass().add("modal-dialog-surface");
-        card.setMaxWidth(460);
 
-        Label lblTitle = new Label("Registrar Pedido Delivery Rápido");
-        lblTitle.getStyleClass().add("text-h2");
-
-        TextField txtNom = new TextField(); txtNom.setPromptText("Nombre Cliente (Ej. Lucia Ramos)"); txtNom.getStyleClass().add("input-field");
-        TextField txtTel = new TextField(); txtTel.setPromptText("Teléfono / WhatsApp (Ej. 981234567)"); txtTel.getStyleClass().add("input-field");
-        TextField txtDir = new TextField(); txtDir.setPromptText("Dirección (Ej. Calle Los Pinos 230)"); txtDir.getStyleClass().add("input-field");
-        TextField txtRef = new TextField(); txtRef.setPromptText("Referencia"); txtRef.getStyleClass().add("input-field");
-        TextField txtTotal = new TextField("38.50"); txtTotal.setPromptText("Total Pedido"); txtTotal.getStyleClass().add("input-field");
-        TextField txtEnvio = new TextField("5.00"); txtEnvio.setPromptText("Costo Envío (Sin IGV)"); txtEnvio.getStyleClass().add("input-field");
+        TextField txtNom = new TextField();
+        txtNom.setPromptText("Ej. Lucía Ramos");
+        TextField txtTel = new TextField();
+        txtTel.setPromptText("Ej. 981234567");
+        TextField txtDir = new TextField();
+        txtDir.setPromptText("Ej. Calle Los Pinos 230");
+        TextField txtRef = new TextField();
+        txtRef.setPromptText("Ej. Frente al parque");
+        TextField txtTotal = new TextField("38.50");
+        txtTotal.setPromptText("Total pedido");
+        TextField txtEnvio = new TextField("5.00");
+        txtEnvio.setPromptText("Costo envío (sin IGV)");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootDeliveryStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Confirmar y Enviar a Cocina");
-        btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             final BigDecimal envioVal;
             final BigDecimal totalVal;
@@ -239,9 +236,9 @@ public class DeliveryController {
                 () -> {
                     try (Connection conn = ConexionBD.getConnection();
                          PreparedStatement ps = conn.prepareStatement(
-                             "INSERT INTO pedido (id_usuario, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, " +
-                             "cliente_direccion, cliente_referencia, costo_envio, total, estado, idempotency_key) " +
-                             "VALUES (1, ?, 'DELIVERY', ?, ?, ?, ?, ?, ?, 'EN_COCINA', UUID())")) {
+                             "INSERT INTO pedido (id_usuario, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, "
+                             + "cliente_direccion, cliente_referencia, costo_envio, total, estado, idempotency_key) "
+                             + "VALUES (1, ?, 'DELIVERY', ?, ?, ?, ?, ?, ?, 'EN_COCINA', UUID())")) {
                         ps.setString(1, "DL-" + (System.currentTimeMillis() % 10000));
                         ps.setString(2, nombre);
                         ps.setString(3, tel);
@@ -265,13 +262,26 @@ public class DeliveryController {
             );
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnGuardar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        card.getChildren().addAll(lblTitle, txtNom, txtTel, txtDir, txtRef, txtTotal, txtEnvio, actions);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnGuardar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Registrar Pedido Delivery Rápido",
+                "Despacho directo a cocina y cola de repartidores.",
+                List.of(
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Nombre del Cliente", txtNom),
+                                DialogService.construirCampoModal("Teléfono / WhatsApp", txtTel)),
+                        DialogService.construirCampoModal("Dirección de Entrega", txtDir),
+                        DialogService.construirCampoModal("Referencia", txtRef),
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Total Pedido (S/)", txtTotal),
+                                DialogService.construirCampoModal("Costo Envío (Sin IGV)", txtEnvio))),
+                footer);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootDeliveryStack.getChildren().add(backdrop);
+        rootDeliveryStack.applyCss();
+        rootDeliveryStack.layout();
     }
 
     @FXML

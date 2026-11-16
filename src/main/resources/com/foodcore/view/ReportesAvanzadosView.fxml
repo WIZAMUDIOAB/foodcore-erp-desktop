@@ -133,7 +133,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-accent">
                                                     <children>
-                                                        <FontIcon iconColor="#F05A22" iconLiteral="fas-coins" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-dollar-sign" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -150,7 +150,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-blue">
                                                     <children>
-                                                        <FontIcon iconColor="#2563EB" iconLiteral="fas-chart-line" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-trending-up" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -167,7 +167,7 @@
                                                 <Region HBox.hgrow="ALWAYS" />
                                                 <StackPane styleClass="kpi-icon-circle-success">
                                                     <children>
-                                                        <FontIcon iconColor="#059669" iconLiteral="fas-trophy" iconSize="16" />
+                                                        <FontIcon iconLiteral="fth-award" iconSize="20" />
                                                     </children>
                                                 </StackPane>
                                             </children>
@@ -195,6 +195,15 @@
                                                     </children>
                                                 </HBox>
                                                 <TableView fx:id="tblResumenCohortes" prefHeight="250.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colSegNombre" prefWidth="245.0" text="Segmento" />
                                                         <TableColumn fx:id="colSegCantidad" prefWidth="85.0" text="Cant." />
@@ -211,6 +220,15 @@
                                             <children>
                                                 <Label styleClass="text-h3" text="Matriz de Cohortes Mensuales (% Retención)" />
                                                 <TableView fx:id="tblMatrizCohortes" prefHeight="250.0" VBox.vgrow="ALWAYS">
+                                                    <placeholder>
+                                                        <VBox alignment="CENTER" spacing="12.0">
+                                                            <children>
+                                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                                <Label styleClass="h3" text="No hay registros" />
+                                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                            </children>
+                                                        </VBox>
+                                                    </placeholder>
                                                     <columns>
                                                         <TableColumn fx:id="colCohorteMes" prefWidth="130.0" text="Cohorte" />
                                                         <TableColumn fx:id="colCohorteTamano" prefWidth="70.0" text="Tamaño" />
@@ -237,6 +255,15 @@
                                     <children>
                                         <Label fx:id="lblTituloTabla" styleClass="text-h3" text="Resultados Detallados" />
                                         <TableView fx:id="tblReporte" VBox.vgrow="ALWAYS">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
                                             <columns>
                                                 <TableColumn fx:id="col1" prefWidth="220.0" text="Concepto / Entidad" />
                                                 <TableColumn fx:id="col2" prefWidth="130.0" text="Volumen / Qty" />

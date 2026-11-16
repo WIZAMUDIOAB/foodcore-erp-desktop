@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F9F7F4">
+  <title>FoodCore Gastronomía · Menú Digital</title>
+  <link rel="stylesheet" href="css/menu-qr.css">
+</head>
+<body>
+  <header class="glass-header">
+    <div class="header-inner">
+      <div class="header-top-bar">
+        <span class="header-brand-tag">QR MENU</span>
+        <div class="header-controls">
+          <div class="lang-toggle" role="group" aria-label="Idioma / Language">
+            <button type="button" id="btnLangEs" class="lang-btn active" data-lang="es">ES</button>
+            <button type="button" id="btnLangEn" class="lang-btn" data-lang="en">EN</button>
+          </div>
+          <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </button>
+        </div>
+      </div>
+      <h1>FOODCORE RESTOBAR &amp; GRILL</h1>
+      <p id="headerSubtitle">Carta Gastronómica Oficial · Actualizada en Tiempo Real</p>
+      <div id="badgeLive" class="badge-live">&#9679; Disponible para Pedidos</div>
+    </div>
+  </header>
+
+  <section class="hero-banner" aria-hidden="true">
+    <div class="hero-parallax-layer parallax-img"></div>
+    <div class="hero-banner-overlay">
+      <span id="heroKicker" class="hero-kicker">EXPERIENCIA CULINARIA EN VIVO</span>
+      <h2 id="heroTitle">Sabores Artesanales a la Parrilla</h2>
+    </div>
+  </section>
+
+  <main class="container">
+    <nav id="categoryTabs" class="category-tabs" aria-label="Categorías del menú"></nav>
+    <section id="menuGrid" class="grid" aria-live="polite"></section>
+  </main>
+
+  <footer id="menuFooter">FoodCore ERP v5.4.0 Enterprise · Todos los derechos reservados</footer>
+
+  <aside id="orderSummaryBar" class="order-summary-bar" aria-label="Resumen estimado del pedido">
+    <div class="order-summary-inner">
+      <div>
+        <span id="lblSummaryCaption" class="order-summary-label">Total estimado</span>
+        <strong id="orderTotalCount" class="order-summary-count">0 ítems</strong>
+      </div>
+      <div class="order-summary-right">
+        <span id="orderPreviewTotal" class="price" data-value="0.00">S/ 0.00</span>
+        <button type="button" id="btnResetPreview" class="btn-reset-preview">Limpiar</button>
+      </div>
+    </div>
+  </aside>
+
+  <script src="js/menu-qr.js"></script>
+</body>
+</html>

@@ -316,9 +316,7 @@ public class MenuController {
                         }
                     } else if ("COMBO".equalsIgnoreCase(item)) {
                         Label pill = new Label("COMBO");
-                        pill.setStyle("-fx-background-color: #EEF2FF; -fx-text-fill: #4338CA; "
-                                + "-fx-border-color: #A5B4FC; -fx-border-radius: 10; -fx-background-radius: 10; "
-                                + "-fx-padding: 2 9; -fx-font-weight: 800; -fx-font-size: 10.5px;");
+                        pill.getStyleClass().add("badge-pill-accent");
                         setGraphic(pill);
                         setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                     } else {

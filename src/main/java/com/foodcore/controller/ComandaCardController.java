@@ -18,6 +18,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.sql.Connection;
@@ -81,8 +83,23 @@ public class ComandaCardController {
         if (btnDespachar != null && (btnDespachar.getId() == null || btnDespachar.getId().isBlank())) {
             btnDespachar.setId("btnListo");
         }
+        aplicarEstiloCronometro(KitchenDisplayController.TIMER_FONT_FAMILY, KitchenDisplayController.TIMER_FONT_SIZE);
         configurarDragAndDrop();
         iniciarTemporizador();
+    }
+
+    /**
+     * Aplica la tipografía de alta legibilidad al cronómetro de comanda KDS (Sub-Fase D - D6).
+     */
+    public void aplicarEstiloCronometro(String fontFamily, double fontSize) {
+        if (lblTiempo == null) {
+            return;
+        }
+        String fam = (fontFamily == null || fontFamily.isBlank()) ? "JetBrains Mono" : fontFamily.trim();
+        double size = fontSize > 0 ? fontSize : 28.0;
+        lblTiempo.setFont(Font.font(fam, FontWeight.BOLD, size));
+        lblTiempo.setStyle("-fx-font-family: '" + fam + "', 'Consolas', monospace; "
+                + "-fx-font-size: " + Math.round(size) + "px; -fx-font-weight: bold;");
     }
 
     private void configurarDragAndDrop() {
@@ -302,16 +319,16 @@ public class ComandaCardController {
             VBox boxDesglose = new VBox(3);
             boxDesglose.setMaxWidth(275);
             boxDesglose.setStyle("-fx-background-color: rgba(255, 255, 255, 0.08); "
-                    + "-fx-border-color: rgba(165, 180, 252, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
+                    + "-fx-border-color: rgba(234, 88, 12, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
                     + "-fx-padding: 6 9;");
             Label lblCabeceraDesglose = new Label("Desglose de empaquetado:");
-            lblCabeceraDesglose.setStyle("-fx-text-fill: #A5B4FC; -fx-font-size: 11px; -fx-font-weight: 700;");
+            lblCabeceraDesglose.setStyle("-fx-text-fill: #EA580C; -fx-font-size: 11px; -fx-font-weight: 700;");
             boxDesglose.getChildren().add(lblCabeceraDesglose);
             for (String comp : componentesCombo) {
                 Label lblComp = new Label("•  " + comp);
                 lblComp.setWrapText(true);
                 lblComp.setMaxWidth(252);
-                lblComp.setStyle("-fx-text-fill: #F8FAFC; -fx-font-size: 12.5px; -fx-font-weight: 600;");
+                lblComp.setStyle("-fx-text-fill: #FAF9F6; -fx-font-size: 12.5px; -fx-font-weight: 600;");
                 boxDesglose.getChildren().add(lblComp);
             }
             itemBox.getChildren().add(boxDesglose);
@@ -468,6 +485,10 @@ public class ComandaCardController {
 
     public Label getLblEstado() {
         return lblEstado;
+    }
+
+    public Label getLblTiempo() {
+        return lblTiempo;
     }
 
     public Button getBtnIniciar() {

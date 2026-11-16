@@ -46,10 +46,10 @@
                                 </HBox>
 
                                 <!-- Banner de Alertas de Cobertura -->
-                                <HBox fx:id="bannerAlertasCobertura" alignment="CENTER_LEFT" spacing="12.0" style="-fx-background-color: #FEF3C7; -fx-padding: 10 16; -fx-background-radius: 8; -fx-border-color: #FCD34D; -fx-border-radius: 8;">
+                                <HBox fx:id="bannerAlertasCobertura" alignment="CENTER_LEFT" spacing="12.0" styleClass="alert-expiry-soon">
                                     <children>
                                         <Label style="-fx-font-size: 16px;" text="⚠" />
-                                        <Label fx:id="lblTextoAlerta" style="-fx-text-fill: #92400E; -fx-font-weight: bold;" text="Evaluando cobertura de personal para el fin de semana..." wrapText="true" HBox.hgrow="ALWAYS" />
+                                        <Label fx:id="lblTextoAlerta" styleClass="text-body-strong" text="Evaluando cobertura de personal para el fin de semana..." wrapText="true" HBox.hgrow="ALWAYS" />
                                     </children>
                                 </HBox>
                             </children>
@@ -97,7 +97,7 @@
                                         <Label styleClass="text-h3" text="Equipo Disponible" />
                                         <Label styleClass="text-body-secondary" text="Seleccione para programar turno rápido" />
                                         <ListView fx:id="listColaboradores" VBox.vgrow="ALWAYS" />
-                                        <Button fx:id="btnAsignarRapido" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAsignarRapido" styleClass="btn-kds-outline" text="Programar Colaborador" />
+                                        <Button fx:id="btnAsignarRapido" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAsignarRapido" styleClass="btn-secondary" text="Programar Colaborador" />
                                     </children>
                                 </VBox>
                             </children>
@@ -110,41 +110,68 @@
         <!-- Modal Asignar Turno -->
         <VBox fx:id="modalTurno" alignment="CENTER" styleClass="modal-backdrop" visible="false">
             <children>
-                <VBox maxWidth="440.0" spacing="16.0" styleClass="modal-card">
+                <VBox maxHeight="680.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-card">
                     <children>
-                        <Label styleClass="modal-title" text="Asignar Turno a Colaborador" />
-
-                        <VBox spacing="10.0">
+                        <!-- HEADER -->
+                        <VBox spacing="4.0" styleClass="modal-header">
+                            <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                             <children>
-                                <Label styleClass="form-field-label" text="Colaborador:" />
-                                <ComboBox fx:id="cmbModalColaborador" maxWidth="1.7976931348623157E308" />
-
-                                <Label styleClass="form-field-label" text="Día de la Semana:" />
-                                <ComboBox fx:id="cmbModalDia" maxWidth="1.7976931348623157E308" />
-
-                                <Label styleClass="form-field-label" text="Turno Programado:" />
-                                <ComboBox fx:id="cmbModalTurno" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="12.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Hora Inicio:" />
-                                                <TextField fx:id="txtModalInicio" promptText="08:00" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Hora Fin:" />
-                                                <TextField fx:id="txtModalFin" promptText="16:00" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
+                                <Label styleClass="h2" text="Asignar Turno a Colaborador" />
+                                <Label styleClass="text-secondary" text="Defina el día, horario de ingreso y salida" />
                             </children>
                         </VBox>
 
-                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                        <!-- BODY -->
+                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox spacing="16.0" styleClass="modal-body">
+                                    <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                                    <children>
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Colaborador" />
+                                                <ComboBox fx:id="cmbModalColaborador" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Día de la Semana" />
+                                                <ComboBox fx:id="cmbModalDia" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Turno Programado" />
+                                                <ComboBox fx:id="cmbModalTurno" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
+
+                                        <HBox spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Hora Inicio" />
+                                                        <TextField fx:id="txtModalInicio" promptText="08:00" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Hora Fin" />
+                                                        <TextField fx:id="txtModalFin" promptText="16:00" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
+                            </content>
+                        </ScrollPane>
+
+                        <!-- FOOTER -->
+                        <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                            <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                             <children>
                                 <Button mnemonicParsing="false" onAction="#handleCerrarModalTurno" styleClass="btn-secondary" text="Cancelar" />
                                 <Button fx:id="btnGuardarTurno" mnemonicParsing="false" onAction="#handleGuardarTurnoModal" styleClass="btn-primary" text="Guardar Turno" />

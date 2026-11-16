@@ -61,7 +61,7 @@ public class ReportesAvanzadosController {
     private static final Logger LOGGER = Logger.getLogger(ReportesAvanzadosController.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private static final String[] PALETA_SAAS = {
-        "#F05A22", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#06B6D4"
+        "#EA580C", "#D97706", "#DC2626", "#A39D94"
     };
 
     @FXML private ComboBox<String> cbCategoriaReporte;
@@ -200,16 +200,16 @@ public class ReportesAvanzadosController {
                 setText(item);
                 setAlignment(Pos.CENTER);
                 if ("-".equals(item)) {
-                    setStyle("-fx-text-fill: #94A3B8; -fx-font-weight: normal;");
+                    setStyle("-fx-text-fill: #A39D94; -fx-font-weight: normal;");
                     return;
                 }
                 double val = parsePctSeguro(item);
                 if (val >= 50.0) {
-                    setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #047857; -fx-font-weight: bold;");
+                    setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: bold;");
                 } else if (val > 0.0) {
-                    setStyle("-fx-background-color: #EFF6FF; -fx-text-fill: #1D4ED8; -fx-font-weight: bold;");
+                    setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold;");
                 } else {
-                    setStyle("-fx-background-color: #F8FAFC; -fx-text-fill: #64748B;");
+                    setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #5C5650;");
                 }
             }
         });

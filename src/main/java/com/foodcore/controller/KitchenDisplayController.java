@@ -47,6 +47,8 @@ public class KitchenDisplayController {
 
     private static final Logger LOGGER = Logger.getLogger(KitchenDisplayController.class.getName());
     public static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    public static final String TIMER_FONT_FAMILY = "JetBrains Mono";
+    public static final double TIMER_FONT_SIZE = 28.0;
 
     @FXML private VBox vboxColPendiente;
     @FXML private VBox vboxColEnPreparacion;
@@ -293,6 +295,7 @@ public class KitchenDisplayController {
             Parent cardNode = loader.load();
             ComandaCardController cardCtrl = loader.getController();
             cardCtrl.initData(mesa, comanda, estado);
+            cardCtrl.aplicarEstiloCronometro(TIMER_FONT_FAMILY, TIMER_FONT_SIZE);
             cardCtrl.setIdPedido(idPedido);
             cardCtrl.setIdDetallePedido(idDetallePedido);
             cardCtrl.setPrioridad(item.getPrioridad());

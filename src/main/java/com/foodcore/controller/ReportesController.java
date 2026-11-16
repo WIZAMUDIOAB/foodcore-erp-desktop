@@ -4,6 +4,8 @@ import com.foodcore.model.ResumenKpi;
 import com.foodcore.service.ReporteService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
+import javafx.geometry.Side;
+import javafx.scene.Node;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
@@ -14,12 +16,16 @@ import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ReportesController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReportesController.class);
+    private static final String[] PALETA_PERMITIDA = {
+        "#EA580C", "#D97706", "#DC2626", "#A39D94"
+    };
 
     @FXML private ComboBox<String> cmbPeriodo;
     @FXML private Label lblTotalVentas;
@@ -41,7 +47,47 @@ public class ReportesController {
         cmbPeriodo.getSelectionModel().selectFirst();
         cmbPeriodo.setOnAction(e -> cargarDatos());
 
+        configurarPieChart(pieChartBajaRotacion);
+        configurarPieChart(pieChartMetodosPago);
+
         cargarDatos();
+    }
+
+    private void configurarPieChart(PieChart chart) {
+        if (chart == null) {
+            return;
+        }
+        chart.setAnimated(false);
+        chart.setLabelsVisible(false);
+        chart.setLegendSide(Side.BOTTOM);
+        chart.needsLayoutProperty().addListener((obs, oldVal, needsLayout) -> {
+            if (!needsLayout) {
+                aplicarColoresDonut(chart);
+            }
+        });
+    }
+
+    private void aplicarColoresDonut(PieChart chart) {
+        if (chart == null || chart.getData().isEmpty()) {
+            return;
+        }
+        int idx = 0;
+        for (PieChart.Data slice : chart.getData()) {
+            String color = PALETA_PERMITIDA[idx % PALETA_PERMITIDA.length];
+            Node node = slice.getNode();
+            if (node != null) {
+                node.setStyle("-fx-pie-color: " + color + "; -fx-background-color: " + color
+                        + "; -fx-border-color: #FFFFFF; -fx-border-width: 2px;");
+            }
+            idx++;
+        }
+        Set<Node> symbols = chart.lookupAll(".chart-legend-item-symbol");
+        int sIdx = 0;
+        for (Node sym : symbols) {
+            String color = PALETA_PERMITIDA[sIdx % PALETA_PERMITIDA.length];
+            sym.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6px;");
+            sIdx++;
+        }
     }
 
     private int obtenerDiasFiltro() {
@@ -100,6 +146,7 @@ public class ReportesController {
                         pieChartBajaRotacion.getData().add(new PieChart.Data(plato + " (" + cant + ")", cant))
                     );
                 }
+                aplicarColoresDonut(pieChartBajaRotacion);
 
                 // 4. PieChart: Métodos de Pago
                 pieChartMetodosPago.getData().clear();
@@ -110,6 +157,7 @@ public class ReportesController {
                         pieChartMetodosPago.getData().add(new PieChart.Data(metodo + " (S/ " + monto + ")", monto.doubleValue()))
                     );
                 }
+                aplicarColoresDonut(pieChartMetodosPago);
             },
             e -> LOGGER.error("Error al cargar datos de reportes para {} días", dias, e)
         );

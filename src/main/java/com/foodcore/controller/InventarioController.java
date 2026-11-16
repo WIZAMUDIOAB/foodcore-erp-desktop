@@ -10,6 +10,7 @@ import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
@@ -19,7 +20,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -268,44 +268,28 @@ public class InventarioController {
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(12);
-        card.setMaxWidth(440);
-        card.setMaxHeight(460);
-        card.getStyleClass().add("modal-dialog-surface");
-
-        Label lblTitle = new Label("Nuevo Insumo de Almacén");
-        lblTitle.getStyleClass().add("text-h1");
-
         TextField txtCodigo = new TextField();
-        txtCodigo.setPromptText("Código SKU (ej. INS-010)");
-        txtCodigo.getStyleClass().add("input-field");
+        txtCodigo.setPromptText("Ej. INS-010");
 
         TextField txtNombre = new TextField();
-        txtNombre.setPromptText("Nombre del insumo (ej. Papa Amarilla Bastón)");
-        txtNombre.getStyleClass().add("input-field");
+        txtNombre.setPromptText("Ej. Papa Amarilla Bastón");
 
         ComboBox<String> cmbUnidad = new ComboBox<>(FXCollections.observableArrayList("UNIDAD", "KG", "GR", "ML", "LT"));
         cmbUnidad.getSelectionModel().selectFirst();
-        cmbUnidad.setMaxWidth(Double.MAX_VALUE);
 
         TextField txtStockIni = new TextField("0");
         txtStockIni.setPromptText("Stock inicial");
-        txtStockIni.getStyleClass().add("input-field");
 
         TextField txtStockMin = new TextField("10");
         txtStockMin.setPromptText("Stock mínimo de alerta");
-        txtStockMin.getStyleClass().add("input-field");
 
         TextField txtCosto = new TextField("1.00");
         txtCosto.setPromptText("Costo unitario (S/)");
-        txtCosto.getStyleClass().add("input-field");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootInventarioStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Guardar Insumo");
-        btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             try {
                 crearNuevoInsumoTransaccional(
@@ -324,13 +308,26 @@ public class InventarioController {
             }
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnGuardar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        card.getChildren().addAll(lblTitle, txtCodigo, txtNombre, cmbUnidad, txtStockIni, txtStockMin, txtCosto, actions);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnGuardar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Nuevo Insumo de Almacén",
+                "Registre el insumo base con unidad de medida y alertas de stock mínimo.",
+                List.of(
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Código SKU", txtCodigo),
+                                DialogService.construirCampoModal("Unidad de Medida", cmbUnidad)),
+                        DialogService.construirCampoModal("Nombre del Insumo", txtNombre),
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Stock Inicial", txtStockIni),
+                                DialogService.construirCampoModal("Stock Mínimo", txtStockMin)),
+                        DialogService.construirCampoModal("Costo Unitario (S/)", txtCosto)),
+                footer);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootInventarioStack.getChildren().add(backdrop);
+        rootInventarioStack.applyCss();
+        rootInventarioStack.layout();
     }
 
     @FXML
@@ -341,16 +338,7 @@ public class InventarioController {
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
 
-        VBox card = new VBox(12);
-        card.setMaxWidth(440);
-        card.setMaxHeight(380);
-        card.getStyleClass().add("modal-dialog-surface");
-
-        Label lblTitle = new Label("Registrar Compra de Insumo");
-        lblTitle.getStyleClass().add("text-h1");
-
         ComboBox<Insumo> cmbInsumo = new ComboBox<>(todosLosInsumos);
-        cmbInsumo.setMaxWidth(Double.MAX_VALUE);
         Insumo sel = tblInventario.getSelectionModel().getSelectedItem();
         if (sel != null) {
             cmbInsumo.getSelectionModel().select(sel);
@@ -359,23 +347,18 @@ public class InventarioController {
         }
 
         TextField txtCantidad = new TextField();
-        txtCantidad.setPromptText("Cantidad comprada (ej. 25)");
-        txtCantidad.getStyleClass().add("input-field");
+        txtCantidad.setPromptText("Ej. 25");
 
         TextField txtCostoCompra = new TextField();
-        txtCostoCompra.setPromptText("Costo unitario de compra S/ (ej. 4.20)");
-        txtCostoCompra.getStyleClass().add("input-field");
+        txtCostoCompra.setPromptText("Ej. 4.20");
 
         TextField txtFactura = new TextField("Compra Factura F001");
         txtFactura.setPromptText("Referencia / Factura");
-        txtFactura.getStyleClass().add("input-field");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootInventarioStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Confirmar Compra");
-        btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             Insumo ins = cmbInsumo.getValue();
             if (ins == null) {
@@ -411,13 +394,23 @@ public class InventarioController {
             );
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnGuardar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        card.getChildren().addAll(lblTitle, cmbInsumo, txtCantidad, txtCostoCompra, txtFactura, actions);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnGuardar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Registrar Compra de Insumo",
+                "Ingreso de stock al almacén con actualización en Kardex.",
+                List.of(
+                        DialogService.construirCampoModal("Insumo", cmbInsumo),
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Cantidad Comprada", txtCantidad),
+                                DialogService.construirCampoModal("Costo Unitario (S/)", txtCostoCompra)),
+                        DialogService.construirCampoModal("Referencia / Factura", txtFactura)),
+                footer);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootInventarioStack.getChildren().add(backdrop);
+        rootInventarioStack.applyCss();
+        rootInventarioStack.layout();
     }
 
     @FXML

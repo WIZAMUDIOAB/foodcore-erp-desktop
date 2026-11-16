@@ -4,6 +4,7 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
@@ -12,6 +13,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootHistorialStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.HistorialPreciosController">
     <children>
@@ -38,11 +40,20 @@
                             </children>
                         </HBox>
 
-                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <HBox alignment="BOTTOM_LEFT" spacing="12.0">
                             <children>
-                                <Label styleClass="text-body-strong" text="Filtrar por Tipo:" />
-                                <ComboBox fx:id="cbFiltroTipo" prefWidth="150.0" styleClass="form-combo-box" />
-                                <TextField fx:id="txtBuscar" prefWidth="280.0" promptText="Buscar producto o insumo..." styleClass="form-text-field" />
+                                <VBox spacing="6.0">
+                                    <children>
+                                        <Label styleClass="label-form" text="Filtrar por Tipo" />
+                                        <ComboBox fx:id="cbFiltroTipo" prefWidth="150.0" styleClass="form-combo-box" />
+                                    </children>
+                                </VBox>
+                                <VBox spacing="6.0">
+                                    <children>
+                                        <Label styleClass="label-form" text="Buscar ítem" />
+                                        <TextField fx:id="txtBuscar" prefWidth="280.0" promptText="Buscar producto o insumo..." styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Label fx:id="lblTotalRegistros" styleClass="badge-pill-success" text="0 Modificaciones" />
                             </children>
@@ -66,6 +77,15 @@
                         <VBox spacing="8.0" styleClass="stat-card" VBox.vgrow="ALWAYS">
                             <children>
                                 <TableView fx:id="tblHistorial" VBox.vgrow="ALWAYS">
+                                    <placeholder>
+                                        <VBox alignment="CENTER" spacing="12.0">
+                                            <children>
+                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                <Label styleClass="h3" text="No hay registros" />
+                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                            </children>
+                                        </VBox>
+                                    </placeholder>
                                     <columns>
                                         <TableColumn fx:id="colFecha" prefWidth="130.0" text="Fecha / Hora" />
                                         <TableColumn fx:id="colTipo" prefWidth="95.0" text="Tipo" />
@@ -90,42 +110,70 @@
         <!-- Modal Registrar Cambio de Precio -->
         <VBox fx:id="modalAjuste" alignment="CENTER" styleClass="modal-backdrop" visible="false">
             <children>
-                <VBox maxWidth="460.0" spacing="16.0" styleClass="modal-card">
+                <VBox maxHeight="680.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-card">
                     <children>
-                        <Label styleClass="modal-title" text="Ajustar Precio con Auditoría Obligatoria" />
-                        <VBox spacing="10.0">
+                        <!-- HEADER -->
+                        <VBox spacing="4.0" styleClass="modal-header">
+                            <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                             <children>
-                                <Label styleClass="form-field-label" text="Tipo de Entidad:" />
-                                <ComboBox fx:id="cbModalTipo" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
-
-                                <Label styleClass="form-field-label" text="Nombre del Ítem / Código:" />
-                                <TextField fx:id="txtModalItemNombre" promptText="Hamburguesa Clásica / Carne de Res" styleClass="form-text-field" />
-
-                                <HBox spacing="10.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Precio Anterior (S/):" />
-                                                <TextField fx:id="txtModalPrecioAnt" promptText="18.00" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Nuevo Precio (S/):" />
-                                                <TextField fx:id="txtModalPrecioNuevo" promptText="20.00" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
-
-                                <Label styleClass="form-field-label" text="Motivo Justificativo (Obligatorio, mín. 5 caracteres):" />
-                                <TextField fx:id="txtModalMotivo" promptText="Alza de costos mayoristas de insumo base" styleClass="form-text-field" />
+                                <Label styleClass="h2" text="Ajustar Precio con Auditoría Obligatoria" />
+                                <Label styleClass="text-secondary" text="Registre el nuevo valor y el sustento auditado del cambio" />
                             </children>
                         </VBox>
 
-                        <Label fx:id="lblModalAjusteError" styleClass="text-danger" text="" wrapText="true" />
+                        <!-- BODY -->
+                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox spacing="16.0" styleClass="modal-body">
+                                    <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                                    <children>
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Tipo de Entidad" />
+                                                <ComboBox fx:id="cbModalTipo" maxWidth="1.7976931348623157E308" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
 
-                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Nombre del Ítem / Código" />
+                                                <TextField fx:id="txtModalItemNombre" promptText="Hamburguesa Clásica / Carne de Res" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <HBox spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Precio Anterior (S/)" />
+                                                        <TextField fx:id="txtModalPrecioAnt" promptText="18.00" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Nuevo Precio (S/)" />
+                                                        <TextField fx:id="txtModalPrecioNuevo" promptText="20.00" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Motivo Justificativo (Obligatorio, mín. 5 caracteres)" />
+                                                <TextField fx:id="txtModalMotivo" promptText="Alza de costos mayoristas de insumo base" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <Label fx:id="lblModalAjusteError" styleClass="text-danger" text="" wrapText="true" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </ScrollPane>
+
+                        <!-- FOOTER -->
+                        <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                            <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                             <children>
                                 <Button mnemonicParsing="false" onAction="#handleCerrarModalAjuste" styleClass="btn-secondary" text="Cancelar" />
                                 <Button mnemonicParsing="false" onAction="#handleGuardarAjuste" styleClass="btn-primary" text="Confirmar Cambio Auditado" />

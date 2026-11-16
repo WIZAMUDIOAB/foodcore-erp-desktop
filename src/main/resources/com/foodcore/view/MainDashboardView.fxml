@@ -10,6 +10,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootDashboardStack" prefHeight="768.0" prefWidth="1280.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.MainDashboardController">
     <children>
@@ -29,11 +30,16 @@
                                 <Label fx:id="lblNetworkStatus" styleClass="badge-pill-success" text="ONLINE" />
                             </HBox>
                         </VBox>
-                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-kds-outline" text="«" />
+                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-secondary" text="«" />
                     </HBox>
 
-                    <!-- Buscador Global Integrado en Sidebar (220px, #1F2937, Texto Blanco) -->
-                    <TextField fx:id="txtBuscarSidebar" maxWidth="220.0" prefWidth="220.0" promptText="Buscar (Ctrl+K)..." style="-fx-background-color: #1F2937; -fx-text-fill: #FFFFFF; -fx-prompt-text-fill: #9CA3AF; -fx-background-radius: 8px; -fx-border-color: #374151; -fx-border-radius: 8px; -fx-padding: 8px 12px;" styleClass="sidebar-search-input" />
+                    <!-- Buscador Global Integrado en Sidebar -->
+                    <VBox spacing="4.0">
+                        <children>
+                            <Label fx:id="lblBuscarSidebar" styleClass="label-form" text="Búsqueda Rápida" />
+                            <TextField fx:id="txtBuscarSidebar" maxWidth="220.0" prefWidth="220.0" promptText="Buscar (Ctrl+K)..." styleClass="sidebar-search-input" />
+                        </children>
+                    </VBox>
 
                     <!-- ScrollPane de Navegación -->
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" style="-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
@@ -42,51 +48,51 @@
                                 <children>
                                     <!-- Sección OPERACIONES (§5) -->
                                     <Label fx:id="lblSecOperaciones" styleClass="sidebar-section-header" text="OPERACIONES" />
-                                    <Button fx:id="btnNavDashboard" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDashboard" styleClass="sidebar-nav-button" text="📊 Dashboard Gerencial" />
-                                    <Button fx:id="btnNavSalon" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavSalon" styleClass="sidebar-nav-button" text="🪑 Salón y Mesas" />
-                                    <Button fx:id="btnNavReservas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReservas" styleClass="sidebar-nav-button" text="📅 Libro de Reservas" />
-                                    <Button fx:id="btnNavDelivery" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDelivery" styleClass="sidebar-nav-button" text="🛵 Delivery y Envíos" />
-                                    <Button fx:id="btnNavPOS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPOS" styleClass="sidebar-nav-button" text="💳 Punto de Venta (POS)" />
-                                    <Button fx:id="btnNavKDS" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKDS" styleClass="sidebar-nav-button" text="👨‍🍳 Cocina (KDS)" />
-                                    <Button fx:id="btnNavCaja" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavCaja" styleClass="sidebar-nav-button" text="💵 Caja y Turnos" />
+                                    <Button fx:id="btnNavDashboard" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDashboard" styleClass="sidebar-nav-button" text="Dashboard Gerencial"><graphic><FontIcon iconLiteral="fth-bar-chart-2" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavSalon" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavSalon" styleClass="sidebar-nav-button" text="Salón y Mesas"><graphic><FontIcon iconLiteral="fth-grid" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavReservas" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReservas" styleClass="sidebar-nav-button" text="Libro de Reservas"><graphic><FontIcon iconLiteral="fth-calendar" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavDelivery" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavDelivery" styleClass="sidebar-nav-button" text="Delivery y Envíos"><graphic><FontIcon iconLiteral="fth-truck" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavPOS" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPOS" styleClass="sidebar-nav-button" text="Punto de Venta (POS)"><graphic><FontIcon iconLiteral="fth-credit-card" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavKDS" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKDS" styleClass="sidebar-nav-button" text="Cocina (KDS)"><graphic><FontIcon iconLiteral="fth-coffee" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavCaja" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavCaja" styleClass="sidebar-nav-button" text="Caja y Turnos"><graphic><FontIcon iconLiteral="fth-dollar-sign" iconSize="16" /></graphic></Button>
 
                                     <!-- Sección CRECIMIENTO COMERCIAL (Sub-Fase 4D v2.0) -->
                                     <Label fx:id="lblSecComercial" styleClass="sidebar-section-header" text="COMERCIAL Y MARKETING" />
-                                    <Button fx:id="btnNavPromociones" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPromociones" styleClass="sidebar-nav-button" text="🏷️ Promociones y Descuentos" />
-                                    <Button fx:id="btnNavKiosco" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKiosco" styleClass="sidebar-nav-button" text="📱 Kiosco Autoservicio" />
-                                    <Button fx:id="btnNavMenuQr" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenuQr" styleClass="sidebar-nav-button" text="📲 Menú Digital QR" />
+                                    <Button fx:id="btnNavPromociones" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavPromociones" styleClass="sidebar-nav-button" text="Promociones y Descuentos"><graphic><FontIcon iconLiteral="fth-tag" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavKiosco" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKiosco" styleClass="sidebar-nav-button" text="Kiosco Autoservicio"><graphic><FontIcon iconLiteral="fth-monitor" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavMenuQr" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenuQr" styleClass="sidebar-nav-button" text="Menú Digital QR"><graphic><FontIcon iconLiteral="fth-smartphone" iconSize="16" /></graphic></Button>
 
                                     <!-- Sección FINANZAS (Sub-Fase 4A v2.0 + v4.9.0 BI) -->
                                     <Label fx:id="lblSecFinanzas" styleClass="sidebar-section-header" text="FINANZAS" />
-                                    <Button fx:id="btnNavEstadoResultados" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavEstadoResultados" styleClass="sidebar-nav-button" text="💹 Estado de Resultados (P&amp;L)" />
-                                    <Button fx:id="btnNavReportesContables" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesContables" styleClass="sidebar-nav-button" text="📑 Reportes Contables" />
-                                    <Button fx:id="btnNavProveedores" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavProveedores" styleClass="sidebar-nav-button" text="🏢 Proveedores y CxP" />
-                                    <Button fx:id="btnNavClientes" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavClientes" styleClass="sidebar-nav-button" text="👥 Clientes y CxC" />
-                                    <Button fx:id="btnNavHistorialPrecios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHistorialPrecios" styleClass="sidebar-nav-button" text="📈 Historial de Precios" />
-                                    <Button fx:id="btnNavReportesAvanzados" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesAvanzados" styleClass="sidebar-nav-button" text="📊 Reportes Avanzados" />
+                                    <Button fx:id="btnNavEstadoResultados" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavEstadoResultados" styleClass="sidebar-nav-button" text="Estado de Resultados (P&amp;L)"><graphic><FontIcon iconLiteral="fth-trending-up" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavReportesContables" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesContables" styleClass="sidebar-nav-button" text="Reportes Contables"><graphic><FontIcon iconLiteral="fth-file-text" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavProveedores" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavProveedores" styleClass="sidebar-nav-button" text="Proveedores y CxP"><graphic><FontIcon iconLiteral="fth-briefcase" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavClientes" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavClientes" styleClass="sidebar-nav-button" text="Clientes y CxC"><graphic><FontIcon iconLiteral="fth-users" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavHistorialPrecios" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHistorialPrecios" styleClass="sidebar-nav-button" text="Historial de Precios"><graphic><FontIcon iconLiteral="fth-sliders" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavReportesAvanzados" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReportesAvanzados" styleClass="sidebar-nav-button" text="Reportes Avanzados"><graphic><FontIcon iconLiteral="fth-bar-chart" iconSize="16" /></graphic></Button>
 
                                     <!-- Sección RECURSOS HUMANOS -->
                                     <Label fx:id="lblSecRrhh" styleClass="sidebar-section-header" text="RECURSOS HUMANOS" />
-                                    <Button fx:id="btnNavAsistencia" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAsistencia" styleClass="sidebar-nav-button" text="⏱️ Control de Asistencia" />
-                                    <Button fx:id="btnNavReloj" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReloj" styleClass="sidebar-nav-button" text="🕒 Reloj Marcador" />
-                                    <Button fx:id="btnNavHorarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHorarios" styleClass="sidebar-nav-button" text="🗓️ Turnos y Horarios" />
-                                    <Button fx:id="btnNavMiHorario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMiHorario" styleClass="sidebar-nav-button" text="👤 Mi Portal y Horario" />
+                                    <Button fx:id="btnNavAsistencia" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAsistencia" styleClass="sidebar-nav-button" text="Control de Asistencia"><graphic><FontIcon iconLiteral="fth-clock" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavReloj" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavReloj" styleClass="sidebar-nav-button" text="Reloj Marcador"><graphic><FontIcon iconLiteral="fth-check-circle" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavHorarios" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavHorarios" styleClass="sidebar-nav-button" text="Turnos y Horarios"><graphic><FontIcon iconLiteral="fth-calendar" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavMiHorario" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMiHorario" styleClass="sidebar-nav-button" text="Mi Portal y Horario"><graphic><FontIcon iconLiteral="fth-user" iconSize="16" /></graphic></Button>
 
                                     <!-- Sección BACKOFFICE -->
                                     <Label fx:id="lblSecBackoffice" styleClass="sidebar-section-header" text="BACKOFFICE" />
-                                    <Button fx:id="btnNavInventario" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavInventario" styleClass="sidebar-nav-button" text="📦 Inventario de Insumos" />
-                                    <Button fx:id="btnNavMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenu" styleClass="sidebar-nav-button" text="🍽️ Menú y Platillos" />
-                                    <Button fx:id="btnNavRecetas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRecetas" styleClass="sidebar-nav-button" text="📖 Recetas y Escandallo" />
-                                    <Button fx:id="btnNavMermas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMermas" styleClass="sidebar-nav-button" text="📉 Registro de Mermas" />
-                                    <Button fx:id="btnNavAnalisisMermas" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAnalisisMermas" styleClass="sidebar-nav-button" text="🔬 Análisis de Mermas" />
-                                    <Button fx:id="btnNavKardex" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKardex" styleClass="sidebar-nav-button" text="📋 Auditoría Kardex" />
-                                    <Button fx:id="btnNavAuditoria" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAuditoria" styleClass="sidebar-nav-button" text="🛡️ Bitácora de Auditoría" />
+                                    <Button fx:id="btnNavInventario" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavInventario" styleClass="sidebar-nav-button" text="Inventario de Insumos"><graphic><FontIcon iconLiteral="fth-package" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavMenu" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMenu" styleClass="sidebar-nav-button" text="Menú y Platillos"><graphic><FontIcon iconLiteral="fth-layers" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavRecetas" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRecetas" styleClass="sidebar-nav-button" text="Recetas y Escandallo"><graphic><FontIcon iconLiteral="fth-book-open" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavMermas" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavMermas" styleClass="sidebar-nav-button" text="Registro de Mermas"><graphic><FontIcon iconLiteral="fth-trending-down" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavAnalisisMermas" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAnalisisMermas" styleClass="sidebar-nav-button" text="Análisis de Mermas"><graphic><FontIcon iconLiteral="fth-activity" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavKardex" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavKardex" styleClass="sidebar-nav-button" text="Auditoría Kardex"><graphic><FontIcon iconLiteral="fth-clipboard" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavAuditoria" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavAuditoria" styleClass="sidebar-nav-button" text="Bitácora de Auditoría"><graphic><FontIcon iconLiteral="fth-shield" iconSize="16" /></graphic></Button>
 
                                     <!-- Sección SISTEMA (§5) -->
                                     <Label fx:id="lblSecSistema" styleClass="sidebar-section-header" text="SISTEMA" />
-                                    <Button fx:id="btnNavUsuarios" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavUsuarios" styleClass="sidebar-nav-button" text="👥 Gestión de Usuarios" />
-                                    <Button fx:id="btnNavRoles" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRoles" styleClass="sidebar-nav-button" text="🔑 Roles y Permisos" />
-                                    <Button fx:id="btnNavConfiguracion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavConfiguracion" styleClass="sidebar-nav-button" text="⚙️ Configuración del Sistema" />
+                                    <Button fx:id="btnNavUsuarios" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavUsuarios" styleClass="sidebar-nav-button" text="Gestión de Usuarios"><graphic><FontIcon iconLiteral="fth-users" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavRoles" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavRoles" styleClass="sidebar-nav-button" text="Roles y Permisos"><graphic><FontIcon iconLiteral="fth-key" iconSize="16" /></graphic></Button>
+                                    <Button fx:id="btnNavConfiguracion" focusTraversable="false" graphicTextGap="8.0" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleNavConfiguracion" styleClass="sidebar-nav-button" text="Configuración del Sistema"><graphic><FontIcon iconLiteral="fth-settings" iconSize="16" /></graphic></Button>
                                 </children>
                             </VBox>
                         </content>
@@ -97,13 +103,13 @@
                         <HBox alignment="CENTER_LEFT" spacing="8.0">
                             <Region styleClass="status-dot-online" />
                             <VBox spacing="1.0" HBox.hgrow="ALWAYS">
-                                <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong-inverse" text="admin · Administrador" />
-                                <Label styleClass="text-caption-muted" text="Sesión autorizada RBAC" />
+                                <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong" text="admin · Administrador" />
+                                <Label styleClass="text-caption" text="Sesión autorizada RBAC" />
                             </VBox>
                         </HBox>
                         <HBox spacing="6.0">
-                            <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-kds-outline" text="Clave" HBox.hgrow="ALWAYS" />
-                            <Button fx:id="btnCerrarSesion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCerrarSesion" styleClass="btn-kds-delivered" text="Salir" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-secondary" text="Clave" HBox.hgrow="ALWAYS" />
+                            <Button fx:id="btnCerrarSesion" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCerrarSesion" styleClass="btn-secondary" text="Salir" HBox.hgrow="ALWAYS" />
                         </HBox>
                     </VBox>
                 </VBox>

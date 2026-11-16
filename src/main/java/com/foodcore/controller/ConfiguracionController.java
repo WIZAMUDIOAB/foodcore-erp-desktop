@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.App;
 import com.foodcore.dao.ConfiguracionImpresoraDAO;
 import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
 import com.foodcore.model.ConfiguracionImpresora;
@@ -8,6 +9,7 @@ import com.foodcore.service.AlertaService.AlertaEmitida;
 import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -15,6 +17,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -105,6 +108,10 @@ public class ConfiguracionController {
     @FXML private Button btnRestaurarBackup;
     @FXML private Label lblEstadoRestauracion;
 
+    // Apariencia / Modo Oscuro (v5.4.0 D4)
+    @FXML private CheckBox chkModoOscuro;
+    @FXML private Label lblEstadoModoOscuro;
+
     private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
     private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
 
@@ -128,6 +135,47 @@ public class ConfiguracionController {
         cargarRuteoImpresorasAsync();
         cargarConfiguracionAlertasEmailUi();
         precargarUltimoBackupDisponible();
+        inicializarToggleModoOscuroUi();
+    }
+
+    private void inicializarToggleModoOscuroUi() {
+        boolean activo = App.isDarkModeActivo();
+        if (chkModoOscuro != null) {
+            chkModoOscuro.setSelected(activo);
+        }
+        actualizarEstadoModoOscuroUi(activo);
+    }
+
+    /** Activa o desactiva {@code dark-theme.css} sobre la escena actual (Sub-Fase D - D4). */
+    @FXML
+    public void handleToggleModoOscuro(ActionEvent event) {
+        boolean activo = chkModoOscuro != null && chkModoOscuro.isSelected();
+        aplicarTemaOscuroUi(activo);
+    }
+
+    public void aplicarTemaOscuroUi(boolean activo) {
+        App.setDarkModeActivo(activo);
+        Scene scene = rootConfigStack != null ? rootConfigStack.getScene() : null;
+        if (scene != null) {
+            App.aplicarModoOscuro(scene, activo);
+        } else if (App.getPrimaryStage() != null && App.getPrimaryStage().getScene() != null) {
+            App.aplicarModoOscuro(App.getPrimaryStage().getScene(), activo);
+        }
+        actualizarEstadoModoOscuroUi(activo);
+    }
+
+    private void actualizarEstadoModoOscuroUi(boolean activo) {
+        if (lblEstadoModoOscuro != null) {
+            lblEstadoModoOscuro.setText(activo ? "Modo Oscuro activo" : "Tema Claro activo");
+        }
+    }
+
+    public CheckBox getChkModoOscuro() {
+        return chkModoOscuro;
+    }
+
+    public Label getLblEstadoModoOscuro() {
+        return lblEstadoModoOscuro;
     }
 
     private void configurarTablaImpresoras() {
@@ -500,10 +548,11 @@ public class ConfiguracionController {
     }
 
     private boolean solicitarConfirmacionRestauracionUi() {
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-        confirm.setTitle("Confirmar Restauración de Base de Datos");
-        confirm.setHeaderText("Se restaurará la base de datos desde el archivo seleccionado");
-        confirm.setContentText("Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
+        Alert confirm = DialogService.crearAlerta(
+                Alert.AlertType.CONFIRMATION,
+                "Confirmar Restauración de Base de Datos",
+                "Se restaurará la base de datos desde el archivo seleccionado",
+                "Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
         if (rootConfigStack != null && rootConfigStack.getScene() != null) {
             confirm.initOwner(rootConfigStack.getScene().getWindow());
         }
