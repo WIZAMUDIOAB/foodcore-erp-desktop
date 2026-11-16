@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#111827" />
-  <title>FoodCore ERP v4.0 — Toma de Comanda Tablet</title>
+  <title>FoodCore ERP v5.4 — Toma de Comanda Tablet</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -23,18 +22,21 @@
     </div>
 
     <div class="topbar-actions">
-      <button type="button" id="btnCambiarMozo" class="btn-touch btn-switch-mozo" onclick="FoodCorePWA.abrirModalCambiarMozo()">
-        🔄 Cambiar Mozo
+      <button type="button" id="btnCambiarMozo" class="btn-touch btn-secondary btn-compact-nav" onclick="FoodCorePWA.abrirModalCambiarMozo()">
+        <span>Cambiar Mozo</span>
       </button>
       <div class="connection-pill" id="connectionPill">
         <span class="status-dot online" id="statusDot"></span>
         <span id="statusText">API Online (8080)</span>
         <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
       </div>
-      <button type="button" id="btnToggleOffline" class="btn-touch btn-dark-outline" onclick="FoodCorePWA.alternarSimulacionOffline()">
-        🔌 Simular Caída API
+      <button type="button" id="btnToggleOffline" class="btn-touch btn-secondary btn-compact-nav" onclick="FoodCorePWA.alternarSimulacionOffline()">
+        <span>Simular Caída API</span>
       </button>
-      <a href="mesas.html" class="btn-touch btn-dark-outline">← Mesas</a>
+      <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a href="mesas.html" class="btn-touch btn-secondary btn-compact-nav">← Mesas</a>
     </div>
   </header>
 
@@ -76,11 +78,11 @@
       <div class="cart-footer">
         <div class="cart-summary-row">
           <span>Op. Gravada (Subtotal)</span>
-          <span id="lblSubtotal" style="font-family:var(--font-mono);">S/ 0.00</span>
+          <span id="lblSubtotal" class="cart-mono-num">S/ 0.00</span>
         </div>
         <div class="cart-summary-row">
           <span>IGV (18%)</span>
-          <span id="lblIgv" style="font-family:var(--font-mono);">S/ 0.00</span>
+          <span id="lblIgv" class="cart-mono-num">S/ 0.00</span>
         </div>
         <div class="cart-total-row">
           <span class="cart-total-label">Total Comanda</span>
@@ -88,13 +90,14 @@
         </div>
 
         <button type="button" id="btnEnviarCocina" class="btn-touch btn-primary btn-send-kds" onclick="FoodCorePWA.enviarPedidoACocina()">
-          Enviar a Cocina (KDS) →
+          <span>Enviar a Cocina (KDS)</span>
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
       </div>
     </aside>
   </main>
 
-  <!-- Modal Táctil de Cambio Rápido de Mozo (v4.2.0 Sub-Fase C.1) -->
+  <!-- Modal Táctil de Cambio Rápido de Mozo -->
   <div id="modalCambiarMozo" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="modalMozoTitulo">
     <div class="modal-card-pin">
       <div class="modal-header">
@@ -105,9 +108,7 @@
         <button type="button" class="btn-close-modal" id="btnCerrarModalMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()" aria-label="Cerrar">✕</button>
       </div>
 
-      <div class="mozo-switch-selector" id="modalMozosList">
-        <!-- Renderizado dinámicamente -->
-      </div>
+      <div class="mozo-switch-selector" id="modalMozosList"></div>
 
       <div class="pin-dots-display" id="modalPinDots">
         <span class="pin-dot" id="mdot-0"></span>
@@ -137,7 +138,7 @@
       </div>
 
       <div class="modal-actions-row">
-        <button type="button" class="btn-touch btn-dark-outline" id="btnCancelarCambioMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()">
+        <button type="button" class="btn-touch btn-secondary" id="btnCancelarCambioMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()">
           Cancelar
         </button>
         <button type="button" class="btn-touch btn-primary" id="btnConfirmarCambioMozo" onclick="FoodCorePWA.confirmarCambioMozoPin()">

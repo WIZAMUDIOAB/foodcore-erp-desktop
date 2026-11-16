@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#111827" />
-  <title>FoodCore ERP v4.0 — Selección de Mesa</title>
+  <title>FoodCore ERP v5.4 — Selección de Mesa</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -19,16 +18,25 @@
     </div>
 
     <div class="topbar-actions">
-      <div id="adminNavLinks" style="display:flex; gap:8px;">
-        <a href="kds/" id="btnAbrirKds" class="btn-touch btn-dark-outline" style="padding: 6px 12px; font-size: 13px;" title="Pantalla de Cocina KDS">👨‍🍳 KDS</a>
-        <a href="dashboard/" id="btnAbrirDashboard" class="btn-touch btn-dark-outline" style="padding: 6px 12px; font-size: 13px;" title="Dashboard del Dueño">📊 Dashboard</a>
+      <div id="adminNavLinks" class="topbar-nav-links">
+        <a href="kds/" id="btnAbrirKds" class="btn-touch btn-secondary btn-compact-nav" title="Pantalla de Cocina KDS">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg>
+          <span>KDS</span>
+        </a>
+        <a href="dashboard/" id="btnAbrirDashboard" class="btn-touch btn-secondary btn-compact-nav" title="Dashboard del Dueño">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+          <span>Dashboard</span>
+        </a>
       </div>
       <div class="connection-pill">
         <span class="status-dot online" id="statusDot"></span>
         <span id="statusText">API Online (8080)</span>
         <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
       </div>
-      <a href="index.html" class="btn-touch btn-dark-outline">Cambiar Operador</a>
+      <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a href="index.html" class="btn-touch btn-secondary btn-compact-nav">Cambiar Operador</a>
     </div>
   </header>
 
@@ -36,12 +44,18 @@
     <div class="section-header">
       <div>
         <h1>Salón y Comedores</h1>
-        <p style="color:var(--fc-text-muted); font-size:14px;">Toque una mesa para abrir o adicionar platos a la comanda</p>
+        <p class="section-subtitle">Toque una mesa para abrir o adicionar platos a la comanda</p>
       </div>
       <div class="filter-pills">
         <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('TODAS')">Todas (12)</button>
-        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('LIBRE')">🟢 Libres</button>
-        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('OCUPADA')">🟠 Ocupadas</button>
+        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('LIBRE')">
+          <span class="status-indicator-dot success"></span>
+          <span>Libres</span>
+        </button>
+        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('OCUPADA')">
+          <span class="status-indicator-dot brand"></span>
+          <span>Ocupadas</span>
+        </button>
       </div>
     </div>
 

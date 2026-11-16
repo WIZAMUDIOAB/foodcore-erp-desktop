@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#111827" />
-  <title>FoodCore ERP v4.2.0 — Acceso Rápido por PIN</title>
+  <title>FoodCore ERP v5.4 — Acceso Rápido por PIN</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -14,7 +13,7 @@
       <div class="brand-mark">FC</div>
       <div>
         <div class="brand-title">FoodCore ERP</div>
-        <span class="brand-subtitle">Modo Mozo &amp; Tablet POS · v4.2.0</span>
+        <span class="brand-subtitle">Modo Mozo &amp; Tablet POS</span>
       </div>
     </div>
 
@@ -24,8 +23,12 @@
         <span id="statusText">API Online</span>
         <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
       </div>
-      <a href="index.html" class="btn-touch btn-dark-outline" id="btnIrLoginClasico">
-        🔑 Clave Completa
+      <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a href="index.html" class="btn-touch btn-secondary btn-compact-nav" id="btnIrLoginClasico">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        <span>Clave Completa</span>
       </a>
     </div>
   </header>
@@ -58,7 +61,7 @@
         </div>
       </section>
 
-      <!-- Columna Derecha: Teclado Numérico Táctil PIN -->
+      <!-- Columna Derecha: Indicador 4 Círculos + Teclado Numérico Táctil 3x4 -->
       <section class="pin-pad-section">
         <div class="pin-pad-header">
           <h2>2. Ingrese su PIN</h2>
@@ -68,14 +71,12 @@
           </div>
         </div>
 
-        <div class="pin-dots-display" id="pinDotsDisplay">
+        <div class="pin-dots-display" id="pinDotsDisplay" aria-label="Indicador de PIN de 4 dígitos">
           <span class="pin-dot" id="dot-0"></span>
           <span class="pin-dot" id="dot-1"></span>
           <span class="pin-dot" id="dot-2"></span>
           <span class="pin-dot" id="dot-3"></span>
         </div>
-
-        <input type="password" id="txtPinInput" maxlength="6" readonly class="sr-only" aria-label="PIN de Acceso" />
 
         <div id="pinErrorMsg" class="pin-error-banner" role="alert" style="display:none;"></div>
 
@@ -94,11 +95,12 @@
 
           <button type="button" class="pin-btn pin-btn-action" id="btnPinClear" onclick="FoodCorePWA.limpiarPin()">C</button>
           <button type="button" class="pin-btn" data-digit="0" onclick="FoodCorePWA.presionarDigitoPin('0')">0</button>
-          <button type="button" class="pin-btn pin-btn-action" id="btnPinDelete" onclick="FoodCorePWA.borrarUltimoDigitoPin()">⌫</button>
+          <button type="button" class="pin-btn pin-btn-action" id="btnPinDelete" onclick="FoodCorePWA.borrarUltimoDigitoPin()" aria-label="Borrar dígito">⌫</button>
         </div>
 
         <button type="button" id="btnPinSubmit" class="btn-touch btn-primary btn-submit-pin" onclick="FoodCorePWA.ejecutarPinLogin()">
-          Ingresar al Salón →
+          <span>Ingresar al Salón</span>
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
       </section>
     </div>

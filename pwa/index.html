@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#111827" />
-  <title>FoodCore ERP v4.0 — Acceso Tablet Mozos</title>
+  <title>FoodCore ERP v5.4 — Acceso Tablet Mozos</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -14,28 +13,37 @@
       <div class="brand-mark">FC</div>
       <div>
         <div class="brand-title">FoodCore</div>
-        <span class="brand-subtitle">Tablet POS · Mozos v4.0</span>
+        <span class="brand-subtitle">Tablet POS · Mozos</span>
       </div>
     </div>
 
     <div class="topbar-actions">
-      <div style="display:flex; gap:8px;">
-        <a href="kds/" id="btnDirectoKds" class="btn-touch btn-dark-outline" style="padding: 6px 12px; font-size: 13px;" title="Pantalla de Cocina KDS">👨‍🍳 KDS</a>
-        <a href="dashboard/" id="btnDirectoDashboard" class="btn-touch btn-dark-outline" style="padding: 6px 12px; font-size: 13px;" title="Dashboard del Dueño">📊 Dashboard</a>
+      <div class="topbar-nav-links">
+        <a href="kds/" id="btnDirectoKds" class="btn-touch btn-secondary btn-compact-nav" title="Pantalla de Cocina KDS">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" x2="18" y1="17" y2="17"/></svg>
+          <span>KDS</span>
+        </a>
+        <a href="dashboard/" id="btnDirectoDashboard" class="btn-touch btn-secondary btn-compact-nav" title="Dashboard del Dueño">
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+          <span>Dashboard</span>
+        </a>
       </div>
       <div class="connection-pill" id="connectionPill">
         <span class="status-dot online" id="statusDot"></span>
         <span id="statusText">API Online (8080)</span>
         <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
       </div>
+      <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
     </div>
   </header>
 
   <main class="login-shell">
     <section class="login-card">
       <div class="auth-tabs-toggle">
-        <a href="pin-login.html" class="auth-tab-btn" id="tabPinLogin">⚡ Ingreso Rápido con PIN</a>
-        <a href="index.html" class="auth-tab-btn active" id="tabPasswordLogin">🔑 Contraseña de Turno</a>
+        <a href="pin-login.html" class="auth-tab-btn" id="tabPinLogin">Ingreso Rápido con PIN</a>
+        <a href="index.html" class="auth-tab-btn active" id="tabPasswordLogin">Contraseña de Turno</a>
       </div>
 
       <div class="login-header">
@@ -54,15 +62,16 @@
           <input type="password" id="txtPassword" class="form-input" placeholder="Contraseña" autocomplete="current-password" required />
         </div>
 
-        <div id="loginErrorMsg" class="login-error-banner" role="alert" style="display:none; color:#B91C1C; background:#FEF2F2; border:1px solid #FECACA; padding:10px 14px; border-radius:10px; font-size:13.5px; font-weight:600; margin-bottom:14px;"></div>
+        <div id="loginErrorMsg" class="login-error-banner" role="alert" style="display:none;"></div>
 
-        <button type="submit" id="btnIngresar" class="btn-touch btn-primary" style="width:100%; font-size:15.5px; margin-top:6px;">
-          Ingresar al Salón de Mesas →
+        <button type="submit" id="btnIngresar" class="btn-touch btn-primary login-submit-btn">
+          <span>Ingresar al Salón de Mesas</span>
+          <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
 
-        <div style="text-align:center; margin-top:16px;">
-          <a href="pin-login.html" id="linkIrPinLogin" style="color:var(--fc-brand-primary); font-weight:700; text-decoration:none; font-size:14px; display:inline-block; padding:6px 12px; border-radius:8px; background:var(--fc-brand-primary-soft);">
-            ⚡ ¿Prefiere ingresar con PIN de 4 dígitos? Toque aquí →
+        <div class="login-pin-link-wrap">
+          <a href="pin-login.html" id="linkIrPinLogin" class="login-pin-link">
+            <span>¿Prefiere ingresar con PIN de 4 dígitos? Toque aquí</span>
           </a>
         </div>
       </form>
