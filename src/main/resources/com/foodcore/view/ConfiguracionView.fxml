@@ -258,6 +258,34 @@
                                         </HBox>
                                     </children>
                                 </VBox>
+
+                                <!-- Datos de Demostración Descartables (v5.5.0 Sub-Fase E - E3) -->
+                                <VBox spacing="12.0" styleClass="card">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Datos de Demostración" />
+                                                <Label styleClass="badge-pill-accent" text="MODO PRUEBA DESCARTABLE" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Carga clientes, productos y ventas de prueba (es_demo = 1) para evaluar el ERP o elimínalos sin afectar datos reales." wrapText="true" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoDemo" styleClass="badge-pill-neutral" text="Sin datos de demo cargados" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnCargarDatosDemo" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCargarDatosDemo" styleClass="btn-secondary" text="Cargar Datos de Demo">
+                                                    <graphic>
+                                                        <FontIcon iconLiteral="fth-plus" iconSize="14" />
+                                                    </graphic>
+                                                </Button>
+                                                <Button fx:id="btnBorrarDatosDemo" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleBorrarDatosDemo" styleClass="btn-destructive" text="Borrar Datos de Demo">
+                                                    <graphic>
+                                                        <FontIcon iconLiteral="fth-trash-2" iconSize="14" />
+                                                    </graphic>
+                                                </Button>
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
                             </children>
                         </VBox>
                     </children>
