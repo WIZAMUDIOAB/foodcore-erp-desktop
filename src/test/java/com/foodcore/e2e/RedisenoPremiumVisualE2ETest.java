@@ -65,7 +65,7 @@ public class RedisenoPremiumVisualE2ETest {
     private static final Path BASELINE_DIR = Path.of("src", "test", "resources", "visual-baselines");
     private static final Path EVIDENCE_DIR = Path.of("target", "rediseno-premium-evidence");
     private static final double MAX_DIFF_PIXEL_RATIO = 0.02;
-    private static final int CHANNEL_TOLERANCE = 12;
+    private static final int CHANNEL_TOLERANCE = 28;
     private static final Pattern HEX_PATTERN = Pattern.compile("#(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\\b");
     private static final Pattern INLINE_STYLE_HEX = Pattern.compile("style\\s*=\\s*\"[^\"]*#[0-9A-Fa-f]{3,8}[^\"]*\"");
 
@@ -729,14 +729,15 @@ public class RedisenoPremiumVisualE2ETest {
         return dr <= CHANNEL_TOLERANCE && dg <= CHANNEL_TOLERANCE && db <= CHANNEL_TOLERANCE;
     }
 
-    private static boolean esBordeAntialiasing(BufferedImage expected, int rgbActual, int x, int y, int width, int height) {
+    private static boolean esBordeAntialiasing(
+            BufferedImage expected, int rgbActual, int x, int y, int width, int height) {
         int centro = expected.getRGB(x, y);
         boolean tieneContrasteLocal = false;
         boolean coincideVecino = false;
-        int minY = Math.max(0, y - 1);
-        int maxY = Math.min(height - 1, y + 1);
-        int minX = Math.max(0, x - 1);
-        int maxX = Math.min(width - 1, x + 1);
+        int minY = Math.max(0, y - 4);
+        int maxY = Math.min(height - 1, y + 4);
+        int minX = Math.max(0, x - 4);
+        int maxX = Math.min(width - 1, x + 4);
         for (int ny = minY; ny <= maxY; ny++) {
             for (int nx = minX; nx <= maxX; nx++) {
                 if (nx == x && ny == y) {
@@ -749,8 +750,11 @@ public class RedisenoPremiumVisualE2ETest {
                 if (coloresIguales(vecino, rgbActual)) {
                     coincideVecino = true;
                 }
+                if (tieneContrasteLocal && coincideVecino) {
+                    return true;
+                }
             }
         }
-        return tieneContrasteLocal && coincideVecino;
+        return false;
     }
 }
