@@ -34,13 +34,13 @@
             </VBox>
             <Region HBox.hgrow="ALWAYS" />
             <HBox alignment="CENTER_RIGHT" spacing="8.0">
-                <Button fx:id="btnFidelizacion" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleFidelizacionCanje" styleClass="btn-secondary" text="Fidelización">
+                <Button fx:id="btnFidelizacion" accessibleRole="BUTTON" accessibleText="Fidelización y canje de puntos" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleFidelizacionCanje" styleClass="btn-secondary" text="Fidelización">
                     <graphic><FontIcon iconLiteral="fth-gift" iconSize="16" /></graphic>
                 </Button>
-                <Button fx:id="btnDividirCuenta" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleDividirCuenta" styleClass="btn-secondary" text="Dividir Cuenta" />
-                <Button fx:id="btnDescuento" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAplicarDescuento" styleClass="btn-secondary" text="Descuento" />
-                <Button fx:id="btnAnularVenta" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAnularVenta" styleClass="btn-secondary" text="Anular Venta" />
-                <Button graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAbrirArqueo" styleClass="btn-secondary" text="Arqueo y Cierre" />
+                <Button fx:id="btnDividirCuenta" accessibleRole="BUTTON" accessibleText="Dividir cuenta" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleDividirCuenta" styleClass="btn-secondary" text="Dividir Cuenta" />
+                <Button fx:id="btnDescuento" accessibleRole="BUTTON" accessibleText="Aplicar descuento autorizado" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAplicarDescuento" styleClass="btn-secondary" text="Descuento" />
+                <Button fx:id="btnAnularVenta" accessibleRole="BUTTON" accessibleText="Anular venta registrada" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAnularVenta" styleClass="btn-secondary" text="Anular Venta" />
+                <Button fx:id="btnArqueoCaja" accessibleRole="BUTTON" accessibleText="Arqueo y cierre de caja" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAbrirArqueo" styleClass="btn-secondary" text="Arqueo y Cierre" />
             </HBox>
         </HBox>
     </top>
@@ -186,20 +186,20 @@
                         <!-- Botones primarios de orden: Enviar y Cobrar de 56px (§2.5 y §6) -->
                         <HBox spacing="10.0">
                             <children>
-                                <Button fx:id="btnEnviarCocina" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEnviarComanda" styleClass="btn-pos-action-secondary" text="Enviar" HBox.hgrow="ALWAYS" />
-                                <Button fx:id="btnEfectivo" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroEfectivo" styleClass="btn-pos-action-primary" text="Cobrar" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnEnviarCocina" accessibleRole="BUTTON" accessibleText="Enviar comanda a cocina" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleEnviarComanda" styleClass="btn-pos-action-secondary" text="Enviar" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnEfectivo" accessibleRole="BUTTON" accessibleText="Cobrar en efectivo (F5)" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroEfectivo" styleClass="btn-pos-action-primary" text="Cobrar" HBox.hgrow="ALWAYS" />
                             </children>
                         </HBox>
 
                         <!-- Botones adicionales de medio de pago (56px) -->
                         <HBox spacing="10.0">
                             <children>
-                                <Button fx:id="btnTarjeta" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroTarjeta" styleClass="btn-pos-action-secondary" text="Cobrar Tarjeta" HBox.hgrow="ALWAYS" />
-                                <Button fx:id="btnYape" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroYape" styleClass="btn-pos-action-secondary" text="Cobrar Yape/Plin" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnTarjeta" accessibleRole="BUTTON" accessibleText="Cobrar con tarjeta (F6)" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroTarjeta" styleClass="btn-pos-action-secondary" text="Cobrar Tarjeta" HBox.hgrow="ALWAYS" />
+                                <Button fx:id="btnYape" accessibleRole="BUTTON" accessibleText="Cobrar con Yape o Plin (F7)" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleCobroYape" styleClass="btn-pos-action-secondary" text="Cobrar Yape/Plin" HBox.hgrow="ALWAYS" />
                             </children>
                         </HBox>
 
-                        <Button fx:id="btnPreCuenta" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleImprimirPreCuenta" prefHeight="36.0" style="-fx-min-height: 36px; -fx-pref-height: 36px; -fx-font-size: 13px;" styleClass="btn-secondary" text="Imprimir Pre-Cuenta" />
+                        <Button fx:id="btnPreCuenta" accessibleRole="BUTTON" accessibleText="Imprimir pre-cuenta" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleImprimirPreCuenta" prefHeight="36.0" style="-fx-min-height: 36px; -fx-pref-height: 36px; -fx-font-size: 13px;" styleClass="btn-secondary" text="Imprimir Pre-Cuenta" />
 
                         <!-- Footer del ticket con atajos visibles como chips (§6) -->
                         <HBox alignment="CENTER_LEFT" spacing="8.0">

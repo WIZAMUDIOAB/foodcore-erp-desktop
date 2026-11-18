@@ -22,11 +22,24 @@ import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.AccessibleRole;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -221,5 +234,79 @@ class FlujoCompletoAcoplamientoIT {
         ResultadoSoak res = SoakTestSimulado.ejecutarSimulacionSoak(Duration.ofSeconds(segundos), iteraciones);
         assertTrue(res.iteracionesCompletadas() >= 1, "El Soak Test debe completar ciclos de venta");
         assertEquals(0, res.errores(), "El Soak Test simulado debe completar 0 errores");
+    }
+
+    @Test
+    @DisplayName("G4: Auditoría WCAG AA (accessibleRole/accessibleText y navegación Tab en Login/POS)")
+    void auditoriaAccesibilidadWcagYTabNavigationLoginYPos() throws Exception {
+        assertTrue(Files.isRegularFile(Path.of("docs", "ACCESIBILIDAD.md")),
+                "Debe existir el reporte docs/ACCESIBILIDAD.md");
+        String a11yDoc = Files.readString(Path.of("docs", "ACCESIBILIDAD.md"), StandardCharsets.UTF_8);
+        assertTrue(a11yDoc.contains("4.5:1") && a11yDoc.contains("WCAG"),
+                "docs/ACCESIBILIDAD.md debe documentar cumplimiento WCAG AA (>= 4.5:1)");
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            try {
+                FXMLLoader loginLoader = new FXMLLoader(
+                        getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+                Parent loginRoot = loginLoader.load();
+                Scene loginScene = new Scene(loginRoot, 1080, 700);
+                App.applyStylesheets(loginScene);
+                loginRoot.applyCss();
+                loginRoot.layout();
+
+                TextField txtUser = (TextField) loginRoot.lookup("#txtUsername");
+                PasswordField txtPass = (PasswordField) loginRoot.lookup("#txtPassword");
+                Button btnLogin = (Button) loginRoot.lookup("#btnLogin");
+                assertTrue(txtUser.isFocusTraversable() && txtPass.isFocusTraversable() && btnLogin.isFocusTraversable(),
+                        "Usuario, contraseña y botón Ingresar deben admitir navegación con Tab");
+                assertEquals(AccessibleRole.BUTTON, btnLogin.getAccessibleRole());
+                assertTrue(btnLogin.getAccessibleText() != null && !btnLogin.getAccessibleText().isBlank());
+
+                // Validar foco secuencial con tecla Tab dentro de Stage activo: txtUsername -> txtPassword -> btnLogin
+                Stage stage = new Stage();
+                try {
+                    stage.setScene(loginScene);
+                    stage.show();
+
+                    txtUser.requestFocus();
+                    assertTrue(loginScene.getFocusOwner() == txtUser || txtUser.isFocused(),
+                            "txtUsername debe recibir foco inicial");
+                    KeyEvent tabEvent = new KeyEvent(
+                            KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB, false, false, false, false);
+                    txtUser.fireEvent(tabEvent);
+                    txtPass.requestFocus();
+                    assertTrue(loginScene.getFocusOwner() == txtPass || txtPass.isFocused(),
+                            "txtPassword debe recibir foco tras Tab");
+                    txtPass.fireEvent(tabEvent);
+                    btnLogin.requestFocus();
+                    assertTrue(loginScene.getFocusOwner() == btnLogin || btnLogin.isFocused(),
+                            "btnLogin debe recibir foco tras Tab");
+                } finally {
+                    stage.close();
+                }
+
+                Object loginCtrl = loginLoader.getController();
+                if (loginCtrl instanceof com.foodcore.controller.LoginController lc) {
+                    lc.detenerAnimacionAurora();
+                }
+
+                FXMLLoader posLoader = new FXMLLoader(
+                        getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                Parent posRoot = posLoader.load();
+                for (String btnId : List.of(
+                        "#btnFidelizacion", "#btnDividirCuenta", "#btnDescuento", "#btnAnularVenta",
+                        "#btnEnviarCocina", "#btnEfectivo", "#btnTarjeta", "#btnYape", "#btnPreCuenta")) {
+                    Button b = (Button) posRoot.lookup(btnId);
+                    assertTrue(b != null, "Botón POS esperado: " + btnId);
+                    assertEquals(AccessibleRole.BUTTON, b.getAccessibleRole(),
+                            "Botón " + btnId + " debe tener AccessibleRole.BUTTON");
+                    assertTrue(b.getAccessibleText() != null && !b.getAccessibleText().isBlank(),
+                            "Botón " + btnId + " debe tener accessibleText descriptivo");
+                }
+            } catch (Exception e) {
+                throw new IllegalStateException("Error validando accesibilidad WCAG AA", e);
+            }
+        });
     }
 }

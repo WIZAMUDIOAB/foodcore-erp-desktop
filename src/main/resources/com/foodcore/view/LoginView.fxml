@@ -76,14 +76,14 @@
                         <VBox spacing="6.0">
                            <children>
                               <Label styleClass="text-body-strong" text="Usuario" />
-                              <TextField fx:id="txtUsername" promptText="Ingrese su usuario" styleClass="input-field" />
+                              <TextField fx:id="txtUsername" accessibleText="Usuario" promptText="Ingrese su usuario" styleClass="input-field" />
                            </children>
                         </VBox>
 
                         <VBox spacing="6.0">
                            <children>
                               <Label styleClass="text-body-strong" text="Contraseña" />
-                              <PasswordField fx:id="txtPassword" onAction="#handleLogin" promptText="Ingrese su contraseña" styleClass="input-field" />
+                              <PasswordField fx:id="txtPassword" accessibleText="Contraseña" onAction="#handleLogin" promptText="Ingrese su contraseña" styleClass="input-field" />
                            </children>
                         </VBox>
                      </children>
@@ -93,7 +93,7 @@
                   <Label fx:id="lblMensaje" managed="false" maxWidth="340.0" styleClass="text-error" text="Mensaje de validación" visible="false" wrapText="true" />
 
                   <!-- Botón primario Ingresar (48px, ancho completo, naranja) (§4.1) -->
-                  <Button fx:id="btnLogin" defaultButton="true" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleLogin" styleClass="btn-primary" text="Ingresar">
+                  <Button fx:id="btnLogin" accessibleRole="BUTTON" accessibleText="Ingresar al sistema" defaultButton="true" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleLogin" styleClass="btn-primary" text="Ingresar">
                      <graphic>
                         <ProgressIndicator fx:id="spinnerLogin" managed="false" maxHeight="18.0" maxWidth="18.0" prefHeight="18.0" prefWidth="18.0" visible="false" />
                      </graphic>
@@ -140,8 +140,8 @@
                   <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
                      <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                      <children>
-                        <Button fx:id="btnCancelarTotp" mnemonicParsing="false" onAction="#handleCancelarTotp" styleClass="btn-secondary" text="Cancelar" />
-                        <Button fx:id="btnVerificarTotp" mnemonicParsing="false" onAction="#handleVerificarTotp" styleClass="btn-primary" text="Verificar y Entrar" />
+                        <Button fx:id="btnCancelarTotp" accessibleRole="BUTTON" accessibleText="Cancelar verificación 2FA" mnemonicParsing="false" onAction="#handleCancelarTotp" styleClass="btn-secondary" text="Cancelar" />
+                        <Button fx:id="btnVerificarTotp" accessibleRole="BUTTON" accessibleText="Verificar código 2FA y entrar" mnemonicParsing="false" onAction="#handleVerificarTotp" styleClass="btn-primary" text="Verificar y Entrar" />
                      </children>
                   </HBox>
                </children>
