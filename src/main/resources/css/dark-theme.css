@@ -129,12 +129,22 @@
 .modal-dialog-surface,
 .kpi-card,
 .kpi-card-secondary,
-.login-shell-card,
-.login-form-panel,
 .sidebar-user-card {
     -fx-background-color: -bg-surface;
     -fx-border-color: -border-subtle;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.40), 2, 0, 0, 1);
+}
+
+.login-shell-card,
+.login-glass-panel {
+    -fx-background-color: rgba(24, 24, 27, 0.65);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.50), 24, 0, 0, 8);
+}
+
+.login-form-panel {
+    -fx-background-color: rgba(24, 24, 27, 0.78);
+    -fx-border-color: transparent;
 }
 
 .dialog-pane > .content.label,
