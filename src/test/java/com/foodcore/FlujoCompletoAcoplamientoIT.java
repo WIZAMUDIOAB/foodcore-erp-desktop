@@ -11,6 +11,8 @@ import com.foodcore.model.EstadoResultadosReporte;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Venta;
+import com.foodcore.perf.SoakTestSimulado;
+import com.foodcore.perf.SoakTestSimulado.ResultadoSoak;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.service.PedidoService;
@@ -29,6 +31,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -208,5 +211,15 @@ class FlujoCompletoAcoplamientoIT {
         BigDecimal deltaIngresos = pnlDespues.ingresosBrutos().subtract(pnlAntes.ingresosBrutos());
         assertEquals(0, new BigDecimal("70.80").compareTo(deltaIngresos),
                 "El P&L debe sumar exactamente +70.80 en ingresos brutos");
+    }
+
+    @Test
+    @DisplayName("G3: Soak Test simulado ejecuta ciclo continuo de ventas sin errores ni fugas")
+    void soakTestSimuladoCicloContinuoSinFugas() throws Exception {
+        int segundos = Integer.getInteger("foodcore.soak.seconds", 4);
+        int iteraciones = Integer.getInteger("foodcore.soak.iterations", 8);
+        ResultadoSoak res = SoakTestSimulado.ejecutarSimulacionSoak(Duration.ofSeconds(segundos), iteraciones);
+        assertTrue(res.iteracionesCompletadas() >= 1, "El Soak Test debe completar ciclos de venta");
+        assertEquals(0, res.errores(), "El Soak Test simulado debe completar 0 errores");
     }
 }
