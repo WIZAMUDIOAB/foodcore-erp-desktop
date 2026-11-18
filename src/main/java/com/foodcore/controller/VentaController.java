@@ -1371,6 +1371,13 @@ public class VentaController {
         if (opt.isPresent() && !opt.get().isBlank()) {
             try {
                 int idVenta = Integer.parseInt(opt.get().trim());
+                Alert confirmAnular = DialogService.crearConfirmacionDestructiva(
+                        "Confirmar Anulación de Venta #" + idVenta,
+                        "Esta operación anulará la venta #" + idVenta + " y revertirá el inventario. ¿Desea continuar?");
+                Optional<ButtonType> confirmRes = confirmAnular.showAndWait();
+                if (confirmRes.isEmpty() || confirmRes.get() != DialogService.BTN_SI_ANULAR) {
+                    return;
+                }
                 ventaService.anularVenta(idVenta, false, sesion, "Anulación solicitada desde POS");
                 mostrarAlerta("Venta Anulada", "La venta #" + idVenta + " fue anulada y su stock revertido.", Alert.AlertType.INFORMATION);
             } catch (Exception e) {
@@ -1392,13 +1399,11 @@ public class VentaController {
             recalcularTotales();
             return;
         }
-        Alert confirm = DialogService.crearAlerta(
-                Alert.AlertType.CONFIRMATION,
+        Alert confirm = DialogService.crearConfirmacionDestructiva(
                 "Confirmar limpieza (Esc)",
-                "¿Desea limpiar los ítems de la venta actual?",
-                ButtonType.YES, ButtonType.NO);
+                "¿Desea limpiar los ítems de la venta actual?");
         Optional<ButtonType> res = confirm.showAndWait();
-        if (res.isPresent() && res.get() == ButtonType.YES) {
+        if (res.isPresent() && res.get() == DialogService.BTN_SI_ANULAR) {
             itemsVenta.clear();
             descuentoActivo = BigDecimal.ZERO;
             descuentoManualFijado = false;

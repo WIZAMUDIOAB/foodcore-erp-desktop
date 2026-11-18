@@ -121,10 +121,16 @@
                 </VBox>
             </left>
 
-            <!-- Zona de Trabajo Central Dinámica al 100% de Alto (Sin TopBar redundante) -->
+            <!-- Zona de Trabajo Central Dinámica con Breadcrumbs de Navegación (F8) -->
             <center>
                 <VBox styleClass="app-canvas">
                     <children>
+                        <HBox fx:id="breadcrumbBar" alignment="CENTER_LEFT" spacing="8.0" styleClass="breadcrumb-bar">
+                            <children>
+                                <FontIcon iconLiteral="fth-home" iconSize="14" styleClass="breadcrumb-icon" />
+                                <Label fx:id="lblBreadcrumbs" styleClass="breadcrumb-text" text="Inicio &gt; Operaciones &gt; Dashboard Gerencial" />
+                            </children>
+                        </HBox>
                         <StackPane fx:id="contentArea" styleClass="app-canvas" VBox.vgrow="ALWAYS" />
                     </children>
                 </VBox>

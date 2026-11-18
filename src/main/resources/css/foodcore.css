@@ -2081,6 +2081,25 @@
     -fx-padding: 16px 24px 24px 24px;
 }
 
+.breadcrumb-bar {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 10px 24px;
+    -fx-min-height: 40px;
+}
+
+.breadcrumb-icon {
+    -fx-icon-color: -brand-primary;
+}
+
+.breadcrumb-text {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -text-secondary;
+}
+
 .dialog-pane,
 .dialog-pane.card {
     -fx-background-color: -bg-surface;

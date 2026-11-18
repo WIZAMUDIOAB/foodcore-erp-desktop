@@ -365,6 +365,15 @@
     -fx-text-fill: -text-primary;
 }
 
+.breadcrumb-bar {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
+}
+
+.breadcrumb-text {
+    -fx-text-fill: -text-secondary;
+}
+
 .skeleton-bar,
 .skeleton-shimmer {
     -fx-background-color: linear-gradient(to right, -bg-surface-hover 0%, -border-subtle 50%, -bg-surface-hover 100%);

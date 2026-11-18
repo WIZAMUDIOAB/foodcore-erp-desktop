@@ -128,10 +128,9 @@ public class ConfiguracionController {
             "Confirmar Carga de Datos Demo",
             "Se insertarán clientes, productos y ventas de prueba (es_demo = 1)",
             "Estos registros pueden eliminarse posteriormente sin afectar tus datos reales. ¿Deseas continuar?");
-    private BooleanSupplier confirmacionBorrarDemoSupplier = () -> solicitarConfirmacionUi(
+    private BooleanSupplier confirmacionBorrarDemoSupplier = () -> solicitarConfirmacionDestructivaUi(
             "Confirmar Borrado de Datos Demo",
-            "Se eliminarán únicamente los registros marcados con es_demo = 1",
-            "Los clientes, productos y ventas reales permanecerán intactos. ¿Deseas continuar?");
+            "Se eliminarán únicamente los registros marcados con es_demo = 1. Los datos reales permanecerán intactos. ¿Deseas continuar?");
     private Function<Path, Boolean> ejecutorRestauracion = ConfiguracionController::ejecutarScriptRestauracionSistema;
     private Supplier<Path> ejecutorBackup = ConfiguracionController::ejecutarScriptBackupSistema;
 
@@ -571,10 +570,18 @@ public class ConfiguracionController {
     }
 
     private boolean solicitarConfirmacionRestauracionUi() {
-        return solicitarConfirmacionUi(
+        return solicitarConfirmacionDestructivaUi(
                 "Confirmar Restauración de Base de Datos",
-                "Se restaurará la base de datos desde el archivo seleccionado",
-                "Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
+                "Se restaurará la base de datos desde el archivo seleccionado, deteniendo temporalmente los servicios y reemplazando los datos actuales. ¿Desea continuar?");
+    }
+
+    private boolean solicitarConfirmacionDestructivaUi(String titulo, String mensaje) {
+        Alert confirm = DialogService.crearConfirmacionDestructiva(titulo, mensaje);
+        if (rootConfigStack != null && rootConfigStack.getScene() != null) {
+            confirm.initOwner(rootConfigStack.getScene().getWindow());
+        }
+        Optional<ButtonType> result = confirm.showAndWait();
+        return result.isPresent() && result.get() == DialogService.BTN_SI_ANULAR;
     }
 
     private boolean solicitarConfirmacionUi(String titulo, String header, String contenido) {
