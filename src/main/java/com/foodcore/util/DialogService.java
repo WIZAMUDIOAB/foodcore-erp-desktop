@@ -1,6 +1,8 @@
 package com.foodcore.util;
 
 import com.foodcore.App;
+import javafx.animation.Interpolator;
+import javafx.animation.TranslateTransition;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -22,6 +24,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.net.URL;
 import java.util.Collection;
@@ -32,6 +35,12 @@ import java.util.List;
  * conforme al estándar cerrado UX/UI v2.2 (§2.1 y §2.2).
  */
 public final class DialogService {
+
+    public static final ButtonType BTN_SI_ANULAR =
+            new ButtonType("Sí, anular", ButtonBar.ButtonData.OK_DONE);
+    public static final ButtonType BTN_CANCELAR =
+            new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+    public static final String PROP_SHAKE_TRANSITION = "fc_shake_transition";
 
     private static final String LIGHT_CSS = "/css/foodcore.css";
     private static final String DARK_CSS = "/com/foodcore/css/dark-theme.css";
@@ -123,6 +132,61 @@ public final class DialogService {
      */
     public static void mostrarAlerta(Alert.AlertType tipo, String titulo, String contenido) {
         crearAlerta(tipo, titulo, contenido).showAndWait();
+    }
+
+    /**
+     * Crea un modal de confirmación destructiva con botón "Sí, anular" en rojo ({@code --status-danger}),
+     * botón "Cancelar" en gris y animación horizontal Shake de 300ms (Sub-Fase F - F7).
+     */
+    public static Alert crearConfirmacionDestructiva(String titulo, String mensaje) {
+        Alert alert = new Alert(Alert.AlertType.WARNING, mensaje, BTN_CANCELAR, BTN_SI_ANULAR);
+        alert.setTitle(titulo != null ? titulo : "Confirmar acción destructiva");
+        alert.setHeaderText(titulo != null ? titulo : "Confirmar acción destructiva");
+        aplicarEstilosDialogo(alert);
+
+        DialogPane pane = alert.getDialogPane();
+        Node btnAnularNode = pane.lookupButton(BTN_SI_ANULAR);
+        if (btnAnularNode instanceof Button btnAnular) {
+            btnAnular.getStyleClass().removeAll("btn-primary", "btn-secondary");
+            if (!btnAnular.getStyleClass().contains("btn-danger")) {
+                btnAnular.getStyleClass().add("btn-danger");
+            }
+            if (!btnAnular.getStyleClass().contains("btn-destructive")) {
+                btnAnular.getStyleClass().add("btn-destructive");
+            }
+        }
+        Node btnCancelarNode = pane.lookupButton(BTN_CANCELAR);
+        if (btnCancelarNode instanceof Button btnCancelar) {
+            btnCancelar.getStyleClass().removeAll("btn-primary", "btn-danger", "btn-destructive");
+            if (!btnCancelar.getStyleClass().contains("btn-secondary")) {
+                btnCancelar.getStyleClass().add("btn-secondary");
+            }
+        }
+
+        TranslateTransition shake = aplicarShake(pane);
+        if (shake != null) {
+            alert.setOnShown(e -> shake.playFromStart());
+            shake.playFromStart();
+        }
+        return alert;
+    }
+
+    /**
+     * Aplica una vibración horizontal (Shake) de 300ms sobre el nodo indicado.
+     */
+    public static TranslateTransition aplicarShake(Node node) {
+        if (node == null) {
+            return null;
+        }
+        TranslateTransition shake = new TranslateTransition(Duration.millis(300), node);
+        shake.setFromX(-10.0);
+        shake.setToX(10.0);
+        shake.setCycleCount(6);
+        shake.setAutoReverse(true);
+        shake.setInterpolator(Interpolator.EASE_BOTH);
+        shake.setOnFinished(e -> node.setTranslateX(0.0));
+        node.getProperties().put(PROP_SHAKE_TRANSITION, shake);
+        return shake;
     }
 
     /**

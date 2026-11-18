@@ -2,6 +2,25 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.6.0] - Sub-Fase F: Premium Polish Desktop (2026-11-18)
+
+- **Login con Fondo Aurora y Glassmorphism (`LoginView.fxml`, `LoginController.java` & `foodcore.css`) (F1)**:
+  - Fondo animado continuo en `Canvas` (`auroraCanvas` + `GaussianBlur` + `Timeline`) con gradientes radiales dinámicos en Terracota (`#EA580C`), Ámbar (`#D97706`) y Zinc oscuro (`#3F3F46`).
+  - Contenedor central `.login-glass-panel` con superficie translúcida `rgba(24, 24, 27, 0.65)` y borde sutil `rgba(255, 255, 255, 0.10)` en modo claro y oscuro, eliminando el badge inferior `"MySQL 8.0 LAN · Conectado"`.
+- **Splash Screen Animado (`SplashView.fxml`, `SplashController.java` & `App.java`) (F2)**:
+  - Pantalla de carga centrada con logo de FoodCore (animación inicial *fade-in* + *scale-up* en 450 ms), `ProgressBar` enlazada al progreso del arranque y textos dinámicos (*"Migrando base de datos…"*, *"Iniciando servicios locales…"*, *"Cargando interfaz de acceso…"*).
+  - Transición suave *fade-out* (200 ms) del Splash hacia *fade-in* (250 ms) del Login mediante `App.transicionarSplashALogin`.
+- **Micro-interacciones Táctiles (`foodcore.css`) (F4)**:
+  - Elevación y sombra en `.button:hover` (`-fx-translate-y: -1px`), compresión táctil en `.button:pressed` (`-fx-scale-x: 0.98`, `-fx-scale-y: 0.98`) y halo de foco Terracota (`rgba(234, 88, 12, 0.2)`) en `.text-field:focused`, `.combo-box:focused` y `.date-picker:focused`.
+- **Notificaciones Toast Animadas (`ToastService.java` & controladores) (F6)**:
+  - Componente `HBox` en `-bg-surface` con borde izquierdo de 4 px semántico (`-status-success` / `-status-danger` / `-status-warning`), icono `FontIcon`, mensaje y botón de cierre manual, animación deslizante (`TranslateTransition`), permanencia de 4 s y desvanecimiento (`FadeTransition`).
+  - Reemplazo de alertas simples de éxito/error/advertencia en `AuditoriaController`, `CobroModalController`, `MantenimientoBDController`, `MenuQrModalController`, `MozoOrderController`, `OnboardingWizardController`, `SalonMesasController` y `VentaController`.
+- **Confirmaciones Destructivas con Shake (`DialogService.java`, `VentaController.java` & `ConfiguracionController.java`) (F7)**:
+  - Nuevo `DialogService.crearConfirmacionDestructiva(titulo, mensaje)` con botón `"Sí, anular"` en estilo rojo (`--status-danger` / `.btn-danger`), botón `"Cancelar"` en gris (`.btn-secondary`) y vibración horizontal `TranslateTransition` de 300 ms al abrirse.
+- **Breadcrumbs de Navegación (`MainLayout.fxml`, `MainDashboardView.fxml` & `MainDashboardController.java`) (F8)**:
+  - Barra superior `#breadcrumbBar` / `#lblBreadcrumbs` bajo el área principal actualizada automáticamente vía `actualizarBreadcrumbs(ruta)` al cambiar de módulo desde el sidebar (`"Inicio > Salón > Mesas"`, `"Inicio > Sistema > Configuración del Sistema"`, etc.).
+- **Verificación (`SubFaseFPremiumPolishTest`)**: Suite automatizada validando F1, F2, F4, F6, F7 y F8 junto con `RedisenoPremiumVisualE2ETest` y quality gates (`clean verify`).
+
 ## [5.5.0] - Sub-Fase E: Auditoría y Onboarding (2026-11-16)
 
 - **Auditoría Visual Mejorada (`AuditoriaView.fxml` & `AuditoriaController.java`) (E1)**:

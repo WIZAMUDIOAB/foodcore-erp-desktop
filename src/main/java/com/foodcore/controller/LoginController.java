@@ -10,19 +10,30 @@ import com.foodcore.service.OnboardingService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextField;
+import javafx.scene.effect.GaussianBlur;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +57,7 @@ public class LoginController {
         "Error inesperado al iniciar sesión. Reinicie la aplicación o contacte al administrador.";
 
     @FXML private StackPane rootStackPane;
+    @FXML private Canvas auroraCanvas;
     @FXML private GridPane loginCardContainer;
     @FXML private TextField txtUsername;
     @FXML private PasswordField txtPassword;
@@ -67,6 +79,8 @@ public class LoginController {
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
     private Usuario usuarioPendiente2FA;
+    private Timeline auroraTimeline;
+    private double auroraPhase = 0.0;
     private boolean autenticating = false;
 
     public LoginController() {
@@ -80,8 +94,90 @@ public class LoginController {
     @FXML
     public void initialize() {
         ocultarError();
+        iniciarAnimacionAurora();
         AnimationUtils.enterWithFadeSlide(loginCardContainer, 12.0, 0);
         AnimationUtils.attachTactileFeedback(btnLogin);
+    }
+
+    /**
+     * Inicializa y anima el fondo Aurora en bucle lento con orbes Terracota, Ámbar y Gris Oscuro (F1).
+     */
+    private void iniciarAnimacionAurora() {
+        if (auroraCanvas == null) {
+            return;
+        }
+        if (rootStackPane != null) {
+            auroraCanvas.widthProperty().bind(rootStackPane.widthProperty());
+            auroraCanvas.heightProperty().bind(rootStackPane.heightProperty());
+        }
+        auroraCanvas.setEffect(new GaussianBlur(16.0));
+        auroraCanvas.widthProperty().addListener((obs, o, n) -> dibujarFrameAurora(auroraPhase));
+        auroraCanvas.heightProperty().addListener((obs, o, n) -> dibujarFrameAurora(auroraPhase));
+        dibujarFrameAurora(0.0);
+
+        auroraTimeline = new Timeline(new KeyFrame(Duration.millis(40), e -> {
+            auroraPhase += 0.025;
+            dibujarFrameAurora(auroraPhase);
+        }));
+        auroraTimeline.setCycleCount(Animation.INDEFINITE);
+        auroraTimeline.play();
+    }
+
+    private void dibujarFrameAurora(double phase) {
+        if (auroraCanvas == null) {
+            return;
+        }
+        double w = Math.max(1040.0, auroraCanvas.getWidth());
+        double h = Math.max(680.0, auroraCanvas.getHeight());
+        GraphicsContext gc = auroraCanvas.getGraphicsContext2D();
+
+        gc.setFill(Color.rgb(24, 24, 27));
+        gc.fillRect(0, 0, w, h);
+
+        double radiusPrincipal = Math.max(w, h) * 0.58;
+        // Orbe 1: Terracota (#EA580C)
+        double x1 = w * (0.28 + 0.16 * Math.sin(phase));
+        double y1 = h * (0.32 + 0.14 * Math.cos(phase * 0.8));
+        gc.setFill(new RadialGradient(
+                0, 0, x1, y1, radiusPrincipal, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.rgb(234, 88, 12, 0.42)),
+                new Stop(1.0, Color.TRANSPARENT)));
+        gc.fillRect(0, 0, w, h);
+
+        // Orbe 2: Ámbar cálido (#D97706)
+        double x2 = w * (0.74 + 0.15 * Math.cos(phase * 0.7));
+        double y2 = h * (0.68 + 0.14 * Math.sin(phase * 0.9));
+        gc.setFill(new RadialGradient(
+                0, 0, x2, y2, radiusPrincipal * 0.90, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.rgb(217, 119, 6, 0.32)),
+                new Stop(1.0, Color.TRANSPARENT)));
+        gc.fillRect(0, 0, w, h);
+
+        // Orbe 3: Gris Oscuro / Zinc (#27272A)
+        double x3 = w * (0.52 + 0.18 * Math.sin(phase * 0.5 + 1.2));
+        double y3 = h * (0.20 + 0.16 * Math.cos(phase * 0.6));
+        gc.setFill(new RadialGradient(
+                0, 0, x3, y3, radiusPrincipal * 0.85, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.rgb(63, 63, 70, 0.55)),
+                new Stop(1.0, Color.TRANSPARENT)));
+        gc.fillRect(0, 0, w, h);
+    }
+
+    /**
+     * Detiene la línea de tiempo del fondo Aurora al abandonar la vista de Login.
+     */
+    public void detenerAnimacionAurora() {
+        if (auroraTimeline != null) {
+            auroraTimeline.stop();
+        }
+    }
+
+    public boolean isAuroraActiva() {
+        return auroraTimeline != null && auroraTimeline.getStatus() == Animation.Status.RUNNING;
+    }
+
+    public Canvas getAuroraCanvas() {
+        return auroraCanvas;
     }
 
     @FXML
@@ -331,6 +427,7 @@ public class LoginController {
     }
 
     private void irAlDashboard() {
+        detenerAnimacionAurora();
         boolean requiereOnboarding = onboardingService.necesitaOnboarding();
         String vistaObjetivo = requiereOnboarding
                 ? "/com/foodcore/view/OnboardingWizardView.fxml"

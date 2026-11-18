@@ -15,6 +15,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.VentaService;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -349,6 +350,6 @@ public class CobroModalController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        DialogService.mostrarAlerta(tipo, titulo, mensaje);
+        ToastService.mostrarPorAlertType(tipo, titulo + ": " + mensaje);
     }
 }

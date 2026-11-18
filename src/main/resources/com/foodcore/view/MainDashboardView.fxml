@@ -5,6 +5,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -17,20 +18,24 @@
         <BorderPane fx:id="mainBorderPane">
             <!-- Barra Lateral Izquierda Colapsable con RBAC y Buscador Integrado (SPEC v3.0.3 §1 & §2) -->
             <left>
-                <VBox fx:id="sidebarBox" prefWidth="252.0" spacing="8.0" styleClass="sidebar-container">
-                    <!-- Brand, Versión y Botón de Colapsar Sidebar [«] -->
+                <VBox fx:id="sidebarBox" prefWidth="260.0" spacing="8.0" styleClass="sidebar-container">
+                    <!-- Toggle de Tema, Brand, Versión y Botón de Colapsar Sidebar [«] (F-UX) -->
                     <HBox alignment="CENTER_LEFT" spacing="8.0">
+                        <Button fx:id="btnToggleTheme" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleTheme" styleClass="btn-secondary, sidebar-icon-btn">
+                            <graphic>
+                                <FontIcon fx:id="iconToggleTheme" iconLiteral="fth-moon" iconSize="16" />
+                            </graphic>
+                            <tooltip>
+                                <Tooltip text="Cambiar Tema" />
+                            </tooltip>
+                        </Button>
                         <VBox fx:id="boxBrandHeader" spacing="2.0" HBox.hgrow="ALWAYS">
-                            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <HBox alignment="CENTER_LEFT" spacing="6.0">
                                 <Label styleClass="sidebar-brand-title" text="FoodCore" />
                                 <Label styleClass="sidebar-brand-badge" text="v3.0" />
                             </HBox>
-                            <HBox alignment="CENTER_LEFT" spacing="6.0">
-                                <Region fx:id="dotNetworkStatus" styleClass="status-dot-online" />
-                                <Label fx:id="lblNetworkStatus" styleClass="badge-pill-success" text="ONLINE" />
-                            </HBox>
                         </VBox>
-                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-secondary" text="«" />
+                        <Button fx:id="btnToggleSidebar" focusTraversable="false" mnemonicParsing="false" onAction="#handleToggleSidebar" styleClass="btn-secondary, sidebar-icon-btn" text="«" />
                     </HBox>
 
                     <!-- Buscador Global Integrado en Sidebar -->
@@ -98,14 +103,15 @@
                         </content>
                     </ScrollPane>
 
-                    <!-- Perfil de Sesión Activa -->
+                    <!-- Perfil de Sesión Activa + Estado de Red (F-UX) -->
                     <VBox spacing="6.0" styleClass="sidebar-user-card">
                         <HBox alignment="CENTER_LEFT" spacing="8.0">
-                            <Region styleClass="status-dot-online" />
+                            <Region fx:id="dotNetworkStatus" styleClass="status-dot-online" />
                             <VBox spacing="1.0" HBox.hgrow="ALWAYS">
                                 <Label fx:id="lblUsuarioLogueado" styleClass="text-body-strong" text="admin · Administrador" />
                                 <Label styleClass="text-caption" text="Sesión autorizada RBAC" />
                             </VBox>
+                            <Label fx:id="lblNetworkStatus" styleClass="badge-pill-success" text="ONLINE" />
                         </HBox>
                         <HBox spacing="6.0">
                             <Button fx:id="btnCambiarPasswordMenu" focusTraversable="false" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAbrirCambioPassword" styleClass="btn-secondary" text="Clave" HBox.hgrow="ALWAYS" />
@@ -115,10 +121,16 @@
                 </VBox>
             </left>
 
-            <!-- Zona de Trabajo Central Dinámica al 100% de Alto (Sin TopBar redundante) -->
+            <!-- Zona de Trabajo Central Dinámica con Breadcrumbs de Navegación (F8) -->
             <center>
                 <VBox styleClass="app-canvas">
                     <children>
+                        <HBox fx:id="breadcrumbBar" alignment="CENTER_LEFT" spacing="8.0" styleClass="breadcrumb-bar">
+                            <children>
+                                <FontIcon iconLiteral="fth-home" iconSize="14" styleClass="breadcrumb-icon" />
+                                <Label fx:id="lblBreadcrumbs" styleClass="breadcrumb-text" text="Inicio &gt; Operaciones &gt; Dashboard Gerencial" />
+                            </children>
+                        </HBox>
                         <StackPane fx:id="contentArea" styleClass="app-canvas" VBox.vgrow="ALWAYS" />
                     </children>
                 </VBox>

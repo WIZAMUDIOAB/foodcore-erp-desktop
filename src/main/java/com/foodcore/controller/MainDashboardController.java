@@ -5,6 +5,7 @@ import com.foodcore.model.Usuario;
 import com.foodcore.offline.SyncWorker;
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.ToastService;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -15,14 +16,17 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,14 +43,57 @@ import java.util.logging.Logger;
 public class MainDashboardController {
 
     private static final Logger LOGGER = Logger.getLogger(MainDashboardController.class.getName());
+    private static final Map<String, String> RUTAS_BREADCRUMBS = Map.ofEntries(
+            Map.entry("/com/foodcore/view/DashboardView.fxml", "Inicio > Operaciones > Dashboard Gerencial"),
+            Map.entry("/com/foodcore/view/SalonMesasView.fxml", "Inicio > Salón > Mesas"),
+            Map.entry("/com/foodcore/view/ReservasView.fxml", "Inicio > Operaciones > Libro de Reservas"),
+            Map.entry("/com/foodcore/view/DeliveryView.fxml", "Inicio > Operaciones > Delivery y Envíos"),
+            Map.entry("/com/foodcore/view/VentaPOSView.fxml", "Inicio > Operaciones > Punto de Venta (POS)"),
+            Map.entry("/com/foodcore/view/KitchenDisplayView.fxml", "Inicio > Operaciones > Cocina (KDS)"),
+            Map.entry("/com/foodcore/view/CajaView.fxml", "Inicio > Operaciones > Caja y Turnos"),
+            Map.entry("/com/foodcore/view/HistorialVentasView.fxml", "Inicio > Operaciones > Historial y Devoluciones"),
+            Map.entry("/com/foodcore/view/PromocionesView.fxml", "Inicio > Comercial > Promociones y Descuentos"),
+            Map.entry("/com/foodcore/view/KioscoView.fxml", "Inicio > Comercial > Kiosco Autoservicio"),
+            Map.entry("/com/foodcore/view/MenuQrModalView.fxml", "Inicio > Comercial > Menú Digital QR"),
+            Map.entry("/com/foodcore/view/EstadoResultadosView.fxml", "Inicio > Finanzas > Estado de Resultados (P&L)"),
+            Map.entry("/com/foodcore/view/ReportesContablesView.fxml", "Inicio > Finanzas > Reportes Contables"),
+            Map.entry("/com/foodcore/view/ProveedoresView.fxml", "Inicio > Finanzas > Proveedores y CxP"),
+            Map.entry("/com/foodcore/view/ClientesView.fxml", "Inicio > Finanzas > Clientes y CxC"),
+            Map.entry("/com/foodcore/view/HistorialPreciosView.fxml", "Inicio > Finanzas > Historial de Precios"),
+            Map.entry("/com/foodcore/view/ReportesAvanzadosView.fxml", "Inicio > Finanzas > Reportes Avanzados"),
+            Map.entry("/com/foodcore/view/AsistenciaView.fxml", "Inicio > Recursos Humanos > Control de Asistencia"),
+            Map.entry("/com/foodcore/view/RelojAsistenciaView.fxml", "Inicio > Recursos Humanos > Reloj Marcador"),
+            Map.entry("/com/foodcore/view/HorariosView.fxml", "Inicio > Recursos Humanos > Turnos y Horarios"),
+            Map.entry("/com/foodcore/view/MiHorarioView.fxml", "Inicio > Recursos Humanos > Mi Portal y Horario"),
+            Map.entry("/com/foodcore/view/SolicitudesView.fxml", "Inicio > Recursos Humanos > Solicitudes y Ausencias"),
+            Map.entry("/com/foodcore/view/ExpedienteEmpleadoView.fxml", "Inicio > Recursos Humanos > Expedientes y Legajos"),
+            Map.entry("/com/foodcore/view/PlanillaView.fxml", "Inicio > Recursos Humanos > Pagos y Planilla"),
+            Map.entry("/com/foodcore/view/InventarioView.fxml", "Inicio > Backoffice > Inventario de Insumos"),
+            Map.entry("/com/foodcore/view/InventarioFisicoView.fxml", "Inicio > Backoffice > Toma de Inventario Físico"),
+            Map.entry("/com/foodcore/view/MenuView.fxml", "Inicio > Backoffice > Menú y Platillos"),
+            Map.entry("/com/foodcore/view/RecetasView.fxml", "Inicio > Backoffice > Recetas y Escandallo"),
+            Map.entry("/com/foodcore/view/MermasView.fxml", "Inicio > Backoffice > Registro de Mermas"),
+            Map.entry("/com/foodcore/view/AnalisisMermasView.fxml", "Inicio > Backoffice > Análisis de Mermas"),
+            Map.entry("/com/foodcore/view/KardexView.fxml", "Inicio > Backoffice > Auditoría Kardex"),
+            Map.entry("/com/foodcore/view/AuditoriaView.fxml", "Inicio > Backoffice > Bitácora de Auditoría"),
+            Map.entry("/com/foodcore/view/UsuariosView.fxml", "Inicio > Sistema > Gestión de Usuarios"),
+            Map.entry("/com/foodcore/view/RolesView.fxml", "Inicio > Sistema > Roles y Permisos"),
+            Map.entry("/com/foodcore/view/ConfiguracionView.fxml", "Inicio > Sistema > Configuración del Sistema"),
+            Map.entry("/com/foodcore/view/EstadoSistemaView.fxml", "Inicio > Sistema > Estado del Sistema"),
+            Map.entry("/com/foodcore/view/MantenimientoBDView.fxml", "Inicio > Sistema > Mantenimiento BD")
+    );
 
     @FXML private StackPane rootDashboardStack;
     @FXML private BorderPane mainBorderPane;
     @FXML private VBox sidebarBox;
     @FXML private VBox boxBrandHeader;
+    @FXML private Button btnToggleTheme;
+    @FXML private FontIcon iconToggleTheme;
     @FXML private Button btnToggleSidebar;
     @FXML private Label lblBuscarSidebar;
     @FXML private javafx.scene.control.TextField txtBuscarSidebar;
+    @FXML private HBox breadcrumbBar;
+    @FXML private Label lblBreadcrumbs;
     @FXML private StackPane contentArea;
     @FXML private Label lblUsuarioLogueado;
     @FXML private Region dotNetworkStatus;
@@ -108,11 +155,13 @@ public class MainDashboardController {
     private boolean sidebarColapsado = false;
     private Object controladorActivo;
     private Usuario usuarioAccesoActual;
+    private String rutaBreadcrumbsActual = "Inicio > Operaciones > Dashboard Gerencial";
 
     @FXML
     public void initialize() {
+        ToastService.registrarHostPane(rootDashboardStack);
         Button[] buttons = {
-            btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja, btnNavHistorialVentas,
+            btnToggleTheme, btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja, btnNavHistorialVentas,
             btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
             btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes, btnNavPlanilla,
             btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
@@ -122,6 +171,7 @@ public class MainDashboardController {
         for (Button btn : buttons) {
             AnimationUtils.attachTactileFeedback(btn);
         }
+        actualizarIconoTema(App.isDarkModeActivo());
 
         configurarSyncWorkerListener();
 
@@ -288,6 +338,32 @@ public class MainDashboardController {
         if (btnToggleSidebar != null) {
             btnToggleSidebar.setText(sidebarColapsado ? "»" : "«");
         }
+    }
+
+    /**
+     * Alterna entre Modo Claro y Modo Oscuro desde el botón superior izquierdo del sidebar (F-UX).
+     */
+    @FXML
+    public void handleToggleTheme(ActionEvent event) {
+        boolean nuevoModoOscuro = !App.isDarkModeActivo();
+        App.setDarkModeActivo(nuevoModoOscuro);
+        Scene scene = rootDashboardStack != null ? rootDashboardStack.getScene() : null;
+        if (scene != null) {
+            App.aplicarModoOscuro(scene, nuevoModoOscuro);
+        }
+        actualizarIconoTema(nuevoModoOscuro);
+    }
+
+    private void actualizarIconoTema(boolean darkMode) {
+        if (iconToggleTheme != null) {
+            iconToggleTheme.setIconLiteral(darkMode ? "fth-sun" : "fth-moon");
+        } else if (btnToggleTheme != null && btnToggleTheme.getGraphic() instanceof FontIcon fi) {
+            fi.setIconLiteral(darkMode ? "fth-sun" : "fth-moon");
+        }
+    }
+
+    public Button getBtnToggleTheme() {
+        return btnToggleTheme;
     }
 
     @FXML
@@ -530,15 +606,64 @@ public class MainDashboardController {
 
             if (contentArea != null) {
                 contentArea.getChildren().setAll(view);
+                if (contentArea.getScene() != null) {
+                    App.aplicarModoOscuro(contentArea.getScene(), App.isDarkModeActivo());
+                }
             } else if (mainBorderPane != null) {
                 mainBorderPane.setCenter(view);
+                if (mainBorderPane.getScene() != null) {
+                    App.aplicarModoOscuro(mainBorderPane.getScene(), App.isDarkModeActivo());
+                }
             }
 
             AnimationUtils.enterWithFadeSlide(view, 6.0, 0);
             actualizarEstilosNav(navBtnActivo);
+            actualizarBreadcrumbs(resolverRutaBreadcrumbs(fxmlPath, navBtnActivo));
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Error cargando vista " + fxmlPath, e);
         }
+    }
+
+    /**
+     * Actualiza la barra superior de migas de pan con la ruta jerárquica activa (Sub-Fase F - F8).
+     */
+    public void actualizarBreadcrumbs(String ruta) {
+        String rutaFinal = (ruta == null || ruta.isBlank())
+                ? "Inicio > Operaciones > Dashboard Gerencial"
+                : ruta.trim();
+        this.rutaBreadcrumbsActual = rutaFinal;
+        if (lblBreadcrumbs != null) {
+            lblBreadcrumbs.setText(rutaFinal);
+        }
+        if (breadcrumbBar != null) {
+            breadcrumbBar.setVisible(true);
+            breadcrumbBar.setManaged(true);
+        }
+    }
+
+    private static String resolverRutaBreadcrumbs(String fxmlPath, Button navBtnActivo) {
+        if (fxmlPath != null) {
+            String mapped = RUTAS_BREADCRUMBS.get(fxmlPath);
+            if (mapped != null) {
+                return mapped;
+            }
+        }
+        if (navBtnActivo != null && navBtnActivo.getText() != null && !navBtnActivo.getText().isBlank()) {
+            return "Inicio > " + navBtnActivo.getText().trim();
+        }
+        return "Inicio > Operaciones > Dashboard Gerencial";
+    }
+
+    public HBox getBreadcrumbBar() {
+        return breadcrumbBar;
+    }
+
+    public Label getLblBreadcrumbs() {
+        return lblBreadcrumbs;
+    }
+
+    public String getRutaBreadcrumbsActual() {
+        return rutaBreadcrumbsActual;
     }
 
     private void actualizarEstilosNav(Button activo) {
