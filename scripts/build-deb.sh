@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_VERSION="5.3.0"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+APP_VERSION="5.7.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 TARGET_JAR="${PROJECT_ROOT}/target/foodcore-erp.jar"
 DIST_DIR="${PROJECT_ROOT}/dist"
 DEB_FILE="${DIST_DIR}/FoodCoreERP-${APP_VERSION}.deb"

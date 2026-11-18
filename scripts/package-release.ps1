@@ -1,13 +1,13 @@
 ﻿# ==============================================================================
-# FoodCore ERP v5.3.0 - Empaquetador Nativo Reproducible jpackage (Sub-Fase C)
+# FoodCore ERP v5.7.0 - Empaquetador Nativo Reproducible jpackage (GA)
 # Incluye: fat-JAR (todos los módulos), pwa/, keystore.jks.example, scripts/,
 # foodcore.cer y application.properties.example.
-# Genera dist/FoodCoreERP-5.3.0.msi + SHA-256
+# Genera dist/FoodCoreERP-5.7.0.msi (+ .deb via WSL si está disponible) + SHA-256
 # ==============================================================================
 param()
 $ErrorActionPreference = "Stop"
 
-$AppVersion  = "5.3.0"
+$AppVersion  = "5.7.0"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $TargetDir   = Join-Path $ProjectRoot "target"
 $DistDir     = Join-Path $ProjectRoot "dist"
@@ -106,9 +106,29 @@ $DebPath = Join-Path $DistDir "FoodCoreERP-$AppVersion.deb"
 
 if (Test-Path $MsiPath) { Remove-Item -Force $MsiPath }
 
-# Empaquetar la imagen generada por jpackage en el instalador MSI v5.3.0
+# Empaquetar la imagen generada por jpackage en el instalador MSI v5.7.0
 Compress-Archive -Path "$AppImageDir\*" -DestinationPath "$MsiPath.zip" -Force
 Move-Item -Path "$MsiPath.zip" -Destination $MsiPath -Force
+
+# Generar también el paquete .deb nativo vía WSL Debian si está disponible
+if (Get-Command wsl -ErrorAction SilentlyContinue) {
+    $WslHasJpackage = $false
+    try {
+        & wsl -d Debian --exec which jpackage | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $WslHasJpackage = $true
+        }
+    } catch {
+        $WslHasJpackage = $false
+    }
+    if ($WslHasJpackage) {
+        Write-Host "[jpackage] Generando paquete Linux .deb via WSL Debian..."
+        & wsl -d Debian --cd "$ProjectRoot" --exec bash scripts/build-deb.sh
+        if ($LASTEXITCODE -ne 0) {
+            throw "build-deb.sh en WSL Debian falló con código de salida $LASTEXITCODE"
+        }
+    }
+}
 
 $HashMsi = (Get-FileHash -Path $MsiPath -Algorithm SHA256).Hash.ToLower()
 
@@ -120,7 +140,10 @@ if (Test-Path $DebPath) {
     $HashDeb = (Get-FileHash -Path $DebPath -Algorithm SHA256).Hash.ToLower()
     $ShaEntries += "$HashDeb  FoodCoreERP-$AppVersion.deb"
 }
-$ShaEntries | Set-Content -Path $ShaFile -Encoding UTF8
+[System.IO.File]::WriteAllLines($ShaFile, $ShaEntries, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "[jpackage] Instalador de produccion generado exitosamente en ${DistDir}:"
+Write-Host "[jpackage] Instaladores de produccion generados exitosamente en ${DistDir}:"
 Write-Host "  SHA-256 MSI: $HashMsi  dist/FoodCoreERP-$AppVersion.msi"
+if (Test-Path $DebPath) {
+    Write-Host "  SHA-256 DEB: $HashDeb  dist/FoodCoreERP-$AppVersion.deb"
+}
