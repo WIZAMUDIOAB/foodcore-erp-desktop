@@ -81,3 +81,39 @@ bash scripts/build-deb.sh
 - **Alertas SMTP (`AlertaService`)**:
   - Configurar `smtp.host`, `smtp.port`, `smtp.user`, `smtp.password` y `alertas.email.destinatario` en `application.properties` o desde **Configuración del Sistema**.
   - Envía alerta por email al dueño cuando MySQL no responde por **> 1 minuto**, el disco libre cae por debajo de **5 GB**, o la RAM se mantiene en **>= 90%** por **> 5 minutos**.
+
+---
+
+## Pruebas de Carga, Estrés y Soak Test (v5.7.0 — Sub-Fase G)
+
+### 1. Pruebas de Carga (20 VUs) y Estrés (hasta 100 VUs) con k6
+El script [scripts/perf/load-test.js](scripts/perf/load-test.js) ejecuta dos escenarios contra el servidor API Javalin (`http://127.0.0.1:8080` o `https://127.0.0.1:8443`):
+- **Carga (`load_20_vus`)**: 20 usuarios virtuales durante 3 minutos (`POST /api/auth/login`, `POST /api/pedidos`, `GET /api/kds/items`), con umbrales `http_req_failed < 1%` y `p(95) < 500ms`.
+- **Estrés (`stress_100_vus`)**: escalado progresivo (`10 -> 35 -> 70 -> 100 -> 0 VUs`) para detectar el punto de quiebre.
+
+Ejecución local (requiere [k6](https://k6.io/) instalado y el servidor FoodCore activo):
+```bash
+k6 run scripts/perf/load-test.js
+# Contra HTTPS con certificado autofirmado:
+k6 run -e BASE_URL=https://127.0.0.1:8443 scripts/perf/load-test.js
+```
+
+### 2. Soak Test Simulado (5 min) y Real de 8 Horas
+- **Simulación rápida (5 minutos en Java)**: ejecuta `com.foodcore.perf.SoakTestSimulado` contra MySQL de prueba para medir crecimiento de Heap y latencia por iteración:
+  ```powershell
+  .\mvnw.cmd -B test-compile exec:java -Dexec.classpathScope=test `
+    "-Dexec.mainClass=com.foodcore.perf.SoakTestSimulado" "-Dexec.args=5"
+  ```
+- **Soak Test real de 8 horas (pre-producción)**:
+  - **Con k6** (20 VUs constantes por 8 horas):
+    ```bash
+    k6 run --vus 20 --duration 8h scripts/perf/load-test.js
+    ```
+  - **Con Apache JMeter (CLI non-GUI)**:
+    ```bash
+    jmeter -n -t scripts/perf/foodcore-soak-8h.jmx -Jthreads=20 -Jduration=28800 -l target/soak-8h.jtl
+    ```
+  - Monitorear memoria Heap JVM (`jstat -gcutil <PID> 10s`), conexiones activas HikariCP/MySQL (`SHOW PROCESSLIST`) y logs en **Estado del Sistema**.
+
+### 3. Accesibilidad (WCAG AA)
+Consulta [docs/ACCESIBILIDAD.md](docs/ACCESIBILIDAD.md) para ver la matriz de contrastes (`>= 4.5:1`), atajos de teclado y verificación automatizada en `FlujoCompletoAcoplamientoIT`.

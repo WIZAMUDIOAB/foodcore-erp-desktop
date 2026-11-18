@@ -2,6 +2,18 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.7.0] - Sub-Fase G: Performance y QA Final (2026-11-18)
+
+- **Smoke Test de Acoplamiento End-to-End (`FlujoCompletoAcoplamientoIT`) (#55 / G1)**:
+  - Prueba integral sobre MySQL 8.0 InnoDB verificando la cadena completa: creación de pedido en POS/Mozo (`PedidoService`), recepción y transición en cocina KDS (`PENDIENTE -> EN_PREPARACION -> LISTO -> ENTREGADO`), cobro en Caja (`VentaService.procesarCobroVenta`), descuento automático de stock y registro firmado (`SALIDA`) en `kardex_movimiento`, y conciliación en el Estado de Resultados P&L (`FinanzasBiService`).
+- **Pruebas de Carga, Estrés y Soak Test (`scripts/perf/load-test.js`, `SoakTestSimulado.java` & `README.md`) (#56, #57, #58 / G2, G3)**:
+  - Script `k6` en `scripts/perf/load-test.js` con escenario de carga sostenida (**20 VUs durante 3 min**, p95 `< 500 ms` y tasa de error `< 1%`) y rampa de estrés progresivo (**hasta 100 VUs**) sobre `/api/auth/login`, `/api/pedidos` y `/api/kds/items`.
+  - Utilidad de Soak Test rápido en Java (`com.foodcore.perf.SoakTestSimulado`, bucle configurable hasta 5 min simulando jornada de 8 h sin fugas de Heap ni conexiones JDBC) validada también desde `FlujoCompletoAcoplamientoIT`, más guía en `README.md` para el soak real de 8 horas con `k6` / Apache JMeter.
+- **Auditoría de Accesibilidad WCAG AA (`docs/ACCESIBILIDAD.md`) (#59 / G4)**:
+  - Documentación completa de ratios de contraste WCAG 2.1 AA (`>= 4.5:1` / `>= 3:1` UI) para Modo Claro (*Warm Neutral*) y Modo Oscuro (*OLED Zinc*).
+  - Incorporación de `accessibleRole="BUTTON"` y `accessibleText` en controles clave de `LoginView.fxml` y `VentaPOSView.fxml`, junto con prueba automatizada de navegación secuencial con tecla `Tab`.
+- **Revisión Final de Calidad (#60)**: Verificación íntegra con `mvnw.cmd -B clean verify` (`304` tests: `233` Surefire + `71` Failsafe, `0` violaciones Checkstyle, `0` bugs SpotBugs, JaCoCo y OWASP en verde).
+
 ## [5.6.0] - Sub-Fase F: Premium Polish Desktop (2026-11-18)
 
 - **Login con Fondo Aurora y Glassmorphism (`LoginView.fxml`, `LoginController.java` & `foodcore.css`) (F1)**:
