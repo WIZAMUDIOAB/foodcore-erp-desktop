@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.foodcore.controller.MarcacionAsistenciaController"
@@ -16,9 +17,12 @@
     </VBox>
 
     <!-- Visor de DNI -->
-    <TextField fx:id="txtDni" alignment="CENTER" editable="false" promptText="00000000"
-               prefHeight="48.0" maxWidth="280.0"
-               style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-background-color: white; -fx-border-color: -color-border-subtle; -fx-border-radius: 8px; -fx-background-radius: 8px;"/>
+    <VBox alignment="CENTER" spacing="6.0">
+        <Label styleClass="label-form" text="Número de DNI" />
+        <TextField fx:id="txtDni" alignment="CENTER" editable="false" promptText="00000000"
+                   prefHeight="48.0" maxWidth="280.0"
+                   style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-background-color: white; -fx-border-color: -color-border-subtle; -fx-border-radius: 8px; -fx-background-radius: 8px;"/>
+    </VBox>
 
     <!-- Teclado Numerico Tactil -->
     <GridPane alignment="CENTER" hgap="12.0" vgap="12.0">
@@ -36,7 +40,9 @@
 
         <Button text="C" onAction="#handleClear" prefWidth="85.0" prefHeight="54.0" styleClass="surface-card-interactive" style="-fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -color-accent-rose;" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
         <Button text="0" onAction="#handleNumClick" prefWidth="85.0" prefHeight="54.0" styleClass="surface-card-interactive" style="-fx-font-size: 20px; -fx-font-weight: 700;" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
-        <Button text="⌫" onAction="#handleBackspace" prefWidth="85.0" prefHeight="54.0" styleClass="surface-card-interactive" style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;" GridPane.columnIndex="2" GridPane.rowIndex="3"/>
+        <Button text="" onAction="#handleBackspace" prefWidth="85.0" prefHeight="54.0" styleClass="surface-card-interactive" style="-fx-font-size: 18px; -fx-font-weight: 700; -fx-text-fill: -color-ink-secondary;" GridPane.columnIndex="2" GridPane.rowIndex="3">
+            <graphic><FontIcon iconLiteral="fth-delete" iconSize="18" /></graphic>
+        </Button>
     </GridPane>
 
     <!-- Estado de Marcacion -->

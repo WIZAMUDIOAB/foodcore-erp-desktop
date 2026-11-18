@@ -1,15 +1,22 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.model.ProductoModificador;
+import com.foodcore.model.ProductoVariante;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.PersonalizacionProductoService;
+import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
+import com.foodcore.util.EmptyStateHelper;
+import com.foodcore.util.FormatoPersonalizacionUtil;
+import com.foodcore.util.ImpresoraTermicaService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -17,6 +24,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -29,6 +37,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,6 +45,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,7 +81,7 @@ public class MozoOrderController {
     private String clienteReferencia;
     private BigDecimal costoEnvio = BigDecimal.ZERO;
     private final ObservableList<DetallePedido> items = FXCollections.observableArrayList();
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
+    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
     private final PedidoService pedidoService = new PedidoService();
 
     public void setNumeroMesa(String mesa) {
@@ -147,11 +157,10 @@ public class MozoOrderController {
             lblMozo.setText("Mozo: Turno Activo (Mateo Quispe)");
         }
 
-        Label lblPlaceholder = new Label("Aún no hay platos en la comanda");
-        lblPlaceholder.getStyleClass().add("text-body-secondary");
-        tblItems.setPlaceholder(lblPlaceholder);
+        EmptyStateHelper.aplicarPlaceholder(tblItems);
 
-        colPlato.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNombreProducto()));
+        colPlato.setCellValueFactory(c -> new SimpleStringProperty(
+                FormatoPersonalizacionUtil.formatearDescripcionItem(c.getValue())));
         colCantidad.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().getCantidad()));
         colPrecio.setCellValueFactory(c -> {
             BigDecimal p = c.getValue().getPrecioUnitario();
@@ -191,7 +200,7 @@ public class MozoOrderController {
         List<Producto> productos = new ArrayList<>();
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
-                productos = productoDAO.listarProductosDisponibles(conn);
+                productos = personalizacionService.listarProductosDisponiblesConOpciones(conn);
             }
         } catch (java.sql.SQLException | RuntimeException ignored) {
             // Se usará catálogo demostrativo de respaldo
@@ -217,32 +226,52 @@ public class MozoOrderController {
         }
         tilePlatos.getChildren().clear();
         for (Producto p : productos) {
-            HBox card = new HBox(10.0);
+            HBox card = new HBox(16.0);
             card.setAlignment(Pos.CENTER_LEFT);
-            card.setPrefWidth(225.0);
-            card.setMinHeight(86.0);
-            card.getStyleClass().add("surface-card-interactive");
-            card.setStyle("-fx-padding: 12 14;");
+            card.setMinWidth(320.0);
+            card.setPrefWidth(340.0);
+            card.getStyleClass().add("card");
+            card.setPadding(new Insets(16.0));
 
-            VBox infoBox = new VBox(6.0);
+            VBox infoBox = new VBox(4.0);
+            infoBox.setMinWidth(0.0);
+            infoBox.setPrefWidth(150.0);
             infoBox.setAlignment(Pos.CENTER_LEFT);
             HBox.setHgrow(infoBox, Priority.ALWAYS);
 
             Label lblNombre = new Label(p.getNombre());
+            lblNombre.setMinWidth(0.0);
             lblNombre.setWrapText(true);
-            lblNombre.setMaxWidth(155.0);
-            lblNombre.setStyle("-fx-font-family: 'Inter', 'Segoe UI', sans-serif; -fx-font-weight: 700; -fx-font-size: 13px; -fx-text-fill: #111827;");
+            lblNombre.getStyleClass().add("h3");
 
-            BigDecimal precioVal = p.getPrecioVenta() != null ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            String descTexto;
+            if (p.isEsCombo()) {
+                descTexto = "COMBO · " + (p.getDescripcion() != null && !p.getDescripcion().isBlank()
+                        ? p.getDescripcion() : "Paquete promocional");
+            } else if (p.tieneOpcionesPersonalizacion()) {
+                descTexto = FormatoPersonalizacionUtil.construirResumenOpciones(p);
+            } else if (p.getDescripcion() != null && !p.getDescripcion().isBlank()) {
+                descTexto = p.getDescripcion();
+            } else {
+                descTexto = p.getCodigo() != null ? p.getCodigo() : "Plato de carta";
+            }
+            Label lblDesc = new Label(descTexto);
+            lblDesc.setMinWidth(0.0);
+            lblDesc.setWrapText(true);
+            lblDesc.getStyleClass().add("text-secondary");
+
+            BigDecimal precioVal = p.getPrecioVenta() != null
+                    ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
             Label lblPrecio = new Label("S/ " + precioVal);
-            lblPrecio.setStyle("-fx-font-family: 'JetBrains Mono', 'Consolas', monospace; -fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #F05A22;");
+            lblPrecio.getStyleClass().add("price");
 
-            infoBox.getChildren().addAll(lblNombre, lblPrecio);
+            infoBox.getChildren().addAll(lblNombre, lblDesc, lblPrecio);
 
-            Button btnMas = new Button("+");
+            Button btnMas = new Button("+ Agregar");
+            btnMas.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
             btnMas.setFocusTraversable(false);
-            btnMas.setStyle("-fx-background-color: #F05A22; -fx-text-fill: #FFFFFF; -fx-font-weight: 800; -fx-font-size: 16px; "
-                    + "-fx-min-width: 38px; -fx-pref-width: 38px; -fx-min-height: 38px; -fx-pref-height: 38px; -fx-padding: 0; -fx-background-radius: 8px; -fx-cursor: hand;");
+            btnMas.getStyleClass().add("btn-primary");
+            btnMas.setGraphicTextGap(8.0);
             AnimationUtils.attachTactileFeedback(btnMas);
             btnMas.setOnAction(e -> {
                 e.consume();
@@ -259,20 +288,71 @@ public class MozoOrderController {
         if (p == null) {
             return;
         }
+        Producto resuelto = personalizacionService.resolverOpcionesProducto(p);
+        if (resuelto.tieneOpcionesPersonalizacion()) {
+            Window owner = tblItems != null && tblItems.getScene() != null
+                    ? tblItems.getScene().getWindow()
+                    : null;
+            Optional<PersonalizacionProductoController.ResultadoPersonalizacion> seleccion =
+                    PersonalizacionProductoController.mostrarModal(
+                            owner, resuelto, resuelto.getVariantes(), resuelto.getModificadores());
+            seleccion.ifPresent(res -> agregarPlatoPersonalizado(
+                    res.producto(), res.variante(), res.modificadores(), res.cantidad(), res.notaEspecial()));
+            return;
+        }
+        agregarPlatoPersonalizado(resuelto, null, List.of(), 1, "");
+    }
+
+    /**
+     * Agrega una línea ya personalizada (variante + modificadores + cantidad) a la comanda del mozo.
+     */
+    public void agregarPlatoPersonalizado(Producto p,
+                                          ProductoVariante variante,
+                                          List<ProductoModificador> modificadores,
+                                          int cantidad,
+                                          String notaEspecial) {
+        if (p == null) {
+            return;
+        }
+        int qty = Math.max(1, cantidad);
+        List<ProductoModificador> mods = modificadores != null ? List.copyOf(modificadores) : List.of();
+        Integer idVariante = variante != null && variante.getIdVariante() > 0 ? variante.getIdVariante() : null;
+        String nombreVariante = variante != null ? variante.getNombreVariante() : null;
+        String modsTexto = FormatoPersonalizacionUtil.formatearTextoModificadores(mods);
+        String nota = notaEspecial != null ? notaEspecial.trim() : "";
+        BigDecimal precioUnitario = FormatoPersonalizacionUtil.calcularPrecioUnitario(p, variante, mods);
+        BigDecimal subtotal = precioUnitario.multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP);
+
         for (DetallePedido dp : items) {
-            if (dp.getIdDetallePedido() <= 0 && dp.getIdProducto() == p.getIdProducto()) {
-                dp.setCantidad(dp.getCantidad() + 1);
-                dp.setSubtotal(dp.getPrecioUnitario().multiply(BigDecimal.valueOf(dp.getCantidad())));
-                if (tblItems != null) {
-                    tblItems.refresh();
+            if (dp.getIdDetallePedido() <= 0) {
+                String modsExistentes = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                        dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
+                if (FormatoPersonalizacionUtil.mismaPersonalizacion(
+                        dp.getIdProducto(), dp.getIdVariante(), modsExistentes, dp.getNotasPreparacion(),
+                        p.getIdProducto(), idVariante, modsTexto, nota)) {
+                    dp.setCantidad(dp.getCantidad() + qty);
+                    dp.setSubtotal(dp.getPrecioUnitario().multiply(BigDecimal.valueOf(dp.getCantidad()))
+                            .setScale(2, RoundingMode.HALF_UP));
+                    if (tblItems != null) {
+                        tblItems.refresh();
+                    }
+                    calcularTotal();
+                    return;
                 }
-                calcularTotal();
-                return;
             }
         }
         int idPedidoObjetivo = idPedidoExistente != null ? idPedidoExistente : 0;
-        DetallePedido nuevo = new DetallePedido(0, idPedidoObjetivo, p.getIdProducto(), 1, p.getPrecioVenta(), p.getPrecioVenta(), "");
+        DetallePedido nuevo = new DetallePedido(0, idPedidoObjetivo, p.getIdProducto(), qty, precioUnitario, subtotal, nota);
         nuevo.setNombreProducto(p.getNombre());
+        nuevo.setIdVariante(idVariante);
+        nuevo.setNombreVariante(nombreVariante);
+        nuevo.setModificadoresTexto(modsTexto);
+        nuevo.setModificadoresSeleccionados(mods);
+        if (p.isEsCombo()) {
+            nuevo.setIdCombo(p.getIdCombo());
+            nuevo.setComboComponentesTexto(
+                    FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(p.getComboComponentes()));
+        }
         items.add(nuevo);
         if (tblItems != null) {
             tblItems.refresh();
@@ -387,9 +467,11 @@ public class MozoOrderController {
             final int idObjetivo = idPedidoExistente;
             UiAsyncExecutor.ejecutarAsync(
                 () -> {
-                    Pedido actualizado = pedidoService.agregarItemsAPedido(idObjetivo, new ArrayList<>(nuevosItems));
+                    List<DetallePedido> adicionales = new ArrayList<>(nuevosItems);
+                    Pedido actualizado = pedidoService.agregarItemsAPedido(idObjetivo, adicionales);
                     BigDecimal totalConfirmado = pedidoService.calcularTotal(idObjetivo);
                     actualizado.setTotal(totalConfirmado);
+                    new ImpresoraTermicaService().imprimirComandaPorCategorias(actualizado, adicionales);
                     return actualizado;
                 },
                 actualizado -> {
@@ -449,7 +531,8 @@ public class MozoOrderController {
                 com.foodcore.offline.SyncWorker worker = com.foodcore.offline.SyncWorker.getInstancia();
                 if (worker.isOnline()) {
                     try {
-                        pedidoService.registrarPedidoYEnviarComanda(pedido, snapshot);
+                        Pedido registrado = pedidoService.registrarPedidoYEnviarComanda(pedido, snapshot);
+                        new ImpresoraTermicaService().imprimirComandaPorCategorias(registrado, snapshot);
                         return "ONLINE";
                     } catch (Exception exNet) {
                         worker.guardarPedidoEnOutboxLocal(pedido, snapshot);
@@ -484,10 +567,6 @@ public class MozoOrderController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        Alert a = new Alert(tipo);
-        a.setTitle(titulo);
-        a.setHeaderText(null);
-        a.setContentText(mensaje);
-        a.showAndWait();
+        ToastService.mostrarPorAlertType(tipo, titulo + ": " + mensaje);
     }
 }

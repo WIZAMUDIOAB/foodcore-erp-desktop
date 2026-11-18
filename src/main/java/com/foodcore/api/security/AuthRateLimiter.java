@@ -30,7 +30,10 @@ public final class AuthRateLimiter {
         Properties props = new Properties();
         cargarSiExiste(props, "/application.properties");
         cargarSiExiste(props, "/application-test.properties");
-        String configured = props.getProperty("security.auth.rateLimit.max");
+        String configured = System.getProperty("security.auth.rateLimit.max");
+        if (configured == null || configured.isBlank()) {
+            configured = props.getProperty("security.auth.rateLimit.max");
+        }
         if (configured != null && !configured.isBlank()) {
             try {
                 int parsed = Integer.parseInt(configured.trim());

@@ -65,11 +65,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                         u.setBloqueadoHasta(leerFechaLima(rs, "bloqueado_hasta"));
                         u.setCambioPasswordRequerido(rs.getBoolean("cambio_password_requerido"));
                         u.setUltimoLogin(leerFechaLima(rs, "ultimo_login"));
-                        try {
-                            u.setDni(rs.getString("dni"));
-                            u.setPin(rs.getString("pin"));
-                            u.setPinHash(rs.getString("pin_hash"));
-                        } catch (SQLException ignored) {}
+                        mapearCamposPinYSeguridad(rs, u);
                     } catch (SQLException ignoredCol) {
                         u.setIntentosFallidos(0);
                     }
@@ -336,9 +332,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         u.setNombreEmpleado(rs.getString("empleado_nombre"));
 
         try {
-            u.setDni(rs.getString("dni"));
-            u.setPin(rs.getString("pin"));
-            u.setPinHash(rs.getString("pin_hash"));
+            mapearCamposPinYSeguridad(rs, u);
             u.setSueldoBase(rs.getDouble("sueldo_base"));
             u.setHorarioLaboral(rs.getString("horario_laboral"));
             Time te = rs.getTime("hora_entrada_programada");
@@ -346,7 +340,82 @@ public class UsuarioDAOImpl implements UsuarioDAO {
             Time ts = rs.getTime("hora_salida_programada");
             if (ts != null) u.setHoraSalidaProgramada(ts.toLocalTime());
         } catch (SQLException ignored) {
+            // Compatibilidad con esquemas sin columnas extendidas de RRHH
         }
         return u;
+    }
+
+    @Override
+    public Optional<Usuario> buscarPorId(Connection conn, int idUsuario) throws SQLException {
+        String sql = "SELECT u.*, r.nombre AS rol_nombre, "
+                + "CONCAT(COALESCE(e.nombres, u.username), ' ', COALESCE(e.apellidos, '')) AS empleado_nombre "
+                + "FROM usuario u "
+                + "JOIN rol r ON u.id_rol = r.id_rol "
+                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
+                + "WHERE u.id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearUsuarioCompleto(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean actualizarConfiguracion2FA(Connection conn, int idUsuario, String totpSecret,
+            boolean habilitado) throws SQLException {
+        String sql = "UPDATE usuario SET totp_secret = ?, totp_habilitado = ? WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, totpSecret);
+            ps.setBoolean(2, habilitado);
+            ps.setInt(3, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean registrarInvalidacionTokensAntes(Connection conn, int idUsuario, long epochMillis)
+            throws SQLException {
+        String sql = "UPDATE usuario SET tokens_invalidados_antes = GREATEST(tokens_invalidados_antes, ?) "
+                + "WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, epochMillis);
+            ps.setInt(2, idUsuario);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public Optional<Long> obtenerTokensInvalidadosAntes(Connection conn, int idUsuario) throws SQLException {
+        String sql = "SELECT tokens_invalidados_antes FROM usuario WHERE id_usuario = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(rs.getLong("tokens_invalidados_antes"));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private void mapearCamposPinYSeguridad(ResultSet rs, Usuario u) {
+        try {
+            u.setDni(rs.getString("dni"));
+            u.setPin(rs.getString("pin"));
+            u.setPinHash(rs.getString("pin_hash"));
+        } catch (SQLException ignored) {
+            u.setPinHash(u.getPinHash());
+        }
+        try {
+            u.setTotpSecret(rs.getString("totp_secret"));
+            u.setTotpHabilitado(rs.getBoolean("totp_habilitado"));
+            u.setTokensInvalidadosAntes(rs.getLong("tokens_invalidados_antes"));
+        } catch (SQLException ignored) {
+            u.setTotpHabilitado(false);
+        }
     }
 }

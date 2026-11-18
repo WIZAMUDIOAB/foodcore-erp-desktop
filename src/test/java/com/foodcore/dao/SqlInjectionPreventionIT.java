@@ -100,7 +100,13 @@ class SqlInjectionPreventionIT {
                 }
             }
             if (tempUsuarioId != null) {
-                try (PreparedStatement psUsr = conn.prepareStatement("DELETE FROM usuario WHERE id_usuario = ?")) {
+                try (PreparedStatement psBlk = conn.prepareStatement("DELETE FROM token_blacklist WHERE id_usuario = ?");
+                     PreparedStatement psAud = conn.prepareStatement("DELETE FROM auditoria WHERE id_usuario = ?");
+                     PreparedStatement psUsr = conn.prepareStatement("DELETE FROM usuario WHERE id_usuario = ?")) {
+                    psBlk.setInt(1, tempUsuarioId);
+                    psBlk.executeUpdate();
+                    psAud.setInt(1, tempUsuarioId);
+                    psAud.executeUpdate();
                     psUsr.setInt(1, tempUsuarioId);
                     psUsr.executeUpdate();
                 }

@@ -4,7 +4,9 @@ import com.foodcore.dao.SolicitudAusenciaDAO;
 import com.foodcore.dao.impl.SolicitudAusenciaDAOImpl;
 import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.Usuario;
+import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.UiAsyncExecutor;
@@ -58,11 +60,13 @@ public class SolicitudesController {
     @FXML private TableColumn<SolicitudAusencia, String> colEmpleado;
     @FXML private TableColumn<SolicitudAusencia, String> colTipo;
     @FXML private TableColumn<SolicitudAusencia, String> colRango;
+    @FXML private TableColumn<SolicitudAusencia, String> colDias;
     @FXML private TableColumn<SolicitudAusencia, String> colMotivo;
     @FXML private TableColumn<SolicitudAusencia, String> colEstado;
     @FXML private TableColumn<SolicitudAusencia, Void> colAcciones;
 
     private final SolicitudAusenciaDAO solicitudDAO = new SolicitudAusenciaDAOImpl();
+    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
     private final ObservableList<SolicitudAusencia> listaSolicitudes = FXCollections.observableArrayList();
 
     @FXML
@@ -106,6 +110,9 @@ public class SolicitudesController {
             String fin = c.getValue().getFechaFin() != null ? c.getValue().getFechaFin().format(FMT) : "-";
             return new SimpleStringProperty(ini + " al " + fin);
         });
+        if (colDias != null) {
+            colDias.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getDiasSolicitados() + " d"));
+        }
         colMotivo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getMotivo()));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getEstado()));
 
@@ -257,13 +264,7 @@ public class SolicitudesController {
 
         btnEnviarSolicitud.setDisable(true);
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                SolicitudAusencia sol = new SolicitudAusencia(0, idUsr, tipo, ini, fin, motivo, "PENDIENTE");
-                try (Connection conn = ConexionBD.getConnection()) {
-                    solicitudDAO.crear(conn, sol);
-                }
-                return sol;
-            },
+            () -> ausenciasService.registrarSolicitud(idUsr, tipo, ini, fin, motivo),
             sol -> {
                 btnEnviarSolicitud.setDisable(false);
                 txtMotivo.clear();
@@ -281,10 +282,14 @@ public class SolicitudesController {
         if (sol == null) {
             return;
         }
+        Usuario aprobador = AuthService.getUsuarioSesionActual();
+        Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    solicitudDAO.actualizarEstado(conn, sol.getIdSolicitud(), estado, comentario);
+                if ("APROBADA".equalsIgnoreCase(estado)) {
+                    ausenciasService.aprobarSolicitud(sol.getIdSolicitud(), comentario, idAprobador);
+                } else {
+                    ausenciasService.rechazarSolicitud(sol.getIdSolicitud(), comentario, idAprobador);
                 }
             },
             () -> {
@@ -298,18 +303,17 @@ public class SolicitudesController {
     }
 
     public SolicitudAusencia registrarSolicitud(int idUsuario, String tipo, LocalDate inicio, LocalDate fin, String motivo) throws Exception {
-        SolicitudAusencia sol = new SolicitudAusencia(0, idUsuario, tipo, inicio, fin, motivo, "PENDIENTE");
-        try (Connection conn = ConexionBD.getConnection()) {
-            solicitudDAO.crear(conn, sol);
-        }
+        SolicitudAusencia sol = ausenciasService.registrarSolicitud(idUsuario, tipo, inicio, fin, motivo);
         cargarSolicitudesSincrono();
         return sol;
     }
 
     public void aprobarSolicitud(SolicitudAusencia sol) {
         if (sol == null) return;
-        try (Connection conn = ConexionBD.getConnection()) {
-            solicitudDAO.actualizarEstado(conn, sol.getIdSolicitud(), "APROBADA", "Aprobado por Gerencia");
+        try {
+            Usuario aprobador = AuthService.getUsuarioSesionActual();
+            Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;
+            ausenciasService.aprobarSolicitud(sol.getIdSolicitud(), "Aprobado por Gerencia", idAprobador);
             sol.setEstado("APROBADA");
             tblSolicitudes.refresh();
             actualizarContadores();
@@ -321,8 +325,10 @@ public class SolicitudesController {
 
     public void rechazarSolicitud(SolicitudAusencia sol) {
         if (sol == null) return;
-        try (Connection conn = ConexionBD.getConnection()) {
-            solicitudDAO.actualizarEstado(conn, sol.getIdSolicitud(), "RECHAZADA", "Rechazado por cobertura de turno");
+        try {
+            Usuario aprobador = AuthService.getUsuarioSesionActual();
+            Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;
+            ausenciasService.rechazarSolicitud(sol.getIdSolicitud(), "Rechazado por cobertura de turno", idAprobador);
             sol.setEstado("RECHAZADA");
             tblSolicitudes.refresh();
             actualizarContadores();

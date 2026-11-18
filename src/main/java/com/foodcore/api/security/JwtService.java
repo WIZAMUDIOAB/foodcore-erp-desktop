@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Servicio criptográfico JWT HS256 para generación y validación real de firma y expiración.
@@ -29,7 +30,11 @@ public final class JwtService {
 
     private final byte[] secretBytes;
 
-    public record JwtClaims(int idUsuario, String username, String rol, long expiresAtEpochSec) {
+    public record JwtClaims(int idUsuario, String username, String rol, long expiresAtEpochSec,
+            String jti, long issuedAtEpochMs) {
+        public JwtClaims(int idUsuario, String username, String rol, long expiresAtEpochSec) {
+            this(idUsuario, username, rol, expiresAtEpochSec, "", 0L);
+        }
     }
 
     public JwtService() {
@@ -93,15 +98,20 @@ public final class JwtService {
 
     public String generarToken(int idUsuario, String username, String rol, long ttlSeconds) {
         try {
-            long iat = Instant.now().getEpochSecond();
+            Instant ahora = Instant.now();
+            long iat = ahora.getEpochSecond();
+            long iatMs = ahora.toEpochMilli();
             long exp = iat + ttlSeconds;
+            String jti = UUID.randomUUID().toString();
 
             Map<String, Object> header = Map.of("alg", "HS256", "typ", "JWT");
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("sub", username != null ? username : "");
             payload.put("uid", idUsuario);
             payload.put("rol", normalizarRol(rol));
+            payload.put("jti", jti);
             payload.put("iat", iat);
+            payload.put("iat_ms", iatMs);
             payload.put("exp", exp);
 
             Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
@@ -152,7 +162,10 @@ public final class JwtService {
             if (sub.isBlank() || uid <= 0 || rol.isBlank()) {
                 return Optional.empty();
             }
-            return Optional.of(new JwtClaims(uid, sub, rol, exp));
+            String jti = payloadNode.path("jti").asText("");
+            long iatSec = payloadNode.path("iat").asLong(0L);
+            long iatMs = payloadNode.path("iat_ms").asLong(iatSec > 0 ? iatSec * 1000L : 0L);
+            return Optional.of(new JwtClaims(uid, sub, rol, exp, jti, iatMs));
         } catch (Exception e) {
             return Optional.empty();
         }

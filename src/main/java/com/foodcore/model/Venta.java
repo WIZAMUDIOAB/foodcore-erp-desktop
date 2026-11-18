@@ -16,6 +16,9 @@ public class Venta {
     private BigDecimal subtotal;
     private BigDecimal igv;
     private BigDecimal descuento = BigDecimal.ZERO;
+    private BigDecimal descuentoPuntos = BigDecimal.ZERO;
+    private int puntosACanjear = 0;
+    private boolean aplicarFidelizacion = true;
     private BigDecimal total;
     private String metodoPago; // EFECTIVO, TARJETA, YAPE_PLIN, MIXTO
     private BigDecimal montoRecibido;
@@ -71,6 +74,27 @@ public class Venta {
     public BigDecimal getDescuento() { return descuento; }
     public void setDescuento(BigDecimal descuento) {
         this.descuento = descuento != null ? descuento : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getDescuentoPuntos() { return descuentoPuntos; }
+    public void setDescuentoPuntos(BigDecimal descuentoPuntos) {
+        this.descuentoPuntos = descuentoPuntos != null ? descuentoPuntos : BigDecimal.ZERO;
+    }
+
+    public int getPuntosACanjear() { return puntosACanjear; }
+    public void setPuntosACanjear(int puntosACanjear) {
+        this.puntosACanjear = Math.max(0, puntosACanjear);
+    }
+
+    public boolean isAplicarFidelizacion() { return aplicarFidelizacion; }
+    public void setAplicarFidelizacion(boolean aplicarFidelizacion) {
+        this.aplicarFidelizacion = aplicarFidelizacion;
+    }
+
+    public BigDecimal getDescuentoTotal() {
+        BigDecimal dCom = descuento != null ? descuento : BigDecimal.ZERO;
+        BigDecimal dPts = descuentoPuntos != null ? descuentoPuntos : BigDecimal.ZERO;
+        return dCom.add(dPts);
     }
 
     public BigDecimal getTotal() { return total; }

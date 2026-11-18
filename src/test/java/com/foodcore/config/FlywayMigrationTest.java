@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V14 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V24 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(14, result.migrationsExecuted);
-        assertEquals("14", result.targetSchemaVersion);
+        assertEquals(24, result.migrationsExecuted);
+        assertEquals("24", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -43,7 +43,42 @@ class FlywayMigrationTest {
                 versiones.add(rs.getString("version"));
                 assertTrue(rs.getBoolean("success"), "Toda migración debe tener success=1");
             }
-            assertTrue(versiones.containsAll(Set.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14")));
+            assertTrue(versiones.containsAll(Set.of(
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24")));
+        }
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rsBlacklist = st.executeQuery(
+                 "SELECT COUNT(*) FROM information_schema.tables "
+                     + "WHERE table_schema = DATABASE() AND table_name IN ('token_blacklist', 'configuracion_impresora', 'cierre_contable')")) {
+            rsBlacklist.next();
+            assertEquals(3, rsBlacklist.getInt(1), "Las tablas de V22 y V23 deben existir");
+        }
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rsCols = st.executeQuery(
+                 "SELECT COUNT(*) FROM information_schema.columns "
+                     + "WHERE table_schema = DATABASE() AND ((table_name = 'detalle_pedido' AND column_name = 'prioridad') "
+                     + "OR (table_name = 'detalle_venta' AND column_name = 'estado') "
+                     + "OR (table_name = 'configuracion_impresora' AND column_name = 'actualizado_en') "
+                     + "OR (table_name = 'mesa' AND column_name = 'capacidad') "
+                     + "OR (table_name = 'cliente' AND column_name = 'es_demo') "
+                     + "OR (table_name = 'producto' AND column_name = 'es_demo') "
+                     + "OR (table_name = 'venta' AND column_name = 'es_demo'))")) {
+            rsCols.next();
+            assertEquals(7, rsCols.getInt(1),
+                "Las columnas de V23 y V24 (capacidad, es_demo en cliente/producto/venta) deben existir");
+        }
+
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rsMinoristas = st.executeQuery(
+                 "SELECT COUNT(*) FROM cliente WHERE tipo_cliente = 'MINORISTA'")) {
+            rsMinoristas.next();
+            assertTrue(rsMinoristas.getInt(1) >= 2, "Deben existir clientes minoristas seedeados en V21");
         }
     }
 

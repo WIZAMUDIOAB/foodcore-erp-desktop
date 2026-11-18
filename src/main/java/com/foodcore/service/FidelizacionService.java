@@ -4,10 +4,14 @@ import com.foodcore.dao.ClienteDAO;
 import com.foodcore.dao.FidelizacionDAO;
 import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.dao.impl.FidelizacionDAOImpl;
+import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
+import com.foodcore.model.CompraClienteResumen;
 import com.foodcore.model.CuponCumpleanos;
 import com.foodcore.model.FidelizacionMovimiento;
+import com.foodcore.model.HistorialPuntos;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.ConfiguracionFidelizacion;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,8 +27,15 @@ import java.util.logging.Logger;
 public class FidelizacionService {
 
     private static final Logger LOGGER = Logger.getLogger(FidelizacionService.class.getName());
-    public static final int PUNTOS_POR_SOL = 1; // S/ 1 = 1 punto
-    public static final int PUNTOS_POR_SOL_DESCUENTO = 10; // 10 puntos = S/ 1 de descuento
+    public static final int PUNTOS_POR_SOL = 1; // S/ 1 = 1 punto (valor por defecto)
+    public static final int PUNTOS_POR_SOL_DESCUENTO = 10; // 10 puntos = S/ 1 (compatibilidad v2.0)
+
+    public record BeneficioCanje(int bloquesDisponibles,
+                                 int puntosPorBloque,
+                                 BigDecimal descuentoPorBloqueSoles,
+                                 int puntosUtilizados,
+                                 BigDecimal descuentoAplicadoSoles) {
+    }
 
     private final FidelizacionDAO fidelizacionDAO;
     private final ClienteDAO clienteDAO;
@@ -39,32 +50,14 @@ public class FidelizacionService {
     }
 
     /**
-     * Acumula puntos para un cliente tras una venta exitosa (S/ 1 = 1 punto).
+     * Acumula puntos para un cliente tras una venta exitosa según {@code fidelizacion.puntosPorSol} (S/ 1 = 1 punto por defecto).
      */
     public int acumularPuntosPorVenta(int idCliente, Integer idVenta, BigDecimal totalVenta) {
         if (idCliente <= 0 || totalVenta == null || totalVenta.compareTo(BigDecimal.ZERO) <= 0) {
             return 0;
         }
-
-        int puntosGanados = totalVenta.intValue() * PUNTOS_POR_SOL;
-        if (puntosGanados <= 0) {
-            return 0;
-        }
-
         try (Connection conn = ConexionBD.getConnection()) {
-            int puntosActuales = fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
-            int nuevosPuntos = puntosActuales + puntosGanados;
-
-            fidelizacionDAO.actualizarPuntosCliente(conn, idCliente, nuevosPuntos);
-
-            FidelizacionMovimiento mov = new FidelizacionMovimiento(
-                    0, idCliente, idVenta, "ACUMULACION", puntosGanados,
-                    "Acumulacion de puntos por consumo total de S/ " + totalVenta,
-                    LocalDateTime.now()
-            );
-            fidelizacionDAO.registrarMovimiento(conn, mov);
-
-            return puntosGanados;
+            return acumularPuntosPorVenta(conn, idCliente, idVenta, totalVenta);
         } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Error al acumular puntos para cliente {0}: {1}", new Object[]{idCliente, e.getMessage()});
             return 0;
@@ -72,8 +65,40 @@ public class FidelizacionService {
     }
 
     /**
-     * Canjea puntos por un descuento monetario en el POS.
-     * Cada 10 puntos = S/ 1.00 de descuento.
+     * Versión transaccional que acumula puntos usando la conexión JDBC activa y registra trazabilidad en
+     * {@code fidelizacion_movimiento} e {@code historial_puntos}.
+     */
+    public int acumularPuntosPorVenta(Connection conn, int idCliente, Integer idVenta, BigDecimal totalVenta) throws SQLException {
+        if (conn == null || idCliente <= 0 || totalVenta == null || totalVenta.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        int puntosPorSol = ConfiguracionFidelizacion.getPuntosPorSol();
+        int puntosGanados = totalVenta.multiply(BigDecimal.valueOf(puntosPorSol)).intValue();
+        if (puntosGanados <= 0) {
+            return 0;
+        }
+
+        int puntosActuales = fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
+        int nuevosPuntos = puntosActuales + puntosGanados;
+
+        fidelizacionDAO.actualizarPuntosCliente(conn, idCliente, nuevosPuntos);
+
+        LocalDateTime ahora = LocalDateTime.now();
+        String detalleDesc = "Acumulación por compra S/ " + totalVenta.setScale(2, RoundingMode.HALF_UP);
+        FidelizacionMovimiento mov = new FidelizacionMovimiento(
+                0, idCliente, idVenta, "ACUMULACION", puntosGanados, detalleDesc, ahora
+        );
+        fidelizacionDAO.registrarMovimiento(conn, mov);
+
+        HistorialPuntos hist = new HistorialPuntos(
+                0L, idCliente, idVenta, puntosGanados, "ACUMULACION", detalleDesc, ahora
+        );
+        fidelizacionDAO.registrarHistorialPuntos(conn, hist);
+        return puntosGanados;
+    }
+
+    /**
+     * Canjea puntos por un descuento monetario en el POS (10 puntos = S/ 1.00, compatibilidad v2.0).
      */
     public BigDecimal canjearPuntos(int idCliente, int puntosACanjear, BigDecimal totalVenta) {
         if (idCliente <= 0 || puntosACanjear <= 0 || totalVenta == null) {
@@ -84,6 +109,9 @@ public class FidelizacionService {
             int puntosDisponibles = fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
             if (puntosACanjear > puntosDisponibles) {
                 puntosACanjear = puntosDisponibles;
+            }
+            if (puntosACanjear <= 0) {
+                return BigDecimal.ZERO;
             }
 
             BigDecimal descuentoCalculado = BigDecimal.valueOf(puntosACanjear)
@@ -97,18 +125,79 @@ public class FidelizacionService {
             int nuevosPuntos = puntosDisponibles - puntosACanjear;
             fidelizacionDAO.actualizarPuntosCliente(conn, idCliente, nuevosPuntos);
 
+            LocalDateTime ahora = LocalDateTime.now();
+            String descCanje = "Canje de " + puntosACanjear + " puntos por descuento de S/ " + descuentoCalculado;
             FidelizacionMovimiento mov = new FidelizacionMovimiento(
-                    0, idCliente, null, "CANJE", -puntosACanjear,
-                    "Canje de " + puntosACanjear + " puntos por descuento de S/ " + descuentoCalculado,
-                    LocalDateTime.now()
+                    0, idCliente, null, "CANJE", -puntosACanjear, descCanje, ahora
             );
             fidelizacionDAO.registrarMovimiento(conn, mov);
+            fidelizacionDAO.registrarHistorialPuntos(conn,
+                    new HistorialPuntos(0L, idCliente, null, -puntosACanjear, "CANJE", descCanje, ahora));
 
             return descuentoCalculado;
         } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Error al canjear puntos para cliente {0}: {1}", new Object[]{idCliente, e.getMessage()});
             return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * Calcula el beneficio de canje por bloques configurables (ej. 100 pts = S/ 5.00 en {@code application.properties})
+     * respetando el tope máximo permitido sobre la venta.
+     */
+    public BeneficioCanje calcularCanjePorBloques(int puntosDisponibles, int bloquesSolicitados, BigDecimal totalVenta) {
+        int puntosPorBloque = ConfiguracionFidelizacion.getPuntosPorCanje();
+        BigDecimal descuentoPorBloque = ConfiguracionFidelizacion.getDescuentoPorCanjeSoles();
+        int maxBloquesPorPuntos = Math.max(0, puntosDisponibles / puntosPorBloque);
+        int maxBloquesPorMonto = 0;
+        if (totalVenta != null && totalVenta.compareTo(BigDecimal.ZERO) > 0 && descuentoPorBloque.compareTo(BigDecimal.ZERO) > 0) {
+            maxBloquesPorMonto = totalVenta.divide(descuentoPorBloque, 0, RoundingMode.FLOOR).intValue();
+        }
+        int maxBloques = Math.min(maxBloquesPorPuntos, maxBloquesPorMonto);
+        int bloquesUsados = Math.max(0, Math.min(bloquesSolicitados <= 0 ? 1 : bloquesSolicitados, maxBloques));
+        int puntosUsados = bloquesUsados * puntosPorBloque;
+        BigDecimal descuentoAplicado = descuentoPorBloque.multiply(BigDecimal.valueOf(bloquesUsados))
+                .setScale(2, RoundingMode.HALF_UP);
+        return new BeneficioCanje(maxBloques, puntosPorBloque, descuentoPorBloque, puntosUsados, descuentoAplicado);
+    }
+
+    /**
+     * Descuenta los puntos canjeados al confirmar la venta dentro de la transacción ACID (v5.0.0 §2.3).
+     */
+    public void canjearPuntosConfiguradosEnVenta(Connection conn,
+                                                int idCliente,
+                                                Integer idVenta,
+                                                int puntosACanjear,
+                                                BigDecimal descuentoSoles) throws SQLException, NegocioException {
+        if (conn == null || idCliente <= 0 || puntosACanjear <= 0) {
+            return;
+        }
+        int disponibles = fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
+        if (disponibles < puntosACanjear) {
+            throw new NegocioException("Puntos insuficientes para canje (disponibles: " + disponibles + ", requeridos: " + puntosACanjear + ").");
+        }
+        int nuevosPuntos = disponibles - puntosACanjear;
+        fidelizacionDAO.actualizarPuntosCliente(conn, idCliente, nuevosPuntos);
+        LocalDateTime ahora = LocalDateTime.now();
+        String desc = "Canje POS de " + puntosACanjear + " puntos por S/ "
+                + (descuentoSoles != null ? descuentoSoles.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO);
+        fidelizacionDAO.registrarMovimiento(conn,
+                new FidelizacionMovimiento(0, idCliente, idVenta, "CANJE", -puntosACanjear, desc, ahora));
+        fidelizacionDAO.registrarHistorialPuntos(conn,
+                new HistorialPuntos(0L, idCliente, idVenta, -puntosACanjear, "CANJE", desc, ahora));
+    }
+
+    public boolean esCumpleanosEnMesActual(Cliente cliente) {
+        return cliente != null && cliente.esMesDeCumpleanos();
+    }
+
+    public BigDecimal calcularDescuentoCumpleanosPos(BigDecimal totalBruto) {
+        if (totalBruto == null || totalBruto.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal pct = ConfiguracionFidelizacion.getCumpleanosDescuentoPorcentaje();
+        return totalBruto.multiply(pct)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -184,6 +273,30 @@ public class FidelizacionService {
             return fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
         } catch (SQLException e) {
             return 0;
+        }
+    }
+
+    public List<CompraClienteResumen> listarUltimasComprasCliente(int idCliente, int limite) {
+        if (idCliente <= 0) {
+            return List.of();
+        }
+        try (Connection conn = ConexionBD.getConnection()) {
+            return fidelizacionDAO.listarUltimasComprasCliente(conn, idCliente, limite);
+        } catch (SQLException e) {
+            LOGGER.log(Level.WARNING, "Error listando últimas compras para cliente {0}: {1}", new Object[]{idCliente, e.getMessage()});
+            return List.of();
+        }
+    }
+
+    public List<HistorialPuntos> listarHistorialPuntos(int idCliente) {
+        if (idCliente <= 0) {
+            return List.of();
+        }
+        try (Connection conn = ConexionBD.getConnection()) {
+            return fidelizacionDAO.listarHistorialPuntos(conn, idCliente);
+        } catch (SQLException e) {
+            LOGGER.log(Level.WARNING, "Error listando historial de puntos para cliente {0}: {1}", new Object[]{idCliente, e.getMessage()});
+            return List.of();
         }
     }
 }

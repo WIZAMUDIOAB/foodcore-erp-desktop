@@ -12,6 +12,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootProveedoresStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ProveedoresController">
     <children>
@@ -40,9 +41,14 @@
                             </children>
                         </HBox>
 
-                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <HBox alignment="BOTTOM_LEFT" spacing="12.0">
                             <children>
-                                <TextField fx:id="txtBuscar" prefWidth="320.0" promptText="Buscar por RUC o Razón Social..." styleClass="form-text-field" />
+                                <VBox spacing="6.0">
+                                    <children>
+                                        <Label styleClass="label-form" text="Buscar proveedor" />
+                                        <TextField fx:id="txtBuscar" prefWidth="320.0" promptText="Buscar por RUC o Razón Social..." styleClass="form-text-field" />
+                                    </children>
+                                </VBox>
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Label fx:id="lblTotalProveedores" styleClass="badge-pill-success" text="0 Proveedores" />
                             </children>
@@ -60,6 +66,15 @@
                             <children>
                                 <Label styleClass="text-h3" text="Proveedores Registrados" />
                                 <TableView fx:id="tblProveedores" VBox.vgrow="ALWAYS">
+                                    <placeholder>
+                                        <VBox alignment="CENTER" spacing="12.0">
+                                            <children>
+                                                <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                <Label styleClass="h3" text="No hay registros" />
+                                                <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                            </children>
+                                        </VBox>
+                                    </placeholder>
                                     <columns>
                                         <TableColumn fx:id="colRuc" prefWidth="120.0" text="RUC" />
                                         <TableColumn fx:id="colRazonSocial" prefWidth="250.0" text="Razón Social" />
@@ -133,45 +148,77 @@
         <!-- Modal Crear/Editar Proveedor -->
         <VBox fx:id="modalProveedor" alignment="CENTER" styleClass="modal-backdrop" visible="false">
             <children>
-                <VBox maxWidth="450.0" spacing="16.0" styleClass="modal-card">
+                <VBox maxHeight="680.0" maxWidth="500.0" prefWidth="500.0" spacing="0.0" styleClass="card, modal-card">
                     <children>
-                        <Label fx:id="lblModalTitulo" styleClass="modal-title" text="Registrar Nuevo Proveedor" />
-                        <VBox spacing="10.0">
+                        <!-- HEADER -->
+                        <VBox spacing="4.0" styleClass="modal-header">
+                            <padding><Insets top="24.0" right="24.0" bottom="16.0" left="24.0" /></padding>
                             <children>
-                                <Label styleClass="form-field-label" text="RUC (11 dígitos):" />
-                                <TextField fx:id="txtModalRuc" promptText="20501234567" styleClass="form-text-field" />
-
-                                <Label styleClass="form-field-label" text="Razón Social:" />
-                                <TextField fx:id="txtModalRazonSocial" promptText="Nombre comercial o social" styleClass="form-text-field" />
-
-                                <HBox spacing="10.0">
-                                    <children>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Contacto:" />
-                                                <TextField fx:id="txtModalContacto" promptText="Representante de ventas" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                        <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                            <children>
-                                                <Label styleClass="form-field-label" text="Teléfono:" />
-                                                <TextField fx:id="txtModalTelefono" promptText="987654321" styleClass="form-text-field" />
-                                            </children>
-                                        </VBox>
-                                    </children>
-                                </HBox>
-
-                                <Label styleClass="form-field-label" text="Correo Electrónico:" />
-                                <TextField fx:id="txtModalEmail" promptText="ventas@proveedor.com" styleClass="form-text-field" />
-
-                                <Label styleClass="form-field-label" text="Días de Crédito Acordados:" />
-                                <TextField fx:id="txtModalDiasCredito" promptText="15" styleClass="form-text-field" text="15" />
+                                <Label fx:id="lblModalTitulo" styleClass="h2" text="Registrar Nuevo Proveedor" />
+                                <Label styleClass="text-secondary" text="Complete los datos fiscales y de contacto comercial" />
                             </children>
                         </VBox>
 
-                        <Label fx:id="lblModalError" styleClass="text-danger" text="" wrapText="true" />
+                        <!-- BODY -->
+                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge" VBox.vgrow="ALWAYS">
+                            <content>
+                                <VBox spacing="16.0" styleClass="modal-body">
+                                    <padding><Insets top="0.0" right="24.0" bottom="24.0" left="24.0" /></padding>
+                                    <children>
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="RUC (11 dígitos)" />
+                                                <TextField fx:id="txtModalRuc" promptText="20501234567" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
 
-                        <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Razón Social" />
+                                                <TextField fx:id="txtModalRazonSocial" promptText="Nombre comercial o social" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <HBox spacing="16.0">
+                                            <children>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Contacto" />
+                                                        <TextField fx:id="txtModalContacto" promptText="Representante de ventas" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Teléfono" />
+                                                        <TextField fx:id="txtModalTelefono" promptText="987654321" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </HBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Correo Electrónico" />
+                                                <TextField fx:id="txtModalEmail" promptText="ventas@proveedor.com" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="8.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Días de Crédito Acordados" />
+                                                <TextField fx:id="txtModalDiasCredito" promptText="15" styleClass="input-field" text="15" />
+                                            </children>
+                                        </VBox>
+
+                                        <Label fx:id="lblModalError" styleClass="text-danger" text="" wrapText="true" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </ScrollPane>
+
+                        <!-- FOOTER -->
+                        <HBox alignment="CENTER_RIGHT" spacing="12.0" styleClass="modal-footer">
+                            <padding><Insets top="16.0" right="24.0" bottom="24.0" left="24.0" /></padding>
                             <children>
                                 <Button mnemonicParsing="false" onAction="#handleCerrarModal" styleClass="btn-secondary" text="Cancelar" />
                                 <Button mnemonicParsing="false" onAction="#handleGuardarProveedor" styleClass="btn-primary" text="Guardar Proveedor" />

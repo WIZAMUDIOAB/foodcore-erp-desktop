@@ -16,6 +16,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,11 @@ class LoginViewTest {
         JavaFxTestSupport.iniciarToolkit();
         authService = new AuthServiceImpl();
         AuthService.logout();
+    }
+
+    @AfterAll
+    static void restaurarEstadoUsuariosTrasLoginTests() {
+        MySqlIntegrationTestSupport.inicializarEntornoMySql();
     }
 
     private static void esperarHastaEnFx(BooleanSupplier condicionFx, Duration timeout, String mensajeFallo)

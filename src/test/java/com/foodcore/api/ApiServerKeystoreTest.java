@@ -49,7 +49,7 @@ class ApiServerKeystoreTest {
         prevPass = System.getProperty(ApiServer.ENV_KEYSTORE_PASS);
         prevPath = System.getProperty(ApiServer.ENV_KEYSTORE_PATH);
         prevCert = System.getProperty(ApiServer.ENV_CERT_PATH);
-        System.clearProperty(ApiServer.ENV_KEYSTORE_PASS);
+        System.setProperty(ApiServer.ENV_KEYSTORE_PASS, "");
         System.clearProperty(ApiServer.ENV_KEYSTORE_PATH);
         System.clearProperty(ApiServer.ENV_CERT_PATH);
     }
@@ -64,6 +64,14 @@ class ApiServerKeystoreTest {
     @Test
     @DisplayName("Falla fail-fast cuando falta FOODCORE_KEYSTORE_PASS")
     void fallaSiFaltaKeystorePassword() {
+        System.clearProperty(ApiServer.ENV_KEYSTORE_PASS);
+        IllegalStateException envMissingEx = assertThrows(
+                IllegalStateException.class,
+                () -> ApiServer.resolverKeystorePasswordObligatorio(key -> null)
+        );
+        assertTrue(envMissingEx.getMessage().contains(ApiServer.ENV_KEYSTORE_PASS));
+
+        System.setProperty(ApiServer.ENV_KEYSTORE_PASS, "");
         IllegalStateException ex = assertThrows(
                 IllegalStateException.class,
                 ApiServer::resolverKeystorePasswordObligatorio

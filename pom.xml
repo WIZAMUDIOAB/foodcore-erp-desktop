@@ -5,7 +5,7 @@
 
     <groupId>com.foodcore</groupId>
     <artifactId>foodcore-desktop</artifactId>
-    <version>1.0.0</version>
+    <version>5.7.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -68,10 +68,15 @@
             <version>2.0.1</version>
         </dependency>
 
-        <!-- Iconos Vectoriales FontAwesome -->
+        <!-- Iconos Vectoriales (Feather / Lucide + FontAwesome compatibilidad) -->
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
             <artifactId>ikonli-javafx</artifactId>
+            <version>12.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-feather-pack</artifactId>
             <version>12.3.1</version>
         </dependency>
         <dependency>
@@ -184,6 +189,19 @@
             <groupId>at.favre.lib</groupId>
             <artifactId>bcrypt</artifactId>
             <version>0.10.2</version>
+        </dependency>
+
+        <!-- Autenticación 2FA TOTP (RFC 6238 / Google Authenticator) — ÍTEM 7 v5.1.0 -->
+        <dependency>
+            <groupId>com.warrenstrange</groupId>
+            <artifactId>googleauth</artifactId>
+            <version>1.5.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.httpcomponents</groupId>
+                    <artifactId>httpclient</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Suite de Pruebas Unitarias, Integración (Testcontainers MySQL 8), UI (TestFX Headless) y E2E (Playwright) -->
@@ -480,32 +498,6 @@
             </plugin>
 
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.2.0</version>
-                <configuration>
-                    <classpathScope>test</classpathScope>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-maven-plugin</artifactId>
-                <version>10.15.0</version>
-                <configuration>
-                    <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
-                    <cleanDisabled>false</cleanDisabled>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.mysql</groupId>
-                        <artifactId>mysql-connector-j</artifactId>
-                        <version>8.3.0</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.2</version>
@@ -537,6 +529,32 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <classpathScope>test</classpathScope>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>10.15.0</version>
+                <configuration>
+                    <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
+                    <cleanDisabled>false</cleanDisabled>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.mysql</groupId>
+                        <artifactId>mysql-connector-j</artifactId>
+                        <version>8.3.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
         </plugins>
     </build>
 
@@ -552,7 +570,7 @@
                         <version>1.6.0</version>
                         <configuration>
                             <name>FoodCoreERP</name>
-                            <appVersion>4.3.0</appVersion>
+                            <appVersion>5.7.0</appVersion>
                             <vendor>FoodCore S.A.C.</vendor>
                             <destination>${project.basedir}/dist</destination>
                             <input>${project.build.directory}</input>

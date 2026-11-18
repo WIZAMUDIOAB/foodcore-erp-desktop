@@ -1,6 +1,7 @@
 package com.foodcore.service.impl;
 
 import com.foodcore.dao.UsuarioDAO;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
@@ -33,6 +34,7 @@ import java.util.Set;
 public class AuthServiceImpl extends AuthService {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
 
     public AuthServiceImpl() {
         super(new UsuarioDAOImpl(), new EncriptadorPassword());
@@ -72,6 +74,9 @@ public class AuthServiceImpl extends AuthService {
         LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
         if (usuario.getBloqueadoHasta() != null) {
             if (usuario.getBloqueadoHasta().isAfter(ahora)) {
+                auditoriaDAO.registrarEventoSeguro(
+                        conn, usuario.getIdUsuario(), "USUARIO_BLOQUEADO", "USUARIO", null,
+                        "Intento de ingreso mientras cuenta está bloqueada hasta " + usuario.getBloqueadoHasta());
                 throw new NegocioException(
                         CodigoError.USUARIO_BLOQUEADO,
                         "Cuenta bloqueada temporalmente por exceso de intentos fallidos hasta " + usuario.getBloqueadoHasta()
@@ -92,6 +97,10 @@ public class AuthServiceImpl extends AuthService {
             int nuevosIntentos = usuario.getIntentosFallidos() + 1;
             boolean bloquear = nuevosIntentos >= MAX_INTENTOS_FALLIDOS;
             usuarioDAO.registrarIntentoFallido(conn, usuario.getIdUsuario(), nuevosIntentos, bloquear);
+            auditoriaDAO.registrarEventoSeguro(
+                    conn, usuario.getIdUsuario(), "LOGIN_FALLIDO", "USUARIO", null,
+                    "Contraseña incorrecta para " + usuario.getUsername()
+                            + " (intento " + nuevosIntentos + "/" + MAX_INTENTOS_FALLIDOS + ")");
             if (bloquear) {
                 throw new NegocioException(
                         CodigoError.USUARIO_BLOQUEADO,

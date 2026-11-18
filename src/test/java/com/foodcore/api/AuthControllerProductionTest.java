@@ -23,49 +23,44 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifica que sin el perfil {@code e2e-test} activo (modo producción por defecto)
- * las credenciales demo y el mapa {@code pinsMemoria} no autentican ningún usuario ni PIN.
+ * Verifica que AuthController autentica exclusivamente contra base de datos
+ * incluso si existen propiedades de perfil como {@code e2e-test}.
  */
 class AuthControllerProductionTest {
 
     private static final byte[] TEST_JWT_SECRET =
             "FoodCore-ProdAuthTest-SecretKey-32Bytes!".getBytes(StandardCharsets.UTF_8);
+    private static final String PROP_SPRING_PROFILES = "spring.profiles.active";
+    private static final String PROP_FOODCORE_PROFILE = "foodcore.profile";
 
     private String prevSpringProfiles;
     private String prevFoodCoreProfile;
 
     @BeforeEach
     void limpiarPerfilAntesDePrueba() {
-        prevSpringProfiles = System.getProperty(AuthTestBypassConfig.PROP_SPRING_PROFILES);
-        prevFoodCoreProfile = System.getProperty(AuthTestBypassConfig.PROP_FOODCORE_PROFILE);
-        System.setProperty(AuthTestBypassConfig.PROP_SPRING_PROFILES, "");
-        System.setProperty(AuthTestBypassConfig.PROP_FOODCORE_PROFILE, "");
+        prevSpringProfiles = System.getProperty(PROP_SPRING_PROFILES);
+        prevFoodCoreProfile = System.getProperty(PROP_FOODCORE_PROFILE);
+        System.setProperty(PROP_SPRING_PROFILES, "");
+        System.setProperty(PROP_FOODCORE_PROFILE, "");
     }
 
     @AfterEach
     void restaurarPerfil() {
-        restaurar(AuthTestBypassConfig.PROP_SPRING_PROFILES, prevSpringProfiles);
-        restaurar(AuthTestBypassConfig.PROP_FOODCORE_PROFILE, prevFoodCoreProfile);
+        restaurar(PROP_SPRING_PROFILES, prevSpringProfiles);
+        restaurar(PROP_FOODCORE_PROFILE, prevFoodCoreProfile);
     }
 
     @Test
-    @DisplayName("Producción sin perfil e2e-test: usuario que existe solo en pinsMemoria / creds demo no autentica")
-    void usuarioSoloEnPinsMemoriaOCredencialesDemoNoAutenticaSinPerfilE2eTest() throws Exception {
-        assertFalse(AuthTestBypassConfig.isE2eTestProfileActive());
-        assertFalse(AuthTestBypassConfig.esCredencialOperativaValida("mozo", "Mozo2026!"));
-        assertNull(AuthTestBypassConfig.construirUsuarioOperativo("mozo"));
-
+    @DisplayName("Sin respaldo en memoria: credenciales legacy o PIN hardcoded no autentican con DAO vacío")
+    void credencialesLegacyOPinHardcodedNoAutenticanSinBd() throws Exception {
         UsuarioDAO emptyDao = crearUsuarioDaoVacio();
         AuthService emptyAuth = new AuthService(emptyDao, new com.foodcore.security.EncriptadorPassword()) {
             @Override
@@ -92,42 +87,42 @@ class AuthControllerProductionTest {
         try {
             HttpClient client = HttpClient.newHttpClient();
 
-            // 1. Credenciales demo de mozo y admin no autentican
-            HttpResponse<String> loginMozoDemo = postJson(
+            // Incluso activando perfil e2e-test, NO existe ningún bypass en memoria
+            System.setProperty(PROP_SPRING_PROFILES, "e2e-test");
+            System.setProperty(PROP_FOODCORE_PROFILE, "e2e-test");
+
+            HttpResponse<String> loginMozoLegacy = postJson(
                     client, port, "/api/auth/login", "{\"username\":\"mozo\",\"password\":\"Mozo2026!\"}"
             );
-            assertEquals(401, loginMozoDemo.statusCode());
-            assertFalse(loginMozoDemo.body().contains("\"token\""));
+            assertEquals(401, loginMozoLegacy.statusCode());
+            assertFalse(loginMozoLegacy.body().contains("\"token\""));
 
-            HttpResponse<String> loginAdminDemo = postJson(
+            HttpResponse<String> loginAdminLegacy = postJson(
                     client, port, "/api/auth/login", "{\"username\":\"admin\",\"password\":\"admin123\"}"
             );
-            assertEquals(401, loginAdminDemo.statusCode());
-            assertFalse(loginAdminDemo.body().contains("\"token\""));
+            assertEquals(401, loginAdminLegacy.statusCode());
+            assertFalse(loginAdminLegacy.body().contains("\"token\""));
 
-            // 2. Usuario que existe solo en pinsMemoria (id=3 mozo / PIN 1234, id=1 admin / PIN 9999) NO autentica
-            HttpResponse<String> pinMozoMemoria = postJson(
+            HttpResponse<String> pinMozoSinBd = postJson(
                     client, port, "/api/auth/pin-login", "{\"id_usuario\":3,\"username\":\"mozo\",\"pin\":\"1234\"}"
             );
-            assertEquals(401, pinMozoMemoria.statusCode());
-            assertFalse(pinMozoMemoria.body().contains("\"token\""));
+            assertEquals(401, pinMozoSinBd.statusCode());
+            assertFalse(pinMozoSinBd.body().contains("\"token\""));
 
-            HttpResponse<String> pinAdminMemoria = postJson(
+            HttpResponse<String> pinAdminSinBd = postJson(
                     client, port, "/api/auth/pin-login", "{\"id_usuario\":1,\"username\":\"admin\",\"pin\":\"9999\"}"
             );
-            assertEquals(401, pinAdminMemoria.statusCode());
-            assertFalse(pinAdminMemoria.body().contains("\"token\""));
+            assertEquals(401, pinAdminSinBd.statusCode());
+            assertFalse(pinAdminSinBd.body().contains("\"token\""));
 
-            // 3. pin-switch con usuario/PIN solo en pinsMemoria NO autentica
             String tokenAdmin = jwtService.generarToken(1, "admin", "ADMIN");
-            HttpResponse<String> pinSwitchMemoria = postJsonConAuth(
+            HttpResponse<String> pinSwitchSinBd = postJsonConAuth(
                     client, port, "/api/auth/pin-switch", tokenAdmin,
                     "{\"id_usuario\":2,\"username\":\"cajero\",\"pin\":\"2001\"}"
             );
-            assertEquals(401, pinSwitchMemoria.statusCode());
-            assertFalse(pinSwitchMemoria.body().contains("\"token\""));
+            assertEquals(401, pinSwitchSinBd.statusCode());
+            assertFalse(pinSwitchSinBd.body().contains("\"token\""));
 
-            // 4. GET /api/usuarios/activos con BD vacía retorna [] sin inyectar usuarios demo
             HttpResponse<String> activos = client.send(
                     HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/usuarios/activos"))
                             .timeout(Duration.ofSeconds(5))
@@ -144,9 +139,10 @@ class AuthControllerProductionTest {
     }
 
     @Test
-    @DisplayName("Producción contra BD real: un PIN presente solo en pinsMemoria ('2001' para cajero) no autentica")
-    void pinSoloEnPinsMemoriaNoAutenticaContraBaseDeDatosReal() throws Exception {
+    @DisplayName("Contra BD real: solo autentican usuarios sembrados en Flyway incluso con perfil e2e-test")
+    void soloAutenticanCredencialesRealesEnBaseDeDatos() throws Exception {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
+        System.setProperty(PROP_SPRING_PROFILES, "e2e-test");
 
         JwtService jwtService = new JwtService(TEST_JWT_SECRET);
         int port = puertoLibre();
@@ -159,51 +155,33 @@ class AuthControllerProductionTest {
         try {
             HttpClient client = HttpClient.newHttpClient();
 
-            // En V12, cajero (id=2) tiene PIN '1234' en BD; '2001' solo existe en pinsMemoria.
-            HttpResponse<String> pinSoloMemoria = postJson(
+            HttpResponse<String> pinInvalido = postJson(
                     client, port, "/api/auth/pin-login", "{\"id_usuario\":2,\"username\":\"cajero\",\"pin\":\"2001\"}"
             );
-            assertEquals(401, pinSoloMemoria.statusCode());
-            assertFalse(pinSoloMemoria.body().contains("\"token\""));
+            assertEquals(401, pinInvalido.statusCode());
+            assertFalse(pinInvalido.body().contains("\"token\""));
 
-            // Contraseña demo tampoco funciona contra BD real
-            HttpResponse<String> passDemo = postJson(
+            HttpResponse<String> passLegacy = postJson(
                     client, port, "/api/auth/login", "{\"username\":\"mozo\",\"password\":\"Mozo2026!\"}"
             );
-            assertEquals(401, passDemo.statusCode());
+            assertEquals(401, passLegacy.statusCode());
 
-            // Usuario real sembrado en BD con contraseña real sí autentica vía AuthServiceImpl
+            // Usuario real sembrado en BD (V3) autentica vía AuthServiceImpl
             HttpResponse<String> loginReal = postJson(
                     client, port, "/api/auth/login", "{\"username\":\"mozo\",\"password\":\"Admin#2026!\"}"
             );
             assertEquals(200, loginReal.statusCode());
             assertTrue(loginReal.body().contains("\"token\":\"eyJ"));
+
+            // PIN real sembrado en BD (V12) autentica vía AuthServiceImpl
+            HttpResponse<String> pinReal = postJson(
+                    client, port, "/api/auth/pin-login", "{\"id_usuario\":2,\"username\":\"cajero\",\"pin\":\"1234\"}"
+            );
+            assertEquals(200, pinReal.statusCode());
+            assertTrue(pinReal.body().contains("\"token\":\"eyJ"));
         } finally {
             server.detener();
         }
-    }
-
-    @Test
-    @DisplayName("El perfil e2e-test permanece inactivo por defecto y solo se habilita de forma explícita")
-    void perfilE2eTestSoloSeActivaExplicitamente() {
-        assertFalse(AuthTestBypassConfig.isE2eTestProfileActive(Map.<String, String>of()::get));
-        assertFalse(AuthTestBypassConfig.isE2eTestProfileActive(Map.of("SPRING_PROFILES_ACTIVE", "prod")::get));
-
-        System.clearProperty(AuthTestBypassConfig.PROP_SPRING_PROFILES);
-        System.clearProperty(AuthTestBypassConfig.PROP_FOODCORE_PROFILE);
-        assertTrue(AuthTestBypassConfig.isE2eTestProfileActive(Map.of("SPRING_PROFILES_ACTIVE", "e2e-test")::get));
-        assertTrue(AuthTestBypassConfig.isE2eTestProfileActive(Map.of("FOODCORE_PROFILE", "e2e-test")::get));
-
-        System.setProperty(AuthTestBypassConfig.PROP_SPRING_PROFILES, AuthTestBypassConfig.PROFILE_E2E_TEST);
-        try {
-            assertTrue(AuthTestBypassConfig.isE2eTestProfileActive());
-            assertTrue(AuthTestBypassConfig.esCredencialOperativaValida("mozo", "Mozo2026!"));
-            assertNotNull(AuthTestBypassConfig.autenticarPinMemoria(2, "cajero", "2001"));
-        } finally {
-            System.setProperty(AuthTestBypassConfig.PROP_SPRING_PROFILES, "");
-        }
-        assertFalse(AuthTestBypassConfig.esCredencialOperativaValida("mozo", "Mozo2026!"));
-        assertNull(AuthTestBypassConfig.autenticarPinMemoria(2, "cajero", "2001"));
     }
 
     private static UsuarioDAO crearUsuarioDaoVacio() {
@@ -243,16 +221,13 @@ class AuthControllerProductionTest {
         );
     }
 
-    private static HttpResponse<String> postJsonConAuth(HttpClient client,
-                                                        int port,
-                                                        String path,
-                                                        String bearerToken,
-                                                        String json) throws Exception {
+    private static HttpResponse<String> postJsonConAuth(
+            HttpClient client, int port, String path, String token, String json) throws Exception {
         return client.send(
                 HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
                         .timeout(Duration.ofSeconds(5))
                         .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + bearerToken)
+                        .header("Authorization", "Bearer " + token)
                         .POST(HttpRequest.BodyPublishers.ofString(json))
                         .build(),
                 HttpResponse.BodyHandlers.ofString()

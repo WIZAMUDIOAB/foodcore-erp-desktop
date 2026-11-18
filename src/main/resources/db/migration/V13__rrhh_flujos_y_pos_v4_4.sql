@@ -57,10 +57,18 @@ WHERE id_usuario = 2;
 -- ----------------------------------------------------------------------------
 DELETE FROM rol_permiso WHERE codigo_rol = 'CAJERO' AND codigo_permiso = 'VENTA_ANULAR';
 
--- Asegurar rol SUPERVISOR con permisos de anulación y descuento
-INSERT IGNORE INTO rol_permiso (codigo_rol, codigo_permiso) VALUES
-('SUPERVISOR', 'VENTA_ANULAR'),
-('SUPERVISOR', 'VENTA_DESCUENTO');
+-- Asegurar rol SUPERVISOR con permisos de anulación y descuento sin generar advertencias 1062
+INSERT INTO rol_permiso (codigo_rol, codigo_permiso)
+SELECT v.codigo_rol, v.codigo_permiso
+FROM (
+    SELECT 'SUPERVISOR' AS codigo_rol, 'VENTA_ANULAR' AS codigo_permiso
+    UNION ALL
+    SELECT 'SUPERVISOR' AS codigo_rol, 'VENTA_DESCUENTO' AS codigo_permiso
+) v
+WHERE NOT EXISTS (
+    SELECT 1 FROM rol_permiso rp
+    WHERE rp.codigo_rol = v.codigo_rol AND rp.codigo_permiso = v.codigo_permiso
+);
 
 -- ----------------------------------------------------------------------------
 -- 4. Semillas de Solicitudes de Demostración

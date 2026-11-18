@@ -14,30 +14,35 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane prefHeight="768.0" prefWidth="1180.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.KioscoController">
 
     <!-- Topbar Kiosco Táctil (§13, §14) -->
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="16.0" style="-fx-background-color: #1E293B; -fx-padding: 16 24 16 24; -fx-border-color: #FF5A1F; -fx-border-width: 0 0 3 0;">
+        <HBox alignment="CENTER_LEFT" spacing="16.0" styleClass="kiosk-header">
             <VBox spacing="2.0">
                 <HBox alignment="CENTER_LEFT" spacing="10.0">
-                    <Label style="-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: 800; -fx-letter-spacing: -0.5px;" text="FOODCORE RESTOBAR · KIOSCO AUTOSERVICIO" />
-                    <Label style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-padding: 3 8 3 8; -fx-background-radius: 6; -fx-font-weight: 700; -fx-font-size: 11px;" text="MODO CLIENTE TÁCTIL" />
+                    <Label styleClass="text-h2-inverse" text="FOODCORE RESTOBAR · KIOSCO AUTOSERVICIO" />
+                    <Label styleClass="badge-pill-success" text="MODO CLIENTE TÁCTIL" />
                 </HBox>
-                <Label style="-fx-text-fill: #94A3B8; -fx-font-size: 13px;" text="Seleccione sus platillos favoritos y confirme su orden directa a cocina" />
+                <Label styleClass="text-body-inverse-muted" text="Seleccione sus platillos favoritos y confirme su orden directa a cocina" />
             </VBox>
             <Region HBox.hgrow="ALWAYS" />
             <HBox alignment="CENTER_RIGHT" spacing="16.0">
                 <children>
                     <VBox alignment="CENTER_RIGHT" spacing="2.0">
                         <children>
-                            <Label fx:id="lblTurnoActual" style="-fx-text-fill: #FF5A1F; -fx-font-size: 18px; -fx-font-weight: 800; -fx-font-family: monospace;" text="TURNO #T-101" />
-                            <Label style="-fx-text-fill: #94A3B8; -fx-font-size: 11px;" text="Emisión automática de ticketera" />
+                            <Label fx:id="lblTurnoActual" styleClass="kiosk-turn-label" text="TURNO #T-101" />
+                            <Label styleClass="text-caption-inverse" text="Emisión automática de ticketera" />
                         </children>
                     </VBox>
-                    <Button fx:id="btnExpandirVentana" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-kds-outline" text="⤢" />
-                    <Button fx:id="btnSalirKiosco" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="✕ Salir del Kiosco" />
+                    <Button fx:id="btnExpandirVentana" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleExpandirVentana" styleClass="btn-kds-outline" text="">
+                        <graphic><FontIcon iconLiteral="fth-maximize-2" iconSize="16" /></graphic>
+                    </Button>
+                    <Button fx:id="btnSalirKiosco" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleSalirKiosco" styleClass="btn-kds-outline" text="Salir del Kiosco">
+                        <graphic><FontIcon iconLiteral="fth-log-out" iconSize="16" /></graphic>
+                    </Button>
                 </children>
             </HBox>
         </HBox>
@@ -78,6 +83,15 @@
 
                     <!-- Lista de Ítems en Carrito -->
                     <TableView fx:id="tblCarrito" VBox.vgrow="ALWAYS">
+                        <placeholder>
+                            <VBox alignment="CENTER" spacing="12.0">
+                                <children>
+                                    <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                    <Label styleClass="h3" text="No hay registros" />
+                                    <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                </children>
+                            </VBox>
+                        </placeholder>
                         <columns>
                             <TableColumn fx:id="colProducto" prefWidth="120.0" text="PRODUCTO" />
                             <TableColumn fx:id="colCantidad" prefWidth="65.0" text="CANT." />
@@ -92,7 +106,7 @@
                     <Separator />
 
                     <!-- Resumen de Pago -->
-                    <VBox spacing="6.0" style="-fx-background-color: #F8FAFC; -fx-padding: 12; -fx-background-radius: 8;">
+                    <VBox spacing="6.0" styleClass="surface-card-subtle">
                         <HBox alignment="CENTER_LEFT">
                             <Label styleClass="text-caption-muted" text="Subtotal Neto" />
                             <Region HBox.hgrow="ALWAYS" />
@@ -107,12 +121,14 @@
                         <HBox alignment="CENTER_LEFT">
                             <Label styleClass="text-body-strong" text="TOTAL A PAGAR:" />
                             <Region HBox.hgrow="ALWAYS" />
-                            <Label fx:id="lblTotalKiosco" style="-fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: #FF5A1F; -fx-font-family: monospace;" text="S/ 0.00" />
+                            <Label fx:id="lblTotalKiosco" styleClass="kiosk-total-label" text="S/ 0.00" />
                         </HBox>
                     </VBox>
 
                     <!-- Botón Gigante de Confirmación Táctil -->
-                    <Button fx:id="btnConfirmarKiosco" maxWidth="Infinity" mnemonicParsing="false" onAction="#handleConfirmarPedido" prefHeight="54.0" style="-fx-background-color: #10B981; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: 800; -fx-background-radius: 10;" text="✓ CONFIRMAR Y ENVIAR A COCINA" />
+                    <Button fx:id="btnConfirmarKiosco" graphicTextGap="8.0" maxWidth="Infinity" mnemonicParsing="false" onAction="#handleConfirmarPedido" prefHeight="54.0" styleClass="btn-emerald" text="CONFIRMAR Y ENVIAR A COCINA">
+                        <graphic><FontIcon iconLiteral="fth-check-circle" iconSize="18" /></graphic>
+                    </Button>
                 </VBox>
             </children>
         </GridPane>

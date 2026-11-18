@@ -561,8 +561,8 @@ class FoodcoreV440FlowsTest {
 
                 assertTrue(ventaCtrl.getBtnDescuento().isDisabled(),
                         "El botón de Descuento en POS debe figurar deshabilitado para CAJERO");
-                assertTrue(ventaCtrl.getBtnAnularVenta().isDisabled(),
-                        "El botón de Anular Venta en POS debe figurar deshabilitado para CAJERO");
+                assertFalse(ventaCtrl.getBtnAnularVenta().isDisabled(),
+                        "En Modo Supervisor (v5.2.0), Anular Venta permanece habilitado para CAJERO y exige PIN de Supervisor");
             });
         } finally {
             JavaFxTestSupport.runOnFxThreadAndWait(() -> {

@@ -62,6 +62,7 @@ public class Launcher {
                     e
             );
         }
+        App.registrarShutdownHookUnaVez();
         try {
             ServidorSockets.getInstance().iniciar();
         } catch (Exception e) {

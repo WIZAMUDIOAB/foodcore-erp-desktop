@@ -6,6 +6,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
+import com.foodcore.util.UiAsyncExecutor;
 import com.google.gson.JsonObject;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -13,12 +14,18 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.input.Dragboard;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -36,6 +43,7 @@ public class ComandaCardController {
 
     @FXML private VBox cardContainer;
     @FXML private Label lblNumeroMesa;
+    @FXML private Label lblPrioridadBadge;
     @FXML private Label lblTiempo;
     @FXML private Label lblNumeroComanda;
     @FXML private VBox vboxItems;
@@ -46,12 +54,14 @@ public class ComandaCardController {
 
     private int idPedido = 0;
     private int idDetallePedido = 0;
+    private int prioridad = 0;
     private int segundosTranscurridos = 0;
     private String estadoActual = "PENDIENTE";
     private String colorUmbral = "GREEN";
     private Timeline timer;
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
+    private BiConsumer<Integer, Integer> onDragReordenarListener;
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
 
     public static String determinarColorPorSegundos(long segundos) {
@@ -73,7 +83,90 @@ public class ComandaCardController {
         if (btnDespachar != null && (btnDespachar.getId() == null || btnDespachar.getId().isBlank())) {
             btnDespachar.setId("btnListo");
         }
+        aplicarEstiloCronometro(KitchenDisplayController.TIMER_FONT_FAMILY, KitchenDisplayController.TIMER_FONT_SIZE);
+        configurarDragAndDrop();
         iniciarTemporizador();
+    }
+
+    /**
+     * Aplica la tipografía de alta legibilidad al cronómetro de comanda KDS (Sub-Fase D - D6).
+     */
+    public void aplicarEstiloCronometro(String fontFamily, double fontSize) {
+        if (lblTiempo == null) {
+            return;
+        }
+        String fam = (fontFamily == null || fontFamily.isBlank()) ? "JetBrains Mono" : fontFamily.trim();
+        double size = fontSize > 0 ? fontSize : 28.0;
+        lblTiempo.setFont(Font.font(fam, FontWeight.BOLD, size));
+        lblTiempo.setStyle("-fx-font-family: '" + fam + "', 'Consolas', monospace; "
+                + "-fx-font-size: " + Math.round(size) + "px; -fx-font-weight: bold;");
+    }
+
+    private void configurarDragAndDrop() {
+        if (cardContainer == null) {
+            return;
+        }
+        cardContainer.setOnDragDetected(ev -> {
+            if (idDetallePedido <= 0 || "ENTREGADO".equalsIgnoreCase(estadoActual)) {
+                return;
+            }
+            Dragboard db = cardContainer.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putString("KDS_DET:" + idDetallePedido);
+            db.setContent(content);
+            cardContainer.setOpacity(0.65);
+            ev.consume();
+        });
+        cardContainer.setOnDragDone(ev -> {
+            cardContainer.setOpacity(1.0);
+            ev.consume();
+        });
+        cardContainer.setOnDragOver(ev -> {
+            Dragboard db = ev.getDragboard();
+            if (db != null && db.hasString() && db.getString().startsWith("KDS_DET:")) {
+                ev.acceptTransferModes(TransferMode.MOVE);
+            }
+            ev.consume();
+        });
+        cardContainer.setOnDragDropped(ev -> {
+            Dragboard db = ev.getDragboard();
+            boolean ok = false;
+            if (db != null && db.hasString() && db.getString().startsWith("KDS_DET:") && idDetallePedido > 0) {
+                try {
+                    int idOrigen = Integer.parseInt(db.getString().substring("KDS_DET:".length()));
+                    if (idOrigen > 0 && idOrigen != idDetallePedido && onDragReordenarListener != null) {
+                        onDragReordenarListener.accept(idOrigen, idDetallePedido);
+                        ok = true;
+                    }
+                } catch (NumberFormatException ignored) {
+                    ok = false;
+                }
+            }
+            ev.setDropCompleted(ok);
+            ev.consume();
+        });
+    }
+
+    public void setPrioridad(int prioridad) {
+        this.prioridad = prioridad;
+        if (lblPrioridadBadge != null) {
+            if (prioridad > 0) {
+                lblPrioridadBadge.setText("P" + prioridad);
+                lblPrioridadBadge.setVisible(true);
+                lblPrioridadBadge.setManaged(true);
+            } else {
+                lblPrioridadBadge.setVisible(false);
+                lblPrioridadBadge.setManaged(false);
+            }
+        }
+    }
+
+    public int getPrioridad() {
+        return prioridad;
+    }
+
+    public void setOnDragReordenarListener(BiConsumer<Integer, Integer> listener) {
+        this.onDragReordenarListener = listener;
     }
 
     public void initDataItem(DetallePedido item, Consumer<DetallePedido> onIniciar, Consumer<DetallePedido> onListo) {
@@ -82,11 +175,7 @@ public class ComandaCardController {
         String mesa = item.getNumeroMesa() != null ? item.getNumeroMesa() : "01";
         String estado = item.getEstadoCocina() != null ? item.getEstadoCocina() : "PENDIENTE";
         initData(mesa, "PED-" + item.getIdPedido() + " · ITEM-" + item.getIdDetallePedido(), estado);
-        agregarPlato(
-            item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto(),
-            item.getCantidad(),
-            item.getNotasPreparacion()
-        );
+        agregarPlatoDetalle(item);
         long seg = item.calcularSegundosDesdeEnvio(LocalDateTime.now(ZONA_LIMA));
         setSegundosTranscurridos((int) seg);
 
@@ -107,6 +196,12 @@ public class ComandaCardController {
     }
 
     public void initData(String mesa, String comanda, String estado) {
+        if (lblTiempo != null) {
+            lblTiempo.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        }
+        if (lblPrioridadBadge != null) {
+            lblPrioridadBadge.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+        }
         if (mesa != null && (mesa.toUpperCase().contains("DELIVERY") || mesa.toUpperCase().contains("DL-"))) {
             lblNumeroMesa.setText("DELIVERY " + mesa);
             lblNumeroMesa.getStyleClass().add("badge-pill-accent");
@@ -190,13 +285,54 @@ public class ComandaCardController {
         AnimationUtils.setSoftPulse(cardContainer, false);
     }
 
+    public void agregarPlatoDetalle(DetallePedido item) {
+        if (item == null) {
+            return;
+        }
+        String tituloCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+        List<String> componentesCombo = com.foodcore.util.FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
+                item.getComboComponentesTexto(), item.getCantidad());
+        agregarPlato(tituloCocina, item.getCantidad(), item.getNotasPreparacion(), componentesCombo);
+    }
+
     public void agregarPlato(String producto, int cantidad, String notas) {
-        VBox itemBox = new VBox(4);
+        agregarPlato(producto, cantidad, notas, List.of());
+    }
+
+    public void agregarPlato(String producto, int cantidad, String notas, List<String> componentesCombo) {
+        VBox itemBox = new VBox(5);
+        boolean esCombo = componentesCombo != null && !componentesCombo.isEmpty();
+        if (esCombo) {
+            Label badgeCombo = new Label("COMBO");
+            badgeCombo.setStyle("-fx-background-color: #4F46E5; -fx-text-fill: #FFFFFF; -fx-font-size: 10px; "
+                    + "-fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
+            itemBox.getChildren().add(badgeCombo);
+        }
+
         Label lblPlato = new Label(cantidad + "x  " + producto);
         lblPlato.setWrapText(true);
         lblPlato.setMaxWidth(275);
         lblPlato.getStyleClass().add("text-body-strong-inverse");
         itemBox.getChildren().add(lblPlato);
+
+        if (esCombo) {
+            VBox boxDesglose = new VBox(3);
+            boxDesglose.setMaxWidth(275);
+            boxDesglose.setStyle("-fx-background-color: rgba(255, 255, 255, 0.08); "
+                    + "-fx-border-color: rgba(234, 88, 12, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
+                    + "-fx-padding: 6 9;");
+            Label lblCabeceraDesglose = new Label("Desglose de empaquetado:");
+            lblCabeceraDesglose.setStyle("-fx-text-fill: #EA580C; -fx-font-size: 11px; -fx-font-weight: 700;");
+            boxDesglose.getChildren().add(lblCabeceraDesglose);
+            for (String comp : componentesCombo) {
+                Label lblComp = new Label("•  " + comp);
+                lblComp.setWrapText(true);
+                lblComp.setMaxWidth(252);
+                lblComp.setStyle("-fx-text-fill: #FAF9F6; -fx-font-size: 12.5px; -fx-font-weight: 600;");
+                boxDesglose.getChildren().add(lblComp);
+            }
+            itemBox.getChildren().add(boxDesglose);
+        }
 
         if (notas != null && !notas.trim().isEmpty()) {
             Label lblNota = new Label("Nota: " + notas);
@@ -252,18 +388,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("EN_PREPARACION");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+                        }
+                        if (idPedido > 0) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
+                        }
                     }
-                    if (idPedido > 0) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -276,24 +414,26 @@ public class ComandaCardController {
         aplicarEstadoVisual("LISTO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
-                    }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
-                    }
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
+                        }
 
-                    JsonObject json = new JsonObject();
-                    json.addProperty("accion", "PLATO_DESPACHADO");
-                    json.addProperty("idPedido", idPedido);
-                    json.addProperty("idDetallePedido", idDetallePedido);
-                    ServidorSockets.getInstance().emitirMensaje(json);
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex);
-                }
-            }).start();
+                        JsonObject json = new JsonObject();
+                        json.addProperty("accion", "PLATO_DESPACHADO");
+                        json.addProperty("idPedido", idPedido);
+                        json.addProperty("idDetallePedido", idDetallePedido);
+                        ServidorSockets.getInstance().emitirMensaje(json);
+                    }
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex)
+            );
         }
 
         if (onEstadoCambiadoListener != null) {
@@ -310,18 +450,20 @@ public class ComandaCardController {
         aplicarEstadoVisual("ENTREGADO");
 
         if (idDetallePedido > 0 || idPedido > 0) {
-            new Thread(() -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (idDetallePedido > 0) {
-                        pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+            UiAsyncExecutor.ejecutarVoidAsync(
+                () -> {
+                    try (Connection conn = ConexionBD.getConnection()) {
+                        if (idDetallePedido > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
+                        }
+                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                        }
                     }
-                    if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex);
-                }
-            }).start();
+                },
+                null,
+                ex -> LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex)
+            );
         }
 
         if (onDespachadoListener != null) {
@@ -343,6 +485,10 @@ public class ComandaCardController {
 
     public Label getLblEstado() {
         return lblEstado;
+    }
+
+    public Label getLblTiempo() {
+        return lblTiempo;
     }
 
     public Button getBtnIniciar() {

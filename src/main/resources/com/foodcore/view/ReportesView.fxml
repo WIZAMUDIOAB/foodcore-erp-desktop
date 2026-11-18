@@ -4,6 +4,7 @@
 <?import javafx.scene.chart.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.foodcore.controller.ReportesController"
@@ -18,10 +19,13 @@
                 <Label text="Métricas comerciales, rotación de carta e ingresos por canal de cobro" styleClass="view-subheading"/>
             </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label text="Periodo:" style="-fx-font-weight: 700; -fx-text-fill: -color-ink-primary; -fx-font-size: 12px;"/>
-            <ComboBox fx:id="cmbPeriodo" prefWidth="180.0" prefHeight="36.0"
-                      style="-fx-font-size: 13px; -fx-background-radius: 7px; -fx-border-color: -color-border-subtle; -fx-border-radius: 7px;"/>
-            <Button text="⟳ Actualizar" onAction="#cargarDatos" prefHeight="36.0" styleClass="btn-secondary"/>
+            <VBox spacing="4.0">
+                <Label text="Periodo" styleClass="label-form"/>
+                <ComboBox fx:id="cmbPeriodo" prefWidth="180.0" prefHeight="36.0" styleClass="form-combo-box"/>
+            </VBox>
+            <Button graphicTextGap="8.0" text="Actualizar" onAction="#cargarDatos" prefHeight="36.0" styleClass="btn-secondary">
+                <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="16" /></graphic>
+            </Button>
         </HBox>
 
         <Separator style="-fx-opacity: 0.6;"/>

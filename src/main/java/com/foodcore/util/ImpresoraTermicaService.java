@@ -1,5 +1,7 @@
 package com.foodcore.util;
 
+import com.foodcore.dao.ConfiguracionImpresoraDAO;
+import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DesgloseFiscal;
@@ -20,11 +22,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,6 +61,19 @@ public class ImpresoraTermicaService {
     private static final String SEPARADOR_DOBLE = "=".repeat(ANCHO_COLUMNAS);
     private static final String SEPARADOR_SIMPLE = "-".repeat(ANCHO_COLUMNAS);
     private static final DateTimeFormatter FMT_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    private static final Object LOCK_LOG = new Object();
+    public static final String IMPRESORA_COCINA_DEFECTO = "Cocina (Predeterminada)";
+
+    /** Resultado de despacho hacia una impresora específica por categoría (v5.2.0). */
+    public record DespachoImpresionGrupo(
+            String nombreImpresora,
+            List<DetallePedido> detalles,
+            boolean impresoSpooler
+    ) {
+        public DespachoImpresionGrupo {
+            detalles = detalles != null ? List.copyOf(detalles) : List.of();
+        }
+    }
 
     private final AutorizacionService autorizacionService;
     private final Path rutaLogFallback;
@@ -114,10 +137,18 @@ public class ImpresoraTermicaService {
 
         for (DetalleVenta det : detalles) {
             String cantStr = String.format("%3dx", det.getCantidad());
-            String desc = det.getNombreProducto() != null ? det.getNombreProducto() : ("ITEM #" + det.getIdProducto());
+            String baseDesc = det.getNombreProducto() != null ? det.getNombreProducto() : ("ITEM #" + det.getIdProducto());
+            String descConVar = (det.getNombreVariante() != null && !det.getNombreVariante().isBlank())
+                ? baseDesc + " (" + det.getNombreVariante().trim() + ")"
+                : baseDesc;
             String subtotalStr = String.format("S/ %8s",
                 DesgloseFiscal.normalizarMoneda(det.getSubtotal()).toPlainString());
-            lineas.add(alinearColumnas(cantStr, desc, subtotalStr));
+            lineas.add(alinearColumnas(cantStr, descConVar, subtotalStr));
+            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                det.getModificadoresSeleccionados(), det.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                agregarLineasEnvolventes(lineas, "     + " + mods, "       ");
+            }
         }
 
         lineas.add(SEPARADOR_SIMPLE);
@@ -194,22 +225,24 @@ public class ImpresoraTermicaService {
     }
 
     public void escribirFallbackEnLog(List<String> lineas) {
-        try {
-            Path parent = rutaLogFallback.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
+        synchronized (LOCK_LOG) {
+            try {
+                Path parent = rutaLogFallback.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                String contenido = String.join(System.lineSeparator(), lineas)
+                    + System.lineSeparator() + System.lineSeparator();
+                Files.writeString(
+                    rutaLogFallback,
+                    contenido,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND
+                );
+            } catch (IOException ioEx) {
+                LOGGER.log(Level.SEVERE, "Error escribiendo respaldo de ticket en " + rutaLogFallback, ioEx);
             }
-            String contenido = String.join(System.lineSeparator(), lineas)
-                + System.lineSeparator() + System.lineSeparator();
-            Files.writeString(
-                rutaLogFallback,
-                contenido,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND
-            );
-        } catch (IOException ioEx) {
-            LOGGER.log(Level.SEVERE, "Error escribiendo respaldo de ticket en " + rutaLogFallback, ioEx);
         }
     }
 
@@ -346,11 +379,19 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_SIMPLE);
 
         for (DetallePedido item : detalles) {
-            String nom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String baseNom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String nomVar = (item.getNombreVariante() != null && !item.getNombreVariante().isBlank())
+                ? baseNom + " (" + item.getNombreVariante().trim() + ")"
+                : baseNom;
             String totalFmt = String.format("S/ %.2f", item.getSubtotal());
-            lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nom, totalFmt));
+            lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nomVar, totalFmt));
+            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                item.getModificadoresSeleccionados(), item.getModificadoresTexto());
+            if (!mods.isEmpty()) {
+                agregarLineasEnvolventes(lineas, "  + " + mods, "    ");
+            }
             if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
-                lineas.add(ajustarLinea(" * Nota: " + item.getNotasPreparacion()));
+                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion(), "   ");
             }
         }
 
@@ -366,6 +407,227 @@ public class ImpresoraTermicaService {
         return lineas;
     }
 
+    /**
+     * Formatea el ticket térmico de comanda para cocina/bar (48 columnas),
+     * imprimiendo explícitamente tamaño/variante y extras (ej. {@code 1x Hamburguesa + Tocino + Extra Queso}).
+     */
+    public List<String> formatearLineasComandaCocina(Pedido pedido, List<DetallePedido> detalles) throws NegocioException {
+        if (pedido == null) {
+            throw new NegocioException("Los datos del pedido son obligatorios para imprimir la comanda de cocina.");
+        }
+        if (detalles == null || detalles.isEmpty()) {
+            throw new NegocioException("La comanda de cocina debe contener al menos un ítem.");
+        }
+
+        List<String> lineas = new ArrayList<>();
+        lineas.add(SEPARADOR_DOBLE);
+        lineas.add(centrar("COMANDA DE COCINA (KDS)"));
+        lineas.add(SEPARADOR_SIMPLE);
+        String mesaStr = pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "01";
+        lineas.add(ajustarLinea("MESA / CANAL : " + mesaStr));
+        lineas.add(ajustarLinea("PEDIDO       : #" + pedido.getIdPedido()));
+        lineas.add(ajustarLinea("FECHA        : " + LocalDateTime.now().format(FMT_FECHA)));
+        lineas.add(SEPARADOR_SIMPLE);
+
+        for (DetallePedido item : detalles) {
+            String descCocina = FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+            agregarLineasEnvolventes(lineas, item.getCantidad() + "x " + descCocina, "   ");
+            List<String> componentesCombo = FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
+                    item.getComboComponentesTexto(), item.getCantidad());
+            for (String comp : componentesCombo) {
+                agregarLineasEnvolventes(lineas, "   - " + comp, "     ");
+            }
+            if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
+                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion().trim(), "   ");
+            }
+        }
+
+        lineas.add(SEPARADOR_DOBLE);
+        return lineas;
+    }
+
+    /** Lista las impresoras instaladas en el sistema operativo (Windows / CUPS). */
+    public static List<String> listarImpresorasWindows() {
+        Set<String> nombres = new LinkedHashSet<>();
+        PrintService[] servicios = PrintServiceLookup.lookupPrintServices(null, null);
+        if (servicios != null) {
+            for (PrintService ps : servicios) {
+                if (ps != null && ps.getName() != null && !ps.getName().isBlank()) {
+                    nombres.add(ps.getName().trim());
+                }
+            }
+        }
+        return List.copyOf(nombres);
+    }
+
+    /** Resuelve un {@link PrintService} por nombre exacto o parcial (o predeterminado si aplica). */
+    public static PrintService resolverPrintServicePorNombre(String nombreImpresora) {
+        if (nombreImpresora == null || nombreImpresora.isBlank()
+                || "PREDETERMINADA".equalsIgnoreCase(nombreImpresora.trim())
+                || "DEFAULT".equalsIgnoreCase(nombreImpresora.trim())
+                || IMPRESORA_COCINA_DEFECTO.equalsIgnoreCase(nombreImpresora.trim())) {
+            return PrintServiceLookup.lookupDefaultPrintService();
+        }
+        String buscado = nombreImpresora.trim();
+        PrintService[] servicios = PrintServiceLookup.lookupPrintServices(null, null);
+        if (servicios == null) {
+            return null;
+        }
+        for (PrintService ps : servicios) {
+            if (ps != null && ps.getName() != null && ps.getName().trim().equalsIgnoreCase(buscado)) {
+                return ps;
+            }
+        }
+        String buscadoLower = buscado.toLowerCase(Locale.ROOT);
+        for (PrintService ps : servicios) {
+            if (ps != null && ps.getName() != null
+                    && ps.getName().toLowerCase(Locale.ROOT).contains(buscadoLower)) {
+                return ps;
+            }
+        }
+        return null;
+    }
+
+    /** Agrupa los ítems de una comanda según la impresora asignada a la categoría de cada producto. */
+    public Map<String, List<DetallePedido>> agruparComandaPorImpresora(
+            List<DetallePedido> detalles,
+            Map<Integer, Integer> productoACategoria,
+            Map<Integer, String> categoriaAImpresora,
+            String impresoraPorDefecto) {
+        Map<String, List<DetallePedido>> grupos = new LinkedHashMap<>();
+        if (detalles == null || detalles.isEmpty()) {
+            return grupos;
+        }
+        String fallbackNombre = (impresoraPorDefecto != null && !impresoraPorDefecto.isBlank())
+                ? impresoraPorDefecto.trim() : IMPRESORA_COCINA_DEFECTO;
+
+        for (DetallePedido detalle : detalles) {
+            if (detalle == null) {
+                continue;
+            }
+            Integer idCategoria = productoACategoria != null ? productoACategoria.get(detalle.getIdProducto()) : null;
+            String nombreImpresora = (idCategoria != null && categoriaAImpresora != null)
+                    ? categoriaAImpresora.get(idCategoria) : null;
+            String destino = (nombreImpresora != null && !nombreImpresora.isBlank())
+                    ? nombreImpresora.trim() : fallbackNombre;
+            grupos.computeIfAbsent(destino, k -> new ArrayList<>()).add(detalle);
+        }
+        return grupos;
+    }
+
+    /** Enruta e imprime en paralelo la comanda separada por impresora configurada por categoría (v5.2.0). */
+    public List<DespachoImpresionGrupo> imprimirComandaPorCategorias(Pedido pedido, List<DetallePedido> detalles) {
+        Map<Integer, Integer> prodCat = Map.of();
+        Map<Integer, String> catImp = Map.of();
+        ConfiguracionImpresoraDAO dao = new ConfiguracionImpresoraDAOImpl();
+        try (Connection conn = ConexionBD.getConnection()) {
+            prodCat = dao.obtenerMapaProductoACategoria(conn);
+            catImp = dao.obtenerMapaCategoriaAImpresora(conn);
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "No se pudo consultar ruteo de impresoras; usando impresora predeterminada.", ex);
+        }
+        return imprimirComandaPorCategorias(pedido, detalles, prodCat, catImp);
+    }
+
+    /** Variante conectada a una transacción existente para ruteo de comandas por categoría. */
+    public List<DespachoImpresionGrupo> imprimirComandaPorCategorias(
+            Connection conn, Pedido pedido, List<DetallePedido> detalles) throws SQLException {
+        ConfiguracionImpresoraDAO dao = new ConfiguracionImpresoraDAOImpl();
+        return imprimirComandaPorCategorias(
+                pedido,
+                detalles,
+                dao.obtenerMapaProductoACategoria(conn),
+                dao.obtenerMapaCategoriaAImpresora(conn)
+        );
+    }
+
+    /** Variante pura / testeable que agrupa e imprime simultáneamente por mapa de categoría a impresora. */
+    public List<DespachoImpresionGrupo> imprimirComandaPorCategorias(
+            Pedido pedido,
+            List<DetallePedido> detalles,
+            Map<Integer, Integer> productoACategoria,
+            Map<Integer, String> categoriaAImpresora) {
+        if (pedido == null || detalles == null || detalles.isEmpty()) {
+            return List.of();
+        }
+        Map<String, List<DetallePedido>> agrupado = agruparComandaPorImpresora(
+                detalles, productoACategoria, categoriaAImpresora, IMPRESORA_COCINA_DEFECTO);
+        if (agrupado.isEmpty()) {
+            return List.of();
+        }
+
+        List<CompletableFuture<DespachoImpresionGrupo>> futuros = new ArrayList<>();
+        for (Map.Entry<String, List<DetallePedido>> entry : agrupado.entrySet()) {
+            String nombreImp = entry.getKey();
+            List<DetallePedido> subLista = List.copyOf(entry.getValue());
+            futuros.add(CompletableFuture.supplyAsync(() -> {
+                boolean spooled = despacharComandaEnImpresora(pedido, subLista, nombreImp);
+                return new DespachoImpresionGrupo(nombreImp, subLista, spooled);
+            }));
+        }
+        return futuros.stream().map(CompletableFuture::join).toList();
+    }
+
+    private boolean despacharComandaEnImpresora(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
+        try {
+            List<String> lineas = formatearLineasComandaCocina(pedido, detalles);
+            List<String> lineasConDestino = new ArrayList<>(lineas.size() + 1);
+            String impTag = (nombreImpresora != null && !nombreImpresora.isBlank())
+                    ? nombreImpresora.trim() : IMPRESORA_COCINA_DEFECTO;
+            lineasConDestino.add(ajustarLinea("[IMPRESORA: " + impTag + "]"));
+            lineasConDestino.addAll(lineas);
+            escribirFallbackEnLog(lineasConDestino);
+
+            if (nombreImpresora != null && !nombreImpresora.isBlank()) {
+                try {
+                    byte[] bytesEscPos = generarBytesEscPos(lineas, true);
+                    PrintService printService = resolverPrintServicePorNombre(nombreImpresora);
+                    if (printService != null) {
+                        DocPrintJob job = printService.createPrintJob();
+                        Doc doc = new SimpleDoc(bytesEscPos, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
+                        job.print(doc, null);
+                        return true;
+                    }
+                } catch (PrintException | RuntimeException pe) {
+                    LOGGER.log(Level.WARNING, "No se pudo enviar comanda a impresora '" + nombreImpresora + "'", pe);
+                }
+            }
+            return false;
+        } catch (NegocioException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al emitir ticket de comanda para impresora '" + nombreImpresora + "'", ex);
+            return false;
+        }
+    }
+
+    public boolean imprimirComandaCocina(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
+        try {
+            despacharComandaEnImpresora(pedido, detalles, nombreImpresora);
+            return true;
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al emitir ticket de comanda para cocina", ex);
+            return false;
+        }
+    }
+
+    private static void agregarLineasEnvolventes(List<String> destino, String texto, String prefijoContinuacion) {
+        String restante = texto != null ? texto.stripTrailing() : "";
+        boolean primera = true;
+        while (!restante.isEmpty()) {
+            String lineaBase = primera ? restante : prefijoContinuacion + restante.stripLeading();
+            if (lineaBase.length() <= ANCHO_COLUMNAS) {
+                destino.add(ajustarLinea(lineaBase));
+                break;
+            }
+            int corte = lineaBase.lastIndexOf(' ', ANCHO_COLUMNAS);
+            if (corte <= (primera ? 0 : prefijoContinuacion.length())) {
+                corte = ANCHO_COLUMNAS;
+            }
+            destino.add(ajustarLinea(lineaBase.substring(0, corte)));
+            restante = lineaBase.substring(corte).stripLeading();
+            primera = false;
+        }
+    }
+
     public boolean imprimirPreCuenta(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
         try {
             List<String> lineas = formatearLineasPreCuenta(pedido, detalles);
@@ -373,7 +635,7 @@ public class ImpresoraTermicaService {
             if (nombreImpresora != null && !nombreImpresora.isBlank()) {
                 try {
                     byte[] bytesEscPos = generarBytesEscPos(lineas, true);
-                    PrintService printService = PrintServiceLookup.lookupDefaultPrintService();
+                    PrintService printService = resolverPrintServicePorNombre(nombreImpresora);
                     if (printService != null) {
                         DocPrintJob job = printService.createPrintJob();
                         Doc doc = new SimpleDoc(bytesEscPos, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);

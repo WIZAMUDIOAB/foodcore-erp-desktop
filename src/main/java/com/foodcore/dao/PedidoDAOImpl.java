@@ -3,21 +3,29 @@ package com.foodcore.dao;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
+import com.foodcore.dao.impl.ComboDAOImpl;
+import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.exception.ConflictoEstadoException;
+import com.foodcore.model.Combo;
 import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
+import com.foodcore.model.ProductoModificador;
+import com.foodcore.util.FormatoPersonalizacionUtil;
 
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class PedidoDAOImpl implements PedidoDAO {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private final ProductoPersonalizacionDAO personalizacionDAO = new ProductoPersonalizacionDAOImpl();
+    private final ComboDAO comboDAO = new ComboDAOImpl();
 
     @Override
     public int crearPedido(Connection conn, Pedido pedido) throws SQLException {
@@ -141,8 +149,16 @@ public class PedidoDAOImpl implements PedidoDAO {
     public int insertarDetallePedido(Connection conn, DetallePedido detalle) throws SQLException {
         LocalDateTime enviadoEn = detalle.getEnviadoEn() != null ? detalle.getEnviadoEn() : LocalDateTime.now(ZONA_LIMA);
         String estadoCocina = detalle.getEstadoCocina() != null ? detalle.getEstadoCocina() : "PENDIENTE";
+        String modsTexto = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                detalle.getModificadoresSeleccionados(), detalle.getModificadoresTexto());
+        if (!modsTexto.isEmpty()) {
+            detalle.setModificadoresTexto(modsTexto);
+        }
+        completarComboDetallePedido(conn, detalle);
         String sql = "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario, subtotal, " +
-                     "notas_preparacion, estado_cocina, enviado_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                     "notas_preparacion, estado_cocina, enviado_en, id_variante, nombre_variante, modificadores_texto, " +
+                     "id_combo, combo_componentes_texto) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, detalle.getIdPedido());
             ps.setInt(2, detalle.getIdProducto());
@@ -152,11 +168,38 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setString(6, detalle.getNotasPreparacion() != null ? detalle.getNotasPreparacion() : "");
             ps.setString(7, estadoCocina);
             ps.setTimestamp(8, Timestamp.valueOf(enviadoEn));
+            if (detalle.getIdVariante() != null && detalle.getIdVariante() > 0) {
+                ps.setInt(9, detalle.getIdVariante());
+            } else {
+                ps.setNull(9, Types.INTEGER);
+            }
+            if (detalle.getNombreVariante() != null && !detalle.getNombreVariante().isBlank()) {
+                ps.setString(10, detalle.getNombreVariante().trim());
+            } else {
+                ps.setNull(10, Types.VARCHAR);
+            }
+            if (!modsTexto.isEmpty()) {
+                ps.setString(11, modsTexto);
+            } else {
+                ps.setNull(11, Types.VARCHAR);
+            }
+            if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0) {
+                ps.setInt(12, detalle.getIdCombo());
+            } else {
+                ps.setNull(12, Types.INTEGER);
+            }
+            if (detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+                ps.setString(13, detalle.getComboComponentesTexto().trim());
+            } else {
+                ps.setNull(13, Types.VARCHAR);
+            }
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     int id = rs.getInt(1);
                     detalle.setIdDetallePedido(id);
+                    personalizacionDAO.insertarDetallePedidoModificadores(
+                            conn, id, detalle.getModificadoresSeleccionados());
                     return id;
                 }
             }
@@ -286,6 +329,9 @@ public class PedidoDAOImpl implements PedidoDAO {
                 }
             }
         }
+        if (!lista.isEmpty()) {
+            adjuntarModificadores(lista, personalizacionDAO.listarModificadoresPorPedido(conn, idPedido));
+        }
         return lista;
     }
 
@@ -302,14 +348,29 @@ public class PedidoDAOImpl implements PedidoDAO {
                      "JOIN pedido ped ON dp.id_pedido = ped.id_pedido " +
                      "WHERE dp.estado_cocina IN ('PENDIENTE', 'EN_PREPARACION', 'LISTO') " +
                      "AND ped.estado IN ('ABIERTO', 'PENDIENTE', 'REGISTRADO', 'EN_PREPARACION', 'LISTO', 'ITEMS_ADICIONALES') " +
-                     "ORDER BY dp.id_detalle_pedido ASC";
+                     "ORDER BY dp.prioridad DESC, dp.id_detalle_pedido ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 lista.add(mapearDetallePedido(rs));
             }
         }
+        if (!lista.isEmpty()) {
+            adjuntarModificadores(lista, personalizacionDAO.listarModificadoresDetallesActivosCocina(conn));
+        }
         return lista;
+    }
+
+    private void adjuntarModificadores(List<DetallePedido> lista, Map<Integer, List<ProductoModificador>> modsPorDetalle) {
+        for (DetallePedido dp : lista) {
+            List<ProductoModificador> mods = modsPorDetalle.get(dp.getIdDetallePedido());
+            if (mods != null && !mods.isEmpty()) {
+                dp.setModificadoresSeleccionados(mods);
+                if (dp.getModificadoresTexto() == null || dp.getModificadoresTexto().isBlank()) {
+                    dp.setModificadoresTexto(FormatoPersonalizacionUtil.formatearTextoModificadores(mods));
+                }
+            }
+        }
     }
 
     @Override
@@ -346,10 +407,45 @@ public class PedidoDAOImpl implements PedidoDAO {
             if (ini != null) dp.setIniciadoEn(ini.toLocalDateTime());
             Timestamp lst = rs.getTimestamp("listo_en");
             if (lst != null) dp.setListoEn(lst.toLocalDateTime());
+            int idVar = rs.getInt("id_variante");
+            if (!rs.wasNull() && idVar > 0) {
+                dp.setIdVariante(idVar);
+            }
+            dp.setNombreVariante(rs.getString("nombre_variante"));
+            dp.setModificadoresTexto(rs.getString("modificadores_texto"));
+            int idCombo = rs.getInt("id_combo");
+            if (!rs.wasNull() && idCombo > 0) {
+                dp.setIdCombo(idCombo);
+            }
+            dp.setComboComponentesTexto(rs.getString("combo_componentes_texto"));
+            dp.setPrioridad(rs.getInt("prioridad"));
         } catch (SQLException ignored) {
             // Columnas opcionales en esquemas previos
         }
         return dp;
+    }
+
+    private void completarComboDetallePedido(Connection conn, DetallePedido detalle) throws SQLException {
+        if (detalle == null || detalle.getIdProducto() <= 0) {
+            return;
+        }
+        if (detalle.getIdCombo() != null && detalle.getIdCombo() > 0
+                && detalle.getComboComponentesTexto() != null && !detalle.getComboComponentesTexto().isBlank()) {
+            return;
+        }
+        Optional<Combo> opt = (detalle.getIdCombo() != null && detalle.getIdCombo() > 0)
+                ? comboDAO.obtenerPorId(conn, detalle.getIdCombo())
+                : comboDAO.obtenerPorIdProducto(conn, detalle.getIdProducto());
+        if (opt.isPresent()) {
+            Combo combo = opt.get();
+            if (detalle.getIdCombo() == null || detalle.getIdCombo() <= 0) {
+                detalle.setIdCombo(combo.getIdCombo());
+            }
+            if (detalle.getComboComponentesTexto() == null || detalle.getComboComponentesTexto().isBlank()) {
+                detalle.setComboComponentesTexto(
+                        FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(combo.getDetalles()));
+            }
+        }
     }
 
     @Override
@@ -392,6 +488,28 @@ public class PedidoDAOImpl implements PedidoDAO {
             ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now(ZONA_LIMA)));
             ps.setInt(3, idDetallePedido);
             ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void actualizarPrioridadesCocina(Connection conn, List<Integer> idsDetalleOrdenDescendente) throws SQLException {
+        if (idsDetalleOrdenDescendente == null || idsDetalleOrdenDescendente.isEmpty()) {
+            return;
+        }
+        String sql = "UPDATE detalle_pedido SET prioridad = ? WHERE id_detalle_pedido = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int total = idsDetalleOrdenDescendente.size();
+            for (int i = 0; i < total; i++) {
+                int idDet = idsDetalleOrdenDescendente.get(i);
+                if (idDet <= 0) {
+                    continue;
+                }
+                int pesoPrioridad = (total - i) * 10;
+                ps.setInt(1, pesoPrioridad);
+                ps.setInt(2, idDet);
+                ps.addBatch();
+            }
+            ps.executeBatch();
         }
     }
 

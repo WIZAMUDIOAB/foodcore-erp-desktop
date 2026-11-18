@@ -1,77 +1,296 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <StackPane fx:id="rootConfigStack" prefHeight="720.0" prefWidth="1120.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.ConfiguracionController">
     <children>
-        <StackPane styleClass="pos-catalog-panel">
-            <children>
-                <VBox alignment="TOP_CENTER" maxWidth="680.0" prefWidth="680.0" spacing="18.0" styleClass="caja-centered-column">
+        <ScrollPane fitToWidth="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
+            <content>
+                <StackPane styleClass="pos-catalog-panel">
                     <children>
-                        <VBox spacing="4.0" styleClass="surface-card">
+                        <VBox alignment="TOP_CENTER" maxWidth="820.0" prefWidth="820.0" spacing="18.0" styleClass="caja-centered-column">
                             <children>
-                                <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                <VBox spacing="4.0" styleClass="surface-card">
                                     <children>
-                                        <Label styleClass="view-heading" text="Configuración del Restaurante y Ticketera" />
-                                        <Label styleClass="badge-pill-neutral" text="TICKET INTERNO NO FISCAL" />
-                                    </children>
-                                </HBox>
-                                <Label styleClass="view-subheading" text="Datos de cabecera del comprobante interno no fiscal y nombre de la impresora térmica LAN/USB" />
-                            </children>
-                        </VBox>
-
-                        <VBox spacing="14.0" styleClass="surface-card">
-                            <children>
-                                <VBox spacing="4.0">
-                                    <children>
-                                        <Label styleClass="text-body-strong" text="Nombre Comercial del Restaurante" />
-                                        <TextField fx:id="txtNombreRestaurante" styleClass="input-field" text="FoodCore Fast Food S.A.C." />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="view-heading" text="Configuración del Restaurante e Impresoras" />
+                                                <Label styleClass="badge-pill-neutral" text="TICKET, IMPRESORAS, BACKUPS Y ALERTAS" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="view-subheading" text="Datos de cabecera del comprobante, ruteo KDS multi-impresora, respaldo automatizado y alertas SMTP" />
                                     </children>
                                 </VBox>
 
-                                <VBox spacing="4.0">
+                                <!-- Apariencia y Modo Oscuro (v5.4.0 Sub-Fase D - D4) -->
+                                <VBox spacing="10.0" styleClass="surface-card">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="Dirección del Local" />
-                                        <TextField fx:id="txtDireccion" styleClass="input-field" text="Av. Javier Prado Este 2450, San Borja, Lima" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Apariencia de Interfaz (Tema Visual)" />
+                                                <Label styleClass="badge-pill-neutral" text="CLARO / OSCURO" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Active el tema oscuro (dark-theme.css) para turnos nocturnos o entornos de baja iluminación." />
+                                        <HBox alignment="CENTER_LEFT" spacing="14.0">
+                                            <children>
+                                                <CheckBox fx:id="chkModoOscuro" mnemonicParsing="false" onAction="#handleToggleModoOscuro" text="Activar Modo Oscuro (dark-theme.css)" />
+                                                <Label fx:id="lblEstadoModoOscuro" styleClass="badge-pill-neutral" text="Tema Claro activo" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
 
-                                <VBox spacing="4.0">
+                                <VBox spacing="14.0" styleClass="surface-card">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="Teléfono de Contacto" />
-                                        <TextField fx:id="txtTelefono" styleClass="input-field" text="(01) 442-8900" />
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Nombre Comercial del Restaurante" />
+                                                <TextField fx:id="txtNombreRestaurante" styleClass="input-field" text="FoodCore Fast Food S.A.C." />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Dirección del Local" />
+                                                <TextField fx:id="txtDireccion" styleClass="input-field" text="Av. Javier Prado Este 2450, San Borja, Lima" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Teléfono de Contacto" />
+                                                <TextField fx:id="txtTelefono" styleClass="input-field" text="(01) 442-8900" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="RUC Opcional (Referencia en Comprobante Interno)" />
+                                                <TextField fx:id="txtRuc" styleClass="input-field" text="20609874512" />
+                                            </children>
+                                        </VBox>
+
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="text-body-strong" text="Impresora Térmica Principal (Comprobantes POS)" />
+                                                <TextField fx:id="txtImpresora" styleClass="input-field" text="EPSON-TM-T20III" />
+                                            </children>
+                                        </VBox>
+
+                                        <HBox alignment="CENTER_RIGHT">
+                                            <children>
+                                                <Button fx:id="btnGuardarConfig" mnemonicParsing="false" onAction="#handleGuardarConfiguracion" styleClass="btn-primary" text="Guardar Configuración" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
 
-                                <VBox spacing="4.0">
+                                <!-- Múltiples Impresoras por Categoría (v5.2.0 Ítem 1) -->
+                                <VBox spacing="12.0" styleClass="surface-card">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="RUC Opcional (Referencia en Comprobante Interno)" />
-                                        <TextField fx:id="txtRuc" styleClass="input-field" text="20609874512" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Ruteo de Comandas por Categoría (Múltiples Impresoras)" />
+                                                <Label styleClass="badge-pill-accent" text="COCINA / BARRA" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Asigne cada categoría de platillos a una impresora de Windows o cola de impresión diferente. Al enviar comanda se imprimirán en paralelo." />
+
+                                        <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                            <children>
+                                                <VBox spacing="6.0">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Categoría de menú" />
+                                                        <ComboBox fx:id="cmbCategoriaImpresora" prefWidth="195.0" promptText="Categoría de menú" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Impresora Windows" />
+                                                        <ComboBox fx:id="cmbNombreImpresoraWindows" editable="true" maxWidth="1.7976931348623157E308" prefWidth="215.0" promptText="Impresora Windows (ej. Cocina, Barra)" styleClass="form-combo-box" />
+                                                    </children>
+                                                </VBox>
+                                                <Button fx:id="btnAsignarImpresora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleAsignarImpresoraCategoria" styleClass="btn-primary" text="Asignar Impresora" />
+                                                <Button fx:id="btnQuitarImpresora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleEliminarImpresoraCategoria" styleClass="btn-secondary" text="Quitar" />
+                                            </children>
+                                        </HBox>
+
+                                        <TableView fx:id="tblRuteoImpresoras" prefHeight="190.0">
+                                            <placeholder>
+                                                <VBox alignment="CENTER" spacing="12.0">
+                                                    <children>
+                                                        <FontIcon iconLiteral="fth-inbox" iconSize="48" styleClass="text-muted" />
+                                                        <Label styleClass="h3" text="No hay registros" />
+                                                        <Label styleClass="text-secondary" text="No se encontraron datos para el período seleccionado." />
+                                                    </children>
+                                                </VBox>
+                                            </placeholder>
+                                            <columns>
+                                                <TableColumn fx:id="colCatNombre" prefWidth="240.0" text="Categoría de Producto" />
+                                                <TableColumn fx:id="colImpWindows" prefWidth="360.0" text="Impresora Windows Destino" />
+                                                <TableColumn fx:id="colImpEstado" prefWidth="130.0" text="Estado" />
+                                            </columns>
+                                            <columnResizePolicy>
+                                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                            </columnResizePolicy>
+                                        </TableView>
                                     </children>
                                 </VBox>
 
-                                <VBox spacing="4.0">
+                                <!-- Alertas de Fallo por Email SMTP (v5.3.0 Ítem 6) -->
+                                <VBox spacing="12.0" styleClass="surface-card">
                                     <children>
-                                        <Label styleClass="text-body-strong" text="Nombre de Impresora Térmica (80mm / 58mm)" />
-                                        <TextField fx:id="txtImpresora" styleClass="input-field" text="EPSON-TM-T20III" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Alertas de Fallo por Email (SMTP)" />
+                                                <Label styleClass="badge-pill-warning" text="MONITOREO 24/7" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Notifica automáticamente al dueño si MySQL cae por más de 1 minuto, disco libre baja de 5 GB o la RAM supera 90% por más de 5 minutos." />
+
+                                        <GridPane hgap="12.0" vgap="10.0">
+                                            <columnConstraints>
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" />
+                                                <ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+                                            </columnConstraints>
+                                            <rowConstraints>
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                                <RowConstraints vgrow="SOMETIMES" />
+                                            </rowConstraints>
+                                            <children>
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Email de Alertas (Dueño / TI)" />
+                                                        <TextField fx:id="txtEmailAlertas" promptText="dueno@foodcore.pe" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox alignment="BOTTOM_LEFT" spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                                    <children>
+                                                        <CheckBox fx:id="chkAlertasEmailHabilitadas" selected="true" text="Alertas automáticas activas" />
+                                                        <CheckBox fx:id="chkSmtpTlsHabilitado" selected="true" text="Usar cifrado TLS / STARTTLS" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Servidor SMTP (Host)" />
+                                                        <TextField fx:id="txtSmtpHost" promptText="smtp.gmail.com" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Puerto SMTP" />
+                                                        <TextField fx:id="txtSmtpPort" promptText="587" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+
+                                                <VBox spacing="4.0" GridPane.columnIndex="0" GridPane.rowIndex="2">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Usuario Remitente SMTP" />
+                                                        <TextField fx:id="txtSmtpUser" promptText="alertas@foodcore.pe" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <VBox spacing="4.0" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                                    <children>
+                                                        <Label styleClass="text-body-strong" text="Contraseña / App Password SMTP" />
+                                                        <PasswordField fx:id="txtSmtpPassword" promptText="Contraseña SMTP (opcional en test)" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                            </children>
+                                        </GridPane>
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoAlertasEmail" styleClass="badge-pill-neutral" text="Configuración SMTP cargada" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnProbarAlertaEmail" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleProbarAlertaEmail" styleClass="btn-secondary" text="Enviar Alerta de Prueba" />
+                                                <Button fx:id="btnGuardarAlertasEmail" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleGuardarConfiguracionAlertas" styleClass="btn-primary" text="Guardar Alertas Email" />
+                                            </children>
+                                        </HBox>
                                     </children>
                                 </VBox>
 
-                                <HBox alignment="CENTER_RIGHT">
+                                <!-- Respaldo y Restauración Automatizada de BD (v5.3.0 Ítem 3) -->
+                                <VBox spacing="12.0" styleClass="surface-card">
                                     <children>
-                                        <Button fx:id="btnGuardarConfig" mnemonicParsing="false" onAction="#handleGuardarConfiguracion" styleClass="btn-primary" text="Guardar Configuración" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Respaldo y Restauración Automatizada de Base de Datos" />
+                                                <Label styleClass="badge-pill-danger" text="RECUPERACIÓN DE DESASTRES" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Ejecuta backups comprimidos (.sql.gz) con retención de 30 días o restaura un respaldo validando su integridad previa confirmación." />
+
+                                        <HBox alignment="BOTTOM_LEFT" spacing="10.0">
+                                            <children>
+                                                <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                                                    <children>
+                                                        <Label styleClass="label-form" text="Archivo de respaldo (.sql.gz)" />
+                                                        <TextField fx:id="txtRutaBackupRestaurar" promptText="Ruta de backup (ej. backups/foodcore_20261115.sql.gz)" styleClass="input-field" />
+                                                    </children>
+                                                </VBox>
+                                                <Button fx:id="btnSeleccionarBackup" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleSeleccionarArchivoBackup" styleClass="btn-secondary" text="Examinar..." />
+                                            </children>
+                                        </HBox>
+
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoRestauracion" styleClass="badge-pill-neutral" text="Sin operaciones recientes" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnGenerarBackupAhora" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleEjecutarBackupAhora" styleClass="btn-secondary" text="Generar Backup Ahora" />
+                                                <Button fx:id="btnRestaurarBackup" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleRestaurarDesdeBackup" styleClass="btn-destructive" text="Restaurar desde Backup" />
+                                            </children>
+                                        </HBox>
                                     </children>
-                                </HBox>
+                                </VBox>
+
+                                <!-- Datos de Demostración Descartables (v5.5.0 Sub-Fase E - E3) -->
+                                <VBox spacing="12.0" styleClass="card">
+                                    <children>
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label styleClass="text-h2" text="Datos de Demostración" />
+                                                <Label styleClass="badge-pill-accent" text="MODO PRUEBA DESCARTABLE" />
+                                            </children>
+                                        </HBox>
+                                        <Label styleClass="text-caption" text="Carga clientes, productos y ventas de prueba (es_demo = 1) para evaluar el ERP o elimínalos sin afectar datos reales." wrapText="true" />
+                                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                            <children>
+                                                <Label fx:id="lblEstadoDemo" styleClass="badge-pill-neutral" text="Sin datos de demo cargados" HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="btnCargarDatosDemo" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleCargarDatosDemo" styleClass="btn-secondary" text="Cargar Datos de Demo">
+                                                    <graphic>
+                                                        <FontIcon iconLiteral="fth-plus" iconSize="14" />
+                                                    </graphic>
+                                                </Button>
+                                                <Button fx:id="btnBorrarDatosDemo" graphicTextGap="8.0" minWidth="-Infinity" mnemonicParsing="false" onAction="#handleBorrarDatosDemo" styleClass="btn-destructive" text="Borrar Datos de Demo">
+                                                    <graphic>
+                                                        <FontIcon iconLiteral="fth-trash-2" iconSize="14" />
+                                                    </graphic>
+                                                </Button>
+                                            </children>
+                                        </HBox>
+                                    </children>
+                                </VBox>
                             </children>
                         </VBox>
                     </children>
-                </VBox>
-            </children>
-        </StackPane>
+                </StackPane>
+            </content>
+        </ScrollPane>
     </children>
 </StackPane>

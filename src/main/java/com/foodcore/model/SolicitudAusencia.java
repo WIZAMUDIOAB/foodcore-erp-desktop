@@ -103,11 +103,45 @@ public class SolicitudAusencia {
         this.observacionGerente = observacionGerente;
     }
 
+    private int diasSolicitados = 1;
+    private Integer aprobadoPor;
+    private LocalDateTime fechaRespuesta;
+
     public LocalDateTime getFechaSolicitud() {
         return fechaSolicitud;
     }
 
     public void setFechaSolicitud(LocalDateTime fechaSolicitud) {
         this.fechaSolicitud = fechaSolicitud;
+    }
+
+    public int getDiasSolicitados() {
+        if (diasSolicitados > 0) {
+            return diasSolicitados;
+        }
+        if (fechaInicio != null && fechaFin != null && !fechaFin.isBefore(fechaInicio)) {
+            return (int) java.time.temporal.ChronoUnit.DAYS.between(fechaInicio, fechaFin) + 1;
+        }
+        return 1;
+    }
+
+    public void setDiasSolicitados(int diasSolicitados) {
+        this.diasSolicitados = diasSolicitados;
+    }
+
+    public Integer getAprobadoPor() {
+        return aprobadoPor;
+    }
+
+    public void setAprobadoPor(Integer aprobadoPor) {
+        this.aprobadoPor = aprobadoPor;
+    }
+
+    public LocalDateTime getFechaRespuesta() {
+        return fechaRespuesta;
+    }
+
+    public void setFechaRespuesta(LocalDateTime fechaRespuesta) {
+        this.fechaRespuesta = fechaRespuesta;
     }
 }

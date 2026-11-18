@@ -6,13 +6,13 @@ import com.foodcore.model.Rol;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
@@ -273,23 +273,18 @@ public class RolesController {
     public void handleAbrirModalNuevoRol(ActionEvent event) {
         StackPane backdrop = new StackPane();
         backdrop.getStyleClass().add("modal-backdrop");
-        VBox card = new VBox(12);
-        card.getStyleClass().add("modal-dialog-surface");
-        card.setMaxWidth(440);
 
-        Label lblTitle = new Label("Crear Nuevo Rol Dinámico");
-        lblTitle.getStyleClass().add("text-h2");
-
-        TextField txtCod = new TextField(); txtCod.setPromptText("Código Rol (Ej. SUPERVISOR, DELIVERY_MGR)"); txtCod.getStyleClass().add("input-field");
-        TextField txtNom = new TextField(); txtNom.setPromptText("Nombre Legible (Ej. Supervisor de Salón)"); txtNom.getStyleClass().add("input-field");
-        TextField txtDesc = new TextField(); txtDesc.setPromptText("Descripción de Funciones"); txtDesc.getStyleClass().add("input-field");
+        TextField txtCod = new TextField();
+        txtCod.setPromptText("Ej. SUPERVISOR, DELIVERY_MGR");
+        TextField txtNom = new TextField();
+        txtNom.setPromptText("Ej. Supervisor de Salón");
+        TextField txtDesc = new TextField();
+        txtDesc.setPromptText("Funciones principales del rol");
 
         Button btnCancelar = new Button("Cancelar");
-        btnCancelar.getStyleClass().add("btn-secondary");
         btnCancelar.setOnAction(ev -> rootRolesStack.getChildren().remove(backdrop));
 
         Button btnGuardar = new Button("Crear Rol");
-        btnGuardar.getStyleClass().add("btn-primary");
         btnGuardar.setOnAction(ev -> {
             String cod = txtCod.getText() != null ? txtCod.getText().trim().toUpperCase() : "";
             String nom = txtNom.getText() != null ? txtNom.getText().trim() : "";
@@ -320,13 +315,23 @@ public class RolesController {
             );
         });
 
-        HBox actions = new HBox(12, btnCancelar, btnGuardar);
-        actions.setAlignment(Pos.CENTER_RIGHT);
+        HBox footer = DialogService.construirFooterModal(btnCancelar, btnGuardar);
+        VBox card = DialogService.construirModalFormulario(
+                500.0,
+                "Crear Nuevo Rol Dinámico",
+                "Defina el identificador RBAC, nombre legible y alcance operativo.",
+                List.of(
+                        DialogService.construirFilaDobleModal(
+                                DialogService.construirCampoModal("Código Rol", txtCod),
+                                DialogService.construirCampoModal("Nombre Legible", txtNom)),
+                        DialogService.construirCampoModal("Descripción de Funciones", txtDesc)),
+                footer);
 
-        card.getChildren().addAll(lblTitle, txtCod, txtNom, txtDesc, actions);
         backdrop.getChildren().add(card);
         AnimationUtils.animateModalEnter(card);
         rootRolesStack.getChildren().add(backdrop);
+        rootRolesStack.applyCss();
+        rootRolesStack.layout();
     }
 
     public ObservableList<Rol> getListaRoles() {

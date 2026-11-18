@@ -2,6 +2,70 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.7.0] - Sub-Fase G: Performance y QA Final (2026-11-18)
+
+- **Smoke Test de Acoplamiento End-to-End (`FlujoCompletoAcoplamientoIT`) (#55 / G1)**:
+  - Prueba integral sobre MySQL 8.0 InnoDB verificando la cadena completa: creación de pedido en POS/Mozo (`PedidoService`), recepción y transición en cocina KDS (`PENDIENTE -> EN_PREPARACION -> LISTO -> ENTREGADO`), cobro en Caja (`VentaService.procesarCobroVenta`), descuento automático de stock y registro firmado (`SALIDA`) en `kardex_movimiento`, y conciliación en el Estado de Resultados P&L (`FinanzasBiService`).
+- **Pruebas de Carga, Estrés y Soak Test (`scripts/perf/load-test.js`, `SoakTestSimulado.java` & `README.md`) (#56, #57, #58 / G2, G3)**:
+  - Script `k6` en `scripts/perf/load-test.js` con escenario de carga sostenida (**20 VUs durante 3 min**, p95 `< 500 ms` y tasa de error `< 1%`) y rampa de estrés progresivo (**hasta 100 VUs**) sobre `/api/auth/login`, `/api/pedidos` y `/api/kds/items`.
+  - Utilidad de Soak Test rápido en Java (`com.foodcore.perf.SoakTestSimulado`, bucle configurable hasta 5 min simulando jornada de 8 h sin fugas de Heap ni conexiones JDBC) validada también desde `FlujoCompletoAcoplamientoIT`, más guía en `README.md` para el soak real de 8 horas con `k6` / Apache JMeter.
+- **Auditoría de Accesibilidad WCAG AA (`docs/ACCESIBILIDAD.md`) (#59 / G4)**:
+  - Documentación completa de ratios de contraste WCAG 2.1 AA (`>= 4.5:1` / `>= 3:1` UI) para Modo Claro (*Warm Neutral*) y Modo Oscuro (*OLED Zinc*).
+  - Incorporación de `accessibleRole="BUTTON"` y `accessibleText` en controles clave de `LoginView.fxml` y `VentaPOSView.fxml`, junto con prueba automatizada de navegación secuencial con tecla `Tab`.
+- **Revisión Final de Calidad (#60)**: Verificación íntegra con `mvnw.cmd -B clean verify` (`304` tests: `233` Surefire + `71` Failsafe, `0` violaciones Checkstyle, `0` bugs SpotBugs, JaCoCo y OWASP en verde).
+
+## [5.6.0] - Sub-Fase F: Premium Polish Desktop (2026-11-18)
+
+- **Login con Fondo Aurora y Glassmorphism (`LoginView.fxml`, `LoginController.java` & `foodcore.css`) (F1)**:
+  - Fondo animado continuo en `Canvas` (`auroraCanvas` + `GaussianBlur` + `Timeline`) con gradientes radiales dinámicos en Terracota (`#EA580C`), Ámbar (`#D97706`) y Zinc oscuro (`#3F3F46`).
+  - Contenedor central `.login-glass-panel` con superficie translúcida `rgba(24, 24, 27, 0.65)` y borde sutil `rgba(255, 255, 255, 0.10)` en modo claro y oscuro, eliminando el badge inferior `"MySQL 8.0 LAN · Conectado"`.
+- **Splash Screen Animado (`SplashView.fxml`, `SplashController.java` & `App.java`) (F2)**:
+  - Pantalla de carga centrada con logo de FoodCore (animación inicial *fade-in* + *scale-up* en 450 ms), `ProgressBar` enlazada al progreso del arranque y textos dinámicos (*"Migrando base de datos…"*, *"Iniciando servicios locales…"*, *"Cargando interfaz de acceso…"*).
+  - Transición suave *fade-out* (200 ms) del Splash hacia *fade-in* (250 ms) del Login mediante `App.transicionarSplashALogin`.
+- **Micro-interacciones Táctiles (`foodcore.css`) (F4)**:
+  - Elevación y sombra en `.button:hover` (`-fx-translate-y: -1px`), compresión táctil en `.button:pressed` (`-fx-scale-x: 0.98`, `-fx-scale-y: 0.98`) y halo de foco Terracota (`rgba(234, 88, 12, 0.2)`) en `.text-field:focused`, `.combo-box:focused` y `.date-picker:focused`.
+- **Notificaciones Toast Animadas (`ToastService.java` & controladores) (F6)**:
+  - Componente `HBox` en `-bg-surface` con borde izquierdo de 4 px semántico (`-status-success` / `-status-danger` / `-status-warning`), icono `FontIcon`, mensaje y botón de cierre manual, animación deslizante (`TranslateTransition`), permanencia de 4 s y desvanecimiento (`FadeTransition`).
+  - Reemplazo de alertas simples de éxito/error/advertencia en `AuditoriaController`, `CobroModalController`, `MantenimientoBDController`, `MenuQrModalController`, `MozoOrderController`, `OnboardingWizardController`, `SalonMesasController` y `VentaController`.
+- **Confirmaciones Destructivas con Shake (`DialogService.java`, `VentaController.java` & `ConfiguracionController.java`) (F7)**:
+  - Nuevo `DialogService.crearConfirmacionDestructiva(titulo, mensaje)` con botón `"Sí, anular"` en estilo rojo (`--status-danger` / `.btn-danger`), botón `"Cancelar"` en gris (`.btn-secondary`) y vibración horizontal `TranslateTransition` de 300 ms al abrirse.
+- **Breadcrumbs de Navegación (`MainLayout.fxml`, `MainDashboardView.fxml` & `MainDashboardController.java`) (F8)**:
+  - Barra superior `#breadcrumbBar` / `#lblBreadcrumbs` bajo el área principal actualizada automáticamente vía `actualizarBreadcrumbs(ruta)` al cambiar de módulo desde el sidebar (`"Inicio > Salón > Mesas"`, `"Inicio > Sistema > Configuración del Sistema"`, etc.).
+- **Verificación (`SubFaseFPremiumPolishTest`)**: Suite automatizada validando F1, F2, F4, F6, F7 y F8 junto con `RedisenoPremiumVisualE2ETest` y quality gates (`clean verify`).
+
+## [5.5.0] - Sub-Fase E: Auditoría y Onboarding (2026-11-16)
+
+- **Auditoría Visual Mejorada (`AuditoriaView.fxml` & `AuditoriaController.java`) (E1)**:
+  - Barra superior de filtros por **Usuario**, **Acción** (`LOGIN`, `VENTA`, `ANULACION`, etc.) y rango de fechas (**Desde** / **Hasta**) con botones **Filtrar** y **Limpiar**, etiquetas estáticas `.label-form` y contenedor principal `.card`.
+  - Paginación de **50 registros por página** con consultas SQL filtradas en `AuditoriaDAO` (`LIMIT`/`OFFSET` + conteo total) y estado vacío estandarizado vía `EmptyStateHelper` (`fth-inbox`, *"No hay registros de auditoría"*).
+  - Exportación en **PDF**, **Excel** y **CSV** reutilizando `ReporteExportUIHelper` / `ExportacionContableService` (OpenPDF y Apache POI) y restricción estricta de acceso y navegación exclusiva para rol **`ADMIN`**.
+- **Wizard de Configuración Inicial / Onboarding (`OnboardingWizardView.fxml` & `OnboardingWizardController.java`) (E2)**:
+  - Flujo guiado de 4 pasos (`1. Restaurante -> 2. Primer Platillo -> 3. Primera Mesa -> 4. Resumen`) con `OnboardingService`, validación de campos por paso, persistencia inmediata del platillo (`producto`), primera mesa (`mesa.capacidad`) y cierre en `configuracion_restaurante`.
+  - Arranque automático desde `LoginController` mostrando el Wizard en lugar del Dashboard cuando `configuracion_restaurante` se encuentra vacía, y redirección al Panel Principal (`MainLayout.fxml`) al pulsar **"Empezar a Operar"**.
+- **Datos de Demostración Descartables (`scripts/seed-demo.sql`, `DemoDataService.java` & Flyway `V24`) (E3)**:
+  - Migración Flyway `V24__subfase_e_v5_5.sql` añadiendo de forma idempotente `mesa.capacidad` y la columna `es_demo TINYINT(1) DEFAULT 0` en `cliente`, `producto`, `venta`, `detalle_venta`, `categoria` y `caja`.
+  - Script `scripts/seed-demo.sql` con clientes, productos y ventas de prueba (`es_demo = 1`) e integración en `ConfiguracionView.fxml` bajo la sección **"Datos de Demostración"** con botones **"Cargar Datos de Demo"** y **"Borrar Datos de Demo"** confirmados con `DialogService` sin afectar registros reales.
+
+## [5.4.0] - Sub-Fase D: PWA y Menú QR Premium (2026-11-16)
+
+- **Sistema de Diseño Cerrado `v2.0` (Warm Neutral & OLED Zinc)**: Migración integral de JavaFX Desktop (`foodcore.css`, `dark-theme.css`), PWA Base y Login PIN, Menú Digital QR (`MenuQrService`), KDS y Dashboard móvil a tokens semánticos cerrados: modo claro `#F9F7F4` / `#F2EFEA` / `#FFFFFF` con acento `#EA580C` y modo oscuro OLED Zinc `#09090B` / `#121214` / `#18181B` con acento `#F97316`, sombras compactas, radios `6/8/12/16px`, targets táctiles (`>= 48px` PWA) y teclado PIN `3x4` sin inputs visibles.
+- **Tipografía `Inter` Local y Placeholders Neutros**: Empaquetado offline de `Inter` (`font-1..13.woff2` + `fonts.css`) en `src/main/resources/fonts/` y `pwa/fonts/`, eliminación de `"Segoe UI"` / CDNs externos, cifras `tabular-nums`, grid espacial de `4px` y sustitución de SVGs antiguos en Menú QR por degradados neutros con iconos Feather y barra fija `glass-panel`.
+- **Correcciones Estructurales UX/UI `v2.2`**:
+  - **Modales §2.1 y Diálogos Estilizados**: Estandarización de los 14 modales FXML y modales dinámicos con estructura Header / `ScrollPane.edge-to-edge` / Footer, además de `DialogService` para inyectar CSS contextual (claro/oscuro) y clase `card` en todas las alertas y diálogos nativos.
+  - **Empty States, Etiquetas Estáticas e Iconos Feather**: Implementación de `EmptyStateHelper` (`fth-inbox` 48px, *"No hay registros"*) en todas las tablas (`TableView`), `<Label styleClass="label-form">` encima de cada input FXML y sustitución de prefijos emoji en botones por `FontIcon` (`fth-*`) con `graphicTextGap="8.0"`.
+  - **Tarjetas Comanda §2.4 y Gráficos Donut de 4 Colores**: Unificación de tarjetas de catálogo/comanda en POS, Mozo y Kiosco (`HBox` `.card` + `+ Agregar`) y restricción de gráficos Donut (`AnalisisMermasController`, `ReportesAvanzadosController`, `ReportesController`) a la paleta aprobada (`#EA580C`, `#D97706`, `#DC2626`, `#A39D94`).
+- **Regresión Visual Automatizada y Verificación Integral**: Suite `RedisenoPremiumVisualE2ETest` + `SubFaseDPwaPremiumTest` con Playwright `toHaveScreenshot` (`8 / 8` baselines `<= 0.34%` diff, límite `2.00%`) y validación de Checklist §5; `mvnw.cmd -B clean verify` en verde (`290 / 290` tests, `0` violaciones Checkstyle, `0` bugs SpotBugs, JaCoCo y OWASP superados).
+
+## [5.3.0] - Sub-Fase C: Infraestructura y Deploy (2026-11-15)
+
+- **Instalador MSI y paquete Linux (`.deb`)**: Empaquetado nativo con `jpackage` (`scripts/package-release.ps1` / `build-deb.sh`) generando `dist/FoodCoreERP-5.3.0.msi` con todos los módulos y recursos (`foodcore-erp.jar`, `pwa/`, `scripts/`, `keystore.jks.example`, `foodcore.cer` y `application.properties.example`), además de guía operativa en `README.md`.
+- **Backup y Restore Automático**:
+  - Scripts `scripts/backup-auto.ps1` y `scripts/backup-auto.sh` con `mysqldump --single-transaction`, compresión `.sql.gz`, permisos restringidos (`icacls` / `chmod 700`/`600`), retención de 30 días y tarea programada diaria a las 03:00 AM (`FoodCoreERP_Backup_3AM` / cron `0 3 * * *`).
+  - Scripts `scripts/restore-auto.ps1` y `scripts/restore-auto.sh` con validación de integridad GZip/SQL, parada y reinicio de servicios e integración en Backoffice (`ConfiguracionView.fxml` / `ConfiguracionController.java`) mediante el botón **"Restaurar desde Backup"** con diálogo de confirmación.
+- **Dashboard Estado del Sistema (`EstadoSistemaView.fxml` & `EstadoSistemaController.java`)**: Vista exclusiva para rol `ADMIN` con auto-refresh cada 5 segundos (`Timeline` + `UiAsyncExecutor`) monitoreando MySQL (`UP`/`DOWN`, versión, latencia ms), Javalin HTTP (`8080`), Javalin HTTPS (`8443`), Socket KDS (`9090` + clientes conectados), Cloudflare Tunnel (URL y estado), versión Flyway y Uptime del sistema (`SistemaMonitorService.java`).
+- **Métricas CPU / RAM / Disco en Tiempo Real**: Telemetría de carga de CPU (`OperatingSystemMXBean` con fallback `wmic`), memoria RAM usada/total y almacenamiento en disco libre/total con `ProgressBar` e indicadores de salud.
+- **Alertas de Fallo por Email SMTP (`AlertaService.java`)**: Notificaciones automáticas por correo vía SMTP estándar (`Socket`/`SSLSocketFactory`, `STARTTLS`/`AUTH LOGIN`) ante caída de MySQL (`> 1 min`), disco libre crítico (`< 5 GB`) o RAM crítica (`>= 90%` por `> 5 min`), configurables desde `application.properties` y `ConfiguracionView.fxml`.
+
 ## [2.0.0-SNAPSHOT] - Sub-Fase 4D: Crecimiento Comercial (2026-11-06)
 
 ### Hotfix 4C.1 (Correcciones Obligatorias Aprobadas)

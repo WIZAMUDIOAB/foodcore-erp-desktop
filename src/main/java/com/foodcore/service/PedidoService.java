@@ -289,7 +289,22 @@ public class PedidoService {
                 JsonArray items = new JsonArray();
                 for (DetallePedido d : detalles) {
                     JsonObject item = new JsonObject();
+                    item.addProperty("idDetallePedido", d.getIdDetallePedido());
                     item.addProperty("producto", d.getNombreProducto());
+                    if (d.getNombreVariante() != null && !d.getNombreVariante().isBlank()) {
+                        item.addProperty("variante", d.getNombreVariante());
+                    }
+                    String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                            d.getModificadoresSeleccionados(), d.getModificadoresTexto());
+                    if (!mods.isEmpty()) {
+                        item.addProperty("modificadores", mods);
+                    }
+                    if (d.getIdCombo() != null && d.getIdCombo() > 0) {
+                        item.addProperty("idCombo", d.getIdCombo());
+                    }
+                    if (d.getComboComponentesTexto() != null && !d.getComboComponentesTexto().isBlank()) {
+                        item.addProperty("componentes", d.getComboComponentesTexto());
+                    }
                     item.addProperty("cantidad", d.getCantidad());
                     item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
                     items.add(item);
@@ -301,9 +316,25 @@ public class PedidoService {
                          new java.io.OutputStreamWriter(client.getOutputStream(), java.nio.charset.StandardCharsets.UTF_8), true)) {
                     out.println(json.toString());
                 }
-            } catch (Exception e) {
+            } catch (java.io.IOException | RuntimeException e) {
                 LOGGER.fine("Servidor KDS no activo al emitir notificación socket: " + e.getMessage());
             }
         }).start();
+    }
+
+    /**
+     * Persiste el orden manual del KDS asignando prioridades descendentes en {@code detalle_pedido} (v5.2.0).
+     */
+    public void reordenarPrioridadKds(List<Integer> idsDetalleOrdenDescendente) throws SQLException {
+        if (idsDetalleOrdenDescendente == null || idsDetalleOrdenDescendente.isEmpty()) {
+            return;
+        }
+        try {
+            tx.executeVoidChecked(conn ->
+                pedidoDAO.actualizarPrioridadesCocina(conn, idsDetalleOrdenDescendente)
+            );
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
     }
 }

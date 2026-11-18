@@ -4,9 +4,61 @@
  * y sincronización automática cada 10s desde IndexedDB (`outbox_pedidos`).
  */
 const FoodCorePWA = (() => {
+  const THEME_STORAGE_KEY = 'fc_theme';
+  const ICON_SUN_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+  const ICON_MOON_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+
   const API_BASE = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file://'))
     ? `${window.location.origin}/api`
     : 'https://localhost:8443/api';
+
+  function resolverTemaInicial() {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'dark') return true;
+      if (saved === 'light') return false;
+    } catch (_) {}
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+
+  function aplicarTemaPwa(esOscuro) {
+    const root = document.documentElement;
+    root.classList.toggle('dark', Boolean(esOscuro));
+    root.setAttribute('data-theme', esOscuro ? 'dark' : 'light');
+    if (document.body) {
+      document.body.classList.toggle('dark', Boolean(esOscuro));
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', esOscuro ? '#09090B' : '#F9F7F4');
+    }
+    const btn = document.getElementById('btnThemeToggle');
+    if (btn) {
+      btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;
+      btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
+    }
+  }
+
+  function inicializarTemaPwa() {
+    const oscuro = resolverTemaInicial();
+    aplicarTemaPwa(oscuro);
+    const btn = document.getElementById('btnThemeToggle');
+    if (btn && !btn.dataset.themeBound) {
+      btn.dataset.themeBound = '1';
+      btn.addEventListener('click', alternarTemaPwa);
+    }
+  }
+
+  function alternarTemaPwa() {
+    const actualOscuro = document.documentElement.classList.contains('dark');
+    const siguiente = !actualOscuro;
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, siguiente ? 'dark' : 'light');
+    } catch (_) {}
+    aplicarTemaPwa(siguiente);
+  }
+
+  aplicarTemaPwa(resolverTemaInicial());
 
   function getAuthHeaders(extra = {}) {
     const token = localStorage.getItem('fc_pwa_token');
@@ -248,6 +300,7 @@ const FoodCorePWA = (() => {
   // FLUJO 1: LOGIN (index.html)
   // =========================================================================
   async function iniciarLoginView() {
+    inicializarTemaPwa();
     registrarServiceWorker();
     await verificarSaludApi();
     setInterval(sincronizarOutbox, 4000);
@@ -298,6 +351,7 @@ const FoodCorePWA = (() => {
   // FLUJO 2: SELECCIÓN DE MESAS (mesas.html)
   // =========================================================================
   async function iniciarMesasView() {
+    inicializarTemaPwa();
     registrarServiceWorker();
     const user = obtenerUsuarioSesion();
     const lblMozo = document.getElementById('lblNombreMozo');
@@ -389,6 +443,7 @@ const FoodCorePWA = (() => {
   // FLUJO 3: CATÁLOGO Y TOMA DE PEDIDO (catalogo.html)
   // =========================================================================
   async function iniciarCatalogoView() {
+    inicializarTemaPwa();
     registrarServiceWorker();
     const params = new URLSearchParams(window.location.search);
     const mesa = params.get('mesa') || '04';
@@ -694,7 +749,7 @@ const FoodCorePWA = (() => {
           <span class="cart-item-subtotal">S/ ${sub.toFixed(2)}</span>
         </div>
         <div class="cart-item-controls">
-          <span style="font-size:12.5px;color:#6B7280;font-family:var(--font-mono);">P.U. S/ ${item.precio_unitario.toFixed(2)}</span>
+          <span style="font-size:12.5px;color:var(--text-secondary);font-variant-numeric:tabular-nums;">P.U. S/ ${item.precio_unitario.toFixed(2)}</span>
           <div class="qty-stepper">
             <button type="button" class="btn-qty" data-action="dec">-</button>
             <span class="qty-value">${item.cantidad}</span>
@@ -799,6 +854,7 @@ const FoodCorePWA = (() => {
   let usuariosActivosCache = [];
 
   async function iniciarPinLoginView() {
+    inicializarTemaPwa();
     registrarServiceWorker();
     await verificarSaludApi();
     await cargarUsuariosActivosPinLogin();
@@ -1028,7 +1084,7 @@ const FoodCorePWA = (() => {
     const currentUser = obtenerUsuarioSesion();
     container.innerHTML = '';
     if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
-      container.innerHTML = '<div style="padding:10px; color:#6B7280; font-size:13px;">No se pudieron cargar los operadores activos del servidor.</div>';
+      container.innerHTML = '<div style="padding:10px; color:var(--text-secondary); font-size:13px;">No se pudieron cargar los operadores activos del servidor.</div>';
       return;
     }
     usuariosActivosCache.forEach((u, index) => {
@@ -1167,17 +1223,19 @@ const FoodCorePWA = (() => {
     modoOfflineSimulado = !modoOfflineSimulado;
     const btn = document.getElementById('btnToggleOffline');
     if (btn) {
-      btn.textContent = modoOfflineSimulado ? '⚡ Reconectar API' : '🔌 Simular Caída API';
+      btn.textContent = modoOfflineSimulado ? 'Reconectar API' : 'Simular Caída API';
     }
     if (!modoOfflineSimulado) {
       await sincronizarOutbox();
     } else {
       await actualizarIndicadorConexion(false);
-      mostrarToast('🔌 Modo Offline activado: Los pedidos se guardarán en IndexedDB');
+      mostrarToast('Modo Offline activado: Los pedidos se guardarán en IndexedDB');
     }
   }
 
   return {
+    inicializarTemaPwa,
+    alternarTemaPwa,
     iniciarLoginView,
     iniciarPinLoginView,
     seleccionarUsuarioPin,

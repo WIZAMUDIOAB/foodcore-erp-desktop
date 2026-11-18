@@ -11,9 +11,9 @@ import com.foodcore.service.ReservasService;
 import com.foodcore.model.ReservaMesa;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.scene.control.ChoiceDialog;
-import javafx.scene.control.TextInputDialog;
 import com.foodcore.util.ConexionBD;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -187,7 +187,7 @@ public class SalonMesasController {
                 if (tieneReserva) {
                     btnMesa.getStyleClass().add("mesa-card-reservada");
                     lblBadge.setText("RESERVADA " + horaRes);
-                    lblBadge.setStyle("-fx-background-color: #EDE9FE; -fx-text-fill: #6D28D9; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 2 8;");
+                    lblBadge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 2 8;");
                 } else {
                     btnMesa.getStyleClass().add("mesa-card-libre");
                     lblBadge.setText("LIBRE");
@@ -260,10 +260,11 @@ public class SalonMesasController {
     }
 
     private void gestionarMesaOcupada(String mesa, Pedido pedido) {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Gestión Operativa · Mesa " + mesa);
-        alert.setHeaderText("Mesa " + mesa + " · Comanda Activa #" + pedido.getIdPedido() + " (Total: S/ " + pedido.getTotal() + ")");
-        alert.setContentText("Estado: " + pedido.getEstado() + "\nSeleccione la operación a ejecutar:");
+        Alert alert = DialogService.crearAlerta(
+                Alert.AlertType.CONFIRMATION,
+                "Gestión Operativa · Mesa " + mesa,
+                "Mesa " + mesa + " · Comanda Activa #" + pedido.getIdPedido() + " (Total: S/ " + pedido.getTotal() + ")",
+                "Estado: " + pedido.getEstado() + "\nSeleccione la operación a ejecutar:");
 
         ButtonType btnAgregarMas = new ButtonType("Agregar Platos");
         ButtonType btnTransferir = new ButtonType("Transferir Mesa");
@@ -300,27 +301,27 @@ public class SalonMesasController {
             }
         }
         if (destinos.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No hay mesas libres disponibles para transferir el pedido.");
-            warn.showAndWait();
+            ToastService.mostrarAdvertencia("No hay mesas libres disponibles para transferir el pedido.");
             return;
         }
 
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(destinos.get(0), destinos);
-        dialog.setTitle("Transferir Mesa");
-        dialog.setHeaderText("Mover comanda activa de Mesa " + mesaOrigen + " a otra mesa");
-        dialog.setContentText("Seleccione Mesa Destino:");
-        dialog.showAndWait().ifPresent(dest ->
+        DialogService.crearChoiceDialog(
+                destinos.get(0),
+                destinos,
+                "Transferir Mesa",
+                "Mover comanda activa de Mesa " + mesaOrigen + " a otra mesa",
+                "Seleccione Mesa Destino:").showAndWait().ifPresent(dest ->
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> salonService.transferirMesa(mesaOrigen, dest, 1),
                 () -> {
-                    Alert ok = new Alert(Alert.AlertType.INFORMATION, "Comanda transferida exitosamente de Mesa " + mesaOrigen + " a Mesa " + dest);
-                    ok.showAndWait();
+                    ToastService.mostrarExito(
+                            "Comanda transferida exitosamente de Mesa " + mesaOrigen + " a Mesa " + dest);
                     cargarMesas();
                 },
                 ex -> {
                     LOGGER.log(Level.WARNING, "Error al transferir mesa", ex);
-                    Alert err = new Alert(Alert.AlertType.ERROR, "Error al transferir: " + (ex != null ? ex.getMessage() : "desconocido"));
-                    err.showAndWait();
+                    ToastService.mostrarError(
+                            "Error al transferir: " + (ex != null ? ex.getMessage() : "desconocido"));
                 }
             )
         );
@@ -335,27 +336,27 @@ public class SalonMesasController {
             }
         }
         if (disponibles.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No hay mesas libres para unir a la Mesa " + mesaPrincipal);
-            warn.showAndWait();
+            ToastService.mostrarAdvertencia("No hay mesas libres para unir a la Mesa " + mesaPrincipal);
             return;
         }
 
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(disponibles.get(0), disponibles);
-        dialog.setTitle("Unir Mesas");
-        dialog.setHeaderText("Unir Mesa Secundaria con Mesa Principal " + mesaPrincipal);
-        dialog.setContentText("Seleccione mesa adicional a unificar:");
-        dialog.showAndWait().ifPresent(sec ->
+        DialogService.crearChoiceDialog(
+                disponibles.get(0),
+                disponibles,
+                "Unir Mesas",
+                "Unir Mesa Secundaria con Mesa Principal " + mesaPrincipal,
+                "Seleccione mesa adicional a unificar:").showAndWait().ifPresent(sec ->
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> salonService.unirMesas(mesaPrincipal, List.of(sec), 1),
                 () -> {
-                    Alert ok = new Alert(Alert.AlertType.INFORMATION, "Mesas unidas exitosamente: Mesa " + mesaPrincipal + " + Mesa " + sec);
-                    ok.showAndWait();
+                    ToastService.mostrarExito(
+                            "Mesas unidas exitosamente: Mesa " + mesaPrincipal + " + Mesa " + sec);
                     cargarMesas();
                 },
                 ex -> {
                     LOGGER.log(Level.WARNING, "Error al unir mesas", ex);
-                    Alert err = new Alert(Alert.AlertType.ERROR, "Error al unir mesas: " + (ex != null ? ex.getMessage() : "desconocido"));
-                    err.showAndWait();
+                    ToastService.mostrarError(
+                            "Error al unir mesas: " + (ex != null ? ex.getMessage() : "desconocido"));
                 }
             )
         );
@@ -370,18 +371,17 @@ public class SalonMesasController {
             },
             detalles -> {
                 if (detalles.isEmpty()) {
-                    Alert warn = new Alert(Alert.AlertType.WARNING, "La comanda no tiene platos registrados.");
-                    warn.showAndWait();
+                    ToastService.mostrarAdvertencia("La comanda no tiene platos registrados.");
                     return;
                 }
                 impresoraService.imprimirPreCuenta(pedido, detalles, null);
-                Alert ok = new Alert(Alert.AlertType.INFORMATION, "Pre-cuenta emitida e impresa para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").\n*** NO ES COMPROBANTE DE PAGO ***");
-                ok.showAndWait();
+                ToastService.mostrarExito(
+                        "Pre-cuenta emitida para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").");
             },
             ex -> {
                 LOGGER.log(Level.WARNING, "Error emitiendo pre-cuenta", ex);
-                Alert err = new Alert(Alert.AlertType.ERROR, "Error al emitir pre-cuenta: " + (ex != null ? ex.getMessage() : "desconocido"));
-                err.showAndWait();
+                ToastService.mostrarError(
+                        "Error al emitir pre-cuenta: " + (ex != null ? ex.getMessage() : "desconocido"));
             }
         );
     }
@@ -389,31 +389,31 @@ public class SalonMesasController {
     @FXML
     public void handleTransferirMesaDialog() {
         if (pedidosActivosPorMesa.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No hay mesas ocupadas actualmente para transferir.");
-            warn.showAndWait();
+            ToastService.mostrarAdvertencia("No hay mesas ocupadas actualmente para transferir.");
             return;
         }
         List<String> ocupadas = new ArrayList<>(pedidosActivosPorMesa.keySet());
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(ocupadas.get(0), ocupadas);
-        dialog.setTitle("Transferir Mesa");
-        dialog.setHeaderText("Seleccionar mesa con comanda activa a transferir");
-        dialog.setContentText("Mesa Origen:");
-        dialog.showAndWait().ifPresent(this::ejecutarTransferenciaDesde);
+        DialogService.crearChoiceDialog(
+                ocupadas.get(0),
+                ocupadas,
+                "Transferir Mesa",
+                "Seleccionar mesa con comanda activa a transferir",
+                "Mesa Origen:").showAndWait().ifPresent(this::ejecutarTransferenciaDesde);
     }
 
     @FXML
     public void handleUnirMesasDialog() {
         if (pedidosActivosPorMesa.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No hay mesas ocupadas actualmente para unir.");
-            warn.showAndWait();
+            ToastService.mostrarAdvertencia("No hay mesas ocupadas actualmente para unir.");
             return;
         }
         List<String> ocupadas = new ArrayList<>(pedidosActivosPorMesa.keySet());
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(ocupadas.get(0), ocupadas);
-        dialog.setTitle("Unir Mesas");
-        dialog.setHeaderText("Seleccionar mesa principal con comanda activa");
-        dialog.setContentText("Mesa Principal:");
-        dialog.showAndWait().ifPresent(this::ejecutarUnionDesde);
+        DialogService.crearChoiceDialog(
+                ocupadas.get(0),
+                ocupadas,
+                "Unir Mesas",
+                "Seleccionar mesa principal con comanda activa",
+                "Mesa Principal:").showAndWait().ifPresent(this::ejecutarUnionDesde);
     }
 
     @FXML
@@ -443,8 +443,7 @@ public class SalonMesasController {
             },
             detallesPed -> {
                 if (detallesPed.isEmpty()) {
-                    Alert warn = new Alert(Alert.AlertType.WARNING, "El pedido no contiene ítems para facturar.");
-                    warn.showAndWait();
+                    ToastService.mostrarAdvertencia("El pedido no contiene ítems para facturar.");
                     return;
                 }
 
@@ -495,14 +494,13 @@ public class SalonMesasController {
                     stage.showAndWait();
                 } catch (IOException ex) {
                     LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
-                    Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + ex.getMessage());
-                    err.showAndWait();
+                    ToastService.mostrarError("No se pudo abrir la pasarela de cobro: " + ex.getMessage());
                 }
             },
             ex -> {
                 LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
-                Alert err = new Alert(Alert.AlertType.ERROR, "No se pudo abrir la pasarela de cobro: " + (ex != null ? ex.getMessage() : "desconocido"));
-                err.showAndWait();
+                ToastService.mostrarError(
+                        "No se pudo abrir la pasarela de cobro: " + (ex != null ? ex.getMessage() : "desconocido"));
             }
         );
     }
