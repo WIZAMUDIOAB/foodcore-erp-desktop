@@ -7,6 +7,8 @@ import com.foodcore.model.ConfiguracionImpresora;
 import com.foodcore.service.AlertaService;
 import com.foodcore.service.AlertaService.AlertaEmitida;
 import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
+import com.foodcore.service.DemoDataService;
+import com.foodcore.service.DemoDataService.ResumenDemo;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
@@ -112,10 +114,24 @@ public class ConfiguracionController {
     @FXML private CheckBox chkModoOscuro;
     @FXML private Label lblEstadoModoOscuro;
 
+    // Datos de Demostración (v5.5.0 Sub-Fase E - E3)
+    @FXML private Button btnCargarDatosDemo;
+    @FXML private Button btnBorrarDatosDemo;
+    @FXML private Label lblEstadoDemo;
+
     private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
+    private final DemoDataService demoDataService = new DemoDataService();
     private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
 
     private BooleanSupplier confirmacionRestauracionSupplier = this::solicitarConfirmacionRestauracionUi;
+    private BooleanSupplier confirmacionCargarDemoSupplier = () -> solicitarConfirmacionUi(
+            "Confirmar Carga de Datos Demo",
+            "Se insertarán clientes, productos y ventas de prueba (es_demo = 1)",
+            "Estos registros pueden eliminarse posteriormente sin afectar tus datos reales. ¿Deseas continuar?");
+    private BooleanSupplier confirmacionBorrarDemoSupplier = () -> solicitarConfirmacionUi(
+            "Confirmar Borrado de Datos Demo",
+            "Se eliminarán únicamente los registros marcados con es_demo = 1",
+            "Los clientes, productos y ventas reales permanecerán intactos. ¿Deseas continuar?");
     private Function<Path, Boolean> ejecutorRestauracion = ConfiguracionController::ejecutarScriptRestauracionSistema;
     private Supplier<Path> ejecutorBackup = ConfiguracionController::ejecutarScriptBackupSistema;
 
@@ -129,6 +145,8 @@ public class ConfiguracionController {
         AnimationUtils.attachTactileFeedback(btnSeleccionarBackup);
         AnimationUtils.attachTactileFeedback(btnGenerarBackupAhora);
         AnimationUtils.attachTactileFeedback(btnRestaurarBackup);
+        AnimationUtils.attachTactileFeedback(btnCargarDatosDemo);
+        AnimationUtils.attachTactileFeedback(btnBorrarDatosDemo);
         configurarTablaImpresoras();
         poblarImpresorasDetectadas();
         cargarConfiguracion();
@@ -136,6 +154,7 @@ public class ConfiguracionController {
         cargarConfiguracionAlertasEmailUi();
         precargarUltimoBackupDisponible();
         inicializarToggleModoOscuroUi();
+        refrescarEstadoDemoAsync();
     }
 
     private void inicializarToggleModoOscuroUi() {
@@ -538,26 +557,129 @@ public class ConfiguracionController {
     }
 
     private void actualizarEstadoRestauracion(String texto, String badgeClass) {
-        if (lblEstadoRestauracion == null) {
+        actualizarBadgeEstado(lblEstadoRestauracion, texto, badgeClass);
+    }
+
+    private void actualizarBadgeEstado(Label label, String texto, String badgeClass) {
+        if (label == null) {
             return;
         }
-        lblEstadoRestauracion.setText(texto);
-        lblEstadoRestauracion.getStyleClass().removeAll(
+        label.setText(texto);
+        label.getStyleClass().removeAll(
                 "badge-pill-success", "badge-pill-danger", "badge-pill-warning", "badge-pill-neutral");
-        lblEstadoRestauracion.getStyleClass().add(badgeClass);
+        label.getStyleClass().add(badgeClass);
     }
 
     private boolean solicitarConfirmacionRestauracionUi() {
-        Alert confirm = DialogService.crearAlerta(
-                Alert.AlertType.CONFIRMATION,
+        return solicitarConfirmacionUi(
                 "Confirmar Restauración de Base de Datos",
                 "Se restaurará la base de datos desde el archivo seleccionado",
                 "Esta acción detendrá temporalmente los servicios auxiliares y reemplazará los datos actuales. ¿Desea continuar?");
+    }
+
+    private boolean solicitarConfirmacionUi(String titulo, String header, String contenido) {
+        Alert confirm = DialogService.crearAlerta(Alert.AlertType.CONFIRMATION, titulo, header, contenido);
         if (rootConfigStack != null && rootConfigStack.getScene() != null) {
             confirm.initOwner(rootConfigStack.getScene().getWindow());
         }
         Optional<ButtonType> result = confirm.showAndWait();
         return result.isPresent() && result.get() == ButtonType.OK;
+    }
+
+    private void refrescarEstadoDemoAsync() {
+        UiAsyncExecutor.ejecutarAsync(
+            demoDataService::contarDatosDemo,
+            resumen -> actualizarLabelResumenDemo(resumen),
+            ex -> LOGGER.log(Level.FINE, "Sin conteo demo disponible al iniciar", ex)
+        );
+    }
+
+    private void actualizarLabelResumenDemo(ResumenDemo resumen) {
+        if (resumen == null || resumen.total() == 0) {
+            actualizarBadgeEstado(lblEstadoDemo, "Sin datos de demo cargados", "badge-pill-neutral");
+        } else {
+            actualizarBadgeEstado(
+                    lblEstadoDemo,
+                    String.format("Demo activos: %d clientes, %d productos, %d ventas",
+                            resumen.clientes(), resumen.productos(), resumen.ventas()),
+                    "badge-pill-success");
+        }
+    }
+
+    @FXML
+    public void handleCargarDatosDemo(ActionEvent event) {
+        if (!confirmacionCargarDemoSupplier.getAsBoolean()) {
+            return;
+        }
+        setBotonesDemoDeshabilitados(true);
+        actualizarBadgeEstado(lblEstadoDemo, "Cargando script seed-demo.sql...", "badge-pill-warning");
+
+        UiAsyncExecutor.ejecutarAsync(
+            demoDataService::cargarDatosDemo,
+            resumen -> {
+                setBotonesDemoDeshabilitados(false);
+                actualizarLabelResumenDemo(resumen);
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Datos de demostración cargados correctamente.", false);
+            },
+            ex -> {
+                setBotonesDemoDeshabilitados(false);
+                actualizarBadgeEstado(lblEstadoDemo, "Error cargando datos demo", "badge-pill-danger");
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Error cargando datos de demo: " + ex.getMessage(), true);
+            }
+        );
+    }
+
+    @FXML
+    public void handleBorrarDatosDemo(ActionEvent event) {
+        if (!confirmacionBorrarDemoSupplier.getAsBoolean()) {
+            return;
+        }
+        setBotonesDemoDeshabilitados(true);
+        actualizarBadgeEstado(lblEstadoDemo, "Eliminando registros es_demo = 1...", "badge-pill-warning");
+
+        UiAsyncExecutor.ejecutarAsync(
+            demoDataService::borrarDatosDemo,
+            eliminados -> {
+                setBotonesDemoDeshabilitados(false);
+                actualizarBadgeEstado(lblEstadoDemo,
+                        "Demo eliminados (" + eliminados + " filas)", "badge-pill-neutral");
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Datos de demostración eliminados (" + eliminados + " registros).", false);
+            },
+            ex -> {
+                setBotonesDemoDeshabilitados(false);
+                actualizarBadgeEstado(lblEstadoDemo, "Error eliminando datos demo", "badge-pill-danger");
+                AnimationUtils.mostrarToast(rootConfigStack,
+                        "Error eliminando datos de demo: " + ex.getMessage(), true);
+            }
+        );
+    }
+
+    private void setBotonesDemoDeshabilitados(boolean disabled) {
+        if (btnCargarDatosDemo != null) {
+            btnCargarDatosDemo.setDisable(disabled);
+        }
+        if (btnBorrarDatosDemo != null) {
+            btnBorrarDatosDemo.setDisable(disabled);
+        }
+    }
+
+    public void setConfirmacionCargarDemoSupplier(BooleanSupplier supplier) {
+        if (supplier != null) {
+            this.confirmacionCargarDemoSupplier = supplier;
+        }
+    }
+
+    public void setConfirmacionBorrarDemoSupplier(BooleanSupplier supplier) {
+        if (supplier != null) {
+            this.confirmacionBorrarDemoSupplier = supplier;
+        }
+    }
+
+    public Label getLblEstadoDemo() {
+        return lblEstadoDemo;
     }
 
     static boolean ejecutarScriptRestauracionSistema(Path backupFile) {

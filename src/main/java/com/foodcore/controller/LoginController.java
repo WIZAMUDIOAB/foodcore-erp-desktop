@@ -6,6 +6,7 @@ import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.OnboardingService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
@@ -60,6 +61,7 @@ public class LoginController {
     @FXML private Button btnCancelarTotp;
 
     private final AuthService authService;
+    private final OnboardingService onboardingService = new OnboardingService();
     private final TotpService totpService = new TotpService();
     private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
     private Parent dialogoPasswordActivo;
@@ -329,17 +331,28 @@ public class LoginController {
     }
 
     private void irAlDashboard() {
+        boolean requiereOnboarding = onboardingService.necesitaOnboarding();
+        String vistaObjetivo = requiereOnboarding
+                ? "/com/foodcore/view/OnboardingWizardView.fxml"
+                : "/com/foodcore/view/MainLayout.fxml";
+        String rol = AuthService.getUsuarioSesionActual() != null
+                ? AuthService.getUsuarioSesionActual().getNombreRol()
+                : "ADMIN";
+        String titulo = requiereOnboarding
+                ? "FoodCore ERP v5.5 - Configuración Inicial (Onboarding)"
+                : "FoodCore ERP v3.0 - Panel Principal [" + rol + "]";
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(vistaObjetivo));
             Parent root = loader.load();
 
             Scene currentScene = rootStackPane != null ? rootStackPane.getScene() : null;
             if (currentScene != null && currentScene.getWindow() instanceof Stage stage) {
-                Scene dashboardScene = new Scene(root, 1920, 1080);
-                App.applyStylesheets(dashboardScene);
-                stage.setScene(dashboardScene);
-                stage.setTitle("FoodCore ERP v3.0 - Panel Principal ["
-                    + AuthService.getUsuarioSesionActual().getNombreRol() + "]");
+                Scene nextScene = requiereOnboarding
+                        ? new Scene(root, 1080, 768)
+                        : new Scene(root, 1920, 1080);
+                App.applyStylesheets(nextScene);
+                stage.setScene(nextScene);
+                stage.setTitle(titulo);
                 stage.setMinWidth(1280);
                 stage.setMinHeight(720);
                 stage.setMaximized(true);
@@ -351,7 +364,7 @@ public class LoginController {
                 }
             }
         } catch (IOException e) {
-            LOGGER.error("Error cargando MainLayout.fxml", e);
+            LOGGER.error("Error cargando " + vistaObjetivo, e);
             mostrarError("Error cargando vista principal: " + e.getMessage());
         }
     }

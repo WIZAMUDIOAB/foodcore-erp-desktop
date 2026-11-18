@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<StackPane fx:id="rootOnboardingStack" prefHeight="768.0" prefWidth="1080.0" styleClass="app-canvas" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.OnboardingWizardController">
+    <padding>
+        <Insets bottom="32.0" left="32.0" right="32.0" top="32.0" />
+    </padding>
+    <children>
+        <VBox alignment="TOP_CENTER" maxWidth="680.0" prefWidth="680.0" spacing="20.0" styleClass="card">
+            <children>
+                <!-- Cabecera e Indicador Visual de Pasos (1 -> 2 -> 3 -> 4) -->
+                <VBox spacing="12.0">
+                    <children>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                            <children>
+                                <FontIcon iconLiteral="fth-award" iconSize="22" styleClass="text-muted" />
+                                <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                    <children>
+                                        <Label styleClass="h2" text="Configuración Inicial de FoodCore ERP" />
+                                        <Label fx:id="lblPasoSubtitulo" styleClass="text-secondary" text="Paso 1 de 4 · Datos del restaurante" />
+                                    </children>
+                                </VBox>
+                                <Label fx:id="lblBadgeProgreso" styleClass="badge-pill-accent" text="Paso 1 / 4" />
+                            </children>
+                        </HBox>
+
+                        <HBox fx:id="boxIndicadorPasos" alignment="CENTER" spacing="8.0">
+                            <children>
+                                <Label fx:id="lblStep1Indicator" styleClass="badge-pill-accent" text="1. Restaurante" />
+                                <FontIcon iconLiteral="fth-arrow-right" iconSize="14" styleClass="text-muted" />
+                                <Label fx:id="lblStep2Indicator" styleClass="badge-pill-neutral" text="2. Primer Platillo" />
+                                <FontIcon iconLiteral="fth-arrow-right" iconSize="14" styleClass="text-muted" />
+                                <Label fx:id="lblStep3Indicator" styleClass="badge-pill-neutral" text="3. Primera Mesa" />
+                                <FontIcon iconLiteral="fth-arrow-right" iconSize="14" styleClass="text-muted" />
+                                <Label fx:id="lblStep4Indicator" styleClass="badge-pill-neutral" text="4. Resumen" />
+                            </children>
+                        </HBox>
+                    </children>
+                </VBox>
+
+                <Region styleClass="divider-horizontal" />
+
+                <!-- Banner de validación de paso -->
+                <Label fx:id="lblErrorWizard" managed="false" styleClass="text-danger" visible="false" wrapText="true" />
+
+                <!-- Contenido intercambiable en StackPane -->
+                <StackPane fx:id="wizardStepsStack" VBox.vgrow="ALWAYS">
+                    <children>
+                        <!-- Paso 1: Datos del Restaurante -->
+                        <VBox fx:id="panelPaso1" spacing="16.0">
+                            <children>
+                                <Label styleClass="h3" text="1. Información del Restaurante" />
+                                <Label styleClass="text-secondary" text="Estos datos aparecerán en la cabecera de tus tickets y comprobantes." />
+                                <GridPane hgap="16.0" vgap="16.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" />
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints />
+                                        <RowConstraints />
+                                    </rowConstraints>
+                                    <children>
+                                        <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Nombre del Restaurante" />
+                                                <TextField fx:id="txtNombreRestaurante" promptText="Ej. FoodCore Grill S.A.C." styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                            <children>
+                                                <Label styleClass="label-form" text="RUC" />
+                                                <TextField fx:id="txtRuc" promptText="Ej. 20609874512" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                            <children>
+                                                <Label styleClass="label-form" text="Dirección" />
+                                                <TextField fx:id="txtDireccion" promptText="Ej. Av. Javier Prado Este 2450, Lima" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                            <children>
+                                                <Label styleClass="label-form" text="Teléfono" />
+                                                <TextField fx:id="txtTelefono" promptText="Ej. (01) 442-8900" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+                            </children>
+                        </VBox>
+
+                        <!-- Paso 2: Crear Primer Platillo -->
+                        <VBox fx:id="panelPaso2" managed="false" spacing="16.0" visible="false">
+                            <children>
+                                <Label styleClass="h3" text="2. Tu Primer Platillo en Carta" />
+                                <Label styleClass="text-secondary" text="Registra el primer ítem disponible para empezar a vender en POS y Mesas." />
+                                <GridPane hgap="16.0" vgap="16.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="60.0" />
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="40.0" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints />
+                                        <RowConstraints />
+                                    </rowConstraints>
+                                    <children>
+                                        <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.columnSpan="2" GridPane.rowIndex="0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Nombre del Platillo" />
+                                                <TextField fx:id="txtNombrePlatillo" promptText="Ej. Hamburguesa Clásica de la Casa" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                            <children>
+                                                <Label styleClass="label-form" text="Categoría" />
+                                                <ComboBox fx:id="cmbCategoriaPlatillo" editable="true" maxWidth="1.7976931348623157E308" promptText="Seleccione o escriba una categoría" styleClass="form-combo-box" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                            <children>
+                                                <Label styleClass="label-form" text="Precio de Venta (S/)" />
+                                                <TextField fx:id="txtPrecioPlatillo" promptText="Ej. 24.50" styleClass="input-field" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+                            </children>
+                        </VBox>
+
+                        <!-- Paso 3: Crear Primera Mesa -->
+                        <VBox fx:id="panelPaso3" managed="false" spacing="16.0" visible="false">
+                            <children>
+                                <Label styleClass="h3" text="3. Primera Mesa del Salón" />
+                                <Label styleClass="text-secondary" text="Configura tu primera mesa para tomar comandas desde Salón o Móvil." />
+                                <GridPane hgap="16.0" vgap="16.0">
+                                    <columnConstraints>
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                        <ColumnConstraints hgrow="ALWAYS" percentWidth="50.0" />
+                                    </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints />
+                                    </rowConstraints>
+                                    <children>
+                                        <VBox spacing="6.0" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Número de Mesa" />
+                                                <TextField fx:id="txtNumeroMesa" promptText="Ej. 01" styleClass="input-field" text="01" />
+                                            </children>
+                                        </VBox>
+                                        <VBox spacing="6.0" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                            <children>
+                                                <Label styleClass="label-form" text="Capacidad (personas)" />
+                                                <TextField fx:id="txtCapacidadMesa" promptText="Ej. 4" styleClass="input-field" text="4" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </GridPane>
+                            </children>
+                        </VBox>
+
+                        <!-- Paso 4: Resumen y Cierre -->
+                        <VBox fx:id="panelPaso4" managed="false" spacing="16.0" visible="false">
+                            <children>
+                                <Label styleClass="h3" text="4. Resumen de Configuración Inicial" />
+                                <Label styleClass="text-secondary" text="Verifica tus datos antes de ingresar al Panel Principal de FoodCore ERP." />
+                                <VBox spacing="12.0" styleClass="surface-card-subtle">
+                                    <children>
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="RESTAURANTE" />
+                                                <Label fx:id="lblResumenRestaurante" styleClass="text-h3" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                        <Region styleClass="divider-horizontal" />
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="PRIMER PLATILLO" />
+                                                <Label fx:id="lblResumenPlatillo" styleClass="text-h3" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                        <Region styleClass="divider-horizontal" />
+                                        <VBox spacing="4.0">
+                                            <children>
+                                                <Label styleClass="label-form" text="PRIMERA MESA" />
+                                                <Label fx:id="lblResumenMesa" styleClass="text-h3" text="-" wrapText="true" />
+                                            </children>
+                                        </VBox>
+                                    </children>
+                                </VBox>
+                            </children>
+                        </VBox>
+                    </children>
+                </StackPane>
+
+                <Region styleClass="divider-horizontal" />
+
+                <!-- Footer de navegación -->
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <children>
+                        <Button fx:id="btnPasoAnterior" disable="true" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleAnterior" styleClass="btn-secondary" text="Anterior">
+                            <graphic>
+                                <FontIcon iconLiteral="fth-chevron-left" iconSize="14" />
+                            </graphic>
+                        </Button>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button fx:id="btnPasoSiguiente" graphicTextGap="8.0" mnemonicParsing="false" onAction="#handleSiguiente" styleClass="btn-primary" text="Siguiente">
+                            <graphic>
+                                <FontIcon iconLiteral="fth-chevron-right" iconSize="14" />
+                            </graphic>
+                        </Button>
+                        <Button fx:id="btnEmpezarOperar" graphicTextGap="8.0" managed="false" mnemonicParsing="false" onAction="#handleEmpezarOperar" styleClass="btn-primary" text="Empezar a Operar" visible="false">
+                            <graphic>
+                                <FontIcon iconLiteral="fth-check-circle" iconSize="15" />
+                            </graphic>
+                        </Button>
+                    </children>
+                </HBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>

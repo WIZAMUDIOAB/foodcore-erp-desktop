@@ -2,6 +2,19 @@
 
 Todos los cambios notables en este proyecto se documentan en este archivo siguiendo `SPEC-FOODCORE-v1.0` y `REMEDIATION-PLAN-FOODCORE-v1.0`.
 
+## [5.5.0] - Sub-Fase E: Auditoría y Onboarding (2026-11-16)
+
+- **Auditoría Visual Mejorada (`AuditoriaView.fxml` & `AuditoriaController.java`) (E1)**:
+  - Barra superior de filtros por **Usuario**, **Acción** (`LOGIN`, `VENTA`, `ANULACION`, etc.) y rango de fechas (**Desde** / **Hasta**) con botones **Filtrar** y **Limpiar**, etiquetas estáticas `.label-form` y contenedor principal `.card`.
+  - Paginación de **50 registros por página** con consultas SQL filtradas en `AuditoriaDAO` (`LIMIT`/`OFFSET` + conteo total) y estado vacío estandarizado vía `EmptyStateHelper` (`fth-inbox`, *"No hay registros de auditoría"*).
+  - Exportación en **PDF**, **Excel** y **CSV** reutilizando `ReporteExportUIHelper` / `ExportacionContableService` (OpenPDF y Apache POI) y restricción estricta de acceso y navegación exclusiva para rol **`ADMIN`**.
+- **Wizard de Configuración Inicial / Onboarding (`OnboardingWizardView.fxml` & `OnboardingWizardController.java`) (E2)**:
+  - Flujo guiado de 4 pasos (`1. Restaurante -> 2. Primer Platillo -> 3. Primera Mesa -> 4. Resumen`) con `OnboardingService`, validación de campos por paso, persistencia inmediata del platillo (`producto`), primera mesa (`mesa.capacidad`) y cierre en `configuracion_restaurante`.
+  - Arranque automático desde `LoginController` mostrando el Wizard en lugar del Dashboard cuando `configuracion_restaurante` se encuentra vacía, y redirección al Panel Principal (`MainLayout.fxml`) al pulsar **"Empezar a Operar"**.
+- **Datos de Demostración Descartables (`scripts/seed-demo.sql`, `DemoDataService.java` & Flyway `V24`) (E3)**:
+  - Migración Flyway `V24__subfase_e_v5_5.sql` añadiendo de forma idempotente `mesa.capacidad` y la columna `es_demo TINYINT(1) DEFAULT 0` en `cliente`, `producto`, `venta`, `detalle_venta`, `categoria` y `caja`.
+  - Script `scripts/seed-demo.sql` con clientes, productos y ventas de prueba (`es_demo = 1`) e integración en `ConfiguracionView.fxml` bajo la sección **"Datos de Demostración"** con botones **"Cargar Datos de Demo"** y **"Borrar Datos de Demo"** confirmados con `DialogService` sin afectar registros reales.
+
 ## [5.4.0] - Sub-Fase D: PWA y Menú QR Premium (2026-11-16)
 
 - **Sistema de Diseño Cerrado `v2.0` (Warm Neutral & OLED Zinc)**: Migración integral de JavaFX Desktop (`foodcore.css`, `dark-theme.css`), PWA Base y Login PIN, Menú Digital QR (`MenuQrService`), KDS y Dashboard móvil a tokens semánticos cerrados: modo claro `#F9F7F4` / `#F2EFEA` / `#FFFFFF` con acento `#EA580C` y modo oscuro OLED Zinc `#09090B` / `#121214` / `#18181B` con acento `#F97316`, sombras compactas, radios `6/8/12/16px`, targets táctiles (`>= 48px` PWA) y teclado PIN `3x4` sin inputs visibles.
