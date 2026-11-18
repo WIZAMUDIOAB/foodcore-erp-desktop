@@ -359,6 +359,12 @@
     -fx-border-color: -border-subtle;
 }
 
+.toast-container,
+.toast-card {
+    -fx-background-color: -bg-surface;
+    -fx-text-fill: -text-primary;
+}
+
 .skeleton-bar,
 .skeleton-shimmer {
     -fx-background-color: linear-gradient(to right, -bg-surface-hover 0%, -border-subtle 50%, -bg-surface-hover 100%);

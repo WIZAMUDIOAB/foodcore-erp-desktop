@@ -12,6 +12,7 @@ import com.foodcore.model.ReservaMesa;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.ConexionBD;
 import javafx.fxml.FXML;
@@ -300,8 +301,7 @@ public class SalonMesasController {
             }
         }
         if (destinos.isEmpty()) {
-            DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                    "No hay mesas libres disponibles para transferir el pedido.");
+            ToastService.mostrarAdvertencia("No hay mesas libres disponibles para transferir el pedido.");
             return;
         }
 
@@ -314,13 +314,13 @@ public class SalonMesasController {
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> salonService.transferirMesa(mesaOrigen, dest, 1),
                 () -> {
-                    DialogService.mostrarAlerta(Alert.AlertType.INFORMATION, "Mesa Transferida",
+                    ToastService.mostrarExito(
                             "Comanda transferida exitosamente de Mesa " + mesaOrigen + " a Mesa " + dest);
                     cargarMesas();
                 },
                 ex -> {
                     LOGGER.log(Level.WARNING, "Error al transferir mesa", ex);
-                    DialogService.mostrarAlerta(Alert.AlertType.ERROR, "Error al Transferir",
+                    ToastService.mostrarError(
                             "Error al transferir: " + (ex != null ? ex.getMessage() : "desconocido"));
                 }
             )
@@ -336,8 +336,7 @@ public class SalonMesasController {
             }
         }
         if (disponibles.isEmpty()) {
-            DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                    "No hay mesas libres para unir a la Mesa " + mesaPrincipal);
+            ToastService.mostrarAdvertencia("No hay mesas libres para unir a la Mesa " + mesaPrincipal);
             return;
         }
 
@@ -350,13 +349,13 @@ public class SalonMesasController {
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> salonService.unirMesas(mesaPrincipal, List.of(sec), 1),
                 () -> {
-                    DialogService.mostrarAlerta(Alert.AlertType.INFORMATION, "Mesas Unidas",
+                    ToastService.mostrarExito(
                             "Mesas unidas exitosamente: Mesa " + mesaPrincipal + " + Mesa " + sec);
                     cargarMesas();
                 },
                 ex -> {
                     LOGGER.log(Level.WARNING, "Error al unir mesas", ex);
-                    DialogService.mostrarAlerta(Alert.AlertType.ERROR, "Error al Unir",
+                    ToastService.mostrarError(
                             "Error al unir mesas: " + (ex != null ? ex.getMessage() : "desconocido"));
                 }
             )
@@ -372,17 +371,16 @@ public class SalonMesasController {
             },
             detalles -> {
                 if (detalles.isEmpty()) {
-                    DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                            "La comanda no tiene platos registrados.");
+                    ToastService.mostrarAdvertencia("La comanda no tiene platos registrados.");
                     return;
                 }
                 impresoraService.imprimirPreCuenta(pedido, detalles, null);
-                DialogService.mostrarAlerta(Alert.AlertType.INFORMATION, "Pre-Cuenta Emitida",
-                        "Pre-cuenta emitida e impresa para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").\n*** NO ES COMPROBANTE DE PAGO ***");
+                ToastService.mostrarExito(
+                        "Pre-cuenta emitida para Mesa " + mesa + " (Comanda #" + pedido.getIdPedido() + ").");
             },
             ex -> {
                 LOGGER.log(Level.WARNING, "Error emitiendo pre-cuenta", ex);
-                DialogService.mostrarAlerta(Alert.AlertType.ERROR, "Error",
+                ToastService.mostrarError(
                         "Error al emitir pre-cuenta: " + (ex != null ? ex.getMessage() : "desconocido"));
             }
         );
@@ -391,8 +389,7 @@ public class SalonMesasController {
     @FXML
     public void handleTransferirMesaDialog() {
         if (pedidosActivosPorMesa.isEmpty()) {
-            DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                    "No hay mesas ocupadas actualmente para transferir.");
+            ToastService.mostrarAdvertencia("No hay mesas ocupadas actualmente para transferir.");
             return;
         }
         List<String> ocupadas = new ArrayList<>(pedidosActivosPorMesa.keySet());
@@ -407,8 +404,7 @@ public class SalonMesasController {
     @FXML
     public void handleUnirMesasDialog() {
         if (pedidosActivosPorMesa.isEmpty()) {
-            DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                    "No hay mesas ocupadas actualmente para unir.");
+            ToastService.mostrarAdvertencia("No hay mesas ocupadas actualmente para unir.");
             return;
         }
         List<String> ocupadas = new ArrayList<>(pedidosActivosPorMesa.keySet());
@@ -447,8 +443,7 @@ public class SalonMesasController {
             },
             detallesPed -> {
                 if (detallesPed.isEmpty()) {
-                    DialogService.mostrarAlerta(Alert.AlertType.WARNING, "Advertencia",
-                            "El pedido no contiene ítems para facturar.");
+                    ToastService.mostrarAdvertencia("El pedido no contiene ítems para facturar.");
                     return;
                 }
 
@@ -499,13 +494,12 @@ public class SalonMesasController {
                     stage.showAndWait();
                 } catch (IOException ex) {
                     LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
-                    DialogService.mostrarAlerta(Alert.AlertType.ERROR, "Error",
-                            "No se pudo abrir la pasarela de cobro: " + ex.getMessage());
+                    ToastService.mostrarError("No se pudo abrir la pasarela de cobro: " + ex.getMessage());
                 }
             },
             ex -> {
                 LOGGER.log(Level.SEVERE, "Error al iniciar liquidación de mesa " + mesa, ex);
-                DialogService.mostrarAlerta(Alert.AlertType.ERROR, "Error",
+                ToastService.mostrarError(
                         "No se pudo abrir la pasarela de cobro: " + (ex != null ? ex.getMessage() : "desconocido"));
             }
         );

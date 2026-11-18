@@ -16,6 +16,7 @@ import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -566,6 +567,6 @@ public class MozoOrderController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        DialogService.mostrarAlerta(tipo, titulo, mensaje);
+        ToastService.mostrarPorAlertType(tipo, titulo + ": " + mensaje);
     }
 }

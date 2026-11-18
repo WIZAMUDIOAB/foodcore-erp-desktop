@@ -12,6 +12,7 @@ import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.ReporteExportUIHelper;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -233,11 +234,9 @@ public class AuditoriaController {
         final int offset = Math.max(0, (paginaActual - 1) * TAMANO_PAGINA);
 
         if (desde != null && hasta != null && desde.isAfter(hasta)) {
-            DialogService.mostrarAlerta(
-                    Alert.AlertType.WARNING,
-                    "Rango de fechas inválido",
-                    "La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'."
-            );
+            ToastService.mostrarAdvertencia(
+                    rootAuditoriaStack,
+                    "Rango de fechas inválido: la fecha 'Desde' no puede ser posterior a 'Hasta'.");
             return;
         }
 

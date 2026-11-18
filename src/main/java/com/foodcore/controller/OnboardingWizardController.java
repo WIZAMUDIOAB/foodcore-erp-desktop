@@ -5,14 +5,13 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
-import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -86,6 +85,7 @@ public class OnboardingWizardController {
 
     @FXML
     public void initialize() {
+        ToastService.registrarHostPane(rootOnboardingStack);
         AnimationUtils.attachTactileFeedback(btnPasoAnterior);
         AnimationUtils.attachTactileFeedback(btnPasoSiguiente);
         AnimationUtils.attachTactileFeedback(btnEmpezarOperar);
@@ -115,11 +115,9 @@ public class OnboardingWizardController {
             mostrarError(ex.getMessage());
         } catch (SQLException ex) {
             LOGGER.log(Level.WARNING, "Error guardando paso de onboarding en BD", ex);
-            DialogService.mostrarAlerta(
-                    Alert.AlertType.ERROR,
-                    "Error al guardar configuración",
-                    "No se pudo guardar el paso " + pasoActual + " en la base de datos: " + ex.getMessage()
-            );
+            ToastService.mostrarError(
+                    rootOnboardingStack,
+                    "No se pudo guardar el paso " + pasoActual + " en la base de datos: " + ex.getMessage());
         }
     }
 
@@ -203,11 +201,9 @@ public class OnboardingWizardController {
             mostrarError(ex.getMessage());
         } catch (SQLException | IOException ex) {
             LOGGER.log(Level.SEVERE, "Error finalizando configuración inicial", ex);
-            DialogService.mostrarAlerta(
-                    Alert.AlertType.ERROR,
-                    "Error al completar configuración",
-                    "No se pudo completar la configuración inicial: " + ex.getMessage()
-            );
+            ToastService.mostrarError(
+                    rootOnboardingStack,
+                    "No se pudo completar la configuración inicial: " + ex.getMessage());
         }
     }
 

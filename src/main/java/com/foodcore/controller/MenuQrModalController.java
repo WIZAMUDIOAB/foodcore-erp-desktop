@@ -2,7 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.service.MenuQrService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
@@ -118,7 +118,7 @@ public class MenuQrModalController {
     }
 
     private void mostrarAlerta(Alert.AlertType tipo, String titulo, String contenido) {
-        DialogService.mostrarAlerta(tipo, titulo, contenido);
+        ToastService.mostrarPorAlertType(tipo, titulo + ": " + contenido);
     }
 
     public File getArchivoHtmlGenerado() {

@@ -36,6 +36,7 @@ import com.foodcore.util.ConfiguracionFidelizacion;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
+import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -1721,7 +1722,7 @@ public class VentaController {
     }
 
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
-        DialogService.mostrarAlerta(tipo, titulo, mensaje);
+        ToastService.mostrarPorAlertType(tipo, titulo + ": " + mensaje);
     }
 
     @FXML
