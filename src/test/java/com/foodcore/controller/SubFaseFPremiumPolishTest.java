@@ -234,10 +234,12 @@ class SubFaseFPremiumPolishTest {
     }
 
     @Test
-    @DisplayName("F8: MainLayout muestra Breadcrumbs y MainDashboardController actualiza ruta al navegar")
+    @DisplayName("F8 + F-UX: MainLayout muestra Breadcrumbs, actualiza ruta al navegar y alterna tema desde el header izquierdo")
     void testBreadcrumbsEnMainLayoutYCambioDeVista() throws Exception {
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            boolean modoInicial = App.isDarkModeActivo();
             try {
+                App.setDarkModeActivo(false);
                 FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
                 Parent root = loader.load();
                 Scene scene = new Scene(root, 1280, 800);
@@ -249,6 +251,23 @@ class SubFaseFPremiumPolishTest {
                 assertNotNull(bar, "MainLayout debe incluir #breadcrumbBar");
                 assertNotNull(lbl, "MainLayout debe incluir #lblBreadcrumbs");
 
+                Button btnTema = (Button) root.lookup("#btnToggleTheme");
+                assertNotNull(btnTema, "MainLayout debe incluir #btnToggleTheme en el header izquierdo");
+                assertNotNull(btnTema.getTooltip());
+                assertEquals("Cambiar Tema", btnTema.getTooltip().getText());
+                assertTrue(btnTema.getGraphic() instanceof FontIcon);
+                assertEquals("fth-moon", ((FontIcon) btnTema.getGraphic()).getIconLiteral());
+
+                ctrl.handleToggleTheme(null);
+                assertTrue(App.isDarkModeActivo(), "handleToggleTheme debe activar modo oscuro");
+                assertEquals("fth-sun", ((FontIcon) btnTema.getGraphic()).getIconLiteral());
+                assertTrue(scene.getStylesheets().stream().anyMatch(s -> s.contains("dark-theme.css")));
+
+                ctrl.handleToggleTheme(null);
+                assertFalse(App.isDarkModeActivo(), "handleToggleTheme debe restaurar modo claro");
+                assertEquals("fth-moon", ((FontIcon) btnTema.getGraphic()).getIconLiteral());
+                assertFalse(scene.getStylesheets().stream().anyMatch(s -> s.contains("dark-theme.css")));
+
                 ctrl.actualizarBreadcrumbs("Inicio > Salón > Mesas");
                 assertEquals("Inicio > Salón > Mesas", lbl.getText());
 
@@ -259,7 +278,9 @@ class SubFaseFPremiumPolishTest {
                 assertEquals("Inicio > Salón > Mesas", lbl.getText());
                 assertEquals("Inicio > Salón > Mesas", ctrl.getRutaBreadcrumbsActual());
             } catch (Exception e) {
-                throw new IllegalStateException("Error probando Breadcrumbs F8", e);
+                throw new IllegalStateException("Error probando Breadcrumbs F8 y Toggle Tema F-UX", e);
+            } finally {
+                App.setDarkModeActivo(modoInicial);
             }
         });
     }

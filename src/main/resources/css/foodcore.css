@@ -721,6 +721,16 @@
     -fx-scale-y: 0.98;
 }
 
+.sidebar-icon-btn {
+    -fx-min-width: 38px;
+    -fx-pref-width: 38px;
+    -fx-max-width: 38px;
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-max-height: 38px;
+    -fx-padding: 0;
+}
+
 .btn-ghost {
     -fx-background-color: transparent;
     -fx-text-fill: -text-secondary;

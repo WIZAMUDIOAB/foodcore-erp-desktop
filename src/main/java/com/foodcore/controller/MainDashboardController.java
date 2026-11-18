@@ -22,6 +22,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -86,6 +87,8 @@ public class MainDashboardController {
     @FXML private BorderPane mainBorderPane;
     @FXML private VBox sidebarBox;
     @FXML private VBox boxBrandHeader;
+    @FXML private Button btnToggleTheme;
+    @FXML private FontIcon iconToggleTheme;
     @FXML private Button btnToggleSidebar;
     @FXML private Label lblBuscarSidebar;
     @FXML private javafx.scene.control.TextField txtBuscarSidebar;
@@ -158,7 +161,7 @@ public class MainDashboardController {
     public void initialize() {
         ToastService.registrarHostPane(rootDashboardStack);
         Button[] buttons = {
-            btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja, btnNavHistorialVentas,
+            btnToggleTheme, btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS, btnNavCaja, btnNavHistorialVentas,
             btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes, btnNavHistorialPrecios, btnNavReportesAvanzados,
             btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes, btnNavExpedientes, btnNavPlanilla,
             btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas, btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
@@ -168,6 +171,7 @@ public class MainDashboardController {
         for (Button btn : buttons) {
             AnimationUtils.attachTactileFeedback(btn);
         }
+        actualizarIconoTema(App.isDarkModeActivo());
 
         configurarSyncWorkerListener();
 
@@ -334,6 +338,32 @@ public class MainDashboardController {
         if (btnToggleSidebar != null) {
             btnToggleSidebar.setText(sidebarColapsado ? "»" : "«");
         }
+    }
+
+    /**
+     * Alterna entre Modo Claro y Modo Oscuro desde el botón superior izquierdo del sidebar (F-UX).
+     */
+    @FXML
+    public void handleToggleTheme(ActionEvent event) {
+        boolean nuevoModoOscuro = !App.isDarkModeActivo();
+        App.setDarkModeActivo(nuevoModoOscuro);
+        Scene scene = rootDashboardStack != null ? rootDashboardStack.getScene() : null;
+        if (scene != null) {
+            App.aplicarModoOscuro(scene, nuevoModoOscuro);
+        }
+        actualizarIconoTema(nuevoModoOscuro);
+    }
+
+    private void actualizarIconoTema(boolean darkMode) {
+        if (iconToggleTheme != null) {
+            iconToggleTheme.setIconLiteral(darkMode ? "fth-sun" : "fth-moon");
+        } else if (btnToggleTheme != null && btnToggleTheme.getGraphic() instanceof FontIcon fi) {
+            fi.setIconLiteral(darkMode ? "fth-sun" : "fth-moon");
+        }
+    }
+
+    public Button getBtnToggleTheme() {
+        return btnToggleTheme;
     }
 
     @FXML
@@ -576,8 +606,14 @@ public class MainDashboardController {
 
             if (contentArea != null) {
                 contentArea.getChildren().setAll(view);
+                if (contentArea.getScene() != null) {
+                    App.aplicarModoOscuro(contentArea.getScene(), App.isDarkModeActivo());
+                }
             } else if (mainBorderPane != null) {
                 mainBorderPane.setCenter(view);
+                if (mainBorderPane.getScene() != null) {
+                    App.aplicarModoOscuro(mainBorderPane.getScene(), App.isDarkModeActivo());
+                }
             }
 
             AnimationUtils.enterWithFadeSlide(view, 6.0, 0);
