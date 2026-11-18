@@ -501,6 +501,50 @@
     -fx-background-radius: 9999px;
 }
 
+.splash-root {
+    -fx-padding: 24px;
+}
+
+.splash-card {
+    -fx-background-color: -bg-surface;
+    -fx-background-radius: 16px;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 16px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 24, 0, 0, 8);
+}
+
+.splash-logo-badge {
+    -fx-background-color: -brand-primary;
+    -fx-background-radius: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(234, 88, 12, 0.35), 14, 0, 0, 4);
+}
+
+.splash-logo-monogram {
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 24px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -text-inverse;
+}
+
+.splash-progress-bar {
+    -fx-pref-height: 8px;
+    -fx-min-height: 8px;
+    -fx-max-height: 8px;
+}
+
+.splash-progress-bar > .track {
+    -fx-background-color: -border-subtle;
+    -fx-background-radius: 9999px;
+    -fx-background-insets: 0;
+}
+
+.splash-progress-bar > .bar {
+    -fx-background-color: -brand-primary;
+    -fx-background-radius: 9999px;
+    -fx-background-insets: 0;
+}
+
 .login-status-chip {
     -fx-background-color: -fc-kds-surface;
     -fx-background-radius: 9999px;

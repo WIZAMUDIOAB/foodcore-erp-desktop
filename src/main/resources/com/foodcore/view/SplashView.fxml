@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<StackPane fx:id="bootstrapSplashRoot" prefHeight="700.0" prefWidth="1080.0" styleClass="login-canvas, splash-root" stylesheets="@../../../css/foodcore.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.foodcore.controller.SplashController">
+    <children>
+        <VBox fx:id="splashCard" alignment="CENTER" maxHeight="340.0" maxWidth="460.0" prefWidth="440.0" spacing="20.0" styleClass="card, splash-card">
+            <padding>
+                <Insets bottom="36.0" left="32.0" right="32.0" top="36.0" />
+            </padding>
+            <children>
+                <VBox fx:id="logoContainer" alignment="CENTER" spacing="10.0">
+                    <children>
+                        <StackPane maxHeight="64.0" maxWidth="64.0" prefHeight="64.0" prefWidth="64.0" styleClass="splash-logo-badge">
+                            <children>
+                                <Label styleClass="splash-logo-monogram" text="FC" />
+                            </children>
+                        </StackPane>
+                        <Label fx:id="lblSplashTitle" styleClass="text-display" text="FoodCore ERP" />
+                        <Label styleClass="text-secondary" text="Sistema Integral de Gestión Gastronómica" />
+                    </children>
+                </VBox>
+
+                <ProgressBar fx:id="progressBarSplash" maxWidth="340.0" prefWidth="340.0" progress="0.15" styleClass="splash-progress-bar" />
+
+                <HBox alignment="CENTER" spacing="10.0">
+                    <children>
+                        <ProgressIndicator fx:id="spinnerBootstrap" maxHeight="20.0" maxWidth="20.0" prefHeight="20.0" prefWidth="20.0" />
+                        <Label fx:id="lblEstadoBootstrap" styleClass="text-body-secondary" text="Migrando base de datos…" wrapText="true" />
+                    </children>
+                </HBox>
+            </children>
+        </VBox>
+    </children>
+</StackPane>
