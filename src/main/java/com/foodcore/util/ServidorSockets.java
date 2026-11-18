@@ -12,6 +12,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -80,8 +82,11 @@ public class ServidorSockets {
         corriendo = true;
         java.util.concurrent.CountDownLatch boundLatch = new java.util.concurrent.CountDownLatch(1);
         threadPool.execute(() -> {
+            ServerSocket ss = null;
             try {
-                ServerSocket ss = new ServerSocket(puerto);
+                ss = new ServerSocket();
+                ss.setReuseAddress(true);
+                ss.bind(new InetSocketAddress(puerto));
                 serverSocket.set(ss);
                 this.puertoActual = ss.getLocalPort();
                 boundLatch.countDown();
@@ -93,13 +98,23 @@ public class ServidorSockets {
                 }
             } catch (IOException | RuntimeException e) {
                 boundLatch.countDown();
+                if (ss != null && serverSocket.get() != ss && !ss.isClosed()) {
+                    try {
+                        ss.close();
+                    } catch (IOException ignored) {
+                        // Ignore close failure during failed bind cleanup
+                    }
+                }
                 if (corriendo) {
                     LOGGER.log(Level.WARNING, "Aviso en ServidorSockets", e);
                 }
             }
         });
         try {
-            boundLatch.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            boolean bound = boundLatch.await(2, TimeUnit.SECONDS);
+            if (!bound) {
+                LOGGER.warning("Tiempo de espera agotado iniciando ServidorSockets en puerto " + puerto);
+            }
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         }
@@ -293,6 +308,13 @@ public class ServidorSockets {
                 ss.close();
             }
             threadPool.shutdownNow();
+            try {
+                if (!threadPool.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    LOGGER.fine("Hilos de ServidorSockets aún finalizando tras cierre.");
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             LOGGER.info("Servidor de Sockets detenido.");
         } catch (IOException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al detener ServidorSockets", e);

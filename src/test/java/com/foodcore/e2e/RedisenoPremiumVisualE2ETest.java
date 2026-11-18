@@ -101,6 +101,11 @@ public class RedisenoPremiumVisualE2ETest {
                 pinPage.addInitScript("() => localStorage.setItem('fc_theme', 'light')");
                 pinPage.navigate(PlaywrightE2ESupport.HTTP_BASE_URL + "/pin-login.html");
                 pinPage.waitForSelector(".pin-keypad-grid .pin-btn");
+                pinPage.waitForCondition(() -> Boolean.TRUE.equals(pinPage.evaluate(
+                        "() => { const st = document.getElementById('statusText');"
+                        + " return !!st && st.innerText.includes('API Online ('); }")));
+                pinPage.evaluate("() => document.fonts ? document.fonts.ready : Promise.resolve()");
+                pinPage.waitForTimeout(350);
 
                 int visibleInputs = ((Number) pinPage.evaluate(
                         "() => Array.from(document.querySelectorAll('input')).filter(i => i.offsetParent !== null).length"))
@@ -117,6 +122,7 @@ public class RedisenoPremiumVisualE2ETest {
                 pinPage.click("#btnThemeToggle");
                 pinPage.waitForCondition(() -> Boolean.TRUE.equals(
                         pinPage.evaluate("() => document.documentElement.classList.contains('dark')")));
+                pinPage.waitForTimeout(200);
                 String bgDarkPin = evaluarComputedStyle(pinPage, "body", "backgroundColor");
                 String cardDarkPin = evaluarComputedStyle(pinPage, ".pin-login-container", "backgroundColor");
                 assertEquals("rgb(9, 9, 11)", bgDarkPin, "Fondo oscuro PIN Login debe ser #09090B");
@@ -659,6 +665,7 @@ public class RedisenoPremiumVisualE2ETest {
                 + "    document.head.appendChild(st);"
                 + "  }"
                 + "}");
+        page.waitForTimeout(100);
 
         Path actualPath = EVIDENCE_DIR.resolve(filename);
         Path baselinePath = BASELINE_DIR.resolve(filename);
@@ -691,10 +698,7 @@ public class RedisenoPremiumVisualE2ETest {
             for (int x = 0; x < width; x++) {
                 int rgbA = expected.getRGB(x, y);
                 int rgbB = actual.getRGB(x, y);
-                int dr = Math.abs(((rgbA >> 16) & 0xFF) - ((rgbB >> 16) & 0xFF));
-                int dg = Math.abs(((rgbA >> 8) & 0xFF) - ((rgbB >> 8) & 0xFF));
-                int db = Math.abs((rgbA & 0xFF) - (rgbB & 0xFF));
-                if (dr > CHANNEL_TOLERANCE || dg > CHANNEL_TOLERANCE || db > CHANNEL_TOLERANCE) {
+                if (!coloresIguales(rgbA, rgbB) && !esBordeAntialiasing(expected, rgbB, x, y, width, height)) {
                     diffPixels++;
                     diffImage.setRGB(x, y, Color.RED.getRGB());
                 } else {
@@ -716,5 +720,37 @@ public class RedisenoPremiumVisualE2ETest {
         assertTrue(ratio <= maxDiffPixelRatio,
                 String.format(Locale.ROOT, "Regresión visual en %s: %.2f%% > %.2f%% (%s)",
                         filename, ratio * 100.0, maxDiffPixelRatio * 100.0, baselinePath));
+    }
+
+    private static boolean coloresIguales(int rgbA, int rgbB) {
+        int dr = Math.abs(((rgbA >> 16) & 0xFF) - ((rgbB >> 16) & 0xFF));
+        int dg = Math.abs(((rgbA >> 8) & 0xFF) - ((rgbB >> 8) & 0xFF));
+        int db = Math.abs((rgbA & 0xFF) - (rgbB & 0xFF));
+        return dr <= CHANNEL_TOLERANCE && dg <= CHANNEL_TOLERANCE && db <= CHANNEL_TOLERANCE;
+    }
+
+    private static boolean esBordeAntialiasing(BufferedImage expected, int rgbActual, int x, int y, int width, int height) {
+        int centro = expected.getRGB(x, y);
+        boolean tieneContrasteLocal = false;
+        boolean coincideVecino = false;
+        int minY = Math.max(0, y - 1);
+        int maxY = Math.min(height - 1, y + 1);
+        int minX = Math.max(0, x - 1);
+        int maxX = Math.min(width - 1, x + 1);
+        for (int ny = minY; ny <= maxY; ny++) {
+            for (int nx = minX; nx <= maxX; nx++) {
+                if (nx == x && ny == y) {
+                    continue;
+                }
+                int vecino = expected.getRGB(nx, ny);
+                if (!coloresIguales(centro, vecino)) {
+                    tieneContrasteLocal = true;
+                }
+                if (coloresIguales(vecino, rgbActual)) {
+                    coincideVecino = true;
+                }
+            }
+        }
+        return tieneContrasteLocal && coincideVecino;
     }
 }

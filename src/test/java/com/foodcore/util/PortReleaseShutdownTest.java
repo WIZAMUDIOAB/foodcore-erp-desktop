@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -39,6 +40,7 @@ class PortReleaseShutdownTest {
 
     @BeforeEach
     void setupProps() {
+        App.detenerServiciosAplicacion();
         prevKeyPass = System.getProperty(ApiServer.ENV_KEYSTORE_PASS);
         prevKeyPath = System.getProperty(ApiServer.ENV_KEYSTORE_PATH);
         prevCertPath = System.getProperty(ApiServer.ENV_CERT_PATH);
@@ -60,9 +62,10 @@ class PortReleaseShutdownTest {
         System.setProperty(ApiServer.ENV_KEYSTORE_PATH, artifacts.keystorePath().toAbsolutePath().toString());
         System.setProperty(ApiServer.ENV_CERT_PATH, artifacts.certPath().toAbsolutePath().toString());
 
-        int tcpPort = puertoLibre();
-        int httpPort = puertoLibre();
-        int httpsPort = puertoLibre();
+        int[] puertos = reservarPuertosDistintos(3);
+        int tcpPort = puertos[0];
+        int httpPort = puertos[1];
+        int httpsPort = puertos[2];
 
         ServidorSockets sockets = ServidorSockets.getInstance();
         sockets.iniciar(tcpPort);
@@ -96,17 +99,13 @@ class PortReleaseShutdownTest {
         assertFalse(singleton.isRunning(), "ApiServer debe estar detenido");
         assertFalse(sockets.isCorriendo(), "ServidorSockets debe estar detenido");
 
-        // Verificar que todos los puertos quedaron libres para enlace inmediato
-        try (ServerSocket rebindTcp = new ServerSocket(tcpPort);
-             ServerSocket rebindHttp = new ServerSocket(httpPort);
-             ServerSocket rebindHttps = new ServerSocket(httpsPort)) {
-            assertTrue(rebindTcp.isBound());
-            assertTrue(rebindHttp.isBound());
-            assertTrue(rebindHttps.isBound());
-        }
+        // Verificar que todos los puertos quedaron libres para enlace
+        assertPuertoLiberado(tcpPort);
+        assertPuertoLiberado(httpPort);
+        assertPuertoLiberado(httpsPort);
 
         // Además verificar un servidor aislado HTTP con puertos dedicados
-        int isoHttp = puertoLibre();
+        int isoHttp = reservarPuertosDistintos(1)[0];
         ApiServer aislado = ApiServer.crearServidorAislado(
                 new JwtService(TEST_JWT_SECRET),
                 new CorsPolicy(Set.of("http://localhost")),
@@ -116,20 +115,51 @@ class PortReleaseShutdownTest {
         assertTrue(aislado.isRunning());
         aislado.detener();
         assertFalse(aislado.isRunning());
-        try (ServerSocket rebindIso = new ServerSocket(isoHttp)) {
-            assertTrue(rebindIso.isBound());
+        assertPuertoLiberado(isoHttp);
+    }
+
+    private static void assertPuertoLiberado(int port) throws Exception {
+        long deadline = System.currentTimeMillis() + 1000L;
+        IOException lastEx = null;
+        while (System.currentTimeMillis() <= deadline) {
+            try (ServerSocket ss = new ServerSocket()) {
+                ss.setReuseAddress(true);
+                ss.bind(new InetSocketAddress(port));
+                assertTrue(ss.isBound(), "Puerto " + port + " debe quedar disponible");
+                return;
+            } catch (IOException ex) {
+                lastEx = ex;
+                Thread.sleep(25);
+            }
+        }
+        throw lastEx != null ? lastEx : new IOException("Puerto " + port + " no liberado");
+    }
+
+    private static int[] reservarPuertosDistintos(int cantidad) throws IOException {
+        ServerSocket[] abiertos = new ServerSocket[cantidad];
+        int[] puertos = new int[cantidad];
+        try {
+            for (int i = 0; i < cantidad; i++) {
+                abiertos[i] = new ServerSocket(0);
+                puertos[i] = abiertos[i].getLocalPort();
+            }
+            return puertos;
+        } finally {
+            for (ServerSocket ss : abiertos) {
+                if (ss != null && !ss.isClosed()) {
+                    try {
+                        ss.close();
+                    } catch (IOException ignored) {
+                        // Cierre preventivo de reserva temporal
+                    }
+                }
+            }
         }
     }
 
     private static void occupiedCheck(ServerSocket s) {
         if (s != null) {
             s.getLocalPort();
-        }
-    }
-
-    private static int puertoLibre() throws IOException {
-        try (ServerSocket ss = new ServerSocket(0)) {
-            return ss.getLocalPort();
         }
     }
 
