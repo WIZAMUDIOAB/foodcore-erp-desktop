@@ -17,6 +17,12 @@ Thumbs.db
 *.jks
 *.p12
 *.keystore
+*.cer
 
-data/*.db*
+data/
+data/**/*.db*
+!data/.gitkeep
+uploads/
+!uploads/.gitkeep
+scripts/*.exe
 scripts/*.js

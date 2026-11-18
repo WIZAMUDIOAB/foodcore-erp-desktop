@@ -22,11 +22,14 @@ import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
+import javafx.event.Event;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.AccessibleRole;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Control;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -47,11 +50,13 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -234,6 +239,15 @@ class FlujoCompletoAcoplamientoIT {
         ResultadoSoak res = SoakTestSimulado.ejecutarSimulacionSoak(Duration.ofSeconds(segundos), iteraciones);
         assertTrue(res.iteracionesCompletadas() >= 1, "El Soak Test debe completar ciclos de venta");
         assertEquals(0, res.errores(), "El Soak Test simulado debe completar 0 errores");
+        assertTrue(res.duracionMs() > 0, "La duración medida del Soak Test debe ser positiva");
+        assertTrue(res.latenciaPromedioMs() >= 0.0, "La latencia promedio debe ser no negativa");
+        try (Connection conn = ConexionBD.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM venta WHERE estado = 'COMPLETADA'");
+             ResultSet rs = ps.executeQuery()) {
+            assertTrue(rs.next());
+            assertTrue(rs.getInt(1) >= res.iteracionesCompletadas(),
+                    "Cada iteración completada del Soak Test debe haber persistido su venta en MySQL");
+        }
     }
 
     @Test
@@ -263,25 +277,34 @@ class FlujoCompletoAcoplamientoIT {
                 assertEquals(AccessibleRole.BUTTON, btnLogin.getAccessibleRole());
                 assertTrue(btnLogin.getAccessibleText() != null && !btnLogin.getAccessibleText().isBlank());
 
-                // Validar foco secuencial con tecla Tab dentro de Stage activo: txtUsername -> txtPassword -> btnLogin
+                // Validar orden real de controles enfocables visibles en el grafo FXML (sin trampas de teclado)
+                List<Control> ordenFoco = new ArrayList<>();
+                recolectarControlesEnfocables(loginRoot, ordenFoco);
+                int idxUser = ordenFoco.indexOf(txtUser);
+                int idxPass = ordenFoco.indexOf(txtPass);
+                int idxBtn = ordenFoco.indexOf(btnLogin);
+                assertTrue(idxUser >= 0 && idxPass == idxUser + 1 && idxBtn == idxPass + 1,
+                        "El orden real de tabulación en LoginView debe ser consecutivo: txtUsername -> txtPassword -> btnLogin");
+
+                // Validar foco real con evento Tab sin forzar requestFocus manual sobre el destino
                 Stage stage = new Stage();
                 try {
                     stage.setScene(loginScene);
                     stage.show();
 
                     txtUser.requestFocus();
-                    assertTrue(loginScene.getFocusOwner() == txtUser || txtUser.isFocused(),
-                            "txtUsername debe recibir foco inicial");
-                    KeyEvent tabEvent = new KeyEvent(
-                            KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB, false, false, false, false);
-                    txtUser.fireEvent(tabEvent);
-                    txtPass.requestFocus();
-                    assertTrue(loginScene.getFocusOwner() == txtPass || txtPass.isFocused(),
-                            "txtPassword debe recibir foco tras Tab");
-                    txtPass.fireEvent(tabEvent);
-                    btnLogin.requestFocus();
-                    assertTrue(loginScene.getFocusOwner() == btnLogin || btnLogin.isFocused(),
-                            "btnLogin debe recibir foco tras Tab");
+                    assertSame(txtUser, loginScene.getFocusOwner(),
+                            "txtUsername debe ser el focusOwner inicial");
+                    KeyEvent tabDesdeUser = new KeyEvent(
+                            txtUser, txtUser, KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB, false, false, false, false);
+                    Event.fireEvent(txtUser, tabDesdeUser);
+                    assertSame(txtPass, loginScene.getFocusOwner(),
+                            "Presionar Tab desde txtUsername debe mover el foco real a txtPassword");
+                    KeyEvent tabDesdePass = new KeyEvent(
+                            txtPass, txtPass, KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB, false, false, false, false);
+                    Event.fireEvent(txtPass, tabDesdePass);
+                    assertSame(btnLogin, loginScene.getFocusOwner(),
+                            "Presionar Tab desde txtPassword debe mover el foco real a btnLogin");
                 } finally {
                     stage.close();
                 }
@@ -308,5 +331,19 @@ class FlujoCompletoAcoplamientoIT {
                 throw new IllegalStateException("Error validando accesibilidad WCAG AA", e);
             }
         });
+    }
+
+    private static void recolectarControlesEnfocables(Node node, List<Control> destino) {
+        if (node == null || !node.isVisible() || !node.isManaged() || node.isDisabled()) {
+            return;
+        }
+        if (node instanceof Control control && control.isFocusTraversable()) {
+            destino.add(control);
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                recolectarControlesEnfocables(child, destino);
+            }
+        }
     }
 }
