@@ -164,11 +164,11 @@ class HardeningFinanceIntegrityTest {
             idCxp = cxpDAO.insertar(conn, cxp);
         }
 
-        // Pagar 50% -> debe quedar PARCIAL, NO PAGADA
+        // Pagar 50% -> debe quedar PENDIENTE, NO PAGADA
         assertTrue(finanzas.registrarPagoProveedor(idCxp, 50.00, "EFECTIVO", null, 1, "Abono 50%"));
         try (Connection conn = ConexionBD.getConnection()) {
             CuentaPorPagar tras50 = cxpDAO.buscarPorId(conn, idCxp).orElseThrow();
-            assertEquals("PARCIAL", tras50.getEstado(), "Pago del 50% debe dejar CxP en PARCIAL");
+            assertEquals("PENDIENTE", tras50.getEstado(), "Pago del 50% debe dejar CxP en PENDIENTE (no PAGADA)");
             assertEquals(50.00, tras50.getMontoPagado(), 0.001);
         }
 
@@ -214,7 +214,7 @@ class HardeningFinanceIntegrityTest {
         assertTrue(finanzas.registrarCobroCliente(idCxc, 50.00, "EFECTIVO", null, 1, "Cobro 50%"));
         try (Connection conn = ConexionBD.getConnection()) {
             CuentaPorCobrar tras50 = cxcDAO.buscarPorId(conn, idCxc).orElseThrow();
-            assertEquals("PARCIAL", tras50.getEstado(), "Cobro del 50% debe dejar CxC en PARCIAL");
+            assertEquals("PENDIENTE", tras50.getEstado(), "Cobro del 50% debe dejar CxC en PENDIENTE (no COBRADA)");
             assertEquals(50.00, tras50.getMontoCobrado(), 0.001);
         }
         assertThrows(IllegalArgumentException.class,

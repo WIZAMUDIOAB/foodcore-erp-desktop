@@ -412,7 +412,7 @@ public class VentaService {
                     ? " [Autorizado por " + supervisorAutorizante.getUsername() + "]" : "";
             MovimientoCaja movAnulacion = new MovimientoCaja(
                 0, idCaja, idUsuarioMov, "ANULACION",
-                metodoPago != null ? metodoPago : "EFECTIVO",
+                normalizarMedioPagoMovimientoCaja(metodoPago),
                 totalVenta.negate(),
                 "Anulación Venta #" + idVenta + ": " + glosaMotivo + sufijoSupervisor
             );
@@ -631,7 +631,7 @@ public class VentaService {
                     idCajaEgreso,
                     (int) sesion.getIdUsuario(),
                     "EGRESO",
-                    metodoPago != null ? metodoPago : "EFECTIVO",
+                    normalizarMedioPagoMovimientoCaja(metodoPago),
                     montoReembolso,
                     "Devolución parcial Venta #" + idVenta + " (" + aDevolver.size() + " ítem(s)): " + glosaMotivo
             );
@@ -884,7 +884,7 @@ public class VentaService {
         if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
             int idxPago = 1;
             for (PagoSplit p : pagosDivididos) {
-                String medio = p.medioPago() != null ? p.medioPago() : "EFECTIVO";
+                String medio = normalizarMedioPagoMovimientoCaja(p.medioPago());
                 MovimientoCaja movSplit = new MovimientoCaja(
                     0, idCaja, idUsrMov,
                     "VENTA", medio, p.monto().setScale(2, RoundingMode.HALF_EVEN),
@@ -894,7 +894,7 @@ public class VentaService {
                 idxPago++;
             }
         } else {
-            String medioPago = venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO";
+            String medioPago = normalizarMedioPagoMovimientoCaja(venta.getMetodoPago());
             MovimientoCaja movVenta = new MovimientoCaja(
                 0, idCaja, idUsrMov,
                 "VENTA", medioPago, totalFinal,
@@ -980,5 +980,20 @@ public class VentaService {
             );
             destino.merge(rec.getIdInsumo(), cantRequerida, BigDecimal::add);
         }
+    }
+
+    /**
+     * Normaliza el medio de pago para {@code movimiento_caja.medio_pago} ({@code VARCHAR(15)} en V1):
+     * mapea {@code CREDITO_CORPORATIVO} a {@code CREDITO} y acota longitudes mayores a 15 caracteres.
+     */
+    public static String normalizarMedioPagoMovimientoCaja(String medioPago) {
+        if (medioPago == null || medioPago.isBlank()) {
+            return "EFECTIVO";
+        }
+        String limpio = medioPago.trim().toUpperCase(Locale.ROOT);
+        if ("CREDITO_CORPORATIVO".equals(limpio)) {
+            return "CREDITO";
+        }
+        return limpio.length() > 15 ? limpio.substring(0, 15) : limpio;
     }
 }

@@ -290,71 +290,73 @@ public class ExportacionContableService {
             }
         }
 
-        Document document = new Document();
         try (FileOutputStream fos = new FileOutputStream(archivoDestino)) {
+            Document document = new Document();
             PdfWriter.getInstance(document, fos);
-            document.open();
+            try {
+                document.open();
 
-            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.BLACK);
-            Font fontSub = FontFactory.getFont(FontFactory.HELVETICA, 10, Color.DARK_GRAY);
-            Font fontH = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
-            Font fontB = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
+                Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.BLACK);
+                Font fontSub = FontFactory.getFont(FontFactory.HELVETICA, 10, Color.DARK_GRAY);
+                Font fontH = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+                Font fontB = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
 
-            Paragraph pTit = new Paragraph("FOODCORE ERP — RESUMEN MENSUAL DE CIERRES Z DE CAJA", fontTitulo);
-            pTit.setAlignment(Element.ALIGN_CENTER);
-            document.add(pTit);
+                Paragraph pTit = new Paragraph("FOODCORE ERP — RESUMEN MENSUAL DE CIERRES Z DE CAJA", fontTitulo);
+                pTit.setAlignment(Element.ALIGN_CENTER);
+                document.add(pTit);
 
-            Paragraph pP = new Paragraph("Rango evaluado: " + inicio + " al " + fin + " | Generado automáticamente", fontSub);
-            pP.setAlignment(Element.ALIGN_CENTER);
-            pP.setSpacingAfter(15);
-            document.add(pP);
+                Paragraph pP = new Paragraph("Rango evaluado: " + inicio + " al " + fin + " | Generado automáticamente", fontSub);
+                pP.setAlignment(Element.ALIGN_CENTER);
+                pP.setSpacingAfter(15);
+                document.add(pP);
 
-            PdfPTable table = new PdfPTable(8);
-            table.setWidthPercentage(100);
-            table.setWidths(new float[]{1.2f, 1.8f, 1.2f, 1.4f, 1.4f, 1.2f, 1.2f, 1.2f});
+                PdfPTable table = new PdfPTable(8);
+                table.setWidthPercentage(100);
+                table.setWidths(new float[]{1.2f, 1.8f, 1.2f, 1.4f, 1.4f, 1.2f, 1.2f, 1.2f});
 
-            String[] headers = {"Turno #", "Apertura", "Saldo Inic.", "Ventas Efec.", "Ventas Digit.", "Egresos", "Saldo Real", "Diferencia"};
-            for (String h : headers) {
-                PdfPCell c = new PdfPCell(new Phrase(h, fontH));
-                c.setBackgroundColor(new Color(25, 42, 86));
-                c.setPadding(5);
-                c.setHorizontalAlignment(Element.ALIGN_CENTER);
-                table.addCell(c);
-            }
+                String[] headers = {"Turno #", "Apertura", "Saldo Inic.", "Ventas Efec.", "Ventas Digit.", "Egresos", "Saldo Real", "Diferencia"};
+                for (String h : headers) {
+                    PdfPCell c = new PdfPCell(new Phrase(h, fontH));
+                    c.setBackgroundColor(new Color(25, 42, 86));
+                    c.setPadding(5);
+                    c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                    table.addCell(c);
+                }
 
-            BigDecimal sumEfec = BigDecimal.ZERO;
-            BigDecimal sumDigit = BigDecimal.ZERO;
-            BigDecimal sumEgr = BigDecimal.ZERO;
-            BigDecimal sumDif = BigDecimal.ZERO;
+                BigDecimal sumEfec = BigDecimal.ZERO;
+                BigDecimal sumDigit = BigDecimal.ZERO;
+                BigDecimal sumEgr = BigDecimal.ZERO;
+                BigDecimal sumDif = BigDecimal.ZERO;
 
-            for (TurnoZResumen t : turnos) {
-                table.addCell(new Phrase("#" + t.idTurno, fontB));
-                table.addCell(new Phrase(t.fechaApertura != null ? t.fechaApertura.format(DateTimeFormatter.ofPattern("dd/MM HH:mm")) : "-", fontB));
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.saldoInicialBd), fontB));
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.totalVentasEfectivoBd), fontB));
-                BigDecimal ventasDig = t.totalVentasTarjetaBd.add(t.totalOtrosMediosBd);
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", ventasDig), fontB));
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.totalEgresosBd), fontB));
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.saldoRealBd), fontB));
-                table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.diferenciaBd), fontB));
+                for (TurnoZResumen t : turnos) {
+                    table.addCell(new Phrase("#" + t.idTurno, fontB));
+                    table.addCell(new Phrase(t.fechaApertura != null ? t.fechaApertura.format(DateTimeFormatter.ofPattern("dd/MM HH:mm")) : "-", fontB));
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.saldoInicialBd), fontB));
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.totalVentasEfectivoBd), fontB));
+                    BigDecimal ventasDig = t.totalVentasTarjetaBd.add(t.totalOtrosMediosBd);
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", ventasDig), fontB));
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.totalEgresosBd), fontB));
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.saldoRealBd), fontB));
+                    table.addCell(new Phrase(String.format(Locale.US, "S/ %.2f", t.diferenciaBd), fontB));
 
-                sumEfec = sumEfec.add(t.totalVentasEfectivoBd);
-                sumDigit = sumDigit.add(ventasDig);
-                sumEgr = sumEgr.add(t.totalEgresosBd);
-                sumDif = sumDif.add(t.diferenciaBd);
-            }
+                    sumEfec = sumEfec.add(t.totalVentasEfectivoBd);
+                    sumDigit = sumDigit.add(ventasDig);
+                    sumEgr = sumEgr.add(t.totalEgresosBd);
+                    sumDif = sumDif.add(t.diferenciaBd);
+                }
 
-            document.add(table);
+                document.add(table);
 
-            Paragraph pTot = new Paragraph(String.format(Locale.US, "%nTOTALES CONSOLIDADOS DEL MES:%n"
-                    + "Total Efectivo Recaudado: S/ %.2f | Total Canales Digitales: S/ %.2f%n"
-                    + "Total Egresos de Caja: S/ %.2f | Diferencia Neta de Arqueos: S/ %.2f",
-                    sumEfec, sumDigit, sumEgr, sumDif), fontTitulo);
-            pTot.setSpacingBefore(15);
-            document.add(pTot);
-        } finally {
-            if (document.isOpen()) {
-                document.close();
+                Paragraph pTot = new Paragraph(String.format(Locale.US, "%nTOTALES CONSOLIDADOS DEL MES:%n"
+                        + "Total Efectivo Recaudado: S/ %.2f | Total Canales Digitales: S/ %.2f%n"
+                        + "Total Egresos de Caja: S/ %.2f | Diferencia Neta de Arqueos: S/ %.2f",
+                        sumEfec, sumDigit, sumEgr, sumDif), fontTitulo);
+                pTot.setSpacingBefore(15);
+                document.add(pTot);
+            } finally {
+                if (document.isOpen()) {
+                    document.close();
+                }
             }
         }
     }
@@ -411,41 +413,43 @@ public class ExportacionContableService {
     }
 
     public void exportarReporteGenericoPdf(String tituloReporte, List<String> encabezados, List<List<String>> filas, File archivoDestino) throws Exception {
-        Document document = new Document();
         try (FileOutputStream fos = new FileOutputStream(archivoDestino)) {
+            Document document = new Document();
             PdfWriter.getInstance(document, fos);
-            document.open();
+            try {
+                document.open();
 
-            Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
-            Font fontH = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
-            Font fontB = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
+                Font fontTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.BLACK);
+                Font fontH = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+                Font fontB = FontFactory.getFont(FontFactory.HELVETICA, 8, Color.BLACK);
 
-            Paragraph pTit = new Paragraph("FOODCORE ERP — " + tituloReporte.toUpperCase(Locale.ROOT), fontTitulo);
-            pTit.setAlignment(Element.ALIGN_CENTER);
-            pTit.setSpacingAfter(10);
-            document.add(pTit);
+                Paragraph pTit = new Paragraph("FOODCORE ERP — " + tituloReporte.toUpperCase(Locale.ROOT), fontTitulo);
+                pTit.setAlignment(Element.ALIGN_CENTER);
+                pTit.setSpacingAfter(10);
+                document.add(pTit);
 
-            PdfPTable table = new PdfPTable(encabezados.size());
-            table.setWidthPercentage(100);
+                PdfPTable table = new PdfPTable(encabezados.size());
+                table.setWidthPercentage(100);
 
-            for (String h : encabezados) {
-                PdfPCell c = new PdfPCell(new Phrase(h, fontH));
-                c.setBackgroundColor(new Color(25, 42, 86));
-                c.setPadding(4);
-                c.setHorizontalAlignment(Element.ALIGN_CENTER);
-                table.addCell(c);
-            }
-
-            for (List<String> fila : filas) {
-                for (String val : fila) {
-                    table.addCell(new Phrase(val != null ? val : "", fontB));
+                for (String h : encabezados) {
+                    PdfPCell c = new PdfPCell(new Phrase(h, fontH));
+                    c.setBackgroundColor(new Color(25, 42, 86));
+                    c.setPadding(4);
+                    c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                    table.addCell(c);
                 }
-            }
 
-            document.add(table);
-        } finally {
-            if (document.isOpen()) {
-                document.close();
+                for (List<String> fila : filas) {
+                    for (String val : fila) {
+                        table.addCell(new Phrase(val != null ? val : "", fontB));
+                    }
+                }
+
+                document.add(table);
+            } finally {
+                if (document.isOpen()) {
+                    document.close();
+                }
             }
         }
     }
