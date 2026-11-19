@@ -46,6 +46,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -85,10 +86,12 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -116,7 +119,11 @@ public class VentaController {
 
     private static final Logger LOGGER = Logger.getLogger(VentaController.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     public static final int TOTAL_MESAS_SALON = 12;
+    public static final String MODALIDAD_SPLIT_2 = "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)";
+    public static final String MODALIDAD_SPLIT_4 = "Dividir en 4 partes iguales (25% c/u)";
+    public static final String MODALIDAD_SPLIT_ITEMS = "Dividir por ítems (Subcuenta A y Subcuenta B)";
 
     @FXML private TabPane tabPanePosCatalogo;
     @FXML private Tab tabCatalogo;
@@ -176,7 +183,7 @@ public class VentaController {
 
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
-    private final PedidoService pedidoService = new PedidoService();
+    private PedidoService pedidoService = new PedidoService();
     private final VentaService ventaService = new VentaService();
     private final PromocionService promocionService = new PromocionService();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
@@ -191,6 +198,7 @@ public class VentaController {
     private int puntosARedimirPos = 0;
     private Cliente clienteSeleccionadoPos = null;
     private String ultimoMensajeAlertaCumpleanos = null;
+    private volatile String ultimaAlertaTitulo = null;
     private Boolean respuestaAutomaticaCumpleanosTest = null;
     private boolean modoCobroDirectoTest = false;
     private boolean confirmacionEscapeAutomatica = false;
@@ -200,6 +208,8 @@ public class VentaController {
     private String canalSeleccionadoActual = "MESA";
     private Integer pedidoActivoId = null;
     private Timeline autoRefreshTimeline;
+    private Scene escenaAtajosRegistrada;
+    private EventHandler<KeyEvent> keyEventFilter;
 
     @FXML
     public void initialize() {
@@ -279,6 +289,19 @@ public class VentaController {
         if (autoRefreshTimeline != null) {
             autoRefreshTimeline.stop();
         }
+        desregistrarAtajosTeclado();
+    }
+
+    private void desregistrarAtajosTeclado() {
+        if (escenaAtajosRegistrada != null && keyEventFilter != null) {
+            escenaAtajosRegistrada.removeEventFilter(KeyEvent.KEY_PRESSED, keyEventFilter);
+        }
+        escenaAtajosRegistrada = null;
+        keyEventFilter = null;
+    }
+
+    public boolean isAtajoTecladoRegistrado() {
+        return escenaAtajosRegistrada != null && keyEventFilter != null;
     }
 
     @FXML
@@ -708,8 +731,10 @@ public class VentaController {
     }
 
     public void registrarAtajosTeclado() {
+        desregistrarAtajosTeclado();
         if (tblDetalle != null && tblDetalle.getScene() != null) {
-            tblDetalle.getScene().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            Scene escena = tblDetalle.getScene();
+            EventHandler<KeyEvent> filter = event -> {
                 if (event.getCode() == KeyCode.F5) {
                     handleCobroEfectivo(null);
                     event.consume();
@@ -723,7 +748,10 @@ public class VentaController {
                     handleLimpiarConEscape();
                     event.consume();
                 }
-            });
+            };
+            escena.addEventFilter(KeyEvent.KEY_PRESSED, filter);
+            this.escenaAtajosRegistrada = escena;
+            this.keyEventFilter = filter;
         }
     }
 
@@ -925,9 +953,9 @@ public class VentaController {
             return null;
         }
         try {
-            File f = new File(imagenUrl);
-            if (f.exists() && f.isFile()) {
-                Image img = new Image(f.toURI().toString(), 42, 32, true, true);
+            Path rutaSegura = MenuController.resolverImagenPlatilloSegura(imagenUrl);
+            if (rutaSegura != null && Files.isRegularFile(rutaSegura)) {
+                Image img = new Image(rutaSegura.toUri().toString(), 42, 32, true, true);
                 ImageView iv = new ImageView(img);
                 iv.setFitWidth(42);
                 iv.setFitHeight(32);
@@ -1135,24 +1163,137 @@ public class VentaController {
         pedido.setEstado("REGISTRADO");
         pedido.setTotal(obtenerTotalNetoActual());
 
-        if (idObjetivo <= 0) {
-            try {
-                Pedido registrado = pedidoService.registrarPedidoYEnviarComanda(pedido, detallesCocina);
-                this.pedidoActivoId = registrado.getIdPedido();
-                if (registrado.getDetalles() != null && !registrado.getDetalles().isEmpty()) {
-                    aplicarDetallesPedidoEnPOS(registrado.getDetalles());
+        if (btnEnviarCocina != null) {
+            btnEnviarCocina.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                Pedido pedidoFinal = pedido;
+                if (idObjetivo <= 0) {
+                    pedidoFinal = pedidoService.registrarPedidoYEnviarComanda(pedido, detallesCocina);
                 }
-                new ImpresoraTermicaService().imprimirComandaPorCategorias(registrado, detallesCocina);
-                mostrarAlerta("Comanda Enviada",
-                        "Orden #" + registrado.getIdPedido() + " enviada a Línea de Cocina (KDS) correctamente.",
-                        Alert.AlertType.INFORMATION);
-                return;
-            } catch (NegocioException | SQLException | RuntimeException ex) {
-                LOGGER.log(Level.FINE, "Envío KDS POS usando respaldo local/offline", ex);
+                boolean impresionOk = true;
+                try {
+                    new ImpresoraTermicaService().imprimirComandaPorCategorias(pedidoFinal, detallesCocina);
+                } catch (Exception exImp) {
+                    impresionOk = false;
+                    LOGGER.log(Level.WARNING, "Comanda persistida pero falló la impresión térmica", exImp);
+                }
+                return new ResultadoEnvioComanda(pedidoFinal, impresionOk);
+            },
+            resultado -> {
+                if (btnEnviarCocina != null) {
+                    btnEnviarCocina.setDisable(false);
+                }
+                Pedido registrado = resultado.pedido();
+                if (registrado != null && registrado.getIdPedido() > 0) {
+                    this.pedidoActivoId = registrado.getIdPedido();
+                    if (registrado.getDetalles() != null && !registrado.getDetalles().isEmpty()) {
+                        aplicarDetallesPedidoEnPOS(registrado.getDetalles());
+                    }
+                    refrescarMesasYCanalesAsync();
+                }
+                if (resultado.impresionOk()) {
+                    String sufijo = registrado != null && registrado.getIdPedido() > 0
+                            ? "Orden #" + registrado.getIdPedido() : "Orden";
+                    mostrarAlerta("Comanda Enviada",
+                            sufijo + " enviada a Línea de Cocina (KDS) correctamente.",
+                            Alert.AlertType.INFORMATION);
+                } else {
+                    mostrarAlerta("Comanda en KDS (Sin Impresión)",
+                            "La orden se envió a KDS pero falló la impresora térmica.",
+                            Alert.AlertType.WARNING);
+                }
+            },
+            ex -> {
+                if (btnEnviarCocina != null) {
+                    btnEnviarCocina.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error registrando/enviando comanda a cocina", ex);
+                mostrarAlerta("Error al Enviar Comanda",
+                        "No se pudo registrar ni enviar la comanda a cocina: "
+                                + (ex.getMessage() != null ? ex.getMessage() : "Error de conexión"),
+                        Alert.AlertType.ERROR);
+            }
+        );
+    }
+
+    private record ResultadoEnvioComanda(Pedido pedido, boolean impresionOk) {
+    }
+
+    /**
+     * Construye los pagos divididos respetando la modalidad seleccionada por el usuario y sumando exactamente
+     * {@code totalNeto} al centavo.
+     */
+    public static List<VentaService.PagoSplit> construirPagosPorModalidad(String modalidad,
+                                                                          BigDecimal totalNeto,
+                                                                          List<DetalleVenta> items) {
+        if (totalNeto == null || totalNeto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El total neto a dividir debe ser mayor a cero.");
+        }
+        BigDecimal total = totalNeto.setScale(2, RoundingMode.HALF_UP);
+        if (MODALIDAD_SPLIT_4.equals(modalidad)) {
+            BigDecimal cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
+            BigDecimal acum = cuarta.multiply(new BigDecimal("3"));
+            BigDecimal ultimo = total.subtract(acum);
+            if (ultimo.compareTo(BigDecimal.ZERO) <= 0) {
+                cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.DOWN);
+                ultimo = total.subtract(cuarta.multiply(new BigDecimal("3")));
+            }
+            List<VentaService.PagoSplit> pagos4 = new ArrayList<>();
+            String[] metodos = {"EFECTIVO", "TARJETA", "YAPE_PLIN", "EFECTIVO"};
+            BigDecimal[] montos = {cuarta, cuarta, cuarta, ultimo};
+            for (int i = 0; i < montos.length; i++) {
+                if (montos[i].compareTo(BigDecimal.ZERO) > 0) {
+                    pagos4.add(new VentaService.PagoSplit(metodos[i], montos[i]));
+                }
+            }
+            return pagos4;
+        }
+        if (MODALIDAD_SPLIT_ITEMS.equals(modalidad) && items != null && !items.isEmpty()) {
+            BigDecimal brutoA = BigDecimal.ZERO;
+            BigDecimal brutoB = BigDecimal.ZERO;
+            if (items.size() >= 2) {
+                for (int i = 0; i < items.size(); i++) {
+                    BigDecimal sub = items.get(i) != null && items.get(i).getSubtotal() != null
+                            ? items.get(i).getSubtotal() : BigDecimal.ZERO;
+                    if (i % 2 == 0) {
+                        brutoA = brutoA.add(sub);
+                    } else {
+                        brutoB = brutoB.add(sub);
+                    }
+                }
+            } else {
+                DetalleVenta unico = items.get(0);
+                int qty = unico != null ? unico.getCantidad() : 1;
+                if (qty >= 2 && unico.getPrecioUnitario() != null) {
+                    int qtyA = (qty + 1) / 2;
+                    int qtyB = qty - qtyA;
+                    brutoA = unico.getPrecioUnitario().multiply(BigDecimal.valueOf(qtyA));
+                    brutoB = unico.getPrecioUnitario().multiply(BigDecimal.valueOf(qtyB));
+                }
+            }
+            BigDecimal sumaBruta = brutoA.add(brutoB);
+            if (sumaBruta.compareTo(BigDecimal.ZERO) > 0
+                    && brutoA.compareTo(BigDecimal.ZERO) > 0
+                    && brutoB.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal montoA = total.multiply(brutoA).divide(sumaBruta, 2, RoundingMode.HALF_UP);
+                BigDecimal montoB = total.subtract(montoA);
+                if (montoA.compareTo(BigDecimal.ZERO) > 0 && montoB.compareTo(BigDecimal.ZERO) > 0) {
+                    return List.of(
+                            new VentaService.PagoSplit("EFECTIVO", montoA),
+                            new VentaService.PagoSplit("TARJETA", montoB)
+                    );
+                }
             }
         }
-        new ImpresoraTermicaService().imprimirComandaPorCategorias(pedido, detallesCocina);
-        mostrarAlerta("Comanda Enviada", "Orden enviada a Línea de Cocina (KDS) correctamente.", Alert.AlertType.INFORMATION);
+        BigDecimal mitad = total.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP);
+        BigDecimal resto = total.subtract(mitad);
+        return List.of(
+                new VentaService.PagoSplit("EFECTIVO", mitad),
+                new VentaService.PagoSplit("TARJETA", resto)
+        );
     }
 
     /**
@@ -1165,27 +1306,63 @@ public class VentaController {
             return;
         }
         Optional<String> res = DialogService.crearChoiceDialog(
-                "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
-                List.of(
-                        "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)",
-                        "Dividir en 4 partes iguales (25% c/u)",
-                        "Dividir por ítems (Subcuenta A y Subcuenta B)"),
+                MODALIDAD_SPLIT_2,
+                List.of(MODALIDAD_SPLIT_2, MODALIDAD_SPLIT_4, MODALIDAD_SPLIT_ITEMS),
                 "División de Cuenta (Split)",
                 "Seleccione la modalidad de división de cuenta",
                 "Modalidad:").showAndWait();
         if (res.isPresent()) {
-            try {
-                BigDecimal totalNeto = obtenerTotalNetoActual();
-                BigDecimal mitad = totalNeto.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP);
-                BigDecimal resto = totalNeto.subtract(mitad);
-                ejecutarCobroSplitEnPagos(List.of(
-                    new VentaService.PagoSplit("EFECTIVO", mitad),
-                    new VentaService.PagoSplit("TARJETA", resto)
-                ));
-                mostrarAlerta("Cuenta Dividida", "Cobro dividido registrado exitosamente en Caja.", Alert.AlertType.INFORMATION);
-            } catch (Exception e) {
-                mostrarAlerta("Error en Split", e.getMessage(), Alert.AlertType.ERROR);
+            BigDecimal totalNeto = obtenerTotalNetoActual();
+            BigDecimal basePreCanje = obtenerBasePreCanjeActual();
+            List<DetalleVenta> itemsSnapshot = new ArrayList<>(itemsVenta);
+            List<VentaService.PagoSplit> pagos = construirPagosPorModalidad(res.get(), totalNeto, itemsSnapshot);
+            int idUsr = AuthService.getUsuarioSesionActual() != null
+                    ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+            Integer idCliVenta = clienteSeleccionadoPos != null && clienteSeleccionadoPos.getIdCliente() > 0
+                    ? clienteSeleccionadoPos.getIdCliente() : null;
+            Integer idPedidoSnap = pedidoActivoId;
+            BigDecimal descSnap = descuentoActivo;
+            BigDecimal descPtsSnap = descuentoPuntosActivo;
+            int ptsSnap = puntosARedimirPos;
+
+            if (btnDividirCuenta != null) {
+                btnDividirCuenta.setDisable(true);
             }
+            UiAsyncExecutor.ejecutarAsync(
+                () -> {
+                    DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
+                    Venta v = new Venta(0, idPedidoSnap, 1, idUsr, idCliVenta,
+                            desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto,
+                            "MIXTO", totalNeto, BigDecimal.ZERO);
+                    v.setDescuento(descSnap);
+                    v.setDescuentoPuntos(descPtsSnap);
+                    v.setPuntosACanjear(ptsSnap);
+                    v.setIdempotencyKey(UUID.randomUUID().toString());
+                    ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", "000001", totalNeto);
+                    return ventaService.registrarVentaDividida(v, itemsSnapshot, comp, pagos);
+                },
+                procesada -> {
+                    if (btnDividirCuenta != null) {
+                        btnDividirCuenta.setDisable(false);
+                    }
+                    itemsVenta.clear();
+                    descuentoActivo = BigDecimal.ZERO;
+                    descuentoManualFijado = false;
+                    limpiarEstadoClienteFidelizacionPos();
+                    pedidoActivoId = null;
+                    recalcularTotales();
+                    refrescarMesasYCanalesAsync();
+                    mostrarAlerta("Cuenta Dividida",
+                            "Cobro dividido en " + pagos.size() + " pagos registrado exitosamente en Caja.",
+                            Alert.AlertType.INFORMATION);
+                },
+                ex -> {
+                    if (btnDividirCuenta != null) {
+                        btnDividirCuenta.setDisable(false);
+                    }
+                    mostrarAlerta("Error en Split", ex.getMessage(), Alert.AlertType.ERROR);
+                }
+            );
         }
     }
 
@@ -1346,20 +1523,39 @@ public class VentaController {
                     mostrarAlerta("Dato requerido", "Debe indicar el ID de la venta a anular.", Alert.AlertType.WARNING);
                     return;
                 }
+                final int idVenta;
                 try {
-                    int idVenta = Integer.parseInt(idRaw);
-                    Usuario supervisor = ventaService.anularVentaConSupervisor(
-                            idVenta, yaPreparado, sesion, pinSup,
-                            motivo.isEmpty() ? "Anulación autorizada en caja (Modo Supervisor)" : motivo);
-                    String nomSup = supervisor.getNombreEmpleado() != null && !supervisor.getNombreEmpleado().isBlank()
-                            ? supervisor.getNombreEmpleado() : supervisor.getUsername();
-                    mostrarAlerta("Venta Anulada (Modo Supervisor)",
-                            "La venta #" + idVenta + " fue anulada correctamente.\n"
-                                    + "Autorizado por: " + nomSup + " (" + supervisor.getNombreRol() + ").",
-                            Alert.AlertType.INFORMATION);
-                } catch (Exception e) {
-                    mostrarAlerta("Autorización Denegada", e.getMessage(), Alert.AlertType.ERROR);
+                    idVenta = Integer.parseInt(idRaw);
+                } catch (NumberFormatException nfe) {
+                    mostrarAlerta("Dato inválido", "El ID de la venta debe ser numérico.", Alert.AlertType.WARNING);
+                    return;
                 }
+                final String motivoFinal = motivo.isEmpty()
+                        ? "Anulación autorizada en caja (Modo Supervisor)" : motivo;
+                if (btnAnularVenta != null) {
+                    btnAnularVenta.setDisable(true);
+                }
+                UiAsyncExecutor.ejecutarAsync(
+                    () -> ventaService.anularVentaConSupervisor(
+                            idVenta, yaPreparado, sesion, pinSup, motivoFinal),
+                    supervisor -> {
+                        if (btnAnularVenta != null) {
+                            btnAnularVenta.setDisable(false);
+                        }
+                        String nomSup = supervisor.getNombreEmpleado() != null && !supervisor.getNombreEmpleado().isBlank()
+                                ? supervisor.getNombreEmpleado() : supervisor.getUsername();
+                        mostrarAlerta("Venta Anulada (Modo Supervisor)",
+                                "La venta #" + idVenta + " fue anulada correctamente.\n"
+                                        + "Autorizado por: " + nomSup + " (" + supervisor.getNombreRol() + ").",
+                                Alert.AlertType.INFORMATION);
+                    },
+                    e -> {
+                        if (btnAnularVenta != null) {
+                            btnAnularVenta.setDisable(false);
+                        }
+                        mostrarAlerta("Autorización Denegada", e.getMessage(), Alert.AlertType.ERROR);
+                    }
+                );
             }
             return;
         }
@@ -1369,20 +1565,43 @@ public class VentaController {
                 "Requiere permiso VENTA_ANULAR",
                 "Ingrese el ID de la venta a anular:").showAndWait();
         if (opt.isPresent() && !opt.get().isBlank()) {
+            final int idVenta;
             try {
-                int idVenta = Integer.parseInt(opt.get().trim());
-                Alert confirmAnular = DialogService.crearConfirmacionDestructiva(
-                        "Confirmar Anulación de Venta #" + idVenta,
-                        "Esta operación anulará la venta #" + idVenta + " y revertirá el inventario. ¿Desea continuar?");
-                Optional<ButtonType> confirmRes = confirmAnular.showAndWait();
-                if (confirmRes.isEmpty() || confirmRes.get() != DialogService.BTN_SI_ANULAR) {
-                    return;
-                }
-                ventaService.anularVenta(idVenta, false, sesion, "Anulación solicitada desde POS");
-                mostrarAlerta("Venta Anulada", "La venta #" + idVenta + " fue anulada y su stock revertido.", Alert.AlertType.INFORMATION);
-            } catch (Exception e) {
-                mostrarAlerta("Error al Anular", e.getMessage(), Alert.AlertType.ERROR);
+                idVenta = Integer.parseInt(opt.get().trim());
+            } catch (NumberFormatException nfe) {
+                mostrarAlerta("Dato inválido", "El ID de la venta debe ser numérico.", Alert.AlertType.WARNING);
+                return;
             }
+            Alert confirmAnular = DialogService.crearConfirmacionDestructiva(
+                    "Confirmar Anulación de Venta #" + idVenta,
+                    "Esta operación anulará la venta #" + idVenta + " y revertirá el inventario. ¿Desea continuar?");
+            Optional<ButtonType> confirmRes = confirmAnular.showAndWait();
+            if (confirmRes.isEmpty() || confirmRes.get() != DialogService.BTN_SI_ANULAR) {
+                return;
+            }
+            if (btnAnularVenta != null) {
+                btnAnularVenta.setDisable(true);
+            }
+            UiAsyncExecutor.ejecutarAsync(
+                () -> {
+                    ventaService.anularVenta(idVenta, false, sesion, "Anulación solicitada desde POS");
+                    return Boolean.TRUE;
+                },
+                ok -> {
+                    if (btnAnularVenta != null) {
+                        btnAnularVenta.setDisable(false);
+                    }
+                    mostrarAlerta("Venta Anulada",
+                            "La venta #" + idVenta + " fue anulada y su stock revertido.",
+                            Alert.AlertType.INFORMATION);
+                },
+                e -> {
+                    if (btnAnularVenta != null) {
+                        btnAnularVenta.setDisable(false);
+                    }
+                    mostrarAlerta("Error al Anular", e.getMessage(), Alert.AlertType.ERROR);
+                }
+            );
         }
     }
 
@@ -1726,7 +1945,18 @@ public class VentaController {
         setBotonesCobroDeshabilitados(enCurso);
     }
 
+    public void setPedidoService(PedidoService pedidoService) {
+        if (pedidoService != null) {
+            this.pedidoService = pedidoService;
+        }
+    }
+
+    public String getUltimaAlertaTitulo() {
+        return ultimaAlertaTitulo;
+    }
+
     private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
+        this.ultimaAlertaTitulo = titulo;
         ToastService.mostrarPorAlertType(tipo, titulo + ": " + mensaje);
     }
 
@@ -1737,24 +1967,41 @@ public class VentaController {
             return;
         }
 
-        try {
-            Pedido p = new Pedido();
-            p.setIdPedido(pedidoActivoId != null ? pedidoActivoId : java.util.concurrent.ThreadLocalRandom.current().nextInt(9000) + 1000);
-            p.setNumeroMesa(mesaSeleccionadaActual);
-            p.setTotal(obtenerTotalNetoActual());
+        Pedido p = new Pedido();
+        p.setIdPedido(pedidoActivoId != null ? pedidoActivoId : SECURE_RANDOM.nextInt(9000) + 1000);
+        p.setNumeroMesa(mesaSeleccionadaActual);
+        p.setTotal(obtenerTotalNetoActual());
 
-            List<DetallePedido> detalles = new ArrayList<>();
-            for (DetalleVenta dv : itemsVenta) {
-                detalles.add(convertirDetalleVentaAPedido(dv, p.getIdPedido()));
-            }
-
-            ImpresoraTermicaService imp = new ImpresoraTermicaService();
-            imp.imprimirPreCuenta(p, detalles, null);
-            mostrarAlerta("Pre-Cuenta Emitida", "Pre-cuenta emitida exitosamente (Ticket no fiscal).", Alert.AlertType.INFORMATION);
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al imprimir pre-cuenta", ex);
-            mostrarAlerta("Error", "Error al emitir pre-cuenta: " + ex.getMessage(), Alert.AlertType.ERROR);
+        List<DetallePedido> detalles = new ArrayList<>();
+        for (DetalleVenta dv : itemsVenta) {
+            detalles.add(convertirDetalleVentaAPedido(dv, p.getIdPedido()));
         }
+
+        if (btnPreCuenta != null) {
+            btnPreCuenta.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                ImpresoraTermicaService imp = new ImpresoraTermicaService();
+                imp.imprimirPreCuenta(p, detalles, null);
+                return Boolean.TRUE;
+            },
+            ok -> {
+                if (btnPreCuenta != null) {
+                    btnPreCuenta.setDisable(false);
+                }
+                mostrarAlerta("Pre-Cuenta Emitida",
+                        "Pre-cuenta emitida exitosamente (Ticket no fiscal).",
+                        Alert.AlertType.INFORMATION);
+            },
+            ex -> {
+                if (btnPreCuenta != null) {
+                    btnPreCuenta.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error al imprimir pre-cuenta", ex);
+                mostrarAlerta("Error", "Error al emitir pre-cuenta: " + ex.getMessage(), Alert.AlertType.ERROR);
+            }
+        );
     }
 
     private DetallePedido convertirDetalleVentaAPedido(DetalleVenta dv, int idPedido) {

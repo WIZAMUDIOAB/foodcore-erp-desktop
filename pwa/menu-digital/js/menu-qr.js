@@ -1,6 +1,59 @@
 (function () {
   'use strict';
 
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function createSvgElement(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs || {}).forEach((k) => el.setAttribute(k, String(attrs[k])));
+    return el;
+  }
+
+  /**
+   * Valida esquema permitido para imagen_url:
+   * solo rutas relativas (/uploads/... o /...) o URLs http:// / https://.
+   */
+  function isSafeImageUrl(url) {
+    if (typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return false;
+    if (/^\/(?!\/)/.test(trimmed)) {
+      return !trimmed.includes('..');
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return false;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function createThemeIconSvg(esOscuro) {
+    const svg = createSvgElement('svg', {
+      class: 'ui-icon',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true'
+    });
+    if (esOscuro) {
+      svg.appendChild(createSvgElement('circle', { cx: '12', cy: '12', r: '4' }));
+      ['M12 2v2', 'M12 20v2', 'm4.93 4.93 1.41 1.41', 'm17.66 17.66 1.41 1.41',
+        'M2 12h2', 'M20 12h2', 'm6.34 17.66-1.41 1.41', 'm19.07 4.93-1.41 1.41'].forEach((d) => {
+        svg.appendChild(createSvgElement('path', { d }));
+      });
+    } else {
+      svg.appendChild(createSvgElement('path', { d: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' }));
+    }
+    return svg;
+  }
+
   const FALLBACK_CATALOG = [
     {
       id: 1,
@@ -231,7 +284,7 @@
       }
     });
 
-    tabsContainer.innerHTML = '';
+    tabsContainer.replaceChildren();
     categories.forEach((cat) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -244,8 +297,6 @@
   }
 
   const THEME_STORAGE_KEY = 'fc_theme';
-  const ICON_SUN_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
-  const ICON_MOON_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
 
   function resolverTemaInicial() {
     try {
@@ -269,7 +320,7 @@
     }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
-      btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;
+      btn.replaceChildren(createThemeIconSvg(esOscuro));
       btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
     }
   }
@@ -289,9 +340,28 @@
     const holder = document.createElement('div');
     holder.className = 'card-img-placeholder parallax-img';
     holder.setAttribute('aria-hidden', 'true');
-    holder.innerHTML = isDrink
-      ? '<svg class="dish-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>'
-      : '<svg class="dish-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+
+    const svg = createSvgElement('svg', {
+      class: 'dish-placeholder-icon',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.75',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    });
+    if (isDrink) {
+      svg.appendChild(createSvgElement('path', { d: 'M17 8h1a4 4 0 1 1 0 8h-1' }));
+      svg.appendChild(createSvgElement('path', { d: 'M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z' }));
+      svg.appendChild(createSvgElement('line', { x1: '6', y1: '2', x2: '6', y2: '4' }));
+      svg.appendChild(createSvgElement('line', { x1: '10', y1: '2', x2: '10', y2: '4' }));
+      svg.appendChild(createSvgElement('line', { x1: '14', y1: '2', x2: '14', y2: '4' }));
+    } else {
+      svg.appendChild(createSvgElement('path', { d: 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2' }));
+      svg.appendChild(createSvgElement('path', { d: 'M7 2v20' }));
+      svg.appendChild(createSvgElement('path', { d: 'M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7' }));
+    }
+    holder.appendChild(svg);
     return holder;
   }
 
@@ -309,15 +379,14 @@
 
     const imgWrap = document.createElement('div');
     imgWrap.className = 'card-img-wrap';
-    if (producto.imagen_url && producto.imagen_url.trim()) {
+    if (isSafeImageUrl(producto.imagen_url)) {
       const img = document.createElement('img');
       img.className = 'parallax-img dish-photo';
       img.alt = producto.nombre || 'Especialidad';
-      img.src = producto.imagen_url.trim();
       img.addEventListener('error', () => {
-        imgWrap.innerHTML = '';
-        imgWrap.appendChild(createDishPlaceholder(category));
-      });
+        imgWrap.replaceChildren(createDishPlaceholder(category));
+      }, { once: true });
+      img.src = producto.imagen_url.trim();
       imgWrap.appendChild(img);
     } else {
       imgWrap.appendChild(createDishPlaceholder(category));
@@ -412,7 +481,7 @@
       return normalizeCategory(p.categoria) === categoryFilter;
     });
 
-    grid.innerHTML = '';
+    grid.replaceChildren();
     filtered.forEach((producto, idx) => {
       const card = createDishCard(producto, idx);
       grid.appendChild(card);
@@ -480,7 +549,8 @@
     updateParallax,
     animatePrice,
     setLanguage,
-    toggleTheme
+    toggleTheme,
+    isSafeImageUrl
   };
 
   document.addEventListener('DOMContentLoaded', async () => {

@@ -4,9 +4,15 @@ import com.foodcore.App;
 import com.foodcore.dao.ConfiguracionImpresoraDAO;
 import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
 import com.foodcore.model.ConfiguracionImpresora;
+import com.foodcore.model.Usuario;
+import com.foodcore.model.enums.Permiso;
+import com.foodcore.security.AutorizacionService;
+import com.foodcore.security.SesionManager;
+import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AlertaService;
 import com.foodcore.service.AlertaService.AlertaEmitida;
 import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
+import com.foodcore.service.AuthService;
 import com.foodcore.service.DemoDataService;
 import com.foodcore.service.DemoDataService.ResumenDemo;
 import com.foodcore.util.AnimationUtils;
@@ -39,6 +45,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -66,6 +73,14 @@ public class ConfiguracionController {
 
     private static final Logger LOGGER = Logger.getLogger(ConfiguracionController.class.getName());
     private static final int SCRIPT_TIMEOUT_SECONDS = 120;
+    private static final String SQL_CARGAR_CONFIG = "SELECT nombre_restaurante, direccion, telefono, ruc, nombre_impresora "
+            + "FROM configuracion_restaurante WHERE id_config = 1";
+    private static final String SQL_GUARDAR_CONFIG = "INSERT INTO configuracion_restaurante "
+            + "(id_config, nombre_restaurante, direccion, telefono, ruc, nombre_impresora) "
+            + "VALUES (1, ?, ?, ?, ?, ?) "
+            + "ON DUPLICATE KEY UPDATE nombre_restaurante = VALUES(nombre_restaurante), "
+            + "direccion = VALUES(direccion), telefono = VALUES(telefono), "
+            + "ruc = VALUES(ruc), nombre_impresora = VALUES(nombre_impresora)";
 
     public record CategoriaOpcion(int idCategoria, String nombre) {
         @Override
@@ -471,15 +486,48 @@ public class ConfiguracionController {
         }
     }
 
+    /**
+     * Evalúa en modo fail-closed si el operador autenticado posee {@link Permiso#CONFIG_RED}
+     * para ejecutar respaldos y restauraciones de base de datos.
+     */
+    public static boolean tienePermisoBackupRestauracion() {
+        SesionUsuario sesion = SesionManager.getSesionActiva();
+        Usuario actual = AuthService.getUsuarioSesionActual();
+        if (actual != null) {
+            if (sesion != null && sesion.getIdUsuario() == actual.getIdUsuario()
+                    && actual.getNombreRol() != null
+                    && actual.getNombreRol().equalsIgnoreCase(sesion.getCodigoRol())) {
+                return sesion.tienePermiso(Permiso.CONFIG_RED);
+            }
+            if (actual.getNombreRol() == null || actual.getNombreRol().isBlank()) {
+                return false;
+            }
+            return AutorizacionService.permisosPorDefectoParaRol(actual.getNombreRol())
+                    .contains(Permiso.CONFIG_RED);
+        }
+        return sesion != null && sesion.tienePermiso(Permiso.CONFIG_RED);
+    }
+
     @FXML
     public void handleEjecutarBackupAhora(ActionEvent event) {
+        if (!tienePermisoBackupRestauracion()) {
+            actualizarEstadoRestauracion("Acceso denegado (requiere CONFIG_RED)", "badge-pill-danger");
+            AnimationUtils.mostrarToast(rootConfigStack,
+                    "Acceso denegado: requiere permiso CONFIG_RED para generar backups.", true);
+            return;
+        }
         if (btnGenerarBackupAhora != null) {
             btnGenerarBackupAhora.setDisable(true);
         }
         actualizarEstadoRestauracion("Generando backup comprimido...", "badge-pill-warning");
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> ejecutorBackup.get(),
+            () -> {
+                if (!tienePermisoBackupRestauracion()) {
+                    throw new SecurityException("Acceso denegado: requiere permiso CONFIG_RED.");
+                }
+                return ejecutorBackup.get();
+            },
             archivoGenerado -> {
                 if (btnGenerarBackupAhora != null) {
                     btnGenerarBackupAhora.setDisable(false);
@@ -507,6 +555,12 @@ public class ConfiguracionController {
 
     @FXML
     public void handleRestaurarDesdeBackup(ActionEvent event) {
+        if (!tienePermisoBackupRestauracion()) {
+            actualizarEstadoRestauracion("Acceso denegado (requiere CONFIG_RED)", "badge-pill-danger");
+            AnimationUtils.mostrarToast(rootConfigStack,
+                    "Acceso denegado: requiere permiso CONFIG_RED para restaurar la base de datos.", true);
+            return;
+        }
         String rutaTexto = txtRutaBackupRestaurar != null ? txtRutaBackupRestaurar.getText().trim() : "";
         if (rutaTexto.isBlank()) {
             AnimationUtils.mostrarToast(rootConfigStack, "Seleccione o indique la ruta de un backup válido.", true);
@@ -516,6 +570,14 @@ public class ConfiguracionController {
         if (!Files.isRegularFile(archivoBackup)) {
             actualizarEstadoRestauracion("Archivo no encontrado", "badge-pill-danger");
             AnimationUtils.mostrarToast(rootConfigStack, "El archivo de backup especificado no existe.", true);
+            return;
+        }
+        Path fnBackup = archivoBackup.getFileName();
+        String nombreLower = fnBackup != null
+                ? fnBackup.toString().toLowerCase(Locale.ROOT) : "";
+        if (!nombreLower.endsWith(".sql.gz") && !nombreLower.endsWith(".sql")) {
+            actualizarEstadoRestauracion("Formato de backup no permitido", "badge-pill-danger");
+            AnimationUtils.mostrarToast(rootConfigStack, "Solo se permiten archivos .sql.gz o .sql.", true);
             return;
         }
         if (!confirmacionRestauracionSupplier.getAsBoolean()) {
@@ -529,7 +591,12 @@ public class ConfiguracionController {
         actualizarEstadoRestauracion("Restaurando base de datos...", "badge-pill-warning");
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> Boolean.TRUE.equals(ejecutorRestauracion.apply(archivoBackup)),
+            () -> {
+                if (!tienePermisoBackupRestauracion()) {
+                    throw new SecurityException("Acceso denegado: requiere permiso CONFIG_RED.");
+                }
+                return Boolean.TRUE.equals(ejecutorRestauracion.apply(archivoBackup));
+            },
             exito -> {
                 if (btnRestaurarBackup != null) {
                     btnRestaurarBackup.setDisable(false);
@@ -690,9 +757,20 @@ public class ConfiguracionController {
     }
 
     static boolean ejecutarScriptRestauracionSistema(Path backupFile) {
-        if (backupFile == null || !Files.isRegularFile(backupFile)) {
+        if (!tienePermisoBackupRestauracion() || backupFile == null || !Files.isRegularFile(backupFile)) {
             return false;
         }
+        Path fnBackup = backupFile.getFileName();
+        String fileName = fnBackup != null
+                ? fnBackup.toString().toLowerCase(Locale.ROOT) : "";
+        boolean esGzip = fileName.endsWith(".sql.gz");
+        boolean esSql = fileName.endsWith(".sql");
+        if (!esGzip && !esSql) {
+            return false;
+        }
+        Path stagingFile = esGzip
+                ? Path.of("backups", ".restore_staging.sql.gz")
+                : Path.of("backups", ".restore_staging.sql");
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         ProcessBuilder pb;
         if (osName.contains("win")) {
@@ -700,22 +778,36 @@ public class ConfiguracionController {
             if (!Files.isRegularFile(script)) {
                 return false;
             }
-            pb = new ProcessBuilder(
-                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                    "-File", script.toString(),
-                    "-BackupFile", backupFile.toAbsolutePath().normalize().toString(),
-                    "-SkipServiceRestart"
-            );
+            if (esGzip) {
+                pb = new ProcessBuilder(
+                        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                        "-File", "scripts\\restore-auto.ps1",
+                        "-BackupFile", "backups\\.restore_staging.sql.gz",
+                        "-SkipServiceRestart"
+                );
+            } else {
+                pb = new ProcessBuilder(
+                        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                        "-File", "scripts\\restore-auto.ps1",
+                        "-BackupFile", "backups\\.restore_staging.sql",
+                        "-SkipServiceRestart"
+                );
+            }
         } else {
             Path script = Path.of("scripts", "restore-auto.sh").toAbsolutePath().normalize();
             if (!Files.isRegularFile(script)) {
                 return false;
             }
-            pb = new ProcessBuilder("bash", script.toString(), backupFile.toAbsolutePath().normalize().toString());
+            pb = esGzip
+                    ? new ProcessBuilder("bash", "scripts/restore-auto.sh", "backups/.restore_staging.sql.gz")
+                    : new ProcessBuilder("bash", "scripts/restore-auto.sh", "backups/.restore_staging.sql");
         }
         pb.redirectErrorStream(true);
         Process proc = null;
         try {
+            Files.createDirectories(Path.of("backups"));
+            Path backupReal = backupFile.toRealPath();
+            Files.copy(backupReal, stagingFile, StandardCopyOption.REPLACE_EXISTING);
             proc = pb.start();
             try (var reader = proc.getInputStream()) {
                 reader.readAllBytes();
@@ -732,10 +824,18 @@ public class ConfiguracionController {
             if (proc != null && proc.isAlive()) {
                 proc.destroyForcibly();
             }
+            try {
+                Files.deleteIfExists(stagingFile);
+            } catch (IOException exDel) {
+                LOGGER.log(Level.FINE, "No se pudo eliminar archivo temporal de staging de restauración", exDel);
+            }
         }
     }
 
     static Path ejecutarScriptBackupSistema() {
+        if (!tienePermisoBackupRestauracion()) {
+            return null;
+        }
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         ProcessBuilder pb;
         if (osName.contains("win")) {
@@ -745,14 +845,14 @@ public class ConfiguracionController {
             }
             pb = new ProcessBuilder(
                     "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                    "-File", script.toString()
+                    "-File", "scripts\\backup-auto.ps1"
             );
         } else {
             Path script = Path.of("scripts", "backup-auto.sh").toAbsolutePath().normalize();
             if (!Files.isRegularFile(script)) {
                 return null;
             }
-            pb = new ProcessBuilder("bash", script.toString());
+            pb = new ProcessBuilder("bash", "scripts/backup-auto.sh");
         }
         pb.redirectErrorStream(true);
         Process proc = null;
@@ -763,14 +863,44 @@ public class ConfiguracionController {
             if (!finished || proc.exitValue() != 0) {
                 return null;
             }
+            Path backupsDir = Path.of("backups").toAbsolutePath().normalize();
+            if (!Files.isDirectory(backupsDir)) {
+                return null;
+            }
             String[] lines = output.split("\\R");
+            String nombreReportado = null;
             for (int i = lines.length - 1; i >= 0; i--) {
                 String candidate = lines[i].trim();
-                if (!candidate.isEmpty() && Files.isRegularFile(Path.of(candidate))) {
-                    return Path.of(candidate);
+                if (!candidate.isEmpty()) {
+                    int sep = Math.max(candidate.lastIndexOf('/'), candidate.lastIndexOf('\\'));
+                    nombreReportado = sep >= 0 ? candidate.substring(sep + 1) : candidate;
+                    break;
                 }
             }
-            return null;
+            try (Stream<Path> files = Files.list(backupsDir)) {
+                List<Path> backups = files
+                        .filter(Files::isRegularFile)
+                        .filter(p -> {
+                            Path fn = p.getFileName();
+                            if (fn == null) {
+                                return false;
+                            }
+                            String name = fn.toString();
+                            return name.endsWith(".sql.gz") || name.endsWith(".sql");
+                        })
+                        .toList();
+                if (nombreReportado != null) {
+                    for (Path p : backups) {
+                        Path fn = p.getFileName();
+                        if (fn != null && fn.toString().equals(nombreReportado)) {
+                            return p;
+                        }
+                    }
+                }
+                return backups.stream()
+                        .max(Comparator.comparingLong(p -> p.toFile().lastModified()))
+                        .orElse(null);
+            }
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -833,12 +963,10 @@ public class ConfiguracionController {
     }
 
     public void cargarConfiguracion() {
-        String sql = "SELECT nombre_restaurante, direccion, telefono, ruc, nombre_impresora "
-            + "FROM configuracion_restaurante WHERE id_config = 1";
         UiAsyncExecutor.ejecutarAsync(
             () -> {
                 try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql);
+                     PreparedStatement ps = conn.prepareStatement(SQL_CARGAR_CONFIG);
                      ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         return new String[] {
@@ -872,10 +1000,6 @@ public class ConfiguracionController {
         final String telefono = txtTelefono.getText();
         final String ruc = txtRuc.getText();
         final String impresora = txtImpresora.getText();
-        final String sql = "INSERT INTO configuracion_restaurante (id_config, nombre_restaurante, direccion, telefono, ruc, nombre_impresora) "
-            + "VALUES (1, ?, ?, ?, ?, ?) "
-            + "ON DUPLICATE KEY UPDATE nombre_restaurante = VALUES(nombre_restaurante), direccion = VALUES(direccion), "
-            + "telefono = VALUES(telefono), ruc = VALUES(ruc), nombre_impresora = VALUES(nombre_impresora)";
 
         if (btnGuardarConfig != null) {
             btnGuardarConfig.setDisable(true);
@@ -883,7 +1007,7 @@ public class ConfiguracionController {
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
                 try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql)) {
+                     PreparedStatement ps = conn.prepareStatement(SQL_GUARDAR_CONFIG)) {
                     ps.setString(1, nombre);
                     ps.setString(2, direccion);
                     ps.setString(3, telefono);

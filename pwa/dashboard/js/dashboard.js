@@ -1,12 +1,43 @@
 /**
- * FOODCORE ERP v4.2.0 — PWA DASHBOARD GERENCIAL (DUEÑO)
- * Conexión a APIs REST de métricas, gráficos Chart.js y menú lateral responsive.
+ * FOODCORE ERP v5.7.1 — PWA DASHBOARD GERENCIAL (DUEÑO)
+ * Conexión segura a APIs REST de métricas, DOM seguro con createElement/textContent, cierre de sesión real
+ * y gráficos Chart.js sin datos demo fabricados.
  */
 const FoodCoreDashboard = (() => {
   let chartInstance = null;
   let pollInterval = null;
   let ultimosPuntosGrafico = [];
+  let redirigiendoLogin = false;
   const THEME_STORAGE_KEY = 'fc_theme';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function crearSvgElemento(tag, attrs = {}) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
+    return el;
+  }
+
+  function crearIconoTemaSvg(esOscuro) {
+    const svg = crearSvgElemento('svg', {
+      width: '18',
+      height: '18',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    });
+    if (esOscuro) {
+      svg.appendChild(crearSvgElemento('circle', { cx: '12', cy: '12', r: '5' }));
+      svg.appendChild(crearSvgElemento('path', {
+        d: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42'
+      }));
+    } else {
+      svg.appendChild(crearSvgElemento('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' }));
+    }
+    return svg;
+  }
 
   function resolverTemaInicial() {
     try {
@@ -30,9 +61,7 @@ const FoodCoreDashboard = (() => {
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
       btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
-      btn.innerHTML = esOscuro
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      btn.replaceChildren(crearIconoTemaSvg(esOscuro));
     }
   }
 
@@ -67,6 +96,45 @@ const FoodCoreDashboard = (() => {
       headers.Authorization = `Bearer ${token.trim()}`;
     }
     return headers;
+  }
+
+  /**
+   * Cierre de sesión real de la PWA desde Dashboard: limpia localStorage, sessionStorage e IndexedDB.
+   */
+  async function cerrarSesionPwa(redirectUrl = '../index.html') {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+    try {
+      localStorage.removeItem('fc_pwa_token');
+      localStorage.removeItem('fc_pwa_user');
+      localStorage.clear();
+    } catch (_e) {}
+    try {
+      sessionStorage.clear();
+    } catch (_e) {}
+    try {
+      if (typeof indexedDB !== 'undefined') {
+        await new Promise((resolve) => {
+          const req = indexedDB.deleteDatabase('foodcore_pwa_db');
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => resolve(false);
+          req.onblocked = () => resolve(false);
+        });
+      }
+    } catch (_e) {}
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }
+
+  function manejarNoAutorizado() {
+    if (redirigiendoLogin) {
+      return;
+    }
+    redirigiendoLogin = true;
+    cerrarSesionPwa('../index.html');
   }
 
   function mostrarModalAuthDash(mensajeError = '') {
@@ -117,7 +185,7 @@ const FoodCoreDashboard = (() => {
         }
         ocultarModalAuthDash();
         cargarDashboardData();
-      } catch (e) {
+      } catch (_e) {
         mostrarModalAuthDash('No se pudo conectar con el servidor de autenticación.');
       }
     });
@@ -129,12 +197,18 @@ const FoodCoreDashboard = (() => {
     if (btnTheme) {
       btnTheme.addEventListener('click', toggleTheme);
     }
+    const btnLogout = document.getElementById('btnDashLogout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        cerrarSesionPwa('../index.html');
+      });
+    }
     registrarServiceWorker();
     configurarDrawer();
     configurarAuthModal();
     cargarDashboardData();
 
-    // Actualizar KPIs cada 10 segundos
     pollInterval = setInterval(cargarDashboardData, 10000);
   }
 
@@ -142,8 +216,7 @@ const FoodCoreDashboard = (() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('sw.js')
-        .then(() => console.log('[Dashboard SW] Registrado correctamente'))
-        .catch((err) => console.log('[Dashboard SW] Error al registrar:', err));
+        .catch(() => {});
     }
   }
 
@@ -170,6 +243,9 @@ const FoodCoreDashboard = (() => {
   }
 
   async function cargarDashboardData() {
+    if (redirigiendoLogin) {
+      return;
+    }
     await Promise.allSettled([
       cargarKpis(),
       cargarVentasPorHora(),
@@ -185,28 +261,31 @@ const FoodCoreDashboard = (() => {
         cache: 'no-store',
         headers: getAuthHeaders()
       });
-      if (resp.status === 401 || resp.status === 403) {
-        mostrarModalAuthDash(resp.status === 403 ? 'Requiere rol ADMIN para consultar métricas.' : '');
+      if (resp.status === 401) {
+        manejarNoAutorizado();
+        return;
+      }
+      if (resp.status === 403) {
+        mostrarModalAuthDash('Requiere rol ADMIN para consultar métricas.');
         return;
       }
       if (resp.ok) {
         ocultarModalAuthDash();
         const kpis = await resp.json();
-        actualizarKpisUI(kpis);
+        actualizarKpisUI(kpis || {});
         return;
       }
-    } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar KPIs de API, usando caché de respaldo', e);
+    } catch (_e) {
+      // Sin respuesta del servidor: mostrar estado vacío honesto sin KPIs falsos
     }
 
-    // Datos iniciales cuando no hay respuesta del servidor
     actualizarKpisUI({
-      ventas_dia: 2410.50,
-      ticket_promedio: 48.20,
-      transacciones: 50,
-      plato_top: 'Hamburguesa Royal Doble',
-      plato_top_unidades: 14,
-      mesas_ocupadas: 4,
+      ventas_dia: 0,
+      ticket_promedio: 0,
+      transacciones: 0,
+      plato_top: '',
+      plato_top_unidades: 0,
+      mesas_ocupadas: 0,
       mesas_totales: 12
     });
   }
@@ -219,25 +298,29 @@ const FoodCoreDashboard = (() => {
 
     if (lblVentas) {
       const v = typeof data.ventas_dia === 'number' ? data.ventas_dia : parseFloat(data.ventas_dia || 0);
-      lblVentas.textContent = `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      lblVentas.textContent = `S/ ${(Number.isFinite(v) ? v : 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (lblTicket) {
       const t = typeof data.ticket_promedio === 'number' ? data.ticket_promedio : parseFloat(data.ticket_promedio || 0);
-      lblTicket.textContent = `S/ ${t.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      lblTicket.textContent = `S/ ${(Number.isFinite(t) ? t : 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
     if (lblTx) {
-      lblTx.textContent = `${data.transacciones || 0} tx`;
+      lblTx.textContent = `${Number(data.transacciones || 0)} tx`;
     }
     if (lblPlato) {
-      const cant = data.plato_top_unidades ? ` (${data.plato_top_unidades} un.)` : '';
-      lblPlato.textContent = `${data.plato_top || 'Hamburguesa Royal'}${cant}`;
+      const nombreTop = typeof data.plato_top === 'string' ? data.plato_top.trim() : '';
+      if (nombreTop) {
+        const cant = data.plato_top_unidades ? ` (${data.plato_top_unidades} un.)` : '';
+        lblPlato.textContent = `${nombreTop}${cant}`;
+      } else {
+        lblPlato.textContent = 'Sin ventas hoy';
+      }
     }
 
-    // Mesas & Ocupación
-    const ocupadas = data.mesas_ocupadas || 2;
-    const totales = data.mesas_totales || 12;
-    const libres = totales - ocupadas;
-    const pct = Math.round((ocupadas / totales) * 100);
+    const ocupadas = Math.max(0, Number(data.mesas_ocupadas ?? 0));
+    const totales = Math.max(1, Number(data.mesas_totales ?? 12));
+    const libres = Math.max(0, totales - ocupadas);
+    const pct = Math.min(100, Math.round((ocupadas / totales) * 100));
 
     const lblOcupadas = document.getElementById('lblMesasOcupadas');
     const lblLibres = document.getElementById('lblMesasLibres');
@@ -256,26 +339,21 @@ const FoodCoreDashboard = (() => {
         cache: 'no-store',
         headers: getAuthHeaders()
       });
+      if (resp.status === 401) {
+        manejarNoAutorizado();
+        return;
+      }
+      if (resp.status === 403) {
+        return;
+      }
       if (resp.ok) {
         const data = await resp.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           puntos = data;
         }
       }
-    } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar ventas por hora, sin respuesta del API', e);
-    }
-
-    if (puntos.length === 0) {
-      puntos = [
-        { hora: '12:00', monto: 180.00 },
-        { hora: '13:00', monto: 345.50 },
-        { hora: '14:00', monto: 490.00 },
-        { hora: '15:00', monto: 210.00 },
-        { hora: '19:00', monto: 390.00 },
-        { hora: '20:00', monto: 620.00 },
-        { hora: '21:00', monto: 480.00 }
-      ];
+    } catch (_e) {
+      puntos = [];
     }
 
     renderizarGrafico(puntos);
@@ -287,10 +365,9 @@ const FoodCoreDashboard = (() => {
     if (!canvas) return;
 
     const tokens = leerTokensGrafico();
-    const labels = ultimosPuntosGrafico.map((p) => p.hora);
-    const dataValues = ultimosPuntosGrafico.map((p) => p.monto);
+    const labels = ultimosPuntosGrafico.map((p) => String(p.hora || ''));
+    const dataValues = ultimosPuntosGrafico.map((p) => Number(p.monto || 0));
 
-    // Si Chart.js está cargado (online), usar Chart.js
     if (typeof Chart !== 'undefined') {
       const ctx = canvas.getContext('2d');
       if (chartInstance) {
@@ -344,7 +421,6 @@ const FoodCoreDashboard = (() => {
       return;
     }
 
-    // Fallback nativo Canvas 2D Bézier si Chart.js está offline
     renderizarCanvasFallback(canvas, labels, dataValues, tokens);
   }
 
@@ -356,6 +432,13 @@ const FoodCoreDashboard = (() => {
     canvas.height = h;
 
     ctx.clearRect(0, 0, w, h);
+    if (!Array.isArray(dataValues) || dataValues.length === 0) {
+      ctx.fillStyle = tokens.muted || tokens.tick;
+      ctx.font = '12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Sin ventas registradas por hora', w / 2, h / 2);
+      return;
+    }
 
     const padLeft = 45;
     const padRight = 20;
@@ -366,7 +449,6 @@ const FoodCoreDashboard = (() => {
 
     const maxVal = Math.max(...dataValues, 100);
 
-    // Líneas de guía horizontales
     ctx.strokeStyle = tokens.grid;
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
@@ -383,13 +465,11 @@ const FoodCoreDashboard = (() => {
       ctx.fillText(`S/${labelVal}`, padLeft - 6, y + 4);
     }
 
-    // Curva suavizada
     const points = dataValues.map((val, idx) => ({
       x: padLeft + (plotW / Math.max(1, dataValues.length - 1)) * idx,
       y: padTop + plotH - (val / maxVal) * plotH
     }));
 
-    // Relleno gradiente 20% a transparente
     const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
     grad.addColorStop(0, tokens.fillStart);
     grad.addColorStop(1, tokens.fillEnd);
@@ -408,7 +488,6 @@ const FoodCoreDashboard = (() => {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Línea principal 3px en --brand-primary
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 0; i < points.length - 1; i++) {
@@ -421,7 +500,6 @@ const FoodCoreDashboard = (() => {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Puntos y etiquetas X
     points.forEach((pt, idx) => {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
@@ -435,6 +513,13 @@ const FoodCoreDashboard = (() => {
     });
   }
 
+  function formatearFechaHoraTx(fechaHoraRaw) {
+    if (!fechaHoraRaw) return '';
+    const raw = String(fechaHoraRaw).trim();
+    const matchHora = raw.match(/(\d{2}:\d{2})/);
+    return matchHora ? matchHora[1] : raw;
+  }
+
   async function cargarTopPlatos() {
     const listEl = document.getElementById('topPlatosList');
     if (!listEl) return;
@@ -446,34 +531,57 @@ const FoodCoreDashboard = (() => {
         cache: 'no-store',
         headers: getAuthHeaders()
       });
-      if (resp.ok) {
-        platos = await resp.json();
+      if (resp.status === 401) {
+        manejarNoAutorizado();
+        return;
       }
-    } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar top platos, sin respuesta del API', e);
+      if (resp.status === 403) {
+        return;
+      }
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data)) {
+          platos = data;
+        }
+      }
+    } catch (_e) {
+      platos = [];
     }
 
-    if (!Array.isArray(platos) || platos.length === 0) {
-      platos = [
-        { ranking: 1, nombre: 'Hamburguesa Royal Doble', unidades_vendidas: 14, total_recaudado: 455.00 },
-        { ranking: 2, nombre: 'Lomo Saltado Criollo', unidades_vendidas: 11, total_recaudado: 418.00 },
-        { ranking: 3, nombre: 'Ceviche Mixto Tradicional', unidades_vendidas: 9, total_recaudado: 342.00 },
-        { ranking: 4, nombre: 'Pollo a la Brasa 1/4', unidades_vendidas: 8, total_recaudado: 208.00 },
-        { ranking: 5, nombre: 'Limonada Frozen Artesanal', unidades_vendidas: 16, total_recaudado: 192.00 }
-      ];
+    listEl.replaceChildren();
+    if (platos.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'top-dish-row';
+      const emptyText = document.createElement('span');
+      emptyText.className = 'top-dish-name';
+      emptyText.textContent = 'Sin platillos vendidos hoy';
+      empty.appendChild(emptyText);
+      listEl.appendChild(empty);
+      return;
     }
 
-    listEl.innerHTML = '';
     platos.forEach((p, idx) => {
       const row = document.createElement('div');
       row.className = 'top-dish-row';
-      row.innerHTML = `
-        <div class="top-dish-info">
-          <span class="top-dish-rank">#${p.ranking || (idx + 1)}</span>
-          <span class="top-dish-name">${p.nombre}</span>
-        </div>
-        <span class="top-dish-units">${p.unidades_vendidas || p.cantidad || 0} un.</span>
-      `;
+
+      const info = document.createElement('div');
+      info.className = 'top-dish-info';
+
+      const rank = document.createElement('span');
+      rank.className = 'top-dish-rank';
+      rank.textContent = `#${p.ranking || (idx + 1)}`;
+
+      const name = document.createElement('span');
+      name.className = 'top-dish-name';
+      name.textContent = String(p.nombre || '');
+      info.append(rank, name);
+
+      const units = document.createElement('span');
+      units.className = 'top-dish-units';
+      const cantidad = p.unidades ?? p.unidades_vendidas ?? p.cantidad ?? 0;
+      units.textContent = `${Number(cantidad) || 0} un.`;
+
+      row.append(info, units);
       listEl.appendChild(row);
     });
   }
@@ -489,32 +597,59 @@ const FoodCoreDashboard = (() => {
         cache: 'no-store',
         headers: getAuthHeaders()
       });
-      if (resp.ok) {
-        txs = await resp.json();
+      if (resp.status === 401) {
+        manejarNoAutorizado();
+        return;
       }
-    } catch (e) {
-      console.warn('[Dashboard] Fallo al cargar transacciones recientes, sin respuesta del API', e);
+      if (resp.status === 403) {
+        return;
+      }
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data)) {
+          txs = data;
+        }
+      }
+    } catch (_e) {
+      txs = [];
     }
 
-    if (!Array.isArray(txs) || txs.length === 0) {
-      txs = [
-        { id_venta: 108, numero_mesa: '04', total: 64.50, medio_pago: 'TARJETA', hora: '14:22' },
-        { id_venta: 107, numero_mesa: '02', total: 38.00, medio_pago: 'EFECTIVO', hora: '13:50' },
-        { id_venta: 106, numero_mesa: '06', total: 112.00, medio_pago: 'YAPE', hora: '13:15' }
-      ];
+    listEl.replaceChildren();
+    if (txs.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tx-item';
+      const label = document.createElement('span');
+      label.className = 'tx-time';
+      label.textContent = 'Sin transacciones recientes';
+      empty.appendChild(label);
+      listEl.appendChild(empty);
+      return;
     }
 
-    listEl.innerHTML = '';
     txs.slice(0, 4).forEach((tx) => {
       const item = document.createElement('div');
       item.className = 'tx-item';
-      item.innerHTML = `
-        <div class="tx-left">
-          <span class="tx-mesa">Mesa ${tx.numero_mesa || '01'} (${tx.medio_pago || 'EFECTIVO'})</span>
-          <span class="tx-time">${tx.hora || 'Reciente'}</span>
-        </div>
-        <span class="tx-amount">S/ ${(tx.total || 0).toFixed(2)}</span>
-      `;
+
+      const left = document.createElement('div');
+      left.className = 'tx-left';
+
+      const primary = document.createElement('span');
+      primary.className = 'tx-mesa';
+      const medio = tx.medio_pago || 'EFECTIVO';
+      primary.textContent = tx.numero_comprobante
+        ? `${tx.numero_comprobante} (${medio})`
+        : `Mesa ${tx.numero_mesa || '01'} (${medio})`;
+
+      const time = document.createElement('span');
+      time.className = 'tx-time';
+      time.textContent = tx.hora || formatearFechaHoraTx(tx.fecha_hora) || 'Reciente';
+      left.append(primary, time);
+
+      const amount = document.createElement('span');
+      amount.className = 'tx-amount';
+      amount.textContent = `S/ ${Number(tx.total || 0).toFixed(2)}`;
+
+      item.append(left, amount);
       listEl.appendChild(item);
     });
   }
@@ -522,6 +657,7 @@ const FoodCoreDashboard = (() => {
   return {
     init,
     cargarDashboardData,
+    cerrarSesionPwa,
     toggleTheme
   };
 })();

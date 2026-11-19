@@ -1,8 +1,10 @@
 package com.foodcore.controller;
 
+import com.foodcore.App;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AsistenciaService;
+import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
@@ -181,24 +183,54 @@ public class RelojAsistenciaController {
         }
     }
 
+    /**
+     * Solo un administrador autenticado puede retornar directamente al Dashboard desde el Kiosco;
+     * cualquier otro usuario o sesión inexistente debe autenticarse nuevamente en LoginView.
+     */
+    public static boolean puedeAccederADashboardDesdeKiosco(Usuario user) {
+        if (user == null || user.getNombreRol() == null) {
+            return false;
+        }
+        String rol = user.getNombreRol().trim().toUpperCase(Locale.ROOT);
+        return rol.contains("ADMIN");
+    }
+
     @FXML
     public void handleSalirKiosco(ActionEvent event) {
         stopTimeline();
-        if (event.getSource() instanceof Button btn && btn.getScene() != null && btn.getScene().getWindow() instanceof javafx.stage.Stage stage) {
+        if (event != null && event.getSource() instanceof Button btn && btn.getScene() != null
+                && btn.getScene().getWindow() instanceof javafx.stage.Stage stage) {
             if (stage.getOwner() != null || stage.getStyle() == javafx.stage.StageStyle.UNDECORATED) {
                 stage.close();
                 stage.setScene(null);
-            } else {
-                javafx.scene.Scene currentScene = btn.getScene();
-                if (currentScene != null && currentScene.lookup("#contentArea") instanceof javafx.scene.layout.StackPane contentArea) {
-                    try {
-                        javafx.fxml.FXMLLoader l = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
-                        javafx.scene.Parent dash = l.load();
-                        contentArea.getChildren().setAll(dash);
-                    } catch (Exception ex) {
-                        LOGGER.log(Level.FINE, "No se pudo volver a DashboardView tras salir de kiosco", ex);
-                    }
+                return;
+            }
+            javafx.scene.Scene currentScene = btn.getScene();
+            Usuario usuarioActual = AuthService.getUsuarioSesionActual();
+            if (puedeAccederADashboardDesdeKiosco(usuarioActual)
+                    && currentScene.lookup("#contentArea") instanceof javafx.scene.layout.StackPane contentArea) {
+                try {
+                    javafx.fxml.FXMLLoader l = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
+                    javafx.scene.Parent dash = l.load();
+                    contentArea.getChildren().setAll(dash);
+                } catch (Exception ex) {
+                    LOGGER.log(Level.FINE, "No se pudo volver a DashboardView tras salir de kiosco", ex);
                 }
+                return;
+            }
+
+            // Fail-closed: usuarios no ADMIN nunca pueden ingresar al Dashboard desde el Kiosco
+            AuthService.logout();
+            try {
+                javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+                javafx.scene.Parent loginRoot = loader.load();
+                javafx.scene.Scene loginScene = new javafx.scene.Scene(loginRoot, 1080, 700);
+                App.applyStylesheets(loginScene);
+                stage.setScene(loginScene);
+                stage.setTitle("FoodCore ERP - Iniciar Sesión");
+                stage.centerOnScreen();
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "No se pudo redirigir a LoginView al salir del kiosco", ex);
             }
         }
     }

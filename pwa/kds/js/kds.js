@@ -1,13 +1,67 @@
 /**
- * FOODCORE ERP v4.2.0 — PWA KDS (Kitchen Display System)
- * Lógica de Kanban en tiempo real, cronómetros dinámicos y transiciones de comandas.
+ * FOODCORE ERP v5.7.1 — PWA KDS (Kitchen Display System)
+ * Tablero Kanban en tiempo real construido íntegramente con DOM seguro (createElement/textContent/addEventListener),
+ * cronómetros dinámicos y sin datos demo falsos ante respuestas vacías o 401/403.
  */
 const FoodCoreKDS = (() => {
   let itemsCocina = [];
   let filtroEstacion = 'TODOS';
   let pollInterval = null;
   let timerInterval = null;
+  let clockInterval = null;
   const THEME_STORAGE_KEY = 'fc_theme';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function crearSvgElemento(tag, attrs = {}) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
+    return el;
+  }
+
+  function crearIconoTemaSvg(esOscuro) {
+    const svg = crearSvgElemento('svg', {
+      width: '18',
+      height: '18',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    });
+    if (esOscuro) {
+      svg.appendChild(crearSvgElemento('circle', { cx: '12', cy: '12', r: '5' }));
+      svg.appendChild(crearSvgElemento('path', {
+        d: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42'
+      }));
+    } else {
+      svg.appendChild(crearSvgElemento('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' }));
+    }
+    return svg;
+  }
+
+  function crearIconoAccionKds(estado) {
+    const svg = crearSvgElemento('svg', {
+      width: '16',
+      height: '16',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': estado === 'EN_PREPARACION' ? '2.4' : (estado === 'PENDIENTE' ? '2.2' : '2'),
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    });
+    if (estado === 'PENDIENTE') {
+      svg.appendChild(crearSvgElemento('polygon', { points: '5 3 19 12 5 21 5 3' }));
+    } else if (estado === 'EN_PREPARACION') {
+      svg.appendChild(crearSvgElemento('polyline', { points: '20 6 9 17 4 12' }));
+    } else {
+      svg.appendChild(crearSvgElemento('path', {
+        d: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'
+      }));
+    }
+    return svg;
+  }
 
   function resolverTemaInicial() {
     try {
@@ -31,9 +85,7 @@ const FoodCoreKDS = (() => {
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
       btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
-      btn.innerHTML = esOscuro
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      btn.replaceChildren(crearIconoTemaSvg(esOscuro));
     }
   }
 
@@ -103,7 +155,7 @@ const FoodCoreKDS = (() => {
         }
         ocultarModalAuthKds();
         cargarItemsKds();
-      } catch (e) {
+      } catch (_e) {
         mostrarModalAuthKds('No se pudo conectar con el servidor de autenticación.');
       }
     });
@@ -120,13 +172,9 @@ const FoodCoreKDS = (() => {
     iniciarReloj();
     cargarItemsKds();
 
-    // Polling cada 5 segundos
     pollInterval = setInterval(cargarItemsKds, 5000);
-
-    // Actualización de cronómetros cada segundo
     timerInterval = setInterval(actualizarCronometros, 1000);
 
-    // Eventos de filtros de estación
     document.querySelectorAll('.kds-filter-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.kds-filter-btn').forEach((b) => b.classList.remove('active'));
@@ -141,8 +189,7 @@ const FoodCoreKDS = (() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('sw.js')
-        .then(() => console.log('[KDS SW] Registrado correctamente'))
-        .catch((err) => console.log('[KDS SW] Error al registrar:', err));
+        .catch(() => {});
     }
   }
 
@@ -154,7 +201,10 @@ const FoodCoreKDS = (() => {
       el.textContent = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     }
     tic();
-    setInterval(tic, 1000);
+    if (clockInterval) {
+      clearInterval(clockInterval);
+    }
+    clockInterval = setInterval(tic, 1000);
   }
 
   async function cargarItemsKds() {
@@ -165,6 +215,14 @@ const FoodCoreKDS = (() => {
         headers: getAuthHeaders()
       });
       if (resp.status === 401 || resp.status === 403) {
+        if (resp.status === 401) {
+          try {
+            localStorage.removeItem('fc_pwa_token');
+            localStorage.removeItem('fc_pwa_user');
+          } catch (_e) {}
+        }
+        itemsCocina = [];
+        renderizarKanban();
         mostrarModalAuthKds(resp.status === 403 ? 'Rol sin permiso para KDS (requiere COCINA o ADMIN).' : '');
         actualizarPillConexion(true);
         return;
@@ -172,69 +230,20 @@ const FoodCoreKDS = (() => {
       if (resp.ok) {
         ocultarModalAuthKds();
         const data = await resp.json();
-        if (Array.isArray(data) && data.length > 0) {
-          // Normalizar enviado_en a timestamp
-          itemsCocina = data.map((item) => ({
+        itemsCocina = Array.isArray(data)
+          ? data.map((item) => ({
             ...item,
             timestamp: item.enviado_en ? new Date(item.enviado_en).getTime() : Date.now()
-          }));
-          renderizarKanban();
-          actualizarPillConexion(true);
-          return;
-        }
+          }))
+          : [];
+        renderizarKanban();
+        actualizarPillConexion(true);
+        return;
       }
-    } catch (err) {
-      console.warn('[KDS] Error al consultar API, usando estado local', err);
+    } catch (_err) {
       actualizarPillConexion(false);
     }
-
-    // Si la lista está vacía, cargar ítems de demostración iniciales
-    if (itemsCocina.length === 0) {
-      const now = Date.now();
-      itemsCocina = [
-        {
-          id_detalle_pedido: 501,
-          id_pedido: 101,
-          numero_mesa: '04',
-          nombre: 'Hamburguesa Royal Doble',
-          cantidad: 2,
-          notas: 'Sin cebolla, papas crocantes',
-          estado_cocina: 'PENDIENTE',
-          timestamp: now - 3 * 60 * 1000 // 3 min atrás (verde)
-        },
-        {
-          id_detalle_pedido: 502,
-          id_pedido: 102,
-          numero_mesa: '02',
-          nombre: 'Lomo Saltado Clásico Criollo',
-          cantidad: 1,
-          notas: 'Término medio 3/4',
-          estado_cocina: 'EN_PREPARACION',
-          timestamp: now - 7 * 60 * 1000 // 7 min atrás (ámbar)
-        },
-        {
-          id_detalle_pedido: 503,
-          id_pedido: 103,
-          numero_mesa: '06',
-          nombre: 'Ceviche Mixto con Chicharrón',
-          cantidad: 1,
-          notas: 'Ají moderado, camote glaseado',
-          estado_cocina: 'PENDIENTE',
-          timestamp: now - 12 * 60 * 1000 // 12 min atrás (rojo)
-        },
-        {
-          id_detalle_pedido: 504,
-          id_pedido: 104,
-          numero_mesa: '01',
-          nombre: 'Limonada Frozen Artesanal',
-          cantidad: 2,
-          notas: 'Con hierbabuena',
-          estado_cocina: 'LISTO',
-          timestamp: now - 4 * 60 * 1000
-        }
-      ];
-      renderizarKanban();
-    }
+    renderizarKanban();
   }
 
   function actualizarPillConexion(online) {
@@ -254,6 +263,13 @@ const FoodCoreKDS = (() => {
     }
   }
 
+  function crearMensajeColumnaVacia(texto) {
+    const div = document.createElement('div');
+    div.className = 'kds-empty-col';
+    div.textContent = texto;
+    return div;
+  }
+
   function renderizarKanban() {
     const colPendiente = document.getElementById('colPendiente');
     const colPreparacion = document.getElementById('colPreparacion');
@@ -261,9 +277,9 @@ const FoodCoreKDS = (() => {
 
     if (!colPendiente || !colPreparacion || !colListo) return;
 
-    colPendiente.innerHTML = '';
-    colPreparacion.innerHTML = '';
-    colListo.innerHTML = '';
+    colPendiente.replaceChildren();
+    colPreparacion.replaceChildren();
+    colListo.replaceChildren();
 
     let cPend = 0;
     let cPrep = 0;
@@ -271,12 +287,12 @@ const FoodCoreKDS = (() => {
 
     itemsCocina.forEach((item) => {
       const est = (item.estado_cocina || 'PENDIENTE').toUpperCase();
+      const nombreLower = String(item.nombre || '').toLowerCase();
 
-      // Aplicar filtro estación si es bar/bebidas
-      if (filtroEstacion === 'BAR' && !item.nombre.toLowerCase().includes('limonada') && !item.nombre.toLowerCase().includes('bebida') && !item.nombre.toLowerCase().includes('cerveza')) {
+      if (filtroEstacion === 'BAR' && !nombreLower.includes('limonada') && !nombreLower.includes('bebida') && !nombreLower.includes('cerveza')) {
         return;
       }
-      if (filtroEstacion === 'COCINA' && (item.nombre.toLowerCase().includes('limonada') || item.nombre.toLowerCase().includes('cerveza'))) {
+      if (filtroEstacion === 'COCINA' && (nombreLower.includes('limonada') || nombreLower.includes('cerveza'))) {
         return;
       }
 
@@ -292,60 +308,105 @@ const FoodCoreKDS = (() => {
       }
     });
 
-    document.getElementById('countPendiente').textContent = cPend;
-    document.getElementById('countPreparacion').textContent = cPrep;
-    document.getElementById('countListo').textContent = cListo;
+    const elPend = document.getElementById('countPendiente');
+    const elPrep = document.getElementById('countPreparacion');
+    const elListo = document.getElementById('countListo');
+    if (elPend) elPend.textContent = String(cPend);
+    if (elPrep) elPrep.textContent = String(cPrep);
+    if (elListo) elListo.textContent = String(cListo);
 
-    if (cPend === 0) colPendiente.innerHTML = '<div class="kds-empty-col">No hay órdenes pendientes</div>';
-    if (cPrep === 0) colPreparacion.innerHTML = '<div class="kds-empty-col">Nada en preparación</div>';
-    if (cListo === 0) colListo.innerHTML = '<div class="kds-empty-col">No hay platos por entregar</div>';
+    if (cPend === 0) colPendiente.appendChild(crearMensajeColumnaVacia('No hay órdenes pendientes'));
+    if (cPrep === 0) colPreparacion.appendChild(crearMensajeColumnaVacia('Nada en preparación'));
+    if (cListo === 0) colListo.appendChild(crearMensajeColumnaVacia('No hay platos por entregar'));
   }
 
   function crearCardElemento(item, estado) {
     const card = document.createElement('div');
-    const diffSeg = Math.max(0, Math.floor((Date.now() - (item.timestamp || Date.now())) / 1000));
+    const ts = Number.isFinite(Number(item.timestamp)) ? Number(item.timestamp) : Date.now();
+    const diffSeg = Math.max(0, Math.floor((Date.now() - ts) / 1000));
     const timerClass = obtenerClaseTimer(diffSeg);
     const cardStateClass = timerClass.replace('timer-', 'state-');
     card.className = `kds-card ${cardStateClass}`;
-    card.dataset.id = item.id_detalle_pedido;
+    card.dataset.id = String(item.id_detalle_pedido ?? '');
 
-    const timerText = formatearTimer(diffSeg);
+    const cardTop = document.createElement('div');
+    cardTop.className = 'kds-card-top';
 
-    let btnHtml = '';
-    if (estado === 'PENDIENTE') {
-      btnHtml = `<button type="button" class="kds-btn-action btn-iniciar" onclick="FoodCoreKDS.cambiarEstado(${item.id_detalle_pedido}, 'EN_PREPARACION')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Iniciar Preparación</button>`;
-    } else if (estado === 'EN_PREPARACION') {
-      btnHtml = `<button type="button" class="kds-btn-action btn-listo" onclick="FoodCoreKDS.cambiarEstado(${item.id_detalle_pedido}, 'LISTO')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Marcar Listo</button>`;
-    } else if (estado === 'LISTO') {
-      btnHtml = `<button type="button" class="kds-btn-action btn-entregar" onclick="FoodCoreKDS.cambiarEstado(${item.id_detalle_pedido}, 'ENTREGADO')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Entregar al Mozo</button>`;
+    const mesaBadge = document.createElement('span');
+    mesaBadge.className = 'kds-mesa-badge';
+    mesaBadge.textContent = `Mesa ${item.numero_mesa || '01'}`;
+
+    const timerBadge = document.createElement('span');
+    timerBadge.className = `kds-timer-badge ${timerClass}`;
+    timerBadge.dataset.ts = String(ts);
+    timerBadge.textContent = `⏱ ${formatearTimer(diffSeg)}`;
+    cardTop.append(mesaBadge, timerBadge);
+
+    const dishTitle = document.createElement('div');
+    dishTitle.className = 'kds-dish-title';
+
+    const qtySpan = document.createElement('span');
+    qtySpan.className = 'kds-qty';
+    qtySpan.textContent = `x${Number(item.cantidad) || 1}`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'kds-name';
+    nameSpan.textContent = String(item.nombre || '');
+    dishTitle.append(qtySpan, nameSpan);
+
+    card.append(cardTop, dishTitle);
+
+    if (item.notas && String(item.notas).trim()) {
+      const notesDiv = document.createElement('div');
+      notesDiv.className = 'kds-notes';
+      notesDiv.textContent = `Nota: ${String(item.notas)}`;
+      card.appendChild(notesDiv);
     }
 
-    const notasHtml = item.notas ? `<div class="kds-notes">Nota: ${item.notas}</div>` : '';
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'kds-card-meta';
 
-    card.innerHTML = `
-      <div class="kds-card-top">
-        <span class="kds-mesa-badge">Mesa ${item.numero_mesa || '01'}</span>
-        <span class="kds-timer-badge ${timerClass}" data-ts="${item.timestamp || Date.now()}">⏱ ${timerText}</span>
-      </div>
-      <div class="kds-dish-title">
-        <span class="kds-qty">x${item.cantidad}</span>
-        <span class="kds-name">${item.nombre}</span>
-      </div>
-      ${notasHtml}
-      <div class="kds-card-meta">
-        <span>Comanda #${item.id_pedido || item.id_detalle_pedido}</span>
-        <span>Ticket #${item.id_detalle_pedido}</span>
-      </div>
-      ${btnHtml}
-    `;
+    const comandaSpan = document.createElement('span');
+    comandaSpan.textContent = `Comanda #${item.id_pedido || item.id_detalle_pedido || ''}`;
+
+    const ticketSpan = document.createElement('span');
+    ticketSpan.textContent = `Ticket #${item.id_detalle_pedido || ''}`;
+    metaDiv.append(comandaSpan, ticketSpan);
+    card.appendChild(metaDiv);
+
+    let nextEstado = null;
+    let btnClass = '';
+    let btnTexto = '';
+    if (estado === 'PENDIENTE') {
+      nextEstado = 'EN_PREPARACION';
+      btnClass = 'btn-iniciar';
+      btnTexto = ' Iniciar Preparación';
+    } else if (estado === 'EN_PREPARACION') {
+      nextEstado = 'LISTO';
+      btnClass = 'btn-listo';
+      btnTexto = ' Marcar Listo';
+    } else if (estado === 'LISTO') {
+      nextEstado = 'ENTREGADO';
+      btnClass = 'btn-entregar';
+      btnTexto = ' Entregar al Mozo';
+    }
+
+    if (nextEstado) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `kds-btn-action ${btnClass}`;
+      btn.append(crearIconoAccionKds(estado), document.createTextNode(btnTexto));
+      btn.addEventListener('click', () => cambiarEstado(item.id_detalle_pedido, nextEstado));
+      card.appendChild(btn);
+    }
 
     return card;
   }
 
   function obtenerClaseTimer(segundos) {
-    if (segundos < 300) return 'timer-green'; // < 5 min
-    if (segundos < 600) return 'timer-amber'; // 5 - 10 min
-    return 'timer-red'; // > 10 min
+    if (segundos < 300) return 'timer-green';
+    if (segundos < 600) return 'timer-amber';
+    return 'timer-red';
   }
 
   function formatearTimer(segundos) {
@@ -372,7 +433,6 @@ const FoodCoreKDS = (() => {
   }
 
   async function cambiarEstado(idDetalle, nuevoEstado) {
-    // 1. Optimistic UI update
     const item = itemsCocina.find((i) => i.id_detalle_pedido === idDetalle);
     if (item) {
       if (nuevoEstado === 'ENTREGADO') {
@@ -383,18 +443,17 @@ const FoodCoreKDS = (() => {
       renderizarKanban();
     }
 
-    // 2. Notificar al Backend Javalin
     try {
-      const resp = await fetch(`/api/kds/items/${idDetalle}/estado`, {
+      const resp = await fetch(`/api/kds/items/${encodeURIComponent(String(idDetalle))}/estado`, {
         method: 'PATCH',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ estado: nuevoEstado })
       });
-      if (resp.status === 401) {
+      if (resp.status === 401 || resp.status === 403) {
         mostrarModalAuthKds('Sesión requerida para actualizar comanda.');
       }
-    } catch (e) {
-      console.warn('[KDS] Error al sincronizar estado con backend', e);
+    } catch (_e) {
+      actualizarPillConexion(false);
     }
   }
 
