@@ -41,6 +41,11 @@ public class CajaDAOImpl extends com.foodcore.dao.CajaDAOImpl {
     }
 
     @Override
+    public BigDecimal calcularTotalIngresosEfectivoTurno(Connection conn, int idCaja) throws SQLException {
+        return super.calcularTotalIngresosEfectivoTurno(conn, idCaja);
+    }
+
+    @Override
     public Map<String, BigDecimal> obtenerTotalesPorMedioPago(Connection conn, int idCaja) throws SQLException {
         return super.obtenerTotalesPorMedioPago(conn, idCaja);
     }

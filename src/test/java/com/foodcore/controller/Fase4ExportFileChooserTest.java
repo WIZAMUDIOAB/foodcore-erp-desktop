@@ -105,8 +105,8 @@ class Fase4ExportFileChooserTest {
             List<String> extensiones = primeraReq.get().filtros().stream()
                     .flatMap(f -> f.getExtensions().stream())
                     .toList();
-            assertTrue(extensiones.containsAll(List.of("*.pdf", "*.xlsx", "*.csv")),
-                    "El selector debe incluir extensiones .pdf, .xlsx y .csv");
+            assertEquals(List.of("*.xlsx"), extensiones,
+                    "El selector de exportación Excel debe exponer exclusivamente el filtro *.xlsx");
 
             // Segunda invocación debe recordar subDir en Preferences
             AtomicReference<FileChooserRequest> segundaReq = new AtomicReference<>();

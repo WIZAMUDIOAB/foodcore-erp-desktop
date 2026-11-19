@@ -224,8 +224,7 @@ public class CobroModalController {
 
             ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComp, serie, numero, totalVenta);
 
-            // Registro transaccional ACID en BD, descuento de insumos, puntos CRM y cierre de comanda si aplica
-            final String serieFinal = serie;
+            // Registro transaccional ACID en BD, descuento de insumos, puntos CRM, CxC corporativa y cierre de comanda si aplica
             final String docCliente = txtDocCliente.getText() != null ? txtDocCliente.getText().trim() : "";
             final String nombreCliente = txtNombreCliente.getText() != null ? txtNombreCliente.getText().trim() : "";
             final List<DetalleVenta> itemsCopia = new java.util.ArrayList<>(itemsVenta);
@@ -236,34 +235,20 @@ public class CobroModalController {
 
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> {
-                    if (venta.getIdCliente() == null && !docCliente.isBlank() && !"00000000".equals(docCliente)) {
-                        try (java.sql.Connection connCli = ConexionBD.getConnection()) {
-                            java.util.Optional<Cliente> optCli = clienteDAO.buscarPorDniOTelefono(connCli, docCliente);
-                            optCli.ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
-                        } catch (java.sql.SQLException ignored) {
-                        }
-                    }
-                    ventaService.registrarVenta(venta, itemsCopia, comprobante);
-
                     if ("CREDITO_CORPORATIVO".equalsIgnoreCase(metodo)) {
-                        try (java.sql.Connection conn = ConexionBD.getConnection()) {
-                            com.foodcore.dao.CuentaPorCobrarDAO cxcDAO = new com.foodcore.dao.impl.CuentaPorCobrarDAOImpl();
-                            java.util.Optional<Cliente> cliOpt = clienteDAO.buscarPorDocumento(conn, docCliente);
-                            int idCli = cliOpt.map(Cliente::getIdCliente).orElse(idClienteVenta != null ? idClienteVenta : 1);
-                            com.foodcore.model.CuentaPorCobrar cxc = new com.foodcore.model.CuentaPorCobrar();
-                            cxc.setIdCliente(idCli);
-                            cxc.setIdVenta(venta.getIdVenta());
-                            cxc.setNumeroComprobante(serieFinal + "-" + numero);
-                            cxc.setFechaEmision(java.time.LocalDate.now());
-                            cxc.setFechaVencimiento(java.time.LocalDate.now().plusDays(30));
-                            cxc.setMontoTotal(totalVenta.doubleValue());
-                            cxc.setMontoCobrado(0.0);
-                            cxc.setEstado("PENDIENTE");
-                            cxc.setObservaciones("Venta POS a credito corporativo. Cliente: " + nombreCliente);
-                            cxcDAO.insertar(conn, cxc);
-                        } catch (java.sql.SQLException | RuntimeException ex) {
-                            LOGGER.log(Level.WARNING, "Aviso al vincular credito corporativo", ex);
+                        // Persiste Venta + CuentaPorCobrar atómicamente en la misma transacción JDBC
+                        ventaService.registrarVentaConCreditoCorporativo(
+                                venta, itemsCopia, comprobante, docCliente, nombreCliente);
+                    } else {
+                        if (venta.getIdCliente() == null && !docCliente.isBlank() && !"00000000".equals(docCliente)) {
+                            try (java.sql.Connection connCli = ConexionBD.getConnection()) {
+                                java.util.Optional<Cliente> optCli = clienteDAO.buscarPorDniOTelefono(connCli, docCliente);
+                                optCli.ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
+                            } catch (java.sql.SQLException ex) {
+                                LOGGER.log(Level.FINE, "No se pudo resolver cliente por documento", ex);
+                            }
                         }
+                        ventaService.registrarVenta(venta, itemsCopia, comprobante);
                     }
                 },
                 () -> {

@@ -13,6 +13,9 @@ public interface CuentaPorCobrarDAO {
     List<CuentaPorCobrar> listarPorEstado(Connection conn, String estado) throws SQLException;
     List<CuentaPorCobrar> listarPorCliente(Connection conn, int idCliente) throws SQLException;
     Optional<CuentaPorCobrar> buscarPorId(Connection conn, int idCuentaCobrar) throws SQLException;
+    default Optional<CuentaPorCobrar> buscarPorIdParaActualizar(Connection conn, int idCuentaCobrar) throws SQLException {
+        return buscarPorId(conn, idCuentaCobrar);
+    }
     int insertar(Connection conn, CuentaPorCobrar cxc) throws SQLException;
     boolean registrarCobro(Connection conn, CobroCliente cobro) throws SQLException;
     int contarVencidas(Connection conn) throws SQLException;

@@ -271,9 +271,12 @@ class SubFaseEAuditoriaOnboardingTest {
     }
 
     @Test
-    @DisplayName("E3: DemoDataService carga scripts/seed-demo.sql (es_demo=1) y los borra sin tocar datos reales (es_demo=0)")
+    @DisplayName("E3: DemoDataService carga recurso inmutable classpath (es_demo=1), exige CONFIG_RED y borra sin tocar datos reales")
     void testCargaYBorradoDatosDemoPreservaDatosReales() throws Exception {
         DemoDataService demoService = new DemoDataService();
+        com.foodcore.model.Usuario admin = new com.foodcore.model.Usuario(1, 1, 1, "admin", "hash", true);
+        admin.setNombreRol("ADMIN");
+        com.foodcore.service.AuthService.setUsuarioSesionActual(admin);
 
         try (Connection conn = ConexionBD.getConnection()) {
             // Insertar un cliente real explícito (es_demo = 0) y un producto real explícito (es_demo = 0)
@@ -285,13 +288,17 @@ class SubFaseEAuditoriaOnboardingTest {
                 ps.executeUpdate();
             }
 
-            ResumenDemo cargado = demoService.cargarDatosDemo(conn, Path.of("scripts", "seed-demo.sql"));
+            // Rutas externas arbitrarias deben ser rechazadas por seguridad
+            org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
+                    () -> demoService.cargarDatosDemo(conn, Path.of("scripts", "seed-demo.sql")));
+
+            ResumenDemo cargado = demoService.cargarDatosDemo(conn);
             assertTrue(cargado.clientes() >= 3, "seed-demo.sql debe insertar al menos 3 clientes demo");
             assertTrue(cargado.productos() >= 3, "seed-demo.sql debe insertar al menos 3 productos demo");
             assertTrue(cargado.ventas() >= 2, "seed-demo.sql debe insertar al menos 2 ventas demo");
 
             // Idempotencia al volver a cargar
-            ResumenDemo recargado = demoService.cargarDatosDemo(conn, Path.of("scripts", "seed-demo.sql"));
+            ResumenDemo recargado = demoService.cargarDatosDemo(conn);
             assertEquals(cargado.clientes(), recargado.clientes());
 
             // Borrar datos demo
@@ -310,6 +317,8 @@ class SubFaseEAuditoriaOnboardingTest {
                     assertEquals(1, rs.getInt(1), "El cliente real (es_demo = 0) no debe ser eliminado");
                 }
             }
+        } finally {
+            com.foodcore.service.AuthService.logout();
         }
     }
 }

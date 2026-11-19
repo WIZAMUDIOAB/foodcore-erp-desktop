@@ -83,19 +83,56 @@ public class MermaDAOImpl implements MermaDAO {
         return lista;
     }
 
+    private static final String SQL_MERMAS_MOTIVO_ANIO =
+            "SELECT motivo, COALESCE(SUM(costo_total), 0) AS total_perdida "
+                    + "FROM merma WHERE YEAR(fecha_hora) = ? "
+                    + "GROUP BY motivo ORDER BY total_perdida DESC";
+
+    private static final String SQL_MERMAS_MOTIVO_ANIO_MES =
+            "SELECT motivo, COALESCE(SUM(costo_total), 0) AS total_perdida "
+                    + "FROM merma WHERE YEAR(fecha_hora) = ? AND MONTH(fecha_hora) = ? "
+                    + "GROUP BY motivo ORDER BY total_perdida DESC";
+
+    private static final String SQL_TOP_PERDIDA_ANIO =
+            "SELECT m.id_insumo, i.nombre AS insumo_nombre, i.unidad_medida, "
+                    + "SUM(m.cantidad) AS total_cant, "
+                    + "AVG(m.costo_unitario) AS avg_costo, "
+                    + "SUM(m.costo_total) AS suma_perdida "
+                    + "FROM merma m JOIN insumo i ON m.id_insumo = i.id_insumo "
+                    + "WHERE YEAR(m.fecha_hora) = ? "
+                    + "GROUP BY m.id_insumo, i.nombre, i.unidad_medida "
+                    + "ORDER BY suma_perdida DESC LIMIT ?";
+
+    private static final String SQL_TOP_PERDIDA_ANIO_MES =
+            "SELECT m.id_insumo, i.nombre AS insumo_nombre, i.unidad_medida, "
+                    + "SUM(m.cantidad) AS total_cant, "
+                    + "AVG(m.costo_unitario) AS avg_costo, "
+                    + "SUM(m.costo_total) AS suma_perdida "
+                    + "FROM merma m JOIN insumo i ON m.id_insumo = i.id_insumo "
+                    + "WHERE YEAR(m.fecha_hora) = ? AND MONTH(m.fecha_hora) = ? "
+                    + "GROUP BY m.id_insumo, i.nombre, i.unidad_medida "
+                    + "ORDER BY suma_perdida DESC LIMIT ?";
+
     @Override
     public Map<String, BigDecimal> obtenerMermasPorMotivo(Connection conn, int anio, int mes) throws SQLException {
         Map<String, BigDecimal> mapa = new LinkedHashMap<>();
-        String sql = "SELECT motivo, COALESCE(SUM(costo_total), 0) AS total_perdida "
-                + "FROM merma "
-                + "WHERE YEAR(fecha_hora) = ? " + (mes > 0 ? "AND MONTH(fecha_hora) = ? " : "")
-                + "GROUP BY motivo ORDER BY total_perdida DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, anio);
-            if (mes > 0) ps.setInt(2, mes);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    mapa.put(rs.getString("motivo"), rs.getBigDecimal("total_perdida"));
+        if (mes > 0) {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_MERMAS_MOTIVO_ANIO_MES)) {
+                ps.setInt(1, anio);
+                ps.setInt(2, mes);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        mapa.put(rs.getString("motivo"), rs.getBigDecimal("total_perdida"));
+                    }
+                }
+            }
+        } else {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_MERMAS_MOTIVO_ANIO)) {
+                ps.setInt(1, anio);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        mapa.put(rs.getString("motivo"), rs.getBigDecimal("total_perdida"));
+                    }
                 }
             }
         }
@@ -126,35 +163,38 @@ public class MermaDAOImpl implements MermaDAO {
 
     @Override
     public List<Merma> obtenerTopInsumosPerdida(Connection conn, int anio, int mes, int limite) throws SQLException {
-        String sql = "SELECT m.id_insumo, i.nombre AS insumo_nombre, i.unidad_medida, "
-                + "SUM(m.cantidad) AS total_cant, "
-                + "AVG(m.costo_unitario) AS avg_costo, "
-                + "SUM(m.costo_total) AS suma_perdida "
-                + "FROM merma m "
-                + "JOIN insumo i ON m.id_insumo = i.id_insumo "
-                + "WHERE YEAR(m.fecha_hora) = ? " + (mes > 0 ? "AND MONTH(m.fecha_hora) = ? " : "")
-                + "GROUP BY m.id_insumo, i.nombre, i.unidad_medida "
-                + "ORDER BY suma_perdida DESC LIMIT ?";
         List<Merma> res = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int idx = 1;
-            ps.setInt(idx++, anio);
-            if (mes > 0) ps.setInt(idx++, mes);
-            ps.setInt(idx, limite > 0 ? limite : 5);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Merma m = new Merma();
-                    m.setIdInsumo(rs.getLong("id_insumo"));
-                    m.setNombreInsumo(rs.getString("insumo_nombre"));
-                    m.setUnidadMedida(rs.getString("unidad_medida"));
-                    m.setCantidad(rs.getBigDecimal("total_cant"));
-                    m.setCostoUnitario(rs.getBigDecimal("avg_costo"));
-                    m.setCostoTotal(rs.getBigDecimal("suma_perdida"));
-                    res.add(m);
-                }
+        int lim = limite > 0 ? limite : 5;
+        if (mes > 0) {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_TOP_PERDIDA_ANIO_MES)) {
+                ps.setInt(1, anio);
+                ps.setInt(2, mes);
+                ps.setInt(3, lim);
+                leerTopPerdida(ps, res);
+            }
+        } else {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_TOP_PERDIDA_ANIO)) {
+                ps.setInt(1, anio);
+                ps.setInt(2, lim);
+                leerTopPerdida(ps, res);
             }
         }
         return res;
+    }
+
+    private void leerTopPerdida(PreparedStatement ps, List<Merma> res) throws SQLException {
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Merma m = new Merma();
+                m.setIdInsumo(rs.getLong("id_insumo"));
+                m.setNombreInsumo(rs.getString("insumo_nombre"));
+                m.setUnidadMedida(rs.getString("unidad_medida"));
+                m.setCantidad(rs.getBigDecimal("total_cant"));
+                m.setCostoUnitario(rs.getBigDecimal("avg_costo"));
+                m.setCostoTotal(rs.getBigDecimal("suma_perdida"));
+                res.add(m);
+            }
+        }
     }
 
     @Override

@@ -4,9 +4,12 @@ import com.foodcore.dao.ExpedienteUsuarioDAO;
 import com.foodcore.dao.MovimientoPagoDAO;
 import com.foodcore.dao.impl.ExpedienteUsuarioDAOImpl;
 import com.foodcore.dao.impl.MovimientoPagoDAOImpl;
+import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.model.MovimientoPago;
 import com.foodcore.model.PlanillaConsolidada;
 import com.foodcore.model.Usuario;
+import com.foodcore.service.CierreContableService;
+import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.PlanillaService;
 import com.foodcore.util.ConexionBD;
 import com.lowagie.text.Document;
@@ -31,9 +34,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -49,17 +56,26 @@ import java.util.stream.Collectors;
 public class PlanillaServiceImpl implements PlanillaService {
 
     private static final Set<String> TIPOS_VALIDOS = Set.of("BONO", "COMISION", "ADELANTO", "DESCUENTO");
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     private final ExpedienteUsuarioDAO expedienteUsuarioDao;
     private final MovimientoPagoDAO movimientoDao;
+    private final CierreContableService cierreContableService;
 
     public PlanillaServiceImpl() {
-        this(new ExpedienteUsuarioDAOImpl(), new MovimientoPagoDAOImpl());
+        this(new ExpedienteUsuarioDAOImpl(), new MovimientoPagoDAOImpl(), new CierreContableService());
     }
 
     public PlanillaServiceImpl(ExpedienteUsuarioDAO expedienteUsuarioDao, MovimientoPagoDAO movimientoDao) {
+        this(expedienteUsuarioDao, movimientoDao, new CierreContableService());
+    }
+
+    public PlanillaServiceImpl(ExpedienteUsuarioDAO expedienteUsuarioDao,
+                               MovimientoPagoDAO movimientoDao,
+                               CierreContableService cierreContableService) {
         this.expedienteUsuarioDao = Objects.requireNonNull(expedienteUsuarioDao, "expedienteUsuarioDao requerido");
         this.movimientoDao = Objects.requireNonNull(movimientoDao, "movimientoDao requerido");
+        this.cierreContableService = cierreContableService != null ? cierreContableService : new CierreContableService();
     }
 
     @Override
@@ -92,7 +108,7 @@ public class PlanillaServiceImpl implements PlanillaService {
         if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("El monto debe ser mayor a S/ 0.00.");
         }
-        LocalDate fechaEfectiva = fecha != null ? fecha : LocalDate.now();
+        LocalDate fechaEfectiva = fecha != null ? fecha : LocalDate.now(ZONA_LIMA);
         String periodoMes = YearMonth.from(fechaEfectiva).toString();
 
         MovimientoPago mov = new MovimientoPago();
@@ -106,8 +122,11 @@ public class PlanillaServiceImpl implements PlanillaService {
         mov.setObservaciones(observaciones != null && !observaciones.isBlank() ? observaciones.trim() : null);
 
         try (Connection conn = ConexionBD.getConnection()) {
+            cierreContableService.validarPeriodoAbierto(conn, fechaEfectiva);
             movimientoDao.insertar(conn, mov);
             return mov;
+        } catch (PeriodoCerradoException e) {
+            throw new IllegalStateException(e.getMessage(), e);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al registrar movimiento de pago: " + e.getMessage(), e);
         }
@@ -119,9 +138,27 @@ public class PlanillaServiceImpl implements PlanillaService {
             throw new IllegalArgumentException("Movimiento inválido.");
         }
         try (Connection conn = ConexionBD.getConnection()) {
+            LocalDate fechaMovimiento = null;
+            String sqlFecha = "SELECT fecha_movimiento FROM movimiento_pago WHERE id_movimiento = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sqlFecha)) {
+                ps.setLong(1, idMovimiento);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        Date d = rs.getDate("fecha_movimiento");
+                        if (d != null) {
+                            fechaMovimiento = d.toLocalDate();
+                        }
+                    } else {
+                        throw new IllegalArgumentException("No se encontró el movimiento #" + idMovimiento);
+                    }
+                }
+            }
+            cierreContableService.validarPeriodoAbierto(conn, fechaMovimiento != null ? fechaMovimiento : LocalDate.now(ZONA_LIMA));
             if (!movimientoDao.eliminar(conn, idMovimiento)) {
                 throw new IllegalArgumentException("No se encontró el movimiento #" + idMovimiento);
             }
+        } catch (PeriodoCerradoException e) {
+            throw new IllegalStateException(e.getMessage(), e);
         } catch (SQLException e) {
             throw new IllegalStateException("Error al eliminar movimiento: " + e.getMessage(), e);
         }
@@ -188,8 +225,8 @@ public class PlanillaServiceImpl implements PlanillaService {
             int r = 1;
             for (PlanillaConsolidada p : filas) {
                 Row row = sheet.createRow(r++);
-                row.createCell(0).setCellValue(p.nombreEmpleado());
-                row.createCell(1).setCellValue(p.cargo());
+                row.createCell(0).setCellValue(ExportacionContableService.sanitizarFormulaCelda(p.nombreEmpleado()));
+                row.createCell(1).setCellValue(ExportacionContableService.sanitizarFormulaCelda(p.cargo()));
                 row.createCell(2).setCellValue(p.sueldoBase().doubleValue());
                 row.createCell(3).setCellValue(p.bonos().doubleValue());
                 row.createCell(4).setCellValue(p.comisiones().doubleValue());

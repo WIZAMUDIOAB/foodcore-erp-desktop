@@ -2,14 +2,17 @@ package com.foodcore.service;
 
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.ConflictoEstadoException;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
+import com.foodcore.model.Usuario;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
+import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -17,13 +20,13 @@ import com.foodcore.util.ServidorSockets;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.Socket;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -37,6 +40,7 @@ public class PedidoService {
     private final TransactionManager tx;
     private final PedidoDAO pedidoDAO;
     private final AutorizacionService autorizacionService;
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
 
     public PedidoService() {
         this(new JdbcTransactionManager(), new PedidoDAOImpl(), new AutorizacionService());
@@ -188,8 +192,19 @@ public class PedidoService {
     /**
      * Agrega nuevos ítems a un pedido activo existente sin crear un segundo pedido,
      * recalcula el total acumulado vía {@link PedidoDAO#calcularTotalPedido} y notifica al KDS.
+     * Si el pedido se encuentra en estado {@code ENTREGADO}, exige explícitamente
+     * {@link Permiso#PEDIDO_ADICIONAR_POST_ENTREGA}.
      */
     public Pedido agregarItemsAPedido(int idPedido, List<DetallePedido> nuevosItems)
+            throws NegocioException, SQLException {
+        return agregarItemsAPedido(idPedido, nuevosItems, resolverSesionActualParaPedido());
+    }
+
+    /**
+     * Variante con sesión explícita para validar {@link Permiso#PEDIDO_ADICIONAR_POST_ENTREGA}
+     * cuando el pedido ya se encuentra {@code ENTREGADO}.
+     */
+    public Pedido agregarItemsAPedido(int idPedido, List<DetallePedido> nuevosItems, SesionUsuario sesion)
             throws NegocioException, SQLException {
         if (idPedido <= 0) {
             throw new NegocioException(CodigoError.VALIDACION_ENTRADA, "Identificador de pedido inválido.");
@@ -204,12 +219,15 @@ public class PedidoService {
                 throw new NegocioException(CodigoError.RECURSO_NO_ENCONTRADO, "El pedido #" + idPedido + " no existe.");
             }
             Pedido pedido = opt.get();
-            String est = pedido.getEstado() != null ? pedido.getEstado().toUpperCase() : "";
+            String est = pedido.getEstado() != null ? pedido.getEstado().toUpperCase(Locale.ROOT) : "";
             if ("COBRADO".equals(est) || "CERRADO".equals(est) || "PAGADO".equals(est)
                     || "CANCELADO".equals(est) || "ANULADO".equals(est)) {
                 throw new ConflictoEstadoException(
                     "No se pueden agregar ítems a un pedido en estado terminal (" + pedido.getEstado() + ")."
                 );
+            }
+            if ("ENTREGADO".equals(est)) {
+                autorizacionService.exigirPermiso(sesion, Permiso.PEDIDO_ADICIONAR_POST_ENTREGA);
             }
 
             for (DetallePedido item : nuevosItems) {
@@ -233,11 +251,22 @@ public class PedidoService {
         return actualizado;
     }
 
+    private SesionUsuario resolverSesionActualParaPedido() {
+        SesionUsuario activa = SesionManager.getSesionActiva();
+        if (activa != null) {
+            return activa;
+        }
+        Usuario usr = AuthService.getUsuarioSesionActual();
+        if (usr != null && usr.getIdUsuario() > 0 && usr.getNombreRol() != null && !usr.getNombreRol().isBlank()) {
+            return autorizacionService.crearSesion(usr.getIdUsuario(), usr.getUsername(), usr.getNombreRol(), "POS-PEDIDO");
+        }
+        return null;
+    }
+
     /**
      * Transfiere un pedido activo completo de una mesa origen a una mesa destino (SPEC-FOODCORE-v4.6.0 §1.2):
-     * actualiza únicamente {@code id_mesa} y {@code numero_mesa} en el registro del pedido activo
-     * (sin crear un pedido nuevo ni mover ítems de {@code detalle_pedido} individualmente)
-     * y actualiza los estados de ambas mesas ({@code LIBRE} / {@code OCUPADA}).
+     * adquiere bloqueo pesimista ordenado sobre ambas mesas, exige que la mesa destino esté {@code LIBRE},
+     * incrementa {@code version} y registra trazabilidad en {@code auditoria}.
      */
     public boolean transferirMesa(int idMesaOrigen, int idMesaDestino) throws SQLException {
         if (idMesaOrigen <= 0 || idMesaDestino <= 0 || idMesaOrigen == idMesaDestino) {
@@ -245,31 +274,66 @@ public class PedidoService {
         }
         try {
             return tx.executeChecked(conn -> {
+                String numOrigen = null;
+                String numDestino = null;
+                String estadoDestino = null;
+                boolean existeOrigen = false;
+                boolean existeDestino = false;
+
+                String sqlLockMesas = "SELECT id_mesa, numero, estado FROM mesa WHERE id_mesa IN (?, ?) ORDER BY id_mesa ASC FOR UPDATE";
+                try (PreparedStatement psLock = conn.prepareStatement(sqlLockMesas)) {
+                    psLock.setInt(1, Math.min(idMesaOrigen, idMesaDestino));
+                    psLock.setInt(2, Math.max(idMesaOrigen, idMesaDestino));
+                    try (ResultSet rs = psLock.executeQuery()) {
+                        while (rs.next()) {
+                            int idM = rs.getInt("id_mesa");
+                            if (idM == idMesaOrigen) {
+                                existeOrigen = true;
+                                numOrigen = rs.getString("numero");
+                            } else if (idM == idMesaDestino) {
+                                existeDestino = true;
+                                numDestino = rs.getString("numero");
+                                estadoDestino = rs.getString("estado");
+                            }
+                        }
+                    }
+                }
+
+                if (!existeOrigen) {
+                    throw new IllegalStateException("La mesa origen #" + idMesaOrigen + " no existe.");
+                }
+                if (!existeDestino) {
+                    throw new IllegalStateException("La mesa destino #" + idMesaDestino + " no existe.");
+                }
+                if (!"LIBRE".equalsIgnoreCase(estadoDestino)) {
+                    throw new IllegalStateException(
+                            "La mesa destino #" + idMesaDestino + " (" + numDestino
+                                    + ") no está LIBRE (estado actual: " + estadoDestino + ").");
+                }
+
                 Optional<Pedido> optPedido = pedidoDAO.buscarPedidoActivoPorMesa(conn, idMesaOrigen);
                 if (optPedido.isEmpty()) {
                     throw new IllegalStateException("No existe pedido activo en la mesa origen #" + idMesaOrigen);
                 }
                 Pedido pedido = optPedido.get();
-                String numOrigen = pedidoDAO.obtenerNumeroMesaPorId(conn, idMesaOrigen)
-                        .orElse(pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : String.format("%02d", idMesaOrigen));
-                String numDestino = pedidoDAO.obtenerNumeroMesaPorId(conn, idMesaDestino)
-                        .orElse(String.format("%02d", idMesaDestino));
+                String etiquetaOrigen = numOrigen != null ? numOrigen
+                        : (pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : String.format("%02d", idMesaOrigen));
+                String etiquetaDestino = numDestino != null ? numDestino : String.format("%02d", idMesaDestino);
 
-                pedidoDAO.moverPedidoAMesa(conn, pedido.getIdPedido(), idMesaDestino, numDestino);
+                pedidoDAO.moverPedidoAMesa(conn, pedido.getIdPedido(), idMesaDestino, etiquetaDestino);
                 pedidoDAO.actualizarEstadoMesaDirecto(conn, idMesaOrigen, "LIBRE", null);
                 pedidoDAO.actualizarEstadoMesaDirecto(conn, idMesaDestino, "OCUPADA", pedido.getIdPedido());
 
                 int idUsuario = AuthService.getUsuarioSesionActual() != null
                         ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                try (PreparedStatement psAud = conn.prepareStatement(
-                        "INSERT INTO auditoria (id_usuario, accion, tabla_afectada, registro_id, detalle) VALUES (?, 'TRANSFERIR_MESA', 'pedido', ?, ?)")) {
-                    psAud.setInt(1, idUsuario);
-                    psAud.setInt(2, pedido.getIdPedido());
-                    psAud.setString(3, "Pedido #" + pedido.getIdPedido() + " transferido de Mesa " + numOrigen + " a Mesa " + numDestino);
-                    psAud.executeUpdate();
-                } catch (SQLException ignored) {
-                    // Compatibilidad cuando la tabla auditoria no está presente en prueba mínima
-                }
+                auditoriaDAO.registrarEventoSeguro(
+                        conn,
+                        idUsuario,
+                        "TRANSFERIR_MESA",
+                        "pedido#" + pedido.getIdPedido(),
+                        "Mesa " + etiquetaOrigen,
+                        "Mesa " + etiquetaDestino
+                );
                 return true;
             });
         } catch (NegocioException e) {
@@ -278,48 +342,43 @@ public class PedidoService {
     }
 
     private void enviarNotificacionSocketCocina(Pedido pedido, List<DetallePedido> detalles, String numeroComanda) {
-        new Thread(() -> {
-            try {
-                JsonObject json = new JsonObject();
-                json.addProperty("accion", "NUEVA_COMANDA");
-                json.addProperty("idPedido", pedido.getIdPedido());
-                json.addProperty("numeroComanda", numeroComanda);
-                json.addProperty("mesa", pedido.getNumeroMesa());
+        try {
+            JsonObject json = new JsonObject();
+            json.addProperty("accion", "NUEVA_COMANDA");
+            json.addProperty("idPedido", pedido.getIdPedido());
+            json.addProperty("numeroComanda", numeroComanda);
+            json.addProperty("mesa", pedido.getNumeroMesa());
 
-                JsonArray items = new JsonArray();
-                for (DetallePedido d : detalles) {
-                    JsonObject item = new JsonObject();
-                    item.addProperty("idDetallePedido", d.getIdDetallePedido());
-                    item.addProperty("producto", d.getNombreProducto());
-                    if (d.getNombreVariante() != null && !d.getNombreVariante().isBlank()) {
-                        item.addProperty("variante", d.getNombreVariante());
-                    }
-                    String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                            d.getModificadoresSeleccionados(), d.getModificadoresTexto());
-                    if (!mods.isEmpty()) {
-                        item.addProperty("modificadores", mods);
-                    }
-                    if (d.getIdCombo() != null && d.getIdCombo() > 0) {
-                        item.addProperty("idCombo", d.getIdCombo());
-                    }
-                    if (d.getComboComponentesTexto() != null && !d.getComboComponentesTexto().isBlank()) {
-                        item.addProperty("componentes", d.getComboComponentesTexto());
-                    }
-                    item.addProperty("cantidad", d.getCantidad());
-                    item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
-                    items.add(item);
+            JsonArray items = new JsonArray();
+            for (DetallePedido d : detalles) {
+                JsonObject item = new JsonObject();
+                item.addProperty("idDetallePedido", d.getIdDetallePedido());
+                item.addProperty("producto", d.getNombreProducto());
+                if (d.getNombreVariante() != null && !d.getNombreVariante().isBlank()) {
+                    item.addProperty("variante", d.getNombreVariante());
                 }
-                json.add("items", items);
-
-                try (Socket client = new Socket("localhost", ServidorSockets.PUERTO_TCP);
-                     PrintWriter out = new PrintWriter(
-                         new java.io.OutputStreamWriter(client.getOutputStream(), java.nio.charset.StandardCharsets.UTF_8), true)) {
-                    out.println(json.toString());
+                String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                        d.getModificadoresSeleccionados(), d.getModificadoresTexto());
+                if (!mods.isEmpty()) {
+                    item.addProperty("modificadores", mods);
                 }
-            } catch (java.io.IOException | RuntimeException e) {
-                LOGGER.fine("Servidor KDS no activo al emitir notificación socket: " + e.getMessage());
+                if (d.getIdCombo() != null && d.getIdCombo() > 0) {
+                    item.addProperty("idCombo", d.getIdCombo());
+                }
+                if (d.getComboComponentesTexto() != null && !d.getComboComponentesTexto().isBlank()) {
+                    item.addProperty("componentes", d.getComboComponentesTexto());
+                }
+                item.addProperty("cantidad", d.getCantidad());
+                item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
+                items.add(item);
             }
-        }).start();
+            json.add("items", items);
+
+            // Despacho interno in-process sin abrir sockets TCP raw ni hilos no gestionados
+            ServidorSockets.getInstance().emitirMensaje(json);
+        } catch (RuntimeException e) {
+            LOGGER.fine("Servidor KDS no activo al emitir notificación interna: " + e.getMessage());
+        }
     }
 
     /**

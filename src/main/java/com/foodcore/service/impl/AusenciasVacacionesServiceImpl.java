@@ -135,18 +135,30 @@ public class AusenciasVacacionesServiceImpl implements AusenciasVacacionesServic
                 if (!"PENDIENTE".equalsIgnoreCase(sol.getEstado())) {
                     throw new IllegalStateException("La solicitud #" + idSolicitud + " ya fue procesada.");
                 }
+                if (idAprobador != null && idAprobador == sol.getIdUsuario()) {
+                    throw new IllegalStateException(
+                            "Segregación de funciones: un colaborador no puede auto-aprobar su propia solicitud.");
+                }
 
                 String obs = (observacion == null || observacion.isBlank())
                         ? "Aprobado por Gerencia"
                         : observacion.trim();
-                solicitudDao.actualizarEstado(conn, idSolicitud, "APROBADA", obs, idAprobador);
+                boolean marcada = solicitudDao.actualizarEstadoSiPendiente(conn, idSolicitud, "APROBADA", obs, idAprobador);
+                if (!marcada) {
+                    throw new IllegalStateException("La solicitud #" + idSolicitud + " ya fue procesada concurrentemente.");
+                }
 
                 if ("VACACIONES".equalsIgnoreCase(sol.getTipo())) {
                     int anio = sol.getFechaInicio() != null
                             ? sol.getFechaInicio().getYear()
                             : LocalDate.now().getYear();
                     obtenerOAsegurarSaldoVacaciones(conn, sol.getIdUsuario(), anio);
-                    vacacionesDao.incrementarDiasGozados(conn, sol.getIdUsuario(), anio, sol.getDiasSolicitados());
+                    boolean descontado = vacacionesDao.incrementarDiasGozadosSiDisponible(
+                            conn, sol.getIdUsuario(), anio, sol.getDiasSolicitados());
+                    if (!descontado) {
+                        throw new IllegalStateException(
+                                "Saldo de vacaciones insuficiente para aprobar la solicitud #" + idSolicitud + ".");
+                    }
                 }
                 conn.commit();
             } catch (Exception ex) {
@@ -174,10 +186,17 @@ public class AusenciasVacacionesServiceImpl implements AusenciasVacacionesServic
             if (!"PENDIENTE".equalsIgnoreCase(sol.getEstado())) {
                 throw new IllegalStateException("La solicitud #" + idSolicitud + " ya fue procesada.");
             }
+            if (idAprobador != null && idAprobador == sol.getIdUsuario()) {
+                throw new IllegalStateException(
+                        "Segregación de funciones: un colaborador no puede resolver su propia solicitud.");
+            }
             String obs = (observacion == null || observacion.isBlank())
                     ? "Rechazado por cobertura de turno"
                     : observacion.trim();
-            solicitudDao.actualizarEstado(conn, idSolicitud, "RECHAZADA", obs, idAprobador);
+            boolean marcada = solicitudDao.actualizarEstadoSiPendiente(conn, idSolicitud, "RECHAZADA", obs, idAprobador);
+            if (!marcada) {
+                throw new IllegalStateException("La solicitud #" + idSolicitud + " ya fue procesada concurrentemente.");
+            }
         } catch (SQLException e) {
             throw new IllegalStateException("Error al rechazar solicitud: " + e.getMessage(), e);
         }

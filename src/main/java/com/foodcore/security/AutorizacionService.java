@@ -1,22 +1,44 @@
 package com.foodcore.security;
 
+import com.foodcore.dao.RolDAO;
+import com.foodcore.dao.impl.RolDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.enums.Permiso;
+import com.foodcore.util.ConexionBD;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Servicio de control de acceso basado en roles y permisos (RBAC) según SPEC-FOODCORE-v1.0 (§10.2, §10.3).
  * La validación se ejecuta obligatoriamente en la capa de servicios (ocultar botones en UI no constituye autorización).
+ * En caso de fallo de base de datos, aplica política estricta fail-closed (cero permisos).
  */
 public class AutorizacionService {
 
+    private static final Logger LOGGER = Logger.getLogger(AutorizacionService.class.getName());
     private static final Map<String, Set<Permiso>> MATRIZ_RBAC;
+    private static final Map<String, String> ALIAS_ROLES = Map.of(
+        "ADMINISTRADOR", "ADMIN",
+        "MESERO", "MOZO",
+        "COCINERO", "COCINA",
+        "ALMACENERO", "ALMACEN"
+    );
+
+    @FunctionalInterface
+    public interface ProveedorConexion {
+        Connection obtener() throws SQLException;
+    }
 
     static {
         Set<Permiso> permisosAdmin = Collections.unmodifiableSet(EnumSet.allOf(Permiso.class));
@@ -70,35 +92,58 @@ public class AutorizacionService {
         );
     }
 
-    private static final com.foodcore.dao.RolDAO ROL_DAO = new com.foodcore.dao.impl.RolDAOImpl();
+    private static final RolDAO ROL_DAO_DEFAULT = new RolDAOImpl();
+
+    private final RolDAO rolDAO;
+    private final ProveedorConexion proveedorConexion;
+
+    public AutorizacionService() {
+        this(ROL_DAO_DEFAULT, ConexionBD::getConnection);
+    }
+
+    public AutorizacionService(RolDAO rolDAO, ProveedorConexion proveedorConexion) {
+        this.rolDAO = rolDAO != null ? rolDAO : ROL_DAO_DEFAULT;
+        this.proveedorConexion = proveedorConexion != null ? proveedorConexion : ConexionBD::getConnection;
+    }
 
     public static Set<Permiso> permisosPorDefectoParaRol(String codigoRol) {
+        return resolverPermisosEnBd(codigoRol, ROL_DAO_DEFAULT, ConexionBD::getConnection);
+    }
+
+    private static Set<Permiso> resolverPermisosEnBd(String codigoRol, RolDAO dao, ProveedorConexion proveedor) {
         if (codigoRol == null || codigoRol.isBlank()) {
             return Collections.emptySet();
         }
-        String codNorm = codigoRol.trim().toUpperCase();
-        try (java.sql.Connection conn = com.foodcore.util.ConexionBD.getConnection()) {
-            Set<Permiso> dinamicos = ROL_DAO.obtenerPermisosPorRol(conn, codNorm);
-            if (!dinamicos.isEmpty()) {
-                return dinamicos;
+        String codNorm = codigoRol.trim().toUpperCase(Locale.ROOT);
+        String codCanonico = ALIAS_ROLES.getOrDefault(codNorm, codNorm);
+        try (Connection conn = proveedor.obtener()) {
+            Optional<Set<Permiso>> opt = dao.obtenerPermisosSiRolExiste(conn, codNorm);
+            if (opt.isEmpty() && !codCanonico.equals(codNorm)) {
+                opt = dao.obtenerPermisosSiRolExiste(conn, codCanonico);
             }
-        } catch (Exception ignored) {}
-        return MATRIZ_RBAC.getOrDefault(codNorm, Collections.emptySet());
+            return opt.orElse(Collections.emptySet());
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE,
+                "Fallo consultando permisos RBAC en BD para rol '" + codNorm + "'; aplicando fail-closed (0 permisos).",
+                ex);
+            return Collections.emptySet();
+        }
     }
 
     public static Set<Permiso> permisosPorDefectoParaRolLegacy(String codigoRol) {
         if (codigoRol == null || codigoRol.isBlank()) {
             return Collections.emptySet();
         }
-        return MATRIZ_RBAC.getOrDefault(codigoRol.trim().toUpperCase(), Collections.emptySet());
+        return MATRIZ_RBAC.getOrDefault(codigoRol.trim().toUpperCase(Locale.ROOT), Collections.emptySet());
     }
 
     /**
-     * Obtiene el conjunto inmutable de permisos asignados a un rol oficial.
-     * Si el rol es nulo o desconocido, devuelve un conjunto vacío (Principio de Mínimo Privilegio).
+     * Obtiene el conjunto inmutable de permisos asignados a un rol oficial en base de datos.
+     * Si el rol es nulo, desconocido, inactivo, sin permisos configurados o ocurre un error de BD,
+     * devuelve un conjunto vacío (Principio de Mínimo Privilegio / Fail-Closed).
      */
     public Set<Permiso> obtenerPermisosPorRol(String codigoRol) {
-        return permisosPorDefectoParaRol(codigoRol);
+        return resolverPermisosEnBd(codigoRol, this.rolDAO, this.proveedorConexion);
     }
 
     /**

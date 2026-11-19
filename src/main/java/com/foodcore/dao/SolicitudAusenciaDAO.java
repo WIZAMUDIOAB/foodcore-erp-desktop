@@ -14,4 +14,5 @@ public interface SolicitudAusenciaDAO {
     Optional<SolicitudAusencia> buscarPorId(Connection conn, int idSolicitud) throws SQLException;
     void actualizarEstado(Connection conn, int idSolicitud, String nuevoEstado, String observacion) throws SQLException;
     void actualizarEstado(Connection conn, int idSolicitud, String nuevoEstado, String observacion, Integer aprobadoPor) throws SQLException;
+    boolean actualizarEstadoSiPendiente(Connection conn, int idSolicitud, String nuevoEstado, String observacion, Integer aprobadoPor) throws SQLException;
 }

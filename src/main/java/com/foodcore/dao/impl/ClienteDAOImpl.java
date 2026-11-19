@@ -174,11 +174,11 @@ public class ClienteDAOImpl implements ClienteDAO {
 
     @Override
     public boolean actualizar(Connection conn, Cliente cliente) throws SQLException {
+        // Nunca sobrescribir puntos_fidelidad/puntos_acumulados desde edición de perfil para evitar lost updates concurrentes.
         String sql = "UPDATE cliente SET tipo_documento = ?, numero_documento = ?, tipo_cliente = ?, nombre_razon_social = ?, razon_social = ?, contacto = ?, "
-                + "telefono = ?, email = ?, limite_credito = ?, dias_credito = ?, puntos_fidelidad = ?, puntos_acumulados = ?, fecha_nacimiento = ?, estado = ?, activo = ? "
+                + "telefono = ?, email = ?, limite_credito = ?, dias_credito = ?, fecha_nacimiento = ?, estado = ?, activo = ? "
                 + "WHERE id_cliente = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int puntos = cliente.getPuntosAcumulados();
             ps.setString(1, cliente.getTipoDocumento());
             ps.setString(2, cliente.getNumeroDocumento());
             ps.setString(3, cliente.getTipoCliente());
@@ -189,16 +189,14 @@ public class ClienteDAOImpl implements ClienteDAO {
             ps.setString(8, cliente.getEmail());
             ps.setDouble(9, cliente.getLimiteCredito());
             ps.setInt(10, cliente.getDiasCredito());
-            ps.setInt(11, puntos);
-            ps.setInt(12, puntos);
             if (cliente.getFechaNacimiento() != null) {
-                ps.setDate(13, java.sql.Date.valueOf(cliente.getFechaNacimiento()));
+                ps.setDate(11, java.sql.Date.valueOf(cliente.getFechaNacimiento()));
             } else {
-                ps.setNull(13, java.sql.Types.DATE);
+                ps.setNull(11, java.sql.Types.DATE);
             }
-            ps.setString(14, cliente.getEstado());
-            ps.setBoolean(15, cliente.isActivo());
-            ps.setInt(16, cliente.getIdCliente());
+            ps.setString(12, cliente.getEstado());
+            ps.setBoolean(13, cliente.isActivo());
+            ps.setInt(14, cliente.getIdCliente());
             return ps.executeUpdate() > 0;
         }
     }

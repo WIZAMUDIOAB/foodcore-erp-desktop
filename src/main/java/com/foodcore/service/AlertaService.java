@@ -1,5 +1,6 @@
 package com.foodcore.service;
 
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.BufferedReader;
@@ -14,8 +15,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -24,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Servicio de alertas por correo electrónico SMTP ante fallos críticos de infraestructura
@@ -42,7 +46,11 @@ public final class AlertaService {
     public static final long UMBRAL_DISCO_LIBRE_BYTES = 5L * 1024L * 1024L * 1024L; // 5 GB
     public static final double UMBRAL_RAM_PORCENTAJE = 90.0;
     public static final long UMBRAL_RAM_ALTA_MS = 5L * 60_000L; // 5 minutos
+    public static final int MAX_HISTORIAL_ALERTAS = 500;
     private static final int SMTP_TIMEOUT_MS = 8_000;
+    private static final Pattern EMAIL_SEGURO = Pattern.compile(
+            "^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\\.[A-Za-z]{2,63}$");
+    private static final Pattern HOST_SEGURO = Pattern.compile("^[A-Za-z0-9._:-]{1,253}$");
 
     private static final AlertaService GLOBAL = new AlertaService();
 
@@ -91,8 +99,11 @@ public final class AlertaService {
     }
 
     private final AtomicReference<ConfiguracionAlertaEmail> configActual = new AtomicReference<>();
-    private final List<AlertaEmitida> historialAlertas = new ArrayList<>();
+    private final Deque<AlertaEmitida> historialAlertas = new ArrayDeque<>();
     private final Object monitorLock = new Object();
+
+    private record PendienteEnvio(TipoAlerta tipo, String asunto, String cuerpo, long timestampMs) {
+    }
 
     private LongSupplier clockMillis;
     private EmailSender emailSender;
@@ -155,6 +166,16 @@ public final class AlertaService {
      */
     public void actualizarConfiguracion(ConfiguracionAlertaEmail nuevaConfig, boolean persistirEnDisco) {
         Objects.requireNonNull(nuevaConfig, "La configuración de alertas no puede ser nula.");
+        if (nuevaConfig.destinatario() != null && !nuevaConfig.destinatario().isBlank()) {
+            validarEmailSeguro(nuevaConfig.destinatario(), "destinatario");
+        }
+        if (nuevaConfig.smtpUser() != null && !nuevaConfig.smtpUser().isBlank()
+                && nuevaConfig.smtpUser().contains("@")) {
+            validarEmailSeguro(nuevaConfig.smtpUser(), "remitente SMTP");
+        }
+        if (nuevaConfig.smtpHost() != null && !nuevaConfig.smtpHost().isBlank()) {
+            validarHostSeguro(nuevaConfig.smtpHost());
+        }
         configActual.set(nuevaConfig);
         if (persistirEnDisco) {
             guardarConfiguracionEnArchivo(Path.of("logs", "alertas-smtp.properties"), nuevaConfig);
@@ -198,13 +219,20 @@ public final class AlertaService {
 
     /**
      * Evalúa métricas actuales contra los 3 umbrales críticos y dispara alertas SMTP cuando corresponda.
+     * Libera {@code monitorLock} durante la E/S de red y solo marca cada alerta como enviada si la entrega
+     * SMTP tuvo éxito (permitiendo reintento automático si falló la red).
      *
      * @return lista de alertas nuevas emitidas durante esta evaluación.
      */
     public List<AlertaEmitida> evaluar(boolean mysqlUp, double ramPorcentaje, long discoLibreBytes) {
-        List<AlertaEmitida> nuevas = new ArrayList<>();
+        List<PendienteEnvio> pendientes = new ArrayList<>();
+        EmailSender senderSnapshot;
+        ConfiguracionAlertaEmail cfgSnapshot;
+
         synchronized (monitorLock) {
             long ahoraMs = clockMillis.getAsLong();
+            senderSnapshot = this.emailSender;
+            cfgSnapshot = this.configActual.get();
 
             // 1. MySQL caído por más de 1 minuto (> 60_000 ms)
             if (!mysqlUp) {
@@ -212,18 +240,14 @@ public final class AlertaService {
                     inicioFalloMysqlMs = ahoraMs;
                 } else if (!alertaMysqlEnviada && (ahoraMs - inicioFalloMysqlMs) > UMBRAL_MYSQL_CAIDO_MS) {
                     long segsCaido = (ahoraMs - inicioFalloMysqlMs) / 1000L;
-                    AlertaEmitida emitida = despacharAlertaLocked(
+                    pendientes.add(new PendienteEnvio(
                             TipoAlerta.MYSQL_CAIDO,
                             "[FoodCore ERP ALERTA] MySQL no responde hace " + segsCaido + "s",
                             "El servidor MySQL de FoodCore ERP no responde hace " + segsCaido
                                     + " segundos (superó el umbral de 1 minuto). Instante: "
                                     + Instant.ofEpochMilli(ahoraMs) + ".",
                             ahoraMs
-                    );
-                    if (emitida != null) {
-                        nuevas.add(emitida);
-                        alertaMysqlEnviada = true;
-                    }
+                    ));
                 }
             } else {
                 inicioFalloMysqlMs = -1L;
@@ -235,17 +259,13 @@ public final class AlertaService {
                 if (!alertaDiscoEnviada) {
                     double gbLibres = discoLibreBytes / (1024.0 * 1024.0 * 1024.0);
                     String gbTexto = String.format(Locale.US, "%.2f", gbLibres);
-                    AlertaEmitida emitida = despacharAlertaLocked(
+                    pendientes.add(new PendienteEnvio(
                             TipoAlerta.DISCO_BAJO,
                             "[FoodCore ERP ALERTA] Espacio en disco crítico (" + gbTexto + " GB libres)",
                             "El volumen principal del servidor tiene solo " + gbTexto
                                     + " GB disponibles (umbral mínimo requerido: 5.00 GB). Libere espacio o archive backups.",
                             ahoraMs
-                    );
-                    if (emitida != null) {
-                        nuevas.add(emitida);
-                        alertaDiscoEnviada = true;
-                    }
+                    ));
                 }
             } else if (discoLibreBytes >= UMBRAL_DISCO_LIBRE_BYTES) {
                 alertaDiscoEnviada = false;
@@ -258,21 +278,31 @@ public final class AlertaService {
                 } else if (!alertaRamEnviada && (ahoraMs - inicioRamAltaMs) > UMBRAL_RAM_ALTA_MS) {
                     long minAlta = (ahoraMs - inicioRamAltaMs) / 60_000L;
                     String ramTexto = String.format(Locale.US, "%.1f", ramPorcentaje);
-                    AlertaEmitida emitida = despacharAlertaLocked(
+                    pendientes.add(new PendienteEnvio(
                             TipoAlerta.RAM_ALTA,
                             "[FoodCore ERP ALERTA] Uso de RAM al " + ramTexto + "% por más de 5 min",
                             "La memoria RAM del servidor se mantuvo en " + ramTexto
                                     + "% durante " + minAlta + " minutos (umbral: >= 90% por > 5 minutos).",
                             ahoraMs
-                    );
-                    if (emitida != null) {
-                        nuevas.add(emitida);
-                        alertaRamEnviada = true;
-                    }
+                    ));
                 }
             } else {
                 inicioRamAltaMs = -1L;
                 alertaRamEnviada = false;
+            }
+        }
+
+        List<AlertaEmitida> nuevas = new ArrayList<>();
+        for (PendienteEnvio p : pendientes) {
+            AlertaEmitida emitida = despacharAlertaSinLock(cfgSnapshot, senderSnapshot, p);
+            if (emitida != null) {
+                nuevas.add(emitida);
+                synchronized (monitorLock) {
+                    registrarEnHistorialLocked(emitida);
+                    if (emitida.enviadoPorRed()) {
+                        marcarBanderaEnviadaLocked(p.tipo());
+                    }
+                }
             }
         }
         return nuevas;
@@ -289,51 +319,87 @@ public final class AlertaService {
     }
 
     /**
-     * Envía un correo de prueba inmediato con la configuración SMTP vigente.
+     * Envía un correo de prueba inmediato con la configuración SMTP vigente sin retener {@code monitorLock}
+     * durante la E/S de red.
      */
     public AlertaEmitida enviarAlertaPrueba() {
+        long ahoraMs;
+        EmailSender senderSnapshot;
+        ConfiguracionAlertaEmail cfgSnapshot;
         synchronized (monitorLock) {
-            long ahoraMs = clockMillis.getAsLong();
-            return despacharAlertaLocked(
-                    TipoAlerta.PRUEBA,
-                    "[FoodCore ERP] Prueba de Alertas SMTP v5.3.0",
-                    "Mensaje de verificación de alertas de infraestructura FoodCore ERP v5.3.0 emitido el "
-                            + Instant.ofEpochMilli(ahoraMs) + ".",
-                    ahoraMs
-            );
+            ahoraMs = clockMillis.getAsLong();
+            senderSnapshot = this.emailSender;
+            cfgSnapshot = this.configActual.get();
         }
+        PendienteEnvio p = new PendienteEnvio(
+                TipoAlerta.PRUEBA,
+                "[FoodCore ERP] Prueba de Alertas SMTP v5.3.0",
+                "Mensaje de verificación de alertas de infraestructura FoodCore ERP v5.3.0 emitido el "
+                        + Instant.ofEpochMilli(ahoraMs) + ".",
+                ahoraMs
+        );
+        AlertaEmitida emitida = despacharAlertaSinLock(cfgSnapshot, senderSnapshot, p);
+        if (emitida != null) {
+            synchronized (monitorLock) {
+                registrarEnHistorialLocked(emitida);
+            }
+        }
+        return emitida;
     }
 
-    private AlertaEmitida despacharAlertaLocked(TipoAlerta tipo, String asunto, String cuerpo, long timestampMs) {
-        ConfiguracionAlertaEmail cfg = configActual.get();
+    private AlertaEmitida despacharAlertaSinLock(ConfiguracionAlertaEmail cfg,
+                                                 EmailSender sender,
+                                                 PendienteEnvio p) {
         if (cfg == null || !cfg.habilitado() || cfg.destinatario() == null || cfg.destinatario().isBlank()) {
             return null;
         }
+        String destinatarioLimpio = cfg.destinatario().trim();
         boolean enviadoRed = false;
         try {
-            enviadoRed = emailSender.enviar(cfg, cfg.destinatario().trim(), asunto, cuerpo);
+            validarEmailSeguro(destinatarioLimpio, "destinatario");
+            enviadoRed = sender.enviar(cfg, destinatarioLimpio, p.asunto(), p.cuerpo());
         } catch (IOException | RuntimeException ex) {
-            LOGGER.log(Level.WARNING, "No se pudo entregar correo SMTP a " + cfg.destinatario() + ": " + ex.getMessage(), ex);
+            LOGGER.log(Level.WARNING, "No se pudo entregar correo SMTP a " + sanitizarCabecera(destinatarioLimpio)
+                    + ": " + ex.getMessage(), ex);
         }
-        AlertaEmitida registro = new AlertaEmitida(
-                tipo, cfg.destinatario().trim(), asunto, cuerpo, timestampMs, enviadoRed);
-        historialAlertas.add(registro);
-        return registro;
+        return new AlertaEmitida(p.tipo(), destinatarioLimpio, p.asunto(), p.cuerpo(), p.timestampMs(), enviadoRed);
+    }
+
+    private void registrarEnHistorialLocked(AlertaEmitida registro) {
+        while (historialAlertas.size() >= MAX_HISTORIAL_ALERTAS) {
+            historialAlertas.removeFirst();
+        }
+        historialAlertas.addLast(registro);
+    }
+
+    private void marcarBanderaEnviadaLocked(TipoAlerta tipo) {
+        switch (tipo) {
+            case MYSQL_CAIDO -> alertaMysqlEnviada = true;
+            case DISCO_BAJO -> alertaDiscoEnviada = true;
+            case RAM_ALTA -> alertaRamEnviada = true;
+            case PRUEBA -> {
+                // Sin bandera persistente de supresión
+            }
+        }
     }
 
     /**
-     * Cliente SMTP mínimo con JDK estándar (soporta SMTP plano, SMTPS puerto 465 y STARTTLS puerto 587).
+     * Cliente SMTP mínimo con JDK estándar (soporta SMTP plano, SMTPS puerto 465 y STARTTLS puerto 587)
+     * con verificación estricta de hostname TLS ({@code HTTPS}) y prevención de SMTP CRLF Injection.
      */
     static boolean enviarCorreoSmtpNativo(
             ConfiguracionAlertaEmail cfg, String destinatario, String asunto, String cuerpo) throws IOException {
         if (cfg.smtpHost() == null || cfg.smtpHost().isBlank()) {
             throw new IOException("Host SMTP no configurado");
         }
+        String hostLimpio = validarHostSeguro(cfg.smtpHost());
+        String destLimpio = validarEmailSeguro(destinatario, "destinatario");
         String remitente = (cfg.smtpUser() != null && !cfg.smtpUser().isBlank())
                 ? cfg.smtpUser().trim()
                 : "alertas@foodcore.pe";
+        remitente = validarEmailSeguro(remitente, "remitente SMTP");
 
-        try (Socket socket = abrirSocketSmtp(cfg)) {
+        try (Socket socket = abrirSocketSmtp(cfg, hostLimpio)) {
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             BufferedWriter writer = new BufferedWriter(
@@ -348,7 +414,8 @@ public final class AlertaService {
                 leerRespuestaSmtp(reader, 220);
                 SSLSocketFactory sslFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
                 try (SSLSocket tlsSocket = (SSLSocket) sslFactory.createSocket(
-                        socket, cfg.smtpHost().trim(), cfg.smtpPort(), true)) {
+                        socket, hostLimpio, cfg.smtpPort(), true)) {
+                    habilitarVerificacionHostnameTls(tlsSocket);
                     tlsSocket.startHandshake();
                     BufferedReader tlsReader = new BufferedReader(
                             new InputStreamReader(tlsSocket.getInputStream(), StandardCharsets.UTF_8));
@@ -356,29 +423,79 @@ public final class AlertaService {
                             new OutputStreamWriter(tlsSocket.getOutputStream(), StandardCharsets.UTF_8));
                     enviarComando(tlsWriter, "EHLO foodcore.local");
                     leerRespuestaSmtp(tlsReader, 250);
-                    autenticarYEnviarMensaje(tlsReader, tlsWriter, cfg, remitente, destinatario, asunto, cuerpo);
+                    autenticarYEnviarMensaje(tlsReader, tlsWriter, cfg, remitente, destLimpio, asunto, cuerpo);
                     return true;
                 }
             }
 
-            autenticarYEnviarMensaje(reader, writer, cfg, remitente, destinatario, asunto, cuerpo);
+            autenticarYEnviarMensaje(reader, writer, cfg, remitente, destLimpio, asunto, cuerpo);
             return true;
         }
     }
 
-    private static Socket abrirSocketSmtp(ConfiguracionAlertaEmail cfg) throws IOException {
+    private static Socket abrirSocketSmtp(ConfiguracionAlertaEmail cfg, String hostLimpio) throws IOException {
         if (cfg.tlsEnabled() && cfg.smtpPort() == 465) {
+            Socket raw = new Socket();
+            raw.connect(new InetSocketAddress(hostLimpio, cfg.smtpPort()), SMTP_TIMEOUT_MS);
+            raw.setSoTimeout(SMTP_TIMEOUT_MS);
             SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket sslSocket = (SSLSocket) factory.createSocket();
-            sslSocket.connect(new InetSocketAddress(cfg.smtpHost().trim(), cfg.smtpPort()), SMTP_TIMEOUT_MS);
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket(raw, hostLimpio, cfg.smtpPort(), true);
             sslSocket.setSoTimeout(SMTP_TIMEOUT_MS);
-            sslSocket.startHandshake();
-            return sslSocket;
+            habilitarVerificacionHostnameTls(sslSocket);
+            try {
+                sslSocket.startHandshake();
+                return sslSocket;
+            } catch (IOException | RuntimeException ex) {
+                try {
+                    sslSocket.close();
+                } catch (IOException suppressed) {
+                    ex.addSuppressed(suppressed);
+                }
+                throw ex;
+            }
         }
         Socket socket = new Socket();
-        socket.connect(new InetSocketAddress(cfg.smtpHost().trim(), cfg.smtpPort()), SMTP_TIMEOUT_MS);
+        socket.connect(new InetSocketAddress(hostLimpio, cfg.smtpPort()), SMTP_TIMEOUT_MS);
         socket.setSoTimeout(SMTP_TIMEOUT_MS);
         return socket;
+    }
+
+    private static void habilitarVerificacionHostnameTls(SSLSocket sslSocket) {
+        SSLParameters params = sslSocket.getSSLParameters();
+        params.setEndpointIdentificationAlgorithm("HTTPS");
+        sslSocket.setSSLParameters(params);
+    }
+
+    /**
+     * Valida estrictamente formato de dirección de correo rechazando CR/LF y metacaracteres SMTP.
+     */
+    public static String validarEmailSeguro(String email, String campo) {
+        if (email == null) {
+            throw new IllegalArgumentException("El campo " + campo + " no puede ser nulo.");
+        }
+        if (contieneCrlf(email)) {
+            throw new IllegalArgumentException("Caracteres CR/LF prohibidos detectados en " + campo + ".");
+        }
+        String trimmed = email.trim();
+        if (!EMAIL_SEGURO.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException("Formato de correo inválido en " + campo + ".");
+        }
+        return trimmed;
+    }
+
+    private static String validarHostSeguro(String host) {
+        if (host == null || contieneCrlf(host)) {
+            throw new IllegalArgumentException("Host SMTP inválido.");
+        }
+        String trimmed = host.trim();
+        if (!HOST_SEGURO.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException("Host SMTP contiene caracteres no permitidos.");
+        }
+        return trimmed;
+    }
+
+    private static boolean contieneCrlf(String valor) {
+        return valor != null && (valor.indexOf('\r') >= 0 || valor.indexOf('\n') >= 0 || valor.indexOf('\0') >= 0);
     }
 
     private static void autenticarYEnviarMensaje(
@@ -455,7 +572,11 @@ public final class AlertaService {
     public static ConfiguracionAlertaEmail cargarConfiguracionDesdeClasspath() {
         Properties props = new Properties();
         cargarPropsRecurso(props, "/application.properties");
-        cargarPropsRecurso(props, "/application-test.properties");
+        // Solo cargar application-test.properties cuando el perfil de pruebas está explícitamente habilitado
+        if ("test".equalsIgnoreCase(System.getProperty("foodcore.profile"))
+                || "true".equalsIgnoreCase(System.getProperty("foodcore.test.mode"))) {
+            cargarPropsRecurso(props, "/application-test.properties");
+        }
 
         String host = resolverValor(props.getProperty("smtp.host", "smtp.gmail.com"));
         int port = parseIntSeguro(resolverValor(props.getProperty("smtp.port", "587")), 587);
