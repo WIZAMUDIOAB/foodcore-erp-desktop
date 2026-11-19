@@ -26,3 +26,4 @@ uploads/
 !uploads/.gitkeep
 scripts/*.exe
 scripts/*.js
+.orchestrator/
