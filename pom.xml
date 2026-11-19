@@ -254,16 +254,16 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>foodcore.cer</exclude>
+                </excludes>
             </resource>
             <resource>
                 <directory>${project.basedir}/pwa</directory>
                 <targetPath>pwa</targetPath>
-            </resource>
-            <resource>
-                <directory>${project.basedir}</directory>
-                <includes>
-                    <include>foodcore.cer</include>
-                </includes>
+                <excludes>
+                    <exclude>foodcore.cer</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
@@ -438,7 +438,7 @@
                 </executions>
             </plugin>
 
-            <!-- SpotBugs (0 High/Medium Bugs, R-01) -->
+            <!-- SpotBugs + FindSecBugs (0 High/Medium Bugs, R-01) -->
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
@@ -449,6 +449,13 @@
                     <failOnError>true</failOnError>
                     <xmlOutput>true</xmlOutput>
                     <excludeFilterFile>config/spotbugs-exclude.xml</excludeFilterFile>
+                    <plugins>
+                        <plugin>
+                            <groupId>com.h3xstream.findsecbugs</groupId>
+                            <artifactId>findsecbugs-plugin</artifactId>
+                            <version>1.13.0</version>
+                        </plugin>
+                    </plugins>
                 </configuration>
                 <executions>
                     <execution>
@@ -545,13 +552,19 @@
                 <version>10.15.0</version>
                 <configuration>
                     <url>jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=America/Lima</url>
-                    <cleanDisabled>false</cleanDisabled>
+                    <cleanDisabled>true</cleanDisabled>
                 </configuration>
                 <dependencies>
                     <dependency>
                         <groupId>com.mysql</groupId>
                         <artifactId>mysql-connector-j</artifactId>
-                        <version>8.3.0</version>
+                        <version>26.10.0</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>com.google.protobuf</groupId>
+                                <artifactId>protobuf-java</artifactId>
+                            </exclusion>
+                        </exclusions>
                     </dependency>
                 </dependencies>
             </plugin>

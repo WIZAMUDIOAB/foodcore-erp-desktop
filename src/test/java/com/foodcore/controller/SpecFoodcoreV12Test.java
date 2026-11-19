@@ -35,6 +35,7 @@ import javafx.scene.image.WritableImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -54,6 +55,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -76,6 +78,23 @@ class SpecFoodcoreV12Test {
     }
 
     @Test
+    @DisplayName("Seguridad pruebas: MySqlIntegrationTestSupport bloquea clean() sobre esquemas que no terminan en _test")
+    void testGuardiaEsquemaPruebasBloqueaProduccion() {
+        assertThrows(IllegalStateException.class, () ->
+            MySqlIntegrationTestSupport.validarEsquemaDePruebas(
+                "jdbc:mysql://127.0.0.1:3306/foodcore?sslMode=REQUIRED"));
+        assertThrows(IllegalStateException.class, () ->
+            MySqlIntegrationTestSupport.validarEsquemaDePruebas(
+                "jdbc:mysql://127.0.0.1:3306/foodcore_prod?sslMode=REQUIRED"));
+        assertThrows(IllegalStateException.class, () ->
+            MySqlIntegrationTestSupport.validarEsquemaDePruebas(
+                "jdbc:mysql://127.0.0.1:3306/_test?sslMode=REQUIRED"));
+        assertDoesNotThrow(() ->
+            MySqlIntegrationTestSupport.validarEsquemaDePruebas(
+                "jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED"));
+    }
+
+    @Test
     @DisplayName("SPEC-FOODCORE-v1.2 §1.1 & §6.1: UnidadMedidaFormatter formatea 120 Unds, 38.2 kg, 150 gr, 500 ml y 1.25 L sin .0000")
     void testUnidadMedidaFormatterSinCerosDecimales() {
         assertEquals("120 Unds", UnidadMedidaFormatter.formatear(new BigDecimal("120.0000"), "UNIDAD"));
@@ -89,12 +108,14 @@ class SpecFoodcoreV12Test {
 
     @Test
     @DisplayName("SPEC-FOODCORE-v1.2 §2, §3, §4, §5, §6 & §7: Flujo E2E Backoffice, Recetas, Split, Descuento RBAC, Merma, Gasto Caja y 5 Capturas")
-    void testFlujoCompletoBackofficeOperacionesYCapturasV12() throws Exception {
+    void testFlujoCompletoBackofficeOperacionesYCapturasV12(@TempDir Path tempDir) throws Exception {
         InsumoDAO insumoDAO = new InsumoDAOImpl();
         CajaService cajaService = new CajaService();
         VentaService ventaService = new VentaService();
         AutorizacionService authz = new AutorizacionService();
+        Path archivoUploadCreado = null;
 
+        try {
         // Abrir turno de caja con S/ 100.00
         int idCaja = cajaService.abrirTurnoCaja(1, "Caja Principal 01", new BigDecimal("100.00"));
 
@@ -139,7 +160,7 @@ class SpecFoodcoreV12Test {
         );
 
         // 2. Crear platillo con fotografía real y verificar copia a uploads/platillos/ y visualización en POS (§2.2, §6.3)
-        File tempImg = generarImagenDemoPlatillo();
+        File tempImg = generarImagenDemoPlatillo(tempDir);
         AtomicReference<MenuController> menuCtrlRef = new AtomicReference<>();
         AtomicReference<Parent> menuRootRef = new AtomicReference<>();
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
@@ -157,8 +178,9 @@ class SpecFoodcoreV12Test {
 
         MenuController menuCtrl = menuCtrlRef.get();
         String rutaRelativaFoto = menuCtrl.copiarImagenAUploads(tempImg);
+        archivoUploadCreado = Path.of(rutaRelativaFoto);
         assertTrue(rutaRelativaFoto.startsWith("uploads/platillos/"));
-        assertTrue(new File(rutaRelativaFoto).exists());
+        assertTrue(Files.isRegularFile(archivoUploadCreado));
 
         Producto burgerFoto = menuCtrl.guardarPlatilloEnBD(
             1, "HAM-FOTO-01", "Burger Angus Trufada", new BigDecimal("28.00"), true, rutaRelativaFoto
@@ -359,9 +381,14 @@ class SpecFoodcoreV12Test {
             assertEquals(new BigDecimal("113.00"), rs.getBigDecimal("saldo_final_teorico"));
             assertEquals(new BigDecimal("0.00"), rs.getBigDecimal("diferencia"));
         }
+        } finally {
+            if (archivoUploadCreado != null) {
+                Files.deleteIfExists(archivoUploadCreado);
+            }
+        }
     }
 
-    private File generarImagenDemoPlatillo() throws Exception {
+    private File generarImagenDemoPlatillo(Path tempDir) throws Exception {
         BufferedImage img = new BufferedImage(160, 120, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -371,7 +398,7 @@ class SpecFoodcoreV12Test {
         g.fillOval(42, 24, 76, 72);
         g.dispose();
 
-        Path temp = Files.createTempFile("burger_angus_trufada_", ".png");
+        Path temp = tempDir.resolve("burger_angus_trufada_" + UUID.randomUUID().toString().substring(0, 8) + ".png");
         ImageIO.write(img, "png", temp.toFile());
         return temp.toFile();
     }
