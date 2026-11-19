@@ -41,7 +41,7 @@ public class SubFaseC2KdsE2ETest {
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of(
-                                    "uuid_local", "kds-e2e-" + java.util.UUID.randomUUID(),
+                                    "uuid_local", java.util.UUID.randomUUID().toString(),
                                     "numero_mesa", "03",
                                     "items", java.util.List.of(
                                             Map.of("id_producto", 1, "cantidad", 1, "notas", "KDS E2E Real")

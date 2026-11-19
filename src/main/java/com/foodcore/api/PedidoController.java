@@ -426,6 +426,9 @@ public class PedidoController {
             String uuidLocal = state.extraerTexto(body, "uuid_local", "uuidLocal", "idempotency_key");
             if (uuidLocal == null || uuidLocal.isBlank()) {
                 uuidLocal = UUID.randomUUID().toString();
+            } else if (uuidLocal.length() > 36) {
+                state.responderError(ctx, 400, "El campo 'uuid_local' no puede exceder 36 caracteres.");
+                return;
             }
 
             String numeroMesa = state.extraerTexto(body, "numero_mesa", "numeroMesa", "mesa");
@@ -883,6 +886,9 @@ public class PedidoController {
             String idempotencyKey = state.extraerTexto(body, "idempotency_key", "uuid_local");
             if (idempotencyKey == null || idempotencyKey.isBlank()) {
                 idempotencyKey = UUID.randomUUID().toString();
+            } else if (idempotencyKey.length() > 36) {
+                state.responderError(ctx, 400, "El campo 'idempotency_key' no puede exceder 36 caracteres.");
+                return;
             }
 
             if (!TIPOS_COMPROBANTE_VALIDOS.contains(tipoComprobante)) {

@@ -1,15 +1,24 @@
 package com.foodcore.e2e;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.microsoft.playwright.APIRequestContext;
+import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.RequestOptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,9 +30,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class SubFaseDDashboardE2ETest {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     @BeforeAll
-    static void setUpServer() {
+    static void setUpServer() throws Exception {
         PlaywrightE2ESupport.asegurarServidorActivo();
+        sembrarVentaRealParaDashboard();
+    }
+
+    private static void sembrarVentaRealParaDashboard() throws Exception {
+        try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
+            APIRequestContext adminReq = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
+            APIResponse kpisResp = adminReq.get("/api/dashboard/kpis");
+            APIResponse topResp = adminReq.get("/api/dashboard/top-platos");
+            boolean yaHayDatosHoy = kpisResp.status() == 200
+                    && MAPPER.readTree(kpisResp.text()).path("ventas_dia").asDouble(0.0) > 0.0
+                    && topResp.status() == 200
+                    && MAPPER.readTree(topResp.text()).size() > 0;
+            if (!yaHayDatosHoy) {
+                APIResponse estadoCaja = adminReq.get("/api/caja/estado");
+                boolean abierta = estadoCaja.status() == 200
+                        && MAPPER.readTree(estadoCaja.text()).path("abierta").asBoolean();
+                if (!abierta) {
+                    APIResponse abrirResp = adminReq.post("/api/caja/abrir",
+                            RequestOptions.create()
+                                    .setHeader("Content-Type", "application/json")
+                                    .setData(Map.of(
+                                            "nombre_caja", "Caja Dashboard Mobile E2E",
+                                            "monto_inicial", 150.00
+                                    )));
+                    assertEquals(200, abrirResp.status(),
+                            "Debe abrir caja para sembrar venta real de Dashboard; " + abrirResp.text());
+                }
+                APIResponse pedResp = adminReq.post("/api/pedidos",
+                        RequestOptions.create()
+                                .setHeader("Content-Type", "application/json")
+                                .setData(Map.of(
+                                        "uuid_local", UUID.randomUUID().toString(),
+                                        "numero_mesa", "07",
+                                        "items", List.of(Map.of("id_producto", 1, "cantidad", 2))
+                                )));
+                assertTrue(pedResp.status() == 201 || pedResp.status() == 200,
+                        "Debe crearse pedido real para Dashboard; recibido " + pedResp.status() + ": " + pedResp.text());
+                int idPedido = MAPPER.readTree(pedResp.text()).path("id_pedido").asInt();
+
+                APIResponse cobroResp = adminReq.post("/api/caja/cobrar",
+                        RequestOptions.create()
+                                .setHeader("Content-Type", "application/json")
+                                .setData(Map.of(
+                                        "id_pedido", idPedido,
+                                        "numero_mesa", "07",
+                                        "tipo_comprobante", "BOLETA",
+                                        "medio_pago", "EFECTIVO",
+                                        "monto_recibido", 100.00
+                                )));
+                assertEquals(200, cobroResp.status(),
+                        "Debe cobrarse el pedido real para Dashboard; recibido " + cobroResp.status() + ": " + cobroResp.text());
+            }
+            adminReq.dispose();
+        }
     }
 
     @AfterAll
@@ -69,6 +134,7 @@ public class SubFaseDDashboardE2ETest {
             // 3. Validar listas secundarias de ranking y mesas
             Locator topPlatos = page.locator("#topPlatosList");
             topPlatos.waitFor();
+            page.waitForCondition(() -> page.locator(".top-dish-row").count() > 0);
             assertTrue(page.locator(".top-dish-row").count() > 0, "La lista de top platos debe tener contenido");
 
             // Guardar evidencia visual móvil

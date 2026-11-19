@@ -51,6 +51,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -450,6 +451,33 @@ class HardeningAuthApiSecurityTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, kdsItems.statusCode());
             assertEquals("[]", kdsItems.body().trim());
+
+            // 5. uuid_local / idempotency_key > 36 caracteres devuelve HTTP 400 (CHAR(36) en BD)
+            String claveLarga = "prefijo-largo-" + UUID.randomUUID();
+            HttpResponse<String> pedidoUuidLargo = client.send(
+                    HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + mainPort + "/api/pedidos"))
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(
+                                    "{\"uuid_local\":\"" + claveLarga + "\",\"numero_mesa\":\"01\","
+                                            + "\"items\":[{\"id_producto\":1,\"cantidad\":1}]}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(400, pedidoUuidLargo.statusCode(),
+                    "POST /api/pedidos con uuid_local > 36 caracteres debe responder HTTP 400");
+
+            HttpResponse<String> cobroKeyLarga = client.send(
+                    HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + mainPort + "/api/caja/cobrar"))
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(
+                                    "{\"idempotency_key\":\"" + claveLarga + "\",\"numero_mesa\":\"01\","
+                                            + "\"tipo_comprobante\":\"BOLETA\",\"medio_pago\":\"EFECTIVO\","
+                                            + "\"items\":[{\"id_producto\":1,\"cantidad\":1}]}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(400, cobroKeyLarga.statusCode(),
+                    "POST /api/caja/cobrar con idempotency_key > 36 caracteres debe responder HTTP 400");
         } finally {
             server.detener();
         }

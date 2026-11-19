@@ -93,7 +93,7 @@ public class SubFaseC2CajaE2ETest {
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of(
-                                    "uuid_local", "caja-e2e-" + java.util.UUID.randomUUID(),
+                                    "uuid_local", java.util.UUID.randomUUID().toString(),
                                     "numero_mesa", "04",
                                     "items", java.util.List.of(
                                             Map.of("id_producto", 1, "cantidad", 2, "precio_unitario", 0.01)

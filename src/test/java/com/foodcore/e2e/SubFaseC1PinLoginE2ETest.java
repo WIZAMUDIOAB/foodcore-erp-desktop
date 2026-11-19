@@ -190,7 +190,7 @@ public class SubFaseC1PinLoginE2ETest {
     void testUiCambioRapidoMozoEnCaliente() {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright();
              Browser browser = PlaywrightE2ESupport.lanzarNavegador(playwright);
-             BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticado(browser, 1366, 850, "MOZO");
+             BrowserContext context = PlaywrightE2ESupport.crearContextoAutenticadoFresco(browser, 1366, 850, "MOZO");
              Page page = context.newPage()) {
 
             // 1. Abrir directamente catalogo.html con mesa 04 y esperar estabilidad de red
