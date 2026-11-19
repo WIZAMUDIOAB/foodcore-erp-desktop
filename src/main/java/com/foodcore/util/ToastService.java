@@ -119,7 +119,7 @@ public final class ToastService {
      * Muestra un mensaje toast informativo sobre el contenedor especificado.
      */
     public static void mostrarInfo(Pane hostPane, String mensaje) {
-        mostrarToast(hostPane, mensaje, TipoToast.EXITO);
+        mostrarToast(hostPane, mensaje, TipoToast.INFO);
     }
 
     /**
@@ -157,6 +157,10 @@ public final class ToastService {
             case ERROR -> {
                 iconLiteral = "fth-alert-circle";
                 claseSemantica = "toast-error";
+            }
+            case INFO -> {
+                iconLiteral = "fth-info";
+                claseSemantica = "toast-info";
             }
             default -> {
                 iconLiteral = "fth-alert-triangle";

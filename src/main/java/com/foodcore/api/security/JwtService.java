@@ -2,6 +2,7 @@ package com.foodcore.api.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.foodcore.util.ConexionBD;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -78,7 +79,9 @@ public final class JwtService {
         }
         Properties props = new Properties();
         cargarSiExiste(props, "/application.properties");
-        cargarSiExiste(props, "/application-test.properties");
+        if (ConexionBD.esPerfilPruebasActivo()) {
+            cargarSiExiste(props, "/application-test.properties");
+        }
         String propVal = props.getProperty("jwt.secret");
         return propVal != null ? propVal.trim() : null;
     }

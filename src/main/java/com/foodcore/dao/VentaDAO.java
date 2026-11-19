@@ -18,6 +18,7 @@ public interface VentaDAO {
     List<Venta> listarVentasDelDia(Connection conn) throws SQLException;
     List<Venta> listarVentasConFiltro(Connection conn, LocalDate desde, LocalDate hasta, String textoBusqueda) throws SQLException;
     Optional<Venta> buscarVentaPorId(Connection conn, int idVenta) throws SQLException;
+    Optional<Venta> buscarPorIdempotencyKey(Connection conn, String idempotencyKey) throws SQLException;
     List<DetalleVenta> listarDetallesPorVenta(Connection conn, int idVenta) throws SQLException;
     int marcarDetalleDevuelto(Connection conn, int idDetalleVenta, String motivo) throws SQLException;
     void actualizarTotalesVentaPorDevolucion(Connection conn, int idVenta, BigDecimal nuevoSubtotal,

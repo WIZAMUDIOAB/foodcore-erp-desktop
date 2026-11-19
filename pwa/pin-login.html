@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#F9F7F4" />
-  <title>FoodCore ERP v5.4 — Acceso Rápido por PIN</title>
+  <title>FoodCore ERP v5.7 — Acceso Rápido por PIN</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -36,43 +36,35 @@
 
   <main class="pin-login-shell">
     <div class="pin-login-container">
-      <!-- Columna Izquierda: Selección de Mozo / Operador Táctil -->
+      <!-- Columna Izquierda: Información de Acceso Táctil (sin enumeración pre-auth de usuarios) -->
       <section class="pin-users-section">
         <div class="pin-section-header">
-          <h2>1. Seleccione su Perfil</h2>
-          <p>Toque su tarjeta para activar el teclado de seguridad</p>
+          <h2>1. Acceso Seguro por PIN</h2>
+          <p>Ingrese su PIN personal de 4 a 6 dígitos para abrir su turno en salón</p>
         </div>
         <div class="mozo-selection-grid" id="mozosGrid">
-          <div class="mozo-card active" data-id="3" data-username="mozo" data-nombre="Mateo Quispe" onclick="FoodCorePWA.seleccionarUsuarioPin(this)">
-            <div class="mozo-avatar-circle">MQ</div>
+          <div class="mozo-card active" id="pinAnonNotice">
+            <div class="mozo-avatar-circle">PN</div>
             <div class="mozo-info">
-              <span class="mozo-name">Mateo Quispe</span>
-              <span class="mozo-role-badge">MOZO</span>
+              <span class="mozo-name">Operador de Turno</span>
+              <span class="mozo-role-badge">PIN 4-6 DÍGITOS</span>
             </div>
-            <span class="pin-ready-dot" title="PIN configurado"></span>
-          </div>
-          <div class="mozo-card" data-id="1" data-username="admin" data-nombre="Administrador General" onclick="FoodCorePWA.seleccionarUsuarioPin(this)">
-            <div class="mozo-avatar-circle admin">AD</div>
-            <div class="mozo-info">
-              <span class="mozo-name">Administrador General</span>
-              <span class="mozo-role-badge badge-admin">ADMIN</span>
-            </div>
-            <span class="pin-ready-dot" title="PIN configurado"></span>
+            <span class="pin-ready-dot" title="Identificación directa por PIN"></span>
           </div>
         </div>
       </section>
 
-      <!-- Columna Derecha: Indicador 4 Círculos + Teclado Numérico Táctil 3x4 -->
+      <!-- Columna Derecha: Indicador de Dígitos + Teclado Numérico Táctil 3x4 -->
       <section class="pin-pad-section">
         <div class="pin-pad-header">
           <h2>2. Ingrese su PIN</h2>
           <div class="target-mozo-chip" id="lblTargetMozoChip">
-            <span>Operando como:</span>
-            <strong id="lblTargetMozoNombre">Mateo Quispe (Mozo)</strong>
+            <span>Modo de acceso:</span>
+            <strong id="lblTargetMozoNombre">PIN Personal</strong>
           </div>
         </div>
 
-        <div class="pin-dots-display" id="pinDotsDisplay" aria-label="Indicador de PIN de 4 dígitos">
+        <div class="pin-dots-display" id="pinDotsDisplay" aria-label="Indicador de PIN de 4 a 6 dígitos">
           <span class="pin-dot" id="dot-0"></span>
           <span class="pin-dot" id="dot-1"></span>
           <span class="pin-dot" id="dot-2"></span>
@@ -82,24 +74,24 @@
         <div id="pinErrorMsg" class="pin-error-banner" role="alert" style="display:none;"></div>
 
         <div class="pin-keypad-grid" id="pinKeypad">
-          <button type="button" class="pin-btn" data-digit="1" onclick="FoodCorePWA.presionarDigitoPin('1')">1</button>
-          <button type="button" class="pin-btn" data-digit="2" onclick="FoodCorePWA.presionarDigitoPin('2')">2</button>
-          <button type="button" class="pin-btn" data-digit="3" onclick="FoodCorePWA.presionarDigitoPin('3')">3</button>
+          <button type="button" class="pin-btn" data-digit="1">1</button>
+          <button type="button" class="pin-btn" data-digit="2">2</button>
+          <button type="button" class="pin-btn" data-digit="3">3</button>
 
-          <button type="button" class="pin-btn" data-digit="4" onclick="FoodCorePWA.presionarDigitoPin('4')">4</button>
-          <button type="button" class="pin-btn" data-digit="5" onclick="FoodCorePWA.presionarDigitoPin('5')">5</button>
-          <button type="button" class="pin-btn" data-digit="6" onclick="FoodCorePWA.presionarDigitoPin('6')">6</button>
+          <button type="button" class="pin-btn" data-digit="4">4</button>
+          <button type="button" class="pin-btn" data-digit="5">5</button>
+          <button type="button" class="pin-btn" data-digit="6">6</button>
 
-          <button type="button" class="pin-btn" data-digit="7" onclick="FoodCorePWA.presionarDigitoPin('7')">7</button>
-          <button type="button" class="pin-btn" data-digit="8" onclick="FoodCorePWA.presionarDigitoPin('8')">8</button>
-          <button type="button" class="pin-btn" data-digit="9" onclick="FoodCorePWA.presionarDigitoPin('9')">9</button>
+          <button type="button" class="pin-btn" data-digit="7">7</button>
+          <button type="button" class="pin-btn" data-digit="8">8</button>
+          <button type="button" class="pin-btn" data-digit="9">9</button>
 
-          <button type="button" class="pin-btn pin-btn-action" id="btnPinClear" onclick="FoodCorePWA.limpiarPin()">C</button>
-          <button type="button" class="pin-btn" data-digit="0" onclick="FoodCorePWA.presionarDigitoPin('0')">0</button>
-          <button type="button" class="pin-btn pin-btn-action" id="btnPinDelete" onclick="FoodCorePWA.borrarUltimoDigitoPin()" aria-label="Borrar dígito">⌫</button>
+          <button type="button" class="pin-btn pin-btn-action" id="btnPinClear">C</button>
+          <button type="button" class="pin-btn" data-digit="0">0</button>
+          <button type="button" class="pin-btn pin-btn-action" id="btnPinDelete" aria-label="Borrar dígito">⌫</button>
         </div>
 
-        <button type="button" id="btnPinSubmit" class="btn-touch btn-primary btn-submit-pin" onclick="FoodCorePWA.ejecutarPinLogin()">
+        <button type="button" id="btnPinSubmit" class="btn-touch btn-primary btn-submit-pin">
           <span>Ingresar al Salón</span>
           <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>

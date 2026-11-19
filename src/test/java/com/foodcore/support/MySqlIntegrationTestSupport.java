@@ -10,6 +10,7 @@ import org.testcontainers.containers.MySQLContainer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -61,6 +62,7 @@ public final class MySqlIntegrationTestSupport {
 
                 activeJdbcUrl = container.getJdbcUrl()
                     + "?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8";
+                validarEsquemaDePruebas(activeJdbcUrl);
                 activeMigratorUser = container.getUsername();
                 activeMigratorPass = migratorPass;
                 activeAppUser = "foodcore_app";
@@ -76,6 +78,7 @@ public final class MySqlIntegrationTestSupport {
                 activeJdbcUrl = "jdbc:mysql://" + host + ":" + port + "/" + db
                     + "?sslMode=" + sslMode + "&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8";
                 ConexionBD.validarJdbcUrlSegura(activeJdbcUrl);
+                validarEsquemaDePruebas(activeJdbcUrl);
 
                 activeMigratorUser = ConexionBD.resolverValor(
                     "foodcore_migrator",
@@ -97,27 +100,42 @@ public final class MySqlIntegrationTestSupport {
                     "FOODCORE_DB_PASS",
                     "FOODCORE_DB_PASS"
                 );
-
-                if (!esCi) {
-                    String localMainUrl = "jdbc:mysql://" + host + ":" + port + "/foodcore"
-                        + "?sslMode=" + sslMode
-                        + "&allowPublicKeyRetrieval=true&serverTimezone=America/Lima&characterEncoding=UTF-8";
-                    Flyway prodFlyway = Flyway.configure()
-                        .dataSource(localMainUrl, activeMigratorUser, activeMigratorPass)
-                        .locations(FlywayMigrator.MIGRATIONS_LOCATION)
-                        .cleanDisabled(false)
-                        .validateOnMigrate(true)
-                        .baselineOnMigrate(false)
-                        .load();
-                    prodFlyway.clean();
-                    prodFlyway.migrate();
-                }
             }
             initialized = true;
         }
 
         reiniciarEsquemaConFlyway();
         ConexionBD.reconfigurarPool(activeJdbcUrl, activeAppUser, activeAppPass);
+    }
+
+    /**
+     * Guarda estricta de seguridad: impide ejecutar operaciones destructivas (p. ej. {@code flyway.clean()})
+     * contra cualquier esquema MySQL cuyo nombre no termine explícitamente en {@code _test}.
+     */
+    public static void validarEsquemaDePruebas(String jdbcUrl) {
+        if (jdbcUrl == null || jdbcUrl.isBlank()) {
+            throw new IllegalStateException(
+                "Operación destructiva de pruebas bloqueada: JDBC URL vacía o nula.");
+        }
+        String trimmed = jdbcUrl.trim();
+        if (!trimmed.toLowerCase(Locale.ROOT).startsWith("jdbc:mysql://")) {
+            throw new IllegalStateException(
+                "Operación destructiva de pruebas bloqueada: JDBC URL no corresponde a MySQL.");
+        }
+        String sinQuery = trimmed.contains("?") ? trimmed.substring(0, trimmed.indexOf('?')) : trimmed;
+        int esquemaIdx = sinQuery.indexOf('/', "jdbc:mysql://".length());
+        if (esquemaIdx < 0 || esquemaIdx + 1 >= sinQuery.length()) {
+            throw new IllegalStateException(
+                "Operación destructiva de pruebas bloqueada: la JDBC URL no especifica un esquema de pruebas.");
+        }
+        String esquema = sinQuery.substring(esquemaIdx + 1).trim();
+        if (!esquema.matches("^[A-Za-z0-9_]+$")
+                || !esquema.toLowerCase(Locale.ROOT).endsWith("_test")
+                || esquema.length() <= "_test".length()) {
+            throw new IllegalStateException(
+                "Operación destructiva de pruebas bloqueada: el esquema JDBC '" + esquema
+                    + "' debe terminar en '_test' (nunca ejecutar clean() sobre esquemas de producción).");
+        }
     }
 
     private static void configurarUsuarioAplicacionEnContenedor(
@@ -137,6 +155,7 @@ public final class MySqlIntegrationTestSupport {
     }
 
     public static synchronized MigrateResult reiniciarEsquemaConFlyway() {
+        validarEsquemaDePruebas(activeJdbcUrl);
         Flyway flyway = Flyway.configure()
             .dataSource(activeJdbcUrl, activeMigratorUser, activeMigratorPass)
             .locations(FlywayMigrator.MIGRATIONS_LOCATION)

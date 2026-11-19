@@ -1,5 +1,6 @@
 package com.foodcore.api.security;
 
+import com.foodcore.util.ConexionBD;
 import io.javalin.http.Context;
 
 import java.io.InputStream;
@@ -63,7 +64,9 @@ public final class CorsPolicy {
         }
         Properties props = new Properties();
         cargarSiExiste(props, "/application.properties");
-        cargarSiExiste(props, "/application-test.properties");
+        if (ConexionBD.esPerfilPruebasActivo()) {
+            cargarSiExiste(props, "/application-test.properties");
+        }
         return props.getProperty("cors.allowed.origins", "");
     }
 

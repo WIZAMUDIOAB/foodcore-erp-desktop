@@ -4,6 +4,7 @@ import com.foodcore.model.enums.Permiso;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -16,6 +17,7 @@ import java.util.Set;
 public final class SesionUsuario {
 
     public static final long MINUTOS_INACTIVIDAD_DEFAULT = 30L;
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     private final long idUsuario;
     private final String nombreCompleto;
@@ -38,7 +40,7 @@ public final class SesionUsuario {
             ? Collections.emptySet()
             : Collections.unmodifiableSet(EnumSet.copyOf(permisos));
         this.idTerminal = idTerminal != null ? idTerminal : "TERM-LOCAL";
-        this.iniciadaEn = iniciadaEn != null ? iniciadaEn : LocalDateTime.now();
+        this.iniciadaEn = iniciadaEn != null ? iniciadaEn : LocalDateTime.now(ZONA_LIMA);
         this.expiraEn = this.iniciadaEn.plusMinutes(MINUTOS_INACTIVIDAD_DEFAULT);
     }
 

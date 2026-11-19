@@ -61,7 +61,7 @@ class SubFaseCInfraestructuraTest {
 
     @AfterEach
     void limpiarEstado() {
-        AuthService.setUsuarioSesionActual(null);
+        AuthService.logout();
         AlertaService.reiniciarEstadoGlobal();
     }
 
@@ -162,6 +162,11 @@ class SubFaseCInfraestructuraTest {
 
         AtomicBoolean ejecutorInvocado = new AtomicBoolean(false);
         AtomicReference<Path> rutaRestaurada = new AtomicReference<>();
+
+        Usuario admin = new Usuario(1, 1, 1, "admin", "hash", true);
+        admin.setNombreRol("ADMIN");
+        admin.setNombreEmpleado("Administrador General");
+        AuthService.setUsuarioSesionActual(admin);
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

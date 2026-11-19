@@ -174,45 +174,11 @@ public class SistemaMonitorService {
                 return Math.min(100.0, Math.max(0.0, cpuLoad * 100.0));
             }
         }
-        double wmicCpu = leerCpuViaWmicWindows();
-        if (wmicCpu >= 0.0) {
-            return Math.min(100.0, Math.max(0.0, wmicCpu));
-        }
         double loadAvg = os.getSystemLoadAverage();
         if (loadAvg >= 0.0 && os.getAvailableProcessors() > 0) {
             return Math.min(100.0, Math.max(0.0, (loadAvg / os.getAvailableProcessors()) * 100.0));
         }
         return 0.0;
-    }
-
-    private static double leerCpuViaWmicWindows() {
-        String osName = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        if (!osName.contains("win")) {
-            return -1.0;
-        }
-        Process proc = null;
-        try {
-            proc = new ProcessBuilder("wmic", "cpu", "get", "loadpercentage")
-                    .redirectErrorStream(true)
-                    .start();
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(proc.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String trimmed = line.trim();
-                    if (!trimmed.isEmpty() && trimmed.chars().allMatch(Character::isDigit)) {
-                        return Double.parseDouble(trimmed);
-                    }
-                }
-            }
-        } catch (IOException | NumberFormatException ignored) {
-            return -1.0;
-        } finally {
-            if (proc != null) {
-                proc.destroyForcibly();
-            }
-        }
-        return -1.0;
     }
 
     static long[] leerRamBytes() {

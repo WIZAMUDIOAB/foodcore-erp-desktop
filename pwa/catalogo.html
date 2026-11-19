@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#F9F7F4" />
-  <title>FoodCore ERP v5.4 — Toma de Comanda Tablet</title>
+  <title>FoodCore ERP v5.7 — Toma de Comanda Tablet</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -23,7 +23,7 @@
     </div>
 
     <div class="topbar-actions">
-      <button type="button" id="btnCambiarMozo" class="btn-touch btn-secondary btn-compact-nav" onclick="FoodCorePWA.abrirModalCambiarMozo()">
+      <button type="button" id="btnCambiarMozo" class="btn-touch btn-secondary btn-compact-nav">
         <span>Cambiar Mozo</span>
       </button>
       <div class="connection-pill" id="connectionPill">
@@ -31,9 +31,6 @@
         <span id="statusText">API Online (8080)</span>
         <span class="outbox-badge" id="outboxBadge" style="display:none;">Outbox: 0</span>
       </div>
-      <button type="button" id="btnToggleOffline" class="btn-touch btn-secondary btn-compact-nav" onclick="FoodCorePWA.alternarSimulacionOffline()">
-        <span>Simular Caída API</span>
-      </button>
       <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </button>
@@ -45,14 +42,7 @@
     <!-- Panel Izquierdo: Catálogo de Platos en Tarjetas -->
     <section class="catalog-pane">
       <div class="catalog-toolbar">
-        <div class="category-tabs" id="categoryTabs">
-          <button type="button" class="cat-tab active" onclick="FoodCorePWA.filtrarCategoria('TODOS', this)">Todos los Platos</button>
-          <button type="button" class="cat-tab tab-menu-dia" onclick="FoodCorePWA.filtrarCategoria('MENU_DEL_DIA', this)">⭐ Menú del Día</button>
-          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Hamburguesas', this)">Hamburguesas</button>
-          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Alitas', this)">Alitas &amp; Pollo</button>
-          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Bebidas', this)">Bebidas</button>
-          <button type="button" class="cat-tab" onclick="FoodCorePWA.filtrarCategoria('Guarniciones', this)">Guarniciones</button>
-        </div>
+        <div class="category-tabs" id="categoryTabs"></div>
         <input type="search" id="txtBuscarPlato" class="search-box" placeholder="Buscar plato rápido (tiempo real)..." autocomplete="off" />
       </div>
 
@@ -69,11 +59,11 @@
       <div id="cartItemsList" class="cart-items-list"></div>
 
       <div class="quick-notes-bar">
-        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Sin cebolla')">+ Sin cebolla</button>
-        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Sin mayonesa')">+ Sin mayonesa</button>
-        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Sin cremas')">+ Sin cremas</button>
-        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Extra papas')">+ Extra papas</button>
-        <button type="button" class="note-chip" onclick="FoodCorePWA.aplicarChipNota('Término 3/4')">+ Término 3/4</button>
+        <button type="button" class="note-chip" data-note="Sin cebolla">+ Sin cebolla</button>
+        <button type="button" class="note-chip" data-note="Sin mayonesa">+ Sin mayonesa</button>
+        <button type="button" class="note-chip" data-note="Sin cremas">+ Sin cremas</button>
+        <button type="button" class="note-chip" data-note="Extra papas">+ Extra papas</button>
+        <button type="button" class="note-chip" data-note="Término 3/4">+ Término 3/4</button>
       </div>
 
       <div class="cart-footer">
@@ -90,7 +80,7 @@
           <span class="cart-total-amount" id="lblTotal">S/ 0.00</span>
         </div>
 
-        <button type="button" id="btnEnviarCocina" class="btn-touch btn-primary btn-send-kds" onclick="FoodCorePWA.enviarPedidoACocina()">
+        <button type="button" id="btnEnviarCocina" class="btn-touch btn-primary btn-send-kds">
           <span>Enviar a Cocina (KDS)</span>
           <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
@@ -104,9 +94,9 @@
       <div class="modal-header">
         <div>
           <h3 id="modalMozoTitulo">Cambio Rápido de Mozo</h3>
-          <p class="modal-subtitle">Ingrese el PIN del mozo que asume esta atención (el carrito se mantiene intacto).</p>
+          <p class="modal-subtitle">Ingrese el PIN de 4 a 6 dígitos del mozo que asume esta atención (el carrito se mantiene intacto).</p>
         </div>
-        <button type="button" class="btn-close-modal" id="btnCerrarModalMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()" aria-label="Cerrar">✕</button>
+        <button type="button" class="btn-close-modal" id="btnCerrarModalMozo" aria-label="Cerrar">✕</button>
       </div>
 
       <div class="mozo-switch-selector" id="modalMozosList"></div>
@@ -121,28 +111,28 @@
       <div id="modalPinErrorMsg" class="pin-error-banner" role="alert" style="display:none;"></div>
 
       <div class="pin-keypad-grid compact">
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('1')">1</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('2')">2</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('3')">3</button>
+        <button type="button" class="pin-btn" data-modal-digit="1">1</button>
+        <button type="button" class="pin-btn" data-modal-digit="2">2</button>
+        <button type="button" class="pin-btn" data-modal-digit="3">3</button>
 
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('4')">4</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('5')">5</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('6')">6</button>
+        <button type="button" class="pin-btn" data-modal-digit="4">4</button>
+        <button type="button" class="pin-btn" data-modal-digit="5">5</button>
+        <button type="button" class="pin-btn" data-modal-digit="6">6</button>
 
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('7')">7</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('8')">8</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('9')">9</button>
+        <button type="button" class="pin-btn" data-modal-digit="7">7</button>
+        <button type="button" class="pin-btn" data-modal-digit="8">8</button>
+        <button type="button" class="pin-btn" data-modal-digit="9">9</button>
 
-        <button type="button" class="pin-btn pin-btn-action" onclick="FoodCorePWA.limpiarPinModal()">C</button>
-        <button type="button" class="pin-btn" onclick="FoodCorePWA.presionarDigitoPinModal('0')">0</button>
-        <button type="button" class="pin-btn pin-btn-action" onclick="FoodCorePWA.borrarDigitoPinModal()">⌫</button>
+        <button type="button" class="pin-btn pin-btn-action" id="btnModalPinClear">C</button>
+        <button type="button" class="pin-btn" data-modal-digit="0">0</button>
+        <button type="button" class="pin-btn pin-btn-action" id="btnModalPinDelete" aria-label="Borrar dígito">⌫</button>
       </div>
 
       <div class="modal-actions-row">
-        <button type="button" class="btn-touch btn-secondary" id="btnCancelarCambioMozo" onclick="FoodCorePWA.cerrarModalCambiarMozo()">
+        <button type="button" class="btn-touch btn-secondary" id="btnCancelarCambioMozo">
           Cancelar
         </button>
-        <button type="button" class="btn-touch btn-primary" id="btnConfirmarCambioMozo" onclick="FoodCorePWA.confirmarCambioMozoPin()">
+        <button type="button" class="btn-touch btn-primary" id="btnConfirmarCambioMozo">
           Confirmar Cambio
         </button>
       </div>

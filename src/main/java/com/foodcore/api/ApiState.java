@@ -6,33 +6,28 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.Producto;
 import io.javalin.http.Context;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Estado compartido y utilidades de serialización para los controladores REST de Javalin (v4.3.0 §1.3).
+ * Estado compartido y utilidades de serialización para los controladores REST de Javalin (v5.7.1 Hardening).
  */
 public class ApiState {
 
+    public static final String PROP_DEMO_FALLBACK = "foodcore.demoFallback";
+
     public final ObjectMapper mapper = new ObjectMapper();
     public final AtomicInteger secuenciaComprobantes = new AtomicInteger(100);
-    public final AtomicBoolean cajaTurnoActivoMemoria = new AtomicBoolean(false);
-    public volatile String cajaNombreMemoria = "Caja Principal";
-    public volatile BigDecimal cajaMontoAperturaMemoria = new BigDecimal("100.00");
-    public volatile BigDecimal cajaVentasMemoria = BigDecimal.ZERO;
-    public volatile BigDecimal ventasAcumuladasHoyMemoria = new BigDecimal("450.00");
-    public final AtomicInteger transaccionesHoyMemoria = new AtomicInteger(6);
-    public final List<ObjectNode> ventasRecientesMemoria = new CopyOnWriteArrayList<>();
-    public final Map<String, ObjectNode> cacheIdempotenciaPedidos = new ConcurrentHashMap<>();
-    public final Map<String, String> estadosMesasMemoria = new ConcurrentHashMap<>();
-    public final Map<String, Double> totalesMesasMemoria = new ConcurrentHashMap<>();
     public final List<Producto> catalogoRespaldoCache = new CopyOnWriteArrayList<>();
-    public final AtomicInteger secuenciaPedidosFallback = new AtomicInteger(1000);
+
+    /**
+     * Indica si los datos demo en memoria están explícitamente habilitados vía {@code -Dfoodcore.demoFallback=true}.
+     * Por defecto es {@code false} para evitar KPIs o comandas ficticias en producción.
+     */
+    public static boolean isDemoFallbackEnabled() {
+        return "true".equalsIgnoreCase(System.getProperty(PROP_DEMO_FALLBACK));
+    }
 
     public void responderError(Context ctx, int status, String mensaje) {
         ObjectNode err = mapper.createObjectNode();

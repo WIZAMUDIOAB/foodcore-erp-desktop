@@ -245,16 +245,32 @@ public class SpecFoodcoreV20Subfase4DTest {
         assertFalse(ordenRappi.getDetalles().isEmpty());
         assertEquals(2, ordenRappi.getDetalles().size());
 
-        // 2. Levantar servidor REST local y realizar POST HTTP
-        int puertoTest = 8089;
+        // 2. Levantar servidor REST local (127.0.0.1) con verificación HMAC-SHA256 obligatoria
+        String prevSecret = System.getProperty(DeliveryWebhookService.ENV_WEBHOOK_SECRET);
+        String testSecret = "FoodCore-Webhook-Test-Secret-Key-2026-32Bytes!";
+        System.setProperty(DeliveryWebhookService.ENV_WEBHOOK_SECRET, testSecret);
         try {
-            deliveryWebhookService.iniciarServidor(puertoTest);
+            deliveryWebhookService.iniciarServidor(0);
+            int puertoTest = deliveryWebhookService.getPuertoActivo();
             assertTrue(deliveryWebhookService.isServidorActivo());
 
-            URL url = new URL("http://localhost:" + puertoTest + "/api/v1/delivery/webhook");
+            // 2a. Solicitud sin firma HMAC debe rechazarse con HTTP 401
+            URL url = new URL("http://127.0.0.1:" + puertoTest + "/api/v1/delivery/webhook");
+            HttpURLConnection connSinFirma = (HttpURLConnection) url.openConnection();
+            connSinFirma.setRequestMethod("POST");
+            connSinFirma.setRequestProperty("Content-Type", "application/json");
+            connSinFirma.setDoOutput(true);
+            try (OutputStream os = connSinFirma.getOutputStream()) {
+                os.write(payloadMock.getBytes(StandardCharsets.UTF_8));
+            }
+            assertEquals(401, connSinFirma.getResponseCode(), "Un webhook sin firma HMAC debe rechazarse con 401");
+
+            // 2b. Solicitud con firma HMAC-SHA256 válida responde HTTP 200 OK
+            String firmaValida = DeliveryWebhookService.calcularFirmaHmacSha256(payloadMock, testSecret);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty(DeliveryWebhookService.HEADER_SIGNATURE, "sha256=" + firmaValida);
             conn.setDoOutput(true);
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -262,10 +278,15 @@ public class SpecFoodcoreV20Subfase4DTest {
             }
 
             int responseCode = conn.getResponseCode();
-            assertEquals(200, responseCode, "El webhook debe responder HTTP 200 OK");
+            assertEquals(200, responseCode, "El webhook firmado con HMAC-SHA256 debe responder HTTP 200 OK");
         } finally {
             deliveryWebhookService.detenerServidor();
             assertFalse(deliveryWebhookService.isServidorActivo());
+            if (prevSecret == null) {
+                System.clearProperty(DeliveryWebhookService.ENV_WEBHOOK_SECRET);
+            } else {
+                System.setProperty(DeliveryWebhookService.ENV_WEBHOOK_SECRET, prevSecret);
+            }
         }
     }
 

@@ -26,9 +26,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Implementación transaccional de {@link ComboService} que sincroniza el catálogo unificado
@@ -203,11 +205,11 @@ public class ComboServiceImpl implements ComboService {
                                               int idCategoria,
                                               String nombre,
                                               String descripcion,
-                                              BigDecimal precio) throws SQLException {
+                                              BigDecimal precio) throws SQLException, NegocioException {
         Integer idProd = combo.getIdProducto();
         String codigo = combo.getCodigo() != null && !combo.getCodigo().isBlank()
-                ? combo.getCodigo().trim().toUpperCase(java.util.Locale.ROOT)
-                : ("CMB-" + (System.currentTimeMillis() % 100000));
+                ? combo.getCodigo().trim().toUpperCase(Locale.ROOT)
+                : generarCodigoComboUnico(conn);
 
         if (idProd != null && idProd > 0) {
             Producto existente = new Producto(
@@ -218,17 +220,10 @@ public class ComboServiceImpl implements ComboService {
             return existente;
         }
 
+        // Al crear un combo nuevo, nunca sobrescribir silenciosamente otro combo/producto existente por colisión de código
         Producto porCodigo = productoDAO.buscarPorCodigo(conn, codigo);
-        if (porCodigo != null && porCodigo.isEsCombo()) {
-            porCodigo.setIdCategoria(idCategoria);
-            porCodigo.setNombre(nombre);
-            porCodigo.setDescripcion(descripcion);
-            porCodigo.setPrecioVenta(precio);
-            porCodigo.setDisponible(combo.isActivo());
-            porCodigo.setEsCombo(true);
-            productoDAO.reactivar(conn, porCodigo.getIdProducto());
-            productoDAO.actualizar(conn, porCodigo);
-            return porCodigo;
+        if (porCodigo != null) {
+            throw new NegocioException("Ya existe un producto o combo registrado con el código '" + codigo + "'.");
         }
 
         Producto nuevo = new Producto(
@@ -237,5 +232,15 @@ public class ComboServiceImpl implements ComboService {
         nuevo.setEsCombo(true);
         productoDAO.crear(conn, nuevo);
         return nuevo;
+    }
+
+    private String generarCodigoComboUnico(Connection conn) throws SQLException {
+        for (int intento = 0; intento < 5; intento++) {
+            String candidato = "CMB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
+            if (productoDAO.buscarPorCodigo(conn, candidato) == null) {
+                return candidato;
+            }
+        }
+        return "CMB-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
     }
 }

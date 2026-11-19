@@ -111,9 +111,9 @@ public class PasswordChangeDialogController {
 
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                boolean actualValida = (hashActual != null && hashActual.startsWith("$2"))
-                    ? encriptador.verificar(actual, hashActual)
-                    : actual.equals(hashActual);
+                boolean actualValida = hashActual != null
+                    && hashActual.startsWith("$2")
+                    && encriptador.verificar(actual, hashActual);
                 if (!actualValida) {
                     throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS,
                         "La contraseña actual ingresada es incorrecta. Verifique e intente nuevamente.");

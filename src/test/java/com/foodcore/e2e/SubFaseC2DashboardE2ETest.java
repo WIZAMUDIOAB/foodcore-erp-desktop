@@ -27,8 +27,38 @@ public class SubFaseC2DashboardE2ETest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @BeforeAll
-    static void setUpServer() {
+    static void setUpServer() throws Exception {
         PlaywrightE2ESupport.asegurarServidorActivo();
+        asegurarAlMenosUnaVentaRealHoy();
+    }
+
+    private static void asegurarAlMenosUnaVentaRealHoy() throws Exception {
+        try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
+            APIRequestContext adminReq = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
+            APIResponse rec = adminReq.get("/api/dashboard/ventas-recientes");
+            if (rec.status() == 200 && MAPPER.readTree(rec.text()).size() > 0) {
+                adminReq.dispose();
+                return;
+            }
+            APIResponse estadoCaja = adminReq.get("/api/caja/estado");
+            boolean abierta = estadoCaja.status() == 200 && MAPPER.readTree(estadoCaja.text()).path("abierta").asBoolean();
+            if (!abierta) {
+                adminReq.post("/api/caja/abrir",
+                        com.microsoft.playwright.options.RequestOptions.create()
+                                .setHeader("Content-Type", "application/json")
+                                .setData(java.util.Map.of("nombre_caja", "Caja Dashboard E2E", "monto_inicial", 100.00)));
+            }
+            adminReq.post("/api/caja/cobrar",
+                    com.microsoft.playwright.options.RequestOptions.create()
+                            .setHeader("Content-Type", "application/json")
+                            .setData(java.util.Map.of(
+                                    "numero_mesa", "06",
+                                    "tipo_comprobante", "BOLETA",
+                                    "medio_pago", "EFECTIVO",
+                                    "items", java.util.List.of(java.util.Map.of("id_producto", 1, "cantidad", 1))
+                            )));
+            adminReq.dispose();
+        }
     }
 
     @AfterAll

@@ -643,6 +643,7 @@ public class KitchenDisplayController {
         for (ComandaCardController c : tarjetasActivas.values()) {
             c.stopTimer();
         }
+        ServidorSockets.getInstance().setMensajeListener(null);
     }
 
     public Label getLblCountHistorial() {

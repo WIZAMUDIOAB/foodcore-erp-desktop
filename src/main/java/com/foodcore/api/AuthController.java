@@ -14,6 +14,7 @@ import com.foodcore.model.Usuario;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.ConexionBD;
 import io.javalin.http.Context;
 
@@ -22,13 +23,14 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador Javalin para autenticación JWT, 2FA TOTP, revocación de sesiones
- * y gestión de usuarios activos (v4.3.0 §1.3 / v5.1.0 Sub-fase A).
+ * Controlador Javalin para autenticación JWT stateless, 2FA TOTP, revocación de sesiones
+ * y gestión de usuarios activos (v4.3.0 §1.3 / v5.1.0 Sub-fase A / v5.7.1 Hardening).
  */
 public class AuthController {
 
@@ -67,7 +69,7 @@ public class AuthController {
     }
 
     /**
-     * POST /api/auth/login
+     * POST /api/auth/login (100% stateless: nunca muta la sesión Desktop en SesionManager).
      */
     public void handleLogin(Context ctx) {
         try {
@@ -82,12 +84,16 @@ public class AuthController {
 
             Usuario usuarioAutenticado;
             try {
-                usuarioAutenticado = authService.login(username, password);
-            } catch (Exception exAuth) {
-                String msgAuth = (exAuth instanceof NegocioException && exAuth.getMessage() != null)
+                usuarioAutenticado = authService.autenticarSoloCredenciales(username, password);
+            } catch (NegocioException exAuth) {
+                String msgAuth = exAuth.getMessage() != null
                         ? exAuth.getMessage()
                         : "Credenciales inválidas. Verifique su usuario y contraseña.";
                 state.responderError(ctx, 401, msgAuth);
+                return;
+            } catch (Exception exAuth) {
+                LOGGER.log(Level.WARNING, "Fallo técnico en autenticación POST /api/auth/login", exAuth);
+                state.responderError(ctx, 401, "Credenciales inválidas. Verifique su usuario y contraseña.");
                 return;
             }
             if (usuarioAutenticado == null) {
@@ -104,19 +110,18 @@ public class AuthController {
                     responderError2Fa(ctx, "Código 2FA TOTP de 6 dígitos requerido.");
                     return;
                 }
-                if (!totpService.verificarCodigo(usuarioAutenticado.getTotpSecret(), codigoTotp)) {
+                String claveUsuario = String.valueOf(usuarioAutenticado.getIdUsuario());
+                if (!totpService.verificarCodigo(claveUsuario, usuarioAutenticado.getTotpSecret(), codigoTotp)) {
                     auditoriaDAO.registrarEventoBestEffort(
                             usuarioAutenticado.getIdUsuario(), "2FA_FALLIDO", "USUARIO", null,
-                            "Código 2FA inválido vía API para " + usuarioAutenticado.getUsername());
+                            "Código 2FA inválido o reutilizado vía API para " + usuarioAutenticado.getUsername());
                     responderError2Fa(ctx, "Código 2FA inválido.");
                     return;
                 }
             }
 
             String rol = usuarioAutenticado.getNombreRol() != null ? usuarioAutenticado.getNombreRol() : "MOZO";
-            String nombre = usuarioAutenticado.getNombreEmpleado() != null && !usuarioAutenticado.getNombreEmpleado().isBlank()
-                    ? usuarioAutenticado.getNombreEmpleado()
-                    : ("admin".equalsIgnoreCase(usuarioAutenticado.getUsername()) ? "Administrador General" : "Mateo Quispe (Mozo)");
+            String nombre = resolverNombreMostrado(usuarioAutenticado);
             String token = generarTokenJwt(usuarioAutenticado.getIdUsuario(), usuarioAutenticado.getUsername(), rol);
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -137,7 +142,7 @@ public class AuthController {
     }
 
     /**
-     * POST /api/auth/pin-login
+     * POST /api/auth/pin-login (stateless; bloquea usuarios con 2FA o roles ADMIN/SUPERVISOR).
      */
     public void handlePinLogin(Context ctx) {
         try {
@@ -152,16 +157,23 @@ public class AuthController {
                 return;
             }
 
-            Usuario usuario = autenticarUsuarioPorPin(idUsuario, username, pin);
+            if (esObjetivoRestringidoParaPin(idUsuario, username)) {
+                state.responderError(ctx, 403, "Acceso por PIN no permitido para usuarios con 2FA o rol administrativo.");
+                return;
+            }
+
+            Usuario usuario = autenticarUsuarioPorPinStateless(idUsuario, username, pin);
             if (usuario == null) {
                 state.responderError(ctx, 401, "PIN inválido. Verifique e intente nuevamente.");
                 return;
             }
+            if (!AuthServiceImpl.esPinPermitidoParaUsuario(usuario)) {
+                state.responderError(ctx, 403, "Acceso por PIN no permitido para usuarios con 2FA o rol administrativo.");
+                return;
+            }
 
             String rol = usuario.getNombreRol() != null ? usuario.getNombreRol() : "MOZO";
-            String nombre = usuario.getNombreEmpleado() != null && !usuario.getNombreEmpleado().isBlank()
-                    ? usuario.getNombreEmpleado()
-                    : ("admin".equalsIgnoreCase(usuario.getUsername()) ? "Administrador General" : "Mateo Quispe (Mozo)");
+            String nombre = resolverNombreMostrado(usuario);
             String token = generarTokenJwt(usuario.getIdUsuario(), usuario.getUsername(), rol);
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -183,7 +195,7 @@ public class AuthController {
     }
 
     /**
-     * POST /api/auth/pin-switch
+     * POST /api/auth/pin-switch (stateless; bloquea escalada a ADMIN/SUPERVISOR/2FA y revoca el JWT anterior).
      */
     public void handlePinSwitch(Context ctx) {
         try {
@@ -198,22 +210,43 @@ public class AuthController {
                 return;
             }
 
-            Usuario usuario = autenticarUsuarioPorPin(idUsuario, username, pin);
-            if (usuario == null) {
-                state.responderError(ctx, 401, "PIN de mozo inválido.");
+            if (esObjetivoRestringidoParaPin(idUsuario, username)) {
+                state.responderError(ctx, 403, "Cambio rápido por PIN no permitido para usuarios con 2FA o rol administrativo.");
                 return;
             }
 
+            Usuario usuario = autenticarUsuarioPorPinStateless(idUsuario, username, pin);
+            if (usuario == null) {
+                state.responderError(ctx, 401, "PIN de operador inválido.");
+                return;
+            }
+            if (!AuthServiceImpl.esPinPermitidoParaUsuario(usuario)) {
+                state.responderError(ctx, 403, "Cambio rápido por PIN no permitido para usuarios con 2FA o rol administrativo.");
+                return;
+            }
+
+            // Revocar el JWT anterior inmediatamente para impedir sesiones huérfanas tras el cambio de operador
+            JwtService.JwtClaims caller = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+            if (caller != null && caller.jti() != null && !caller.jti().isBlank()) {
+                try (Connection conn = abrirConexionOpcional()) {
+                    tokenBlacklistService.revocarToken(
+                            conn,
+                            caller.jti(),
+                            caller.idUsuario(),
+                            caller.idUsuario(),
+                            "Cambio de operador vía pin-switch",
+                            Instant.ofEpochSecond(caller.expiresAtEpochSec()));
+                }
+            }
+
             String rol = usuario.getNombreRol() != null ? usuario.getNombreRol() : "MOZO";
-            String nombre = usuario.getNombreEmpleado() != null && !usuario.getNombreEmpleado().isBlank()
-                    ? usuario.getNombreEmpleado()
-                    : ("admin".equalsIgnoreCase(usuario.getUsername()) ? "Administrador General" : "Mateo Quispe (Mozo)");
+            String nombre = resolverNombreMostrado(usuario);
             String token = generarTokenJwt(usuario.getIdUsuario(), usuario.getUsername(), rol);
 
             ObjectNode resp = state.mapper.createObjectNode();
             resp.put("status", "OK");
             resp.put("token", token);
-            resp.put("mensaje", "Mozo cambiado exitosamente.");
+            resp.put("mensaje", "Operador cambiado exitosamente.");
             ObjectNode userNode = resp.putObject("usuario");
             userNode.put("id", usuario.getIdUsuario());
             userNode.put("idUsuario", usuario.getIdUsuario());
@@ -225,7 +258,7 @@ public class AuthController {
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error en POST /api/auth/pin-switch", e);
-            state.responderError(ctx, 400, "Solicitud de cambio de mozo inválida.");
+            state.responderError(ctx, 400, "Solicitud de cambio de operador inválida.");
         }
     }
 
@@ -245,21 +278,17 @@ public class AuthController {
             LOGGER.log(Level.FINE, "Error consultando usuarios activos de BD", e);
         }
 
-
-
         for (Usuario u : usuarios) {
             ObjectNode node = array.addObject();
             node.put("id", u.getIdUsuario());
             node.put("id_usuario", u.getIdUsuario());
             node.put("username", u.getUsername());
-            String nombre = u.getNombreEmpleado() != null && !u.getNombreEmpleado().isBlank()
-                    ? u.getNombreEmpleado()
-                    : ("admin".equalsIgnoreCase(u.getUsername()) ? "Administrador General" : "Mateo Quispe (Mozo)");
-            node.put("nombre", nombre);
-            String rol = u.getNombreRol() != null ? u.getNombreRol() : ("admin".equalsIgnoreCase(u.getUsername()) ? "ADMINISTRADOR" : "MOZO");
+            node.put("nombre", resolverNombreMostrado(u));
+            String rol = u.getNombreRol() != null ? u.getNombreRol() : "MOZO";
             node.put("rol", rol);
             node.put("avatar", obtenerAvatarUsuario(u.getUsername()));
             node.put("tiene_pin", u.isPinConfigurado());
+            node.put("pin_permitido", AuthServiceImpl.esPinPermitidoParaUsuario(u));
         }
 
         ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
@@ -284,14 +313,14 @@ public class AuthController {
 
             try (Connection conn = ConexionBD.getConnection()) {
                 if (conn != null) {
-                    actualizado = usuarioDAO.actualizarPin(conn, idUsuario, nuevoPin, pinHash);
+                    actualizado = usuarioDAO.actualizarPin(conn, idUsuario, null, pinHash);
                 }
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Error al actualizar PIN en base de datos para usuario " + idUsuario, e);
             }
 
             if (!actualizado) {
-                state.responderError(ctx, 500, "No se pudo actualizar el PIN en base de datos.");
+                state.responderError(ctx, 503, "No se pudo actualizar el PIN en base de datos.");
                 return;
             }
 
@@ -304,9 +333,11 @@ public class AuthController {
 
         } catch (NumberFormatException e) {
             state.responderError(ctx, 400, "ID de usuario inválido.");
+        } catch (JsonProcessingException e) {
+            state.responderError(ctx, 400, "Cuerpo JSON inválido.");
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error procesando PATCH /api/usuarios/{id}/pin", e);
-            state.responderError(ctx, 500, "No se pudo actualizar el PIN: " + e.getMessage());
+            state.responderError(ctx, 500, "No se pudo actualizar el PIN.");
         }
     }
 
@@ -394,9 +425,41 @@ public class AuthController {
         try {
             return ConexionBD.getConnection();
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Sin conexión BD durante force-logout; se aplica revocación en memoria", e);
+            LOGGER.log(Level.FINE, "Sin conexión BD durante operación de revocación; se aplica en memoria", e);
             return null;
         }
+    }
+
+    private boolean esObjetivoRestringidoParaPin(int idUsuario, String username) {
+        if (idUsuario <= 0 && (username == null || username.isBlank())) {
+            return false;
+        }
+        try (Connection conn = abrirConexionOpcional()) {
+            if (conn == null) {
+                return false;
+            }
+            Optional<Usuario> objetivo = idUsuario > 0
+                    ? usuarioDAO.buscarPorId(conn, idUsuario)
+                    : usuarioDAO.buscarPorUsername(conn, username.trim());
+            if (objetivo.isPresent()) {
+                Usuario u = objetivo.get();
+                if (u.isTotpHabilitado()) {
+                    return true;
+                }
+                String rolNorm = JwtService.normalizarRol(u.getNombreRol());
+                return "ADMIN".equals(rolNorm) || "SUPERVISOR".equals(rolNorm);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "No se pudo verificar elegibilidad PIN en BD", e);
+        }
+        return false;
+    }
+
+    private static String resolverNombreMostrado(Usuario usuario) {
+        if (usuario.getNombreEmpleado() != null && !usuario.getNombreEmpleado().isBlank()) {
+            return usuario.getNombreEmpleado();
+        }
+        return usuario.getUsername() != null ? usuario.getUsername() : "Usuario";
     }
 
     private static String extraerCodigoTotp(JsonNode body) {
@@ -423,16 +486,15 @@ public class AuthController {
         return jwtService.verificarToken(token);
     }
 
-    private Usuario autenticarUsuarioPorPin(int idUsuario, String username, String pin) {
+    private Usuario autenticarUsuarioPorPinStateless(int idUsuario, String username, String pin) {
         try {
-            Optional<Usuario> opt = authService.autenticarPorPin(idUsuario, username, pin);
+            Optional<Usuario> opt = authService.autenticarPorPinStateless(idUsuario, username, pin);
             if (opt.isPresent()) {
                 return opt.get();
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Error verificando PIN en BD", e);
         }
-
         return null;
     }
 
@@ -440,7 +502,7 @@ public class AuthController {
         if (username == null) {
             return "/img/avatars/default.png";
         }
-        String u = username.toLowerCase();
+        String u = username.toLowerCase(Locale.ROOT);
         if (u.contains("admin")) {
             return "/img/avatars/admin.png";
         }

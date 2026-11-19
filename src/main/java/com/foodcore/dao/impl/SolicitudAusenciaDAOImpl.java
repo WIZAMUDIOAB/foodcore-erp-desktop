@@ -104,9 +104,15 @@ public class SolicitudAusenciaDAOImpl implements SolicitudAusenciaDAO {
 
     @Override
     public void actualizarEstado(Connection conn, int idSolicitud, String nuevoEstado, String observacion, Integer aprobadoPor) throws SQLException {
+        actualizarEstadoSiPendiente(conn, idSolicitud, nuevoEstado, observacion, aprobadoPor);
+    }
+
+    @Override
+    public boolean actualizarEstadoSiPendiente(Connection conn, int idSolicitud, String nuevoEstado,
+                                               String observacion, Integer aprobadoPor) throws SQLException {
         String sql = "UPDATE solicitud_ausencia "
                 + "SET estado = ?, observacion_gerente = ?, aprobado_por = ?, fecha_respuesta = CURRENT_TIMESTAMP "
-                + "WHERE id_solicitud = ?";
+                + "WHERE id_solicitud = ? AND estado = 'PENDIENTE'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, nuevoEstado);
             ps.setString(2, observacion);
@@ -116,7 +122,7 @@ public class SolicitudAusenciaDAOImpl implements SolicitudAusenciaDAO {
                 ps.setNull(3, Types.INTEGER);
             }
             ps.setInt(4, idSolicitud);
-            ps.executeUpdate();
+            return ps.executeUpdate() > 0;
         }
     }
 

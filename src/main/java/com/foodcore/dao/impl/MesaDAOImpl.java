@@ -14,6 +14,8 @@ import java.util.Map;
 
 public class MesaDAOImpl implements MesaDAO {
 
+    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+
     @Override
     public Map<String, String> obtenerEstadoTodasMesas(Connection conn) throws SQLException {
         Map<String, String> mapa = new HashMap<>();
@@ -29,28 +31,54 @@ public class MesaDAOImpl implements MesaDAO {
 
     @Override
     public boolean transferirPedidoMesa(Connection conn, String numeroOrigen, String numeroDestino, int idUsuario) throws SQLException {
-        if (numeroOrigen == null || numeroDestino == null || numeroOrigen.equalsIgnoreCase(numeroDestino)) {
+        if (numeroOrigen == null || numeroDestino == null || numeroOrigen.isBlank()
+                || numeroDestino.isBlank() || numeroOrigen.trim().equalsIgnoreCase(numeroDestino.trim())) {
             throw new IllegalArgumentException("Las mesas de origen y destino deben ser distintas");
         }
 
-        // 1. Obtener pedido activo en mesa origen (por id_mesa o numero_mesa)
+        String numOrigen = numeroOrigen.trim();
+        String numDestino = numeroDestino.trim();
+
+        // 1. Bloqueo pesimista ordenado por id_mesa sobre ambas mesas (previene deadlocks y sobreescritura)
         long idMesaOrigen = 0;
-        try (PreparedStatement psOri = conn.prepareStatement("SELECT id_mesa FROM mesa WHERE numero = ?")) {
-            psOri.setString(1, numeroOrigen);
-            try (ResultSet rsOri = psOri.executeQuery()) {
-                if (rsOri.next()) {
-                    idMesaOrigen = rsOri.getLong("id_mesa");
+        long idMesaDestino = 0;
+        String estadoDestino = null;
+        String sqlLockMesas = "SELECT id_mesa, numero, estado FROM mesa WHERE numero IN (?, ?) ORDER BY id_mesa ASC FOR UPDATE";
+        try (PreparedStatement psLock = conn.prepareStatement(sqlLockMesas)) {
+            psLock.setString(1, numOrigen);
+            psLock.setString(2, numDestino);
+            try (ResultSet rs = psLock.executeQuery()) {
+                while (rs.next()) {
+                    String num = rs.getString("numero");
+                    if (numOrigen.equalsIgnoreCase(num)) {
+                        idMesaOrigen = rs.getLong("id_mesa");
+                    } else if (numDestino.equalsIgnoreCase(num)) {
+                        idMesaDestino = rs.getLong("id_mesa");
+                        estadoDestino = rs.getString("estado");
+                    }
                 }
             }
         }
 
+        if (idMesaOrigen <= 0) {
+            throw new IllegalStateException("La mesa origen " + numOrigen + " no existe.");
+        }
+        if (idMesaDestino <= 0) {
+            throw new IllegalStateException("La mesa destino " + numDestino + " no existe.");
+        }
+        if (!"LIBRE".equalsIgnoreCase(estadoDestino)) {
+            throw new IllegalStateException(
+                    "La mesa destino " + numDestino + " no está LIBRE (estado actual: " + estadoDestino + ").");
+        }
+
+        // 2. Obtener pedido activo en mesa origen (por id_mesa o numero_mesa)
         int idPedido = 0;
-        String sqlPed = "SELECT id_pedido FROM pedido WHERE (numero_mesa = ? OR (? > 0 AND id_mesa = ?)) "
-                + "AND estado NOT IN ('COBRADO', 'CERRADO', 'PAGADO', 'CANCELADO', 'ANULADO') ORDER BY id_pedido DESC LIMIT 1";
+        String sqlPed = "SELECT id_pedido FROM pedido WHERE (numero_mesa = ? OR id_mesa = ?) "
+                + "AND estado NOT IN ('COBRADO', 'CERRADO', 'PAGADO', 'CANCELADO', 'ANULADO') "
+                + "ORDER BY id_pedido DESC LIMIT 1 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sqlPed)) {
-            ps.setString(1, numeroOrigen);
+            ps.setString(1, numOrigen);
             ps.setLong(2, idMesaOrigen);
-            ps.setLong(3, idMesaOrigen);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     idPedido = rs.getInt("id_pedido");
@@ -59,56 +87,41 @@ public class MesaDAOImpl implements MesaDAO {
         }
 
         if (idPedido <= 0) {
-            throw new IllegalStateException("No existe comanda activa en la mesa " + numeroOrigen);
+            throw new IllegalStateException("No existe comanda activa en la mesa " + numOrigen);
         }
 
-        // 2. Obtener id_mesa de mesa destino
-        long idMesaDestino = 0;
-        String sqlMesaDest = "SELECT id_mesa, estado FROM mesa WHERE numero = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sqlMesaDest)) {
-            ps.setString(1, numeroDestino);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    idMesaDestino = rs.getLong("id_mesa");
-                }
-            }
-        }
-
-        if (idMesaDestino <= 0) {
-            idMesaDestino = Long.parseLong(numeroDestino.replaceAll("[^0-9]", ""));
-        }
-
-        // 3. Actualizar pedido con nueva mesa
-        String sqlUpdPed = "UPDATE pedido SET numero_mesa = ?, id_mesa = ? WHERE id_pedido = ?";
+        // 3. Actualizar pedido con nueva mesa e incrementar versión optimista
+        String sqlUpdPed = "UPDATE pedido SET numero_mesa = ?, id_mesa = ?, version = version + 1 WHERE id_pedido = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlUpdPed)) {
-            ps.setString(1, numeroDestino);
+            ps.setString(1, numDestino);
             ps.setLong(2, idMesaDestino);
             ps.setInt(3, idPedido);
             ps.executeUpdate();
         }
 
-        // 4. Liberar mesa origen y ocupar mesa destino
-        try (PreparedStatement ps = conn.prepareStatement("UPDATE mesa SET estado = 'LIBRE', id_pedido_actual = NULL WHERE numero = ?")) {
-            ps.setString(1, numeroOrigen);
-            ps.executeUpdate();
-        }
-
-        try (PreparedStatement ps = conn.prepareStatement("UPDATE mesa SET estado = 'OCUPADA', id_pedido_actual = ? WHERE numero = ?")) {
-            ps.setInt(1, idPedido);
-            ps.setString(2, numeroDestino);
-            ps.executeUpdate();
-        }
-
-        // 5. Registrar en auditoría
+        // 4. Liberar mesa origen y ocupar mesa destino incrementando version
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO auditoria (id_usuario, accion, tabla_afectada, registro_id, detalle) VALUES (?, 'TRANSFERIR_MESA', 'pedido', ?, ?)")) {
-            ps.setInt(1, idUsuario > 0 ? idUsuario : 1);
-            ps.setInt(2, idPedido);
-            ps.setString(3, "Comanda #" + idPedido + " transferida de Mesa " + numeroOrigen + " a Mesa " + numeroDestino);
+                "UPDATE mesa SET estado = 'LIBRE', id_pedido_actual = NULL, version = version + 1 WHERE id_mesa = ?")) {
+            ps.setLong(1, idMesaOrigen);
             ps.executeUpdate();
-        } catch (SQLException ignored) {
-            // Si auditoria no existe o falla, no abortar la transferencia operativa
         }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE mesa SET estado = 'OCUPADA', id_pedido_actual = ?, version = version + 1 WHERE id_mesa = ?")) {
+            ps.setInt(1, idPedido);
+            ps.setLong(2, idMesaDestino);
+            ps.executeUpdate();
+        }
+
+        // 5. Registrar en auditoría con columnas reales del esquema V6
+        auditoriaDAO.registrarEventoSeguro(
+                conn,
+                idUsuario > 0 ? idUsuario : 1,
+                "TRANSFERIR_MESA",
+                "pedido#" + idPedido,
+                "Mesa " + numOrigen,
+                "Mesa " + numDestino
+        );
 
         return true;
     }
@@ -137,8 +150,9 @@ public class MesaDAOImpl implements MesaDAO {
             idMesaPrincipal = Long.parseLong(numeroPrincipal.replaceAll("[^0-9]", ""));
         }
 
-        // Asegurar mesa principal con id_pedido_actual y estado OCUPADA
-        try (PreparedStatement ps = conn.prepareStatement("UPDATE mesa SET estado = 'OCUPADA', id_pedido_actual = ? WHERE id_mesa = ? OR numero = ?")) {
+        // Asegurar mesa principal con id_pedido_actual, estado OCUPADA y version + 1
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE mesa SET estado = 'OCUPADA', id_pedido_actual = ?, version = version + 1 WHERE id_mesa = ? OR numero = ?")) {
             ps.setInt(1, idPedido);
             ps.setLong(2, idMesaPrincipal);
             ps.setString(3, numeroPrincipal);
@@ -147,21 +161,26 @@ public class MesaDAOImpl implements MesaDAO {
 
         // 2. Asociar cada mesa secundaria
         for (String sec : numerosSecundarios) {
-            if (sec.equalsIgnoreCase(numeroPrincipal)) continue;
+            if (sec.equalsIgnoreCase(numeroPrincipal)) {
+                continue;
+            }
 
             long idMesaSec = 0;
-            try (PreparedStatement ps = conn.prepareStatement("SELECT id_mesa FROM mesa WHERE numero = ?")) {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id_mesa FROM mesa WHERE numero = ? FOR UPDATE")) {
                 ps.setString(1, sec);
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) idMesaSec = rs.getLong("id_mesa");
+                    if (rs.next()) {
+                        idMesaSec = rs.getLong("id_mesa");
+                    }
                 }
             }
             if (idMesaSec <= 0) {
                 idMesaSec = Long.parseLong(sec.replaceAll("[^0-9]", ""));
             }
 
-            // Ocupar mesa secundaria marcando id_mesa_principal
-            try (PreparedStatement ps = conn.prepareStatement("UPDATE mesa SET estado = 'OCUPADA', id_mesa_principal = ?, id_pedido_actual = ? WHERE numero = ?")) {
+            // Ocupar mesa secundaria marcando id_mesa_principal y version + 1
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE mesa SET estado = 'OCUPADA', id_mesa_principal = ?, id_pedido_actual = ?, version = version + 1 WHERE numero = ?")) {
                 ps.setLong(1, idMesaPrincipal);
                 ps.setInt(2, idPedido);
                 ps.setString(3, sec);
@@ -178,15 +197,15 @@ public class MesaDAOImpl implements MesaDAO {
             }
         }
 
-        // 3. Auditoría
-        try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO auditoria (id_usuario, accion, tabla_afectada, registro_id, detalle) VALUES (?, 'UNIR_MESAS', 'mesa', ?, ?)")) {
-            ps.setInt(1, idUsuario > 0 ? idUsuario : 1);
-            ps.setLong(2, idMesaPrincipal);
-            ps.setString(3, "Mesa " + numeroPrincipal + " unida con mesas: " + String.join(", ", numerosSecundarios));
-            ps.executeUpdate();
-        } catch (SQLException ignored) {
-        }
+        // 3. Auditoría con columnas reales del esquema V6
+        auditoriaDAO.registrarEventoSeguro(
+                conn,
+                idUsuario > 0 ? idUsuario : 1,
+                "UNIR_MESAS",
+                "mesa#" + idMesaPrincipal,
+                "Mesa " + numeroPrincipal,
+                "Unida con mesas: " + String.join(", ", numerosSecundarios)
+        );
 
         return true;
     }
@@ -195,7 +214,7 @@ public class MesaDAOImpl implements MesaDAO {
     public boolean liberarMesasUnidasPorPedido(Connection conn, int idPedido) throws SQLException {
         // 1. Liberar secundarias vinculadas en mesa_union
         String sqlSec = "UPDATE mesa m JOIN mesa_union u ON m.id_mesa = u.id_mesa_secundaria "
-                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL "
+                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL, m.version = m.version + 1 "
                 + "WHERE u.id_pedido = ? AND u.activo = 1";
         try (PreparedStatement ps = conn.prepareStatement(sqlSec)) {
             ps.setInt(1, idPedido);
@@ -204,7 +223,7 @@ public class MesaDAOImpl implements MesaDAO {
 
         // 2. Liberar principal vinculada en mesa_union
         String sqlPrincUnion = "UPDATE mesa m JOIN mesa_union u ON m.id_mesa = u.id_mesa_principal "
-                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL "
+                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL, m.version = m.version + 1 "
                 + "WHERE u.id_pedido = ? AND u.activo = 1";
         try (PreparedStatement ps = conn.prepareStatement(sqlPrincUnion)) {
             ps.setInt(1, idPedido);
@@ -213,7 +232,7 @@ public class MesaDAOImpl implements MesaDAO {
 
         // 3. Liberar mesa referenciada directamente en pedido
         String sqlPrincPed = "UPDATE mesa m JOIN pedido p ON (m.id_mesa = p.id_mesa OR m.numero = p.numero_mesa) "
-                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL "
+                + "SET m.estado = 'LIBRE', m.id_mesa_principal = NULL, m.id_pedido_actual = NULL, m.version = m.version + 1 "
                 + "WHERE p.id_pedido = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlPrincPed)) {
             ps.setInt(1, idPedido);
@@ -221,7 +240,7 @@ public class MesaDAOImpl implements MesaDAO {
         }
 
         // 4. Fallback directo por id_pedido_actual
-        String sqlFallback = "UPDATE mesa SET estado = 'LIBRE', id_mesa_principal = NULL, id_pedido_actual = NULL WHERE id_pedido_actual = ?";
+        String sqlFallback = "UPDATE mesa SET estado = 'LIBRE', id_mesa_principal = NULL, id_pedido_actual = NULL, version = version + 1 WHERE id_pedido_actual = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlFallback)) {
             ps.setInt(1, idPedido);
             ps.executeUpdate();

@@ -10,9 +10,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -103,6 +106,34 @@ public class RolDAOImpl implements RolDAO {
             }
         }
         return permisos.isEmpty() ? EnumSet.noneOf(Permiso.class) : EnumSet.copyOf(permisos);
+    }
+
+    @Override
+    public Optional<Set<Permiso>> obtenerPermisosSiRolExiste(Connection conn, String codigoRol) throws SQLException {
+        if (codigoRol == null || codigoRol.isBlank()) {
+            return Optional.empty();
+        }
+        String normalizado = codigoRol.trim().toUpperCase(Locale.ROOT);
+        String sqlRol = "SELECT estado FROM rol WHERE UPPER(codigo_rol) = ? LIMIT 1";
+        boolean existe = false;
+        boolean activo = false;
+        try (PreparedStatement ps = conn.prepareStatement(sqlRol)) {
+            ps.setString(1, normalizado);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    existe = true;
+                    activo = rs.getBoolean("estado");
+                }
+            }
+        }
+        if (!existe) {
+            return Optional.empty();
+        }
+        if (!activo) {
+            return Optional.of(Collections.emptySet());
+        }
+        Set<Permiso> permisos = obtenerPermisosPorRol(conn, normalizado);
+        return Optional.of(permisos.isEmpty() ? Collections.emptySet() : Collections.unmodifiableSet(permisos));
     }
 
     @Override

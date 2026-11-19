@@ -8,7 +8,9 @@ import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 
 import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,6 +26,7 @@ public class Launcher {
 
     public static void main(String[] args) {
         LoggingBootstrap.installBridge();
+        App.registrarManejadorExcepcionesNoCapturadas();
         ConexionBD.validarVariablesEntornoObligatorias();
         ApiServer.resolverKeystorePasswordObligatorio();
         JwtService.validarConfiguracionObligatoria();
@@ -40,12 +43,54 @@ public class Launcher {
 
         try {
             App.main(args);
-        } catch (IllegalStateException ex) {
-            throw ex;
-        } catch (Throwable t) {
-            LOGGER.log(Level.WARNING, "Entorno sin display gráfico detectado; iniciando modo Servidor Headless", t);
+        } catch (HeadlessException ex) {
+            LOGGER.log(Level.WARNING, "Entorno sin display gráfico detectado; iniciando modo Servidor Headless", ex);
             iniciarModoServidorHeadless();
+        } catch (RuntimeException | LinkageError ex) {
+            if (esErrorInicializacionHeadlessJavaFx(ex)) {
+                LOGGER.log(Level.WARNING, "Error de inicialización gráfica JavaFX/Headless; iniciando modo Servidor Headless", ex);
+                iniciarModoServidorHeadless();
+            } else {
+                throw ex;
+            }
         }
+    }
+
+    /**
+     * Determina de forma estricta si un error durante el lanzamiento de JavaFX corresponde
+     * exclusivamente a ausencia de display/toolkit gráfico (headless/Glass/GTK),
+     * permitiendo propagar fallos reales de negocio, configuración o programación.
+     */
+    static boolean esErrorInicializacionHeadlessJavaFx(Throwable error) {
+        Throwable actual = error;
+        int depth = 0;
+        while (actual != null && depth++ < 16) {
+            if (actual instanceof HeadlessException) {
+                return true;
+            }
+            String className = actual.getClass().getName();
+            String msg = actual.getMessage() != null ? actual.getMessage().toLowerCase(Locale.ROOT) : "";
+            if (actual instanceof UnsupportedOperationException
+                    && (msg.contains("unable to open display")
+                        || msg.contains("headless")
+                        || msg.contains("glass")
+                        || msg.contains("display"))) {
+                return true;
+            }
+            if ((actual instanceof UnsatisfiedLinkError || actual instanceof NoClassDefFoundError)
+                    && (msg.contains("javafx") || msg.contains("glass") || msg.contains("prism")
+                        || msg.contains("gtk") || className.contains("javafx"))) {
+                return true;
+            }
+            if (msg.contains("unable to open display")
+                    || msg.contains("no x11 display")
+                    || msg.contains("cannot open display")
+                    || msg.contains("graphics device initialization failed")) {
+                return true;
+            }
+            actual = actual.getCause();
+        }
+        return false;
     }
 
     private static void iniciarModoServidorHeadless() {

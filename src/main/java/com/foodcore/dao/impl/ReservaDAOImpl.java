@@ -81,26 +81,47 @@ public class ReservaDAOImpl implements ReservaDAO {
         return lista;
     }
 
+    private static final String SQL_RESERVA_PROXIMA_NORMAL =
+            "SELECT r.*, m.numero AS numero_mesa FROM reserva_mesa r "
+                    + "JOIN mesa m ON r.id_mesa = m.id_mesa "
+                    + "WHERE m.numero = ? AND r.fecha = ? AND r.estado IN ('CONFIRMADA', 'PENDIENTE') "
+                    + "AND (r.hora BETWEEN ? AND ?) "
+                    + "ORDER BY r.hora ASC LIMIT 1";
+
+    private static final String SQL_RESERVA_PROXIMA_CRUCE =
+            "SELECT r.*, m.numero AS numero_mesa FROM reserva_mesa r "
+                    + "JOIN mesa m ON r.id_mesa = m.id_mesa "
+                    + "WHERE m.numero = ? AND r.fecha = ? AND r.estado IN ('CONFIRMADA', 'PENDIENTE') "
+                    + "AND (r.hora >= ? OR r.hora <= ?) "
+                    + "ORDER BY r.hora ASC LIMIT 1";
+
     @Override
     public Optional<ReservaMesa> buscarReservaProximaParaMesa(Connection conn, String numeroMesa, LocalDate fecha, LocalTime horaActual, int minutosMargen) throws SQLException {
         LocalTime inicio = horaActual.minusMinutes(15);
         LocalTime fin = horaActual.plusMinutes(minutosMargen);
 
-        String condHora = inicio.isAfter(fin) ? "(r.hora >= ? OR r.hora <= ?)" : "(r.hora BETWEEN ? AND ?)";
-        String sql = "SELECT r.*, m.numero AS numero_mesa FROM reserva_mesa r "
-                + "JOIN mesa m ON r.id_mesa = m.id_mesa "
-                + "WHERE m.numero = ? AND r.fecha = ? AND r.estado IN ('CONFIRMADA', 'PENDIENTE') "
-                + "AND " + condHora + " "
-                + "ORDER BY r.hora ASC LIMIT 1";
-
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, numeroMesa);
-            ps.setDate(2, Date.valueOf(fecha));
-            ps.setTime(3, Time.valueOf(inicio));
-            ps.setTime(4, Time.valueOf(fin));
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapearReserva(rs));
+        if (inicio.isAfter(fin)) {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_RESERVA_PROXIMA_CRUCE)) {
+                ps.setString(1, numeroMesa);
+                ps.setDate(2, Date.valueOf(fecha));
+                ps.setTime(3, Time.valueOf(inicio));
+                ps.setTime(4, Time.valueOf(fin));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapearReserva(rs));
+                    }
+                }
+            }
+        } else {
+            try (PreparedStatement ps = conn.prepareStatement(SQL_RESERVA_PROXIMA_NORMAL)) {
+                ps.setString(1, numeroMesa);
+                ps.setDate(2, Date.valueOf(fecha));
+                ps.setTime(3, Time.valueOf(inicio));
+                ps.setTime(4, Time.valueOf(fin));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.of(mapearReserva(rs));
+                    }
                 }
             }
         }

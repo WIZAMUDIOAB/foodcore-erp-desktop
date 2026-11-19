@@ -1,5 +1,5 @@
 # ==============================================================================
-# FoodCore ERP - Ejemplo de configuracion segura para MySQL 8.0
+# FoodCore ERP v5.7.1 - Ejemplo de configuracion segura para MySQL 8.0
 # Copiar a my.ini / /etc/mysql/mysql.conf.d/foodcore.cnf en el servidor anfitrion.
 # Aislar el puerto 3306 exclusivamente a loopback local (127.0.0.1);
 # en topologias LAN restringir por firewall y exigir TLS (require_secure_transport=ON).
@@ -7,6 +7,8 @@
 [mysqld]
 port=3306
 bind-address=127.0.0.1
+require_secure_transport=ON
+local_infile=0
 character-set-server=utf8mb4
 collation-server=utf8mb4_0900_ai_ci
 default-time-zone=-05:00

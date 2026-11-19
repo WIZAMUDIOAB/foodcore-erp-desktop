@@ -226,6 +226,8 @@ class ApiSecurityTest {
         JwtService jwtService = new JwtService(TEST_SECRET);
         ApiServer server = ApiServer.crearServidorAislado(
                 jwtService, CorsPolicy.desdeCadena(""), new AuthRateLimiter());
+        String prevDemo = System.getProperty(ApiState.PROP_DEMO_FALLBACK);
+        System.setProperty(ApiState.PROP_DEMO_FALLBACK, "true");
         server.iniciar(port, -1);
 
         try {
@@ -233,6 +235,10 @@ class ApiSecurityTest {
 
             HttpResponse<String> publicCatalog = enviarGet(client, port, "/api/public/productos", null);
             assertEquals(200, publicCatalog.statusCode());
+            assertEquals("nosniff", publicCatalog.headers().firstValue("X-Content-Type-Options").orElse(""));
+            assertEquals("DENY", publicCatalog.headers().firstValue("X-Frame-Options").orElse(""));
+            assertEquals("no-referrer", publicCatalog.headers().firstValue("Referrer-Policy").orElse(""));
+            assertTrue(publicCatalog.headers().firstValue("Content-Security-Policy").isPresent());
             JsonNode arr = MAPPER.readTree(publicCatalog.body());
             assertTrue(arr.isArray() && !arr.isEmpty());
             JsonNode primero = arr.get(0);
@@ -263,6 +269,11 @@ class ApiSecurityTest {
             assertTrue(traversal.statusCode() == 403 || traversal.statusCode() == 404);
         } finally {
             server.detener();
+            if (prevDemo == null) {
+                System.clearProperty(ApiState.PROP_DEMO_FALLBACK);
+            } else {
+                System.setProperty(ApiState.PROP_DEMO_FALLBACK, prevDemo);
+            }
         }
     }
 

@@ -16,4 +16,6 @@ public interface VacacionesDAO {
     void guardarOActualizar(Connection conn, Vacaciones vacaciones) throws SQLException;
 
     void incrementarDiasGozados(Connection conn, int idUsuario, int anio, int dias) throws SQLException;
+
+    boolean incrementarDiasGozadosSiDisponible(Connection conn, int idUsuario, int anio, int dias) throws SQLException;
 }

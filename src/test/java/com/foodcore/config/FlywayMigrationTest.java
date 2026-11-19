@@ -28,11 +28,11 @@ class FlywayMigrationTest {
     }
 
     @Test
-    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V24 sin error y registra success=1 en flyway_schema_history")
+    @DisplayName("R-02.8 & R-05 (1/3): BD vacía -> flyway.migrate() aplica V1..V25 sin error y registra success=1 en flyway_schema_history")
     void debeAplicarMigracionesV1AV4SobreBaseDeDatosVacia() throws Exception {
         MigrateResult result = MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
-        assertEquals(24, result.migrationsExecuted);
-        assertEquals("24", result.targetSchemaVersion);
+        assertEquals(25, result.migrationsExecuted);
+        assertEquals("25", result.targetSchemaVersion);
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement();
@@ -45,7 +45,33 @@ class FlywayMigrationTest {
             }
             assertTrue(versiones.containsAll(Set.of(
                 "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24")));
+                "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25")));
+        }
+
+        // Verificar hardening V25: 0 PINs en texto plano, índices compuestos creados y collations normalizadas
+        try (Connection conn = ConexionBD.getConnection();
+             Statement st = conn.createStatement()) {
+            try (ResultSet rsPin = st.executeQuery("SELECT COUNT(*) FROM usuario WHERE pin IS NOT NULL")) {
+                rsPin.next();
+                assertEquals(0, rsPin.getInt(1), "V25 debe limpiar todos los PINs en texto plano (usuario.pin IS NULL)");
+            }
+            try (ResultSet rsIdx = st.executeQuery(
+                "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics "
+                    + "WHERE table_schema = DATABASE() AND index_name IN ("
+                    + "'idx_venta_estado_fecha', 'idx_pedido_estado_fecha', 'idx_detven_producto_estado', "
+                    + "'idx_asistencia_usuario_fecha', 'idx_auditoria_fecha_accion', "
+                    + "'idx_cxc_cliente_estado', 'idx_cxp_proveedor_estado', 'idx_kardex_ref_tipo')")) {
+                rsIdx.next();
+                assertEquals(8, rsIdx.getInt(1), "V25 debe crear todos los índices compuestos críticos");
+            }
+            try (ResultSet rsCol = st.executeQuery(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                    + "WHERE table_schema = DATABASE() "
+                    + "AND table_name IN ('documento_empleado', 'vacaciones', 'movimiento_pago', 'token_blacklist') "
+                    + "AND table_collation = 'utf8mb4_0900_ai_ci'")) {
+                rsCol.next();
+                assertEquals(4, rsCol.getInt(1), "V25 debe normalizar collation de 4 tablas a utf8mb4_0900_ai_ci");
+            }
         }
 
         try (Connection conn = ConexionBD.getConnection();

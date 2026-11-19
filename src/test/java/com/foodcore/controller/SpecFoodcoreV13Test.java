@@ -8,6 +8,7 @@ import com.foodcore.dao.RolDAO;
 import com.foodcore.dao.impl.RolDAOImpl;
 import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Pedido;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
+import javax.print.PrintServiceLookup;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.math.BigDecimal;
@@ -56,6 +58,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -120,8 +123,20 @@ class SpecFoodcoreV13Test {
             assertTrue(syncWorker.isOnline(), "Debe marcar estado online");
 
             int sincronizados = syncWorker.procesarOutboxSync();
-            assertTrue(sincronizados >= 0, "Debe procesar la cola de sincronizacion");
+            assertEquals(1, sincronizados, "Debe sincronizar exactamente el pedido encolado en outbox local");
             assertEquals(0, syncWorker.contarPedidosPendientes(), "Los registros sincronizados deben purgarse localmente");
+
+            try (Connection conn = ConexionBD.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                         "SELECT tipo_pedido, cliente_nombre, total FROM pedido WHERE numero_mesa = ? ORDER BY id_pedido DESC LIMIT 1")) {
+                ps.setString(1, "DELIV-01");
+                try (ResultSet rs = ps.executeQuery()) {
+                    assertTrue(rs.next(), "El pedido sincronizado debe quedar persistido en MySQL");
+                    assertEquals("DELIVERY", rs.getString("tipo_pedido"));
+                    assertEquals("Carlos Mendoza", rs.getString("cliente_nombre"));
+                    assertEquals(0, new BigDecimal("35.00").compareTo(rs.getBigDecimal("total")));
+                }
+            }
         } finally {
             syncWorker.setSimularDesconexionRed(false);
             LocalDatabaseManager.setDbPath(null);
@@ -162,7 +177,7 @@ class SpecFoodcoreV13Test {
 
     @Test
     @DisplayName("SPEC v1.3 SEC-3: Pedido Delivery calcula costo de envio inafecto de IGV")
-    void testPedidoDeliveryCalculos() {
+    void testPedidoDeliveryCalculos() throws Exception {
         Pedido pedido = new Pedido();
         pedido.setTipoPedido("DELIVERY");
         pedido.setClienteNombre("Lucia Ramos");
@@ -171,9 +186,18 @@ class SpecFoodcoreV13Test {
         pedido.setCostoEnvio(new BigDecimal("7.50"));
 
         BigDecimal subtotalComida = new BigDecimal("50.00");
-        BigDecimal totalFinal = subtotalComida.add(pedido.getCostoEnvio());
+        DesgloseFiscal desgloseComida = DesgloseFiscal.desdeTotalConImpuestos(subtotalComida);
+        BigDecimal totalFinal = desgloseComida.getTotal().add(pedido.getCostoEnvio());
+        pedido.setTotal(totalFinal);
 
-        assertEquals(new BigDecimal("57.50"), totalFinal, "El costo de envio se suma al total directo sin recargo adicional de IGV");
+        assertEquals("DELIVERY", pedido.getTipoPedido());
+        assertEquals("Lucia Ramos", pedido.getClienteNombre());
+        assertEquals(0, new BigDecimal("42.37").compareTo(desgloseComida.getSubtotalGravado()),
+                "El valor gravado debe calcularse solo sobre el consumo de comida");
+        assertEquals(0, new BigDecimal("7.63").compareTo(desgloseComida.getIgv()),
+                "El IGV (18%) no debe gravar el costo de envio");
+        assertEquals(0, new BigDecimal("57.50").compareTo(pedido.getTotal()),
+                "El costo de envio se suma al total directo sin recargo adicional de IGV");
     }
 
     @Test
@@ -188,8 +212,17 @@ class SpecFoodcoreV13Test {
         assertEquals((byte) 0x19, pulso[3]);
         assertEquals((byte) 0xFA, pulso[4]);
 
-        ImpresoraTermicaService.emitirPulsoAperturaCajon("CAJA_PRINCIPAL");
-        assertTrue(true, "Pulso ESC/POS emitido sin lanzar excepcion");
+        // Copia defensiva: mutar el arreglo retornado no debe corromper invocaciones futuras
+        pulso[0] = 0x00;
+        byte[] pulsoFresh = ImpresoraTermicaService.getEscPosAbrirCajon();
+        assertEquals((byte) 0x1B, pulsoFresh[0], "getEscPosAbrirCajon debe devolver una copia defensiva");
+
+        boolean enviado = assertDoesNotThrow(
+                () -> ImpresoraTermicaService.emitirPulsoAperturaCajon("CAJA_PRINCIPAL"),
+                "Emitir pulso ESC/POS no debe lanzar excepciones incluso sin hardware fisico");
+        if (PrintServiceLookup.lookupDefaultPrintService() == null) {
+            assertFalse(enviado, "Sin impresora fisica ni predeterminada debe devolver false");
+        }
     }
 
     @Test
