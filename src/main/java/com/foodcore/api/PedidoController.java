@@ -1,5 +1,6 @@
 package com.foodcore.api;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -8,19 +9,29 @@ import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.ProductoDAO;
+import com.foodcore.exception.CajaCerradaException;
+import com.foodcore.exception.ConflictoEstadoException;
+import com.foodcore.exception.InsumoNoEncontradoException;
+import com.foodcore.exception.NegocioException;
+import com.foodcore.exception.StockInsuficienteException;
 import com.foodcore.model.Caja;
+import com.foodcore.model.ComprobantePago;
+import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetallePedido;
+import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.model.Venta;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.VentaService;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.javalin.http.Context;
 
-import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
@@ -31,21 +42,40 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador Javalin para catálogo de productos, estado de mesas, comandas de salón y operaciones de caja (v4.3.0 §1.3).
+ * Controlador Javalin para catálogo de productos, imágenes confinadas, estado de mesas,
+ * comandas de salón con precios autoritativos en BD y cobro real de caja vía {@link VentaService}
+ * (v5.7.1 Hardening).
  */
 public class PedidoController {
 
     private static final Logger LOGGER = Logger.getLogger(PedidoController.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private static final Path UPLOADS_PLATILLOS_DIR = Path.of("uploads", "platillos");
+    private static final Set<String> EXTENSIONES_IMAGEN_PERMITIDAS = Set.of(".png", ".jpg", ".jpeg", ".webp");
+    private static final Set<String> TIPOS_COMPROBANTE_VALIDOS = Set.of("BOLETA", "FACTURA", "TICKET");
+    private static final Set<String> MEDIOS_PAGO_VALIDOS =
+            Set.of("EFECTIVO", "TARJETA", "YAPE", "PLIN", "YAPE_PLIN", "TRANSFERENCIA", "MIXTO");
+    private static final Set<String> ESTADOS_PEDIDO_VALIDOS = Set.of(
+            "PENDIENTE", "REGISTRADO", "ABIERTO", "EN_PREPARACION", "LISTO",
+            "ENTREGADO", "ITEMS_ADICIONALES", "POR_COBRAR", "COBRADO", "PAGADO", "CANCELADO", "ANULADO"
+    );
+    private static final Set<String> ESTADOS_PEDIDO_TERMINALES = Set.of(
+            "COBRADO", "PAGADO", "CERRADO", "CANCELADO", "ANULADO"
+    );
 
     private final ApiState state;
     private final ProductoDAO productoDAO;
@@ -53,6 +83,7 @@ public class PedidoController {
     private final PedidoDAO pedidoDAO;
     private final PedidoService pedidoService;
     private final CajaService cajaService;
+    private final VentaService ventaService;
 
     public PedidoController(ApiState state,
                             ProductoDAO productoDAO,
@@ -60,12 +91,23 @@ public class PedidoController {
                             PedidoDAO pedidoDAO,
                             PedidoService pedidoService,
                             CajaService cajaService) {
+        this(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService, new VentaService());
+    }
+
+    public PedidoController(ApiState state,
+                            ProductoDAO productoDAO,
+                            MesaDAO mesaDAO,
+                            PedidoDAO pedidoDAO,
+                            PedidoService pedidoService,
+                            CajaService cajaService,
+                            VentaService ventaService) {
         this.state = state;
         this.productoDAO = productoDAO;
         this.mesaDAO = mesaDAO;
         this.pedidoDAO = pedidoDAO;
         this.pedidoService = pedidoService;
         this.cajaService = cajaService;
+        this.ventaService = ventaService != null ? ventaService : new VentaService();
     }
 
     public void handleListarProductos(Context ctx) {
@@ -126,10 +168,10 @@ public class PedidoController {
                 }
             }
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Usando catálogo de respaldo para listado de productos", e);
+            LOGGER.log(Level.FINE, "Error consultando catálogo de productos en BD", e);
         }
 
-        if (productos.isEmpty()) {
+        if (productos.isEmpty() && ApiState.isDemoFallbackEnabled()) {
             productos = obtenerCatalogoRespaldo();
         }
         if (soloDisponibles) {
@@ -141,6 +183,10 @@ public class PedidoController {
     public void handleActualizarDisponibilidad(Context ctx) {
         try {
             int idProducto = Integer.parseInt(ctx.pathParam("id"));
+            if (idProducto <= 0) {
+                state.responderError(ctx, 400, "ID de producto inválido.");
+                return;
+            }
             boolean nuevoEstado = false;
 
             if (ctx.body() != null && !ctx.body().isBlank()) {
@@ -155,18 +201,15 @@ public class PedidoController {
             }
 
             try (Connection conn = ConexionBD.getConnection()) {
-                if (conn != null) {
-                    productoDAO.cambiarDisponibilidad(conn, idProducto, nuevoEstado);
+                if (conn == null) {
+                    state.responderError(ctx, 503, "Servicio de base de datos no disponible.");
+                    return;
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "No se pudo actualizar disponibilidad en MySQL, aplicando a memoria", e);
-            }
-
-            for (Producto p : state.catalogoRespaldoCache) {
-                if (p.getIdProducto() == idProducto) {
-                    p.setDisponible(nuevoEstado);
-                    break;
-                }
+                productoDAO.cambiarDisponibilidad(conn, idProducto, nuevoEstado);
+            } catch (SQLException e) {
+                LOGGER.log(Level.WARNING, "Error SQL actualizando disponibilidad de producto #" + idProducto, e);
+                state.responderError(ctx, 503, "No se pudo actualizar la disponibilidad en base de datos.");
+                return;
             }
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -175,17 +218,26 @@ public class PedidoController {
             resp.put("disponible", nuevoEstado);
             resp.put("mensaje", nuevoEstado ? "Producto disponible en catálogo" : "Producto marcado como AGOTADO");
             ctx.status(200).json(resp);
-        } catch (NumberFormatException e) {
-            state.responderError(ctx, 400, "ID de producto inválido.");
+        } catch (NumberFormatException | JsonProcessingException e) {
+            state.responderError(ctx, 400, "Parámetros de disponibilidad inválidos.");
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al actualizar disponibilidad de producto", e);
             state.responderError(ctx, 500, "Error interno al actualizar disponibilidad.");
         }
     }
 
+    /**
+     * GET /api/productos/{id}/imagen y /api/public/productos/{id}/imagen
+     * Confinamiento estricto dentro de {@code uploads/platillos} mediante {@code toRealPath().normalize()}
+     * y lista blanca de extensiones ({@code .png, .jpg, .jpeg, .webp}); bloquea {@code .svg} y path traversal.
+     */
     public void handleImagenProducto(Context ctx) {
         try {
             int idProd = Integer.parseInt(ctx.pathParam("id"));
+            if (idProd <= 0) {
+                ctx.status(400);
+                return;
+            }
             String rutaImg = null;
             try (Connection conn = ConexionBD.getConnection()) {
                 if (conn != null) {
@@ -204,7 +256,19 @@ public class PedidoController {
                 ctx.status(404);
                 return;
             }
-            servirArchivoImagen(ctx, new File(rutaImg.trim()));
+            if (esRutaImagenSospechosa(rutaImg)) {
+                LOGGER.warning("Intento LFI / extensión prohibida bloqueada en handleImagenProducto para producto #" + idProd);
+                ctx.status(403);
+                return;
+            }
+            Optional<Path> confinada = resolverArchivoImagenConfinado(UPLOADS_PLATILLOS_DIR, rutaImg);
+            if (confinada.isEmpty()) {
+                ctx.status(404);
+                return;
+            }
+            servirArchivoImagen(ctx, confinada.get());
+        } catch (NumberFormatException e) {
+            ctx.status(400);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "No se pudo servir imagen de producto", e);
             ctx.status(404);
@@ -213,22 +277,82 @@ public class PedidoController {
 
     public void handleServirUploadPlatillo(Context ctx) {
         String rawArchivo = ctx.pathParam("archivo");
-        if (rawArchivo.contains("/") || rawArchivo.contains("\\") || rawArchivo.contains("..")) {
+        if (esRutaImagenSospechosa(rawArchivo)) {
             ctx.status(403);
             return;
         }
-        String archivo = rawArchivo.replaceAll("[^a-zA-Z0-9._-]", "");
-        if (archivo.isBlank()) {
+        Optional<Path> target = resolverArchivoImagenConfinado(UPLOADS_PLATILLOS_DIR, rawArchivo);
+        if (target.isEmpty()) {
             ctx.status(404);
             return;
         }
-        Path baseDir = Path.of("uploads", "platillos").toAbsolutePath().normalize();
-        Path target = baseDir.resolve(archivo).normalize();
-        if (!target.startsWith(baseDir)) {
-            ctx.status(403);
-            return;
+        servirArchivoImagen(ctx, target.get());
+    }
+
+    /**
+     * Valida si un nombre o ruta de imagen contiene traversal, rutas absolutas o extensiones prohibidas (como .svg).
+     */
+    static boolean esRutaImagenSospechosa(String rawInput) {
+        if (rawInput == null || rawInput.isBlank()) {
+            return true;
         }
-        servirArchivoImagen(ctx, target.toFile());
+        String limpio = rawInput.trim().replace('\\', '/');
+        if (limpio.contains("\0") || limpio.contains("..")) {
+            return true;
+        }
+        String relativo = limpiarPrefijoUploads(limpio);
+        if (relativo.isBlank() || relativo.startsWith("/") || relativo.contains("/") || relativo.contains(":")) {
+            return true;
+        }
+        String lower = relativo.toLowerCase(Locale.ROOT);
+        for (String ext : EXTENSIONES_IMAGEN_PERMITIDAS) {
+            if (lower.endsWith(ext)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Resuelve de forma segura un archivo de imagen estrictamente confinado dentro de {@code baseDirRaw}
+     * usando {@code toRealPath().normalize().startsWith(baseDir.toRealPath().normalize())}.
+     */
+    static Optional<Path> resolverArchivoImagenConfinado(Path baseDirRaw, String rawInput) {
+        if (baseDirRaw == null || esRutaImagenSospechosa(rawInput)) {
+            return Optional.empty();
+        }
+        String limpio = rawInput.trim().replace('\\', '/');
+        String nombreArchivo = limpiarPrefijoUploads(limpio);
+        if (!nombreArchivo.matches("^[a-zA-Z0-9._-]+$")) {
+            return Optional.empty();
+        }
+        try {
+            if (!Files.exists(baseDirRaw) || !Files.isDirectory(baseDirRaw)) {
+                return Optional.empty();
+            }
+            Path baseReal = baseDirRaw.toRealPath().normalize();
+            Path candidato = baseReal.resolve(nombreArchivo).normalize();
+            if (!candidato.startsWith(baseReal) || !Files.exists(candidato) || !Files.isRegularFile(candidato)) {
+                return Optional.empty();
+            }
+            Path candidatoReal = candidato.toRealPath().normalize();
+            if (!candidatoReal.startsWith(baseReal)) {
+                return Optional.empty();
+            }
+            return Optional.of(candidatoReal);
+        } catch (IOException | RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private static String limpiarPrefijoUploads(String rutaConSlashes) {
+        if (rutaConSlashes.startsWith("/uploads/platillos/")) {
+            return rutaConSlashes.substring("/uploads/platillos/".length());
+        }
+        if (rutaConSlashes.startsWith("uploads/platillos/")) {
+            return rutaConSlashes.substring("uploads/platillos/".length());
+        }
+        return rutaConSlashes;
     }
 
     public void handleListarMesas(Context ctx) {
@@ -237,14 +361,6 @@ public class PedidoController {
         ArrayNode array = state.mapper.createArrayNode();
         Map<String, String> estadosPorMesa = new LinkedHashMap<>();
         Map<String, Double> totalesPorMesa = new LinkedHashMap<>();
-
-        for (int i = 1; i <= 12; i++) {
-            String key = String.format("%02d", i);
-            estadosPorMesa.put(key, state.estadosMesasMemoria.getOrDefault(key, "LIBRE"));
-            if (state.totalesMesasMemoria.containsKey(key)) {
-                totalesPorMesa.put(key, state.totalesMesasMemoria.get(key));
-            }
-        }
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
@@ -268,7 +384,13 @@ public class PedidoController {
                 }
             }
         } catch (SQLException | RuntimeException e) {
-            LOGGER.log(Level.FINE, "Usando estado de mesas por defecto en GET /api/mesas", e);
+            LOGGER.log(Level.FINE, "No se pudo consultar tabla mesa en GET /api/mesas", e);
+        }
+
+        if (estadosPorMesa.isEmpty() && ApiState.isDemoFallbackEnabled()) {
+            for (int i = 1; i <= 12; i++) {
+                estadosPorMesa.put(String.format("%02d", i), "LIBRE");
+            }
         }
 
         int idx = 1;
@@ -289,19 +411,21 @@ public class PedidoController {
         ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
     }
 
+    /**
+     * POST /api/pedidos — Carga precios y disponibilidad autoritativos desde {@link ProductoDAO},
+     * valida {@code cantidad > 0} y persiste en MySQL sin swallows a IDs ficticios en memoria.
+     */
     public void handleCrearPedido(Context ctx) {
+        JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+        if (claims == null || claims.idUsuario() <= 0) {
+            state.responderError(ctx, 401, "Autenticación requerida.");
+            return;
+        }
         try {
             JsonNode body = state.mapper.readTree(ctx.body());
             String uuidLocal = state.extraerTexto(body, "uuid_local", "uuidLocal", "idempotency_key");
             if (uuidLocal == null || uuidLocal.isBlank()) {
                 uuidLocal = UUID.randomUUID().toString();
-            }
-
-            if (state.cacheIdempotenciaPedidos.containsKey(uuidLocal)) {
-                ObjectNode prev = state.cacheIdempotenciaPedidos.get(uuidLocal).deepCopy();
-                prev.put("idempotente", true);
-                ctx.status(200).contentType("application/json; charset=UTF-8").result(prev.toString());
-                return;
             }
 
             String numeroMesa = state.extraerTexto(body, "numero_mesa", "numeroMesa", "mesa");
@@ -313,60 +437,85 @@ public class PedidoController {
                 numeroMesa = "0" + numeroMesa;
             }
 
-            JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
-            int defaultUserId = claims != null ? claims.idUsuario() : 1;
-            int idUsuario = body.hasNonNull("id_usuario") ? body.get("id_usuario").asInt(defaultUserId)
-                    : (body.hasNonNull("idUsuario") ? body.get("idUsuario").asInt(defaultUserId) : defaultUserId);
-            int idUsuarioCreador = body.hasNonNull("id_usuario_creador")
-                    ? body.get("id_usuario_creador").asInt(idUsuario)
-                    : (body.hasNonNull("idUsuarioCreador") ? body.get("idUsuarioCreador").asInt(idUsuario) : idUsuario);
-            if (claims != null && !"ADMIN".equals(claims.rol()) && !"SUPERVISOR".equals(claims.rol())) {
-                idUsuario = claims.idUsuario();
-                idUsuarioCreador = claims.idUsuario();
-            }
-
             JsonNode itemsNode = body.has("items") ? body.get("items") : body.get("detalles");
             if (itemsNode == null || !itemsNode.isArray() || itemsNode.isEmpty()) {
                 state.responderError(ctx, 400, "El pedido debe incluir al menos un ítem en 'items'.");
                 return;
             }
 
+            int idUsuario = claims.idUsuario();
+            int idUsuarioCreador = claims.idUsuario();
+
             List<DetallePedido> detalles = new ArrayList<>();
             BigDecimal totalCalculado = BigDecimal.ZERO;
 
-            for (JsonNode item : itemsNode) {
-                int idProd = item.hasNonNull("id_producto") ? item.get("id_producto").asInt(1)
-                        : (item.hasNonNull("idProducto") ? item.get("idProducto").asInt(1)
-                        : (item.hasNonNull("id") ? item.get("id").asInt(1) : 1));
-                String nombreProd = state.extraerTexto(item, "nombre", "nombre_producto", "nombreProducto");
-                if (nombreProd == null || nombreProd.isBlank()) {
-                    nombreProd = "Plato #" + idProd;
-                }
-                int cantidad = item.hasNonNull("cantidad") ? Math.max(1, item.get("cantidad").asInt(1)) : 1;
-                double precioVal = item.hasNonNull("precio_unitario") ? item.get("precio_unitario").asDouble(0.0)
-                        : (item.hasNonNull("precioUnitario") ? item.get("precioUnitario").asDouble(0.0)
-                        : (item.hasNonNull("precio") ? item.get("precio").asDouble(0.0) : 18.0));
-
-                BigDecimal precioUnit = BigDecimal.valueOf(precioVal).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal subtotal = precioUnit.multiply(BigDecimal.valueOf(cantidad)).setScale(2, RoundingMode.HALF_UP);
-                String notas = state.extraerTexto(item, "notas", "notas_preparacion", "notasPreparacion");
-
-                DetallePedido det = new DetallePedido(
-                        0, 0, idProd, nombreProd, cantidad, precioUnit, subtotal, notas != null ? notas : "");
-                detalles.add(det);
-                totalCalculado = totalCalculado.add(subtotal);
-            }
-
-            boolean yaExistiaEnBd = false;
             try (Connection conn = ConexionBD.getConnection()) {
-                if (conn != null) {
-                    Optional<Pedido> optExistente = pedidoDAO.buscarPorIdempotencyKey(conn, uuidLocal);
-                    if (optExistente.isPresent()) {
-                        yaExistiaEnBd = true;
-                    }
+                if (conn == null) {
+                    state.responderError(ctx, 503, "Base de datos no disponible para registrar pedidos.");
+                    return;
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Verificación previa de idempotencia delegada a PedidoService", e);
+
+                // 1. Verificar idempotencia real en MySQL
+                Optional<Pedido> optExistente = pedidoDAO.buscarPorIdempotencyKey(conn, uuidLocal);
+                if (optExistente.isPresent()) {
+                    Pedido existente = optExistente.get();
+                    List<DetallePedido> detExistentes = pedidoDAO.listarDetallesPorPedido(conn, existente.getIdPedido());
+                    ObjectNode respIdem = construirRespuestaPedido(existente, detExistentes, true);
+                    ctx.status(200).contentType("application/json; charset=UTF-8").result(respIdem.toString());
+                    return;
+                }
+
+                // 2. Cargar catálogo autoritativo desde ProductoDAO (bloquea price tampering y productos agotados)
+                Map<Integer, Producto> catalogoPorId = new HashMap<>();
+                for (Producto p : productoDAO.listarTodos(conn)) {
+                    catalogoPorId.put(p.getIdProducto(), p);
+                }
+
+                for (JsonNode item : itemsNode) {
+                    int idProd = extraerIdProducto(item);
+                    if (idProd <= 0) {
+                        state.responderError(ctx, 400, "Cada ítem debe especificar un 'id_producto' válido.");
+                        return;
+                    }
+                    if (!item.hasNonNull("cantidad") || !item.get("cantidad").isInt()) {
+                        state.responderError(ctx, 400, "Cada ítem debe indicar una 'cantidad' entera positiva.");
+                        return;
+                    }
+                    int cantidad = item.get("cantidad").asInt(0);
+                    if (cantidad <= 0) {
+                        state.responderError(ctx, 400, "La cantidad de cada ítem debe ser mayor a cero.");
+                        return;
+                    }
+
+                    Producto prodAutoritativo = catalogoPorId.get(idProd);
+                    if (prodAutoritativo == null) {
+                        state.responderError(ctx, 422, "Producto no encontrado en catálogo: #" + idProd);
+                        return;
+                    }
+                    if (!prodAutoritativo.isDisponible()) {
+                        state.responderError(ctx, 422, "Producto no disponible actualmente: " + prodAutoritativo.getNombre());
+                        return;
+                    }
+                    BigDecimal precioAutoritativo = prodAutoritativo.getPrecioVenta();
+                    if (precioAutoritativo == null || precioAutoritativo.compareTo(BigDecimal.ZERO) <= 0) {
+                        state.responderError(ctx, 422, "El producto #" + idProd + " no tiene un precio válido configurado.");
+                        return;
+                    }
+
+                    BigDecimal precioUnit = precioAutoritativo.setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal subtotal = precioUnit.multiply(BigDecimal.valueOf(cantidad)).setScale(2, RoundingMode.HALF_UP);
+                    String notas = state.extraerTexto(item, "notas", "notas_preparacion", "notasPreparacion");
+
+                    DetallePedido det = new DetallePedido(
+                            0, 0, idProd, prodAutoritativo.getNombre(), cantidad, precioUnit, subtotal,
+                            notas != null ? notas : "");
+                    detalles.add(det);
+                    totalCalculado = totalCalculado.add(subtotal);
+                }
+            } catch (SQLException exSql) {
+                LOGGER.log(Level.WARNING, "Error SQL validando catálogo/idempotencia en POST /api/pedidos", exSql);
+                state.responderError(ctx, 503, "Servicio de base de datos no disponible.");
+                return;
             }
 
             Pedido nuevoPedido = new Pedido();
@@ -387,17 +536,17 @@ public class PedidoController {
             Pedido guardado;
             try {
                 guardado = pedidoService.registrarPedidoYEnviarComanda(nuevoPedido, detalles);
-            } catch (Exception exDb) {
-                LOGGER.log(Level.FINE, "Registrando pedido en modo resiliente de memoria (CI/Offline DB)", exDb);
-                int idGenerado = state.secuenciaPedidosFallback.incrementAndGet();
-                nuevoPedido.setIdPedido(idGenerado);
-                nuevoPedido.setEstado("PENDIENTE");
-                nuevoPedido.setDetalles(detalles);
-                guardado = nuevoPedido;
+            } catch (ConflictoEstadoException exConf) {
+                state.responderError(ctx, 409, exConf.getMessage() != null ? exConf.getMessage() : "Conflicto de estado del pedido.");
+                return;
+            } catch (NegocioException exNeg) {
+                state.responderError(ctx, 422, exNeg.getMessage() != null ? exNeg.getMessage() : "Validación de negocio fallida.");
+                return;
+            } catch (SQLException exDb) {
+                LOGGER.log(Level.WARNING, "Error persistiendo pedido en POST /api/pedidos", exDb);
+                state.responderError(ctx, 503, "No se pudo persistir el pedido en base de datos.");
+                return;
             }
-
-            state.estadosMesasMemoria.put(numeroMesa, "OCUPADA");
-            state.totalesMesasMemoria.put(numeroMesa, totalCalculado.doubleValue());
 
             try (Connection conn = ConexionBD.getConnection()) {
                 if (conn != null) {
@@ -414,76 +563,111 @@ public class PedidoController {
 
             emitirEventoDirectoKds(guardado, detalles);
 
-            String numComanda = "COM-" + String.format("%04d", guardado.getIdPedido());
-            ObjectNode resp = state.mapper.createObjectNode();
-            resp.put("status", "OK");
-            resp.put("id_pedido", guardado.getIdPedido());
-            resp.put("numero_comanda", numComanda);
-            resp.put("uuid_local", uuidLocal);
-            resp.put("numero_mesa", guardado.getNumeroMesa());
-            resp.put("estado", "PENDIENTE");
-            resp.put("estado_pedido", guardado.getEstado() != null ? guardado.getEstado() : "REGISTRADO");
-            resp.put("estado_comanda", "PENDIENTE");
-            resp.put("notificado_kds", true);
-            resp.put("total", guardado.getTotal() != null ? guardado.getTotal().doubleValue() : totalCalculado.doubleValue());
-            resp.put("id_usuario", guardado.getIdUsuario());
-            resp.put("id_usuario_creador", guardado.getIdUsuarioCreador() != null ? guardado.getIdUsuarioCreador() : idUsuarioCreador);
-            resp.put("idempotente", yaExistiaEnBd);
+            ObjectNode resp = construirRespuestaPedido(guardado, detalles, false);
+            ctx.status(201).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-            ArrayNode itemsResp = resp.putArray("items");
-            for (DetallePedido d : detalles) {
-                ObjectNode detNode = itemsResp.addObject();
-                detNode.put("id_producto", d.getIdProducto());
-                detNode.put("nombre", d.getNombreProducto());
-                detNode.put("cantidad", d.getCantidad());
-                detNode.put("precio_unitario", d.getPrecioUnitario().doubleValue());
-                detNode.put("subtotal", d.getSubtotal().doubleValue());
-                detNode.put("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
-                detNode.put("estado_cocina", d.getEstadoCocina() != null ? d.getEstadoCocina() : "PENDIENTE");
-            }
-
-            state.cacheIdempotenciaPedidos.put(uuidLocal, resp.deepCopy());
-            ctx.status(yaExistiaEnBd ? 200 : 201)
-                    .contentType("application/json; charset=UTF-8")
-                    .result(resp.toString());
-
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
+        } catch (JsonProcessingException e) {
+            state.responderError(ctx, 400, "Cuerpo JSON inválido en solicitud de pedido.");
+        } catch (RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error procesando POST /api/pedidos", e);
-            state.responderError(ctx, 500, "No se pudo registrar el pedido: " + e.getMessage());
+            state.responderError(ctx, 500, "No se pudo registrar el pedido.");
         }
     }
 
+    /**
+     * GET /api/pedidos — Lee pedidos activos directamente desde MySQL (sin caché unbounded en memoria).
+     */
     public void handleListarPedidos(Context ctx) {
         ctx.header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         ArrayNode array = state.mapper.createArrayNode();
-        for (ObjectNode ped : state.cacheIdempotenciaPedidos.values()) {
-            array.add(ped.deepCopy());
+        try (Connection conn = ConexionBD.getConnection()) {
+            if (conn == null) {
+                state.responderError(ctx, 503, "Base de datos no disponible.");
+                return;
+            }
+            List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
+            Map<Integer, List<DetallePedido>> detallesPorPedido = cargarDetallesEnLote(conn, pedidos);
+            for (Pedido p : pedidos) {
+                List<DetallePedido> dets = detallesPorPedido.getOrDefault(p.getIdPedido(), List.of());
+                array.add(construirRespuestaPedido(p, dets, false));
+            }
+            ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
+        } catch (SQLException | RuntimeException e) {
+            LOGGER.log(Level.WARNING, "Error consultando GET /api/pedidos en BD", e);
+            state.responderError(ctx, 503, "No se pudieron consultar los pedidos en base de datos.");
         }
-        ctx.status(200).contentType("application/json; charset=UTF-8").result(array.toString());
     }
 
+    /**
+     * GET /api/pedidos/{uuid} — Busca el pedido por {@code idempotency_key} directamente en MySQL.
+     */
     public void handleObtenerPedidoPorUuid(Context ctx) {
         String uuid = ctx.pathParam("uuid");
-        ObjectNode ped = state.cacheIdempotenciaPedidos.get(uuid);
-        if (ped != null) {
-            ctx.status(200).contentType("application/json; charset=UTF-8").result(ped.toString());
+        if (uuid == null || uuid.isBlank()) {
+            state.responderError(ctx, 400, "UUID de pedido inválido.");
             return;
         }
-        state.responderError(ctx, 404, "Pedido no encontrado para uuid_local: " + uuid);
+        try (Connection conn = ConexionBD.getConnection()) {
+            if (conn == null) {
+                state.responderError(ctx, 503, "Base de datos no disponible.");
+                return;
+            }
+            Optional<Pedido> opt = pedidoDAO.buscarPorIdempotencyKey(conn, uuid.trim());
+            if (opt.isEmpty()) {
+                state.responderError(ctx, 404, "Pedido no encontrado.");
+                return;
+            }
+            Pedido pedido = opt.get();
+            List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
+            ObjectNode resp = construirRespuestaPedido(pedido, detalles, false);
+            ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
+        } catch (SQLException | RuntimeException e) {
+            LOGGER.log(Level.WARNING, "Error consultando GET /api/pedidos/{uuid} en BD", e);
+            state.responderError(ctx, 503, "No se pudo consultar el pedido en base de datos.");
+        }
     }
 
     public void handleActualizarEstadoPedido(Context ctx) {
         try {
             int idPedido = Integer.parseInt(ctx.pathParam("id"));
+            if (idPedido <= 0) {
+                state.responderError(ctx, 400, "ID de pedido inválido.");
+                return;
+            }
             JsonNode body = state.mapper.readTree(ctx.body());
-            String nuevoEstado = body.hasNonNull("estado") ? body.get("estado").asText().trim().toUpperCase() : "EN_PREPARACION";
+            if (!body.hasNonNull("estado") || body.get("estado").asText().isBlank()) {
+                state.responderError(ctx, 400, "El campo 'estado' es obligatorio.");
+                return;
+            }
+            String nuevoEstado = body.get("estado").asText().trim().toUpperCase(Locale.ROOT);
+            if (!ESTADOS_PEDIDO_VALIDOS.contains(nuevoEstado)) {
+                state.responderError(ctx, 400, "Estado de pedido no permitido: " + nuevoEstado);
+                return;
+            }
 
             try (Connection conn = ConexionBD.getConnection()) {
-                if (conn != null) {
-                    pedidoDAO.actualizarEstadoPedido(conn, idPedido, nuevoEstado);
+                if (conn == null) {
+                    state.responderError(ctx, 503, "Base de datos no disponible.");
+                    return;
                 }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Aviso actualizando estado de pedido en BD", e);
+                Optional<Pedido> actualOpt = pedidoDAO.obtenerPorId(conn, idPedido);
+                if (actualOpt.isEmpty()) {
+                    state.responderError(ctx, 404, "Pedido no encontrado: #" + idPedido);
+                    return;
+                }
+                String estadoActual = actualOpt.get().getEstado() != null
+                        ? actualOpt.get().getEstado().trim().toUpperCase(Locale.ROOT)
+                        : "";
+                if (ESTADOS_PEDIDO_TERMINALES.contains(estadoActual) && !estadoActual.equals(nuevoEstado)) {
+                    state.responderError(ctx, 409,
+                            "No se puede cambiar el estado de un pedido en estado terminal (" + estadoActual + ").");
+                    return;
+                }
+                pedidoDAO.actualizarEstadoPedido(conn, idPedido, nuevoEstado);
+            } catch (SQLException e) {
+                LOGGER.log(Level.WARNING, "Error SQL actualizando estado de pedido #" + idPedido, e);
+                state.responderError(ctx, 503, "No se pudo actualizar el estado del pedido en base de datos.");
+                return;
             }
 
             ObjectNode resp = state.mapper.createObjectNode();
@@ -493,11 +677,11 @@ public class PedidoController {
             resp.put("mensaje", "Estado del pedido actualizado a " + nuevoEstado);
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (NumberFormatException e) {
-            state.responderError(ctx, 400, "ID de pedido inválido.");
+        } catch (NumberFormatException | JsonProcessingException e) {
+            state.responderError(ctx, 400, "Solicitud de actualización de estado inválida.");
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al actualizar estado de pedido", e);
-            state.responderError(ctx, 500, "Error interno: " + e.getMessage());
+            state.responderError(ctx, 500, "Error interno al actualizar estado del pedido.");
         }
     }
 
@@ -518,7 +702,7 @@ public class PedidoController {
                     ventas = cajaService.calcularVentasTurno(c.getIdCaja());
                     gastos = cajaService.calcularGastosTurno(c.getIdCaja());
                 } catch (Exception ex) {
-                    LOGGER.log(Level.FINE, "Aviso procesando operación auxiliar en BD", ex);
+                    LOGGER.log(Level.FINE, "Aviso consultando totales del turno en BD", ex);
                 }
                 BigDecimal saldo = c.getMontoApertura().add(ventas).subtract(gastos);
 
@@ -536,21 +720,6 @@ public class PedidoController {
                 return;
             }
 
-            if (state.cajaTurnoActivoMemoria.get()) {
-                ObjectNode resp = state.mapper.createObjectNode();
-                resp.put("abierta", true);
-                resp.put("id_caja", 1);
-                resp.put("nombre_caja", state.cajaNombreMemoria);
-                resp.put("id_usuario", 1);
-                resp.put("monto_apertura", state.cajaMontoAperturaMemoria.doubleValue());
-                resp.put("total_ventas", state.cajaVentasMemoria.doubleValue());
-                resp.put("total_gastos", 0.0);
-                resp.put("saldo_esperado", state.cajaMontoAperturaMemoria.add(state.cajaVentasMemoria).doubleValue());
-                resp.put("estado", "ABIERTA");
-                ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
-                return;
-            }
-
             ObjectNode resp = state.mapper.createObjectNode();
             resp.put("abierta", false);
             resp.put("mensaje", "No hay ningún turno de caja abierto actualmente.");
@@ -558,155 +727,421 @@ public class PedidoController {
 
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al consultar estado de caja", e);
-            state.responderError(ctx, 500, "Error consultando estado de caja: " + e.getMessage());
+            state.responderError(ctx, 500, "Error interno al consultar estado de caja.");
         }
     }
 
+    /**
+     * POST /api/caja/abrir — Toma {@code id_usuario} estrictamente de los claims JWT y persiste en BD.
+     */
     public void handleCajaAbrir(Context ctx) {
+        JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+        if (claims == null || claims.idUsuario() <= 0) {
+            state.responderError(ctx, 401, "Autenticación requerida.");
+            return;
+        }
         try {
             JsonNode body = state.mapper.readTree(ctx.body());
-            int idUsuario = body.hasNonNull("id_usuario") ? body.get("id_usuario").asInt(1) : 1;
-            String nombreCaja = body.hasNonNull("nombre_caja") ? body.get("nombre_caja").asText().trim() : "Caja Principal";
-            BigDecimal montoInicial = body.hasNonNull("monto_inicial")
-                    ? BigDecimal.valueOf(body.get("monto_inicial").asDouble(100.0)).setScale(2, RoundingMode.HALF_UP)
-                    : new BigDecimal("100.00");
+            int idUsuario = claims.idUsuario();
+            String nombreCaja = body.hasNonNull("nombre_caja") && !body.get("nombre_caja").asText().isBlank()
+                    ? body.get("nombre_caja").asText().trim()
+                    : "Caja Principal";
+            double montoRaw = body.hasNonNull("monto_inicial") ? body.get("monto_inicial").asDouble(Double.NaN) : 0.0;
+            if (Double.isNaN(montoRaw) || Double.isInfinite(montoRaw) || montoRaw < 0.0) {
+                state.responderError(ctx, 400, "El monto inicial de caja debe ser un número válido mayor o igual a cero.");
+                return;
+            }
+            BigDecimal montoInicial = BigDecimal.valueOf(montoRaw).setScale(2, RoundingMode.HALF_UP);
 
-            int idCaja = 1;
+            int idCaja;
             try {
                 idCaja = cajaService.abrirTurnoCaja(idUsuario, nombreCaja, montoInicial);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "Aviso abriendo caja en BD, registrando en memoria", e);
+            } catch (NegocioException exNeg) {
+                String msg = exNeg.getMessage() != null ? exNeg.getMessage() : "No se pudo abrir la caja.";
+                int status = msg.toLowerCase(Locale.ROOT).contains("ya existe una caja abierta") ? 409 : 422;
+                state.responderError(ctx, status, msg);
+                return;
+            } catch (SQLException exSql) {
+                LOGGER.log(Level.WARNING, "Error SQL abriendo caja", exSql);
+                state.responderError(ctx, 503, "No se pudo abrir la caja en base de datos.");
+                return;
             }
-
-            state.cajaTurnoActivoMemoria.set(true);
-            state.cajaNombreMemoria = nombreCaja;
-            state.cajaMontoAperturaMemoria = montoInicial;
-            state.cajaVentasMemoria = BigDecimal.ZERO;
 
             ObjectNode resp = state.mapper.createObjectNode();
             resp.put("status", "OK");
             resp.put("id_caja", idCaja);
+            resp.put("id_usuario", idUsuario);
             resp.put("nombre_caja", nombreCaja);
             resp.put("monto_inicial", montoInicial.doubleValue());
             resp.put("mensaje", "Turno de caja #" + idCaja + " abierto exitosamente con fondo S/ " + montoInicial);
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
+        } catch (JsonProcessingException e) {
+            state.responderError(ctx, 400, "Solicitud JSON inválida al abrir caja.");
+        } catch (RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al abrir turno de caja", e);
-            state.responderError(ctx, 500, "No se pudo abrir la caja: " + e.getMessage());
+            state.responderError(ctx, 500, "Error interno al abrir turno de caja.");
         }
     }
 
+    /**
+     * POST /api/caja/cerrar — Toma {@code id_usuario} estrictamente de los claims JWT y ejecuta cierre real en BD.
+     */
     public void handleCajaCerrar(Context ctx) {
+        JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+        if (claims == null || claims.idUsuario() <= 0) {
+            state.responderError(ctx, 401, "Autenticación requerida.");
+            return;
+        }
         try {
             JsonNode body = state.mapper.readTree(ctx.body());
-            int idCaja = body.hasNonNull("id_caja") ? body.get("id_caja").asInt(1) : 1;
-            int idUsuario = body.hasNonNull("id_usuario") ? body.get("id_usuario").asInt(1) : 1;
-            BigDecimal contado = body.hasNonNull("efectivo_fisico_contado")
-                    ? BigDecimal.valueOf(body.get("efectivo_fisico_contado").asDouble()).setScale(2, RoundingMode.HALF_UP)
-                    : state.cajaMontoAperturaMemoria.add(state.cajaVentasMemoria);
+            int idUsuario = claims.idUsuario();
+            int idCaja = body.hasNonNull("id_caja") ? body.get("id_caja").asInt(0) : 0;
+            if (!body.hasNonNull("efectivo_fisico_contado")) {
+                state.responderError(ctx, 400, "El campo 'efectivo_fisico_contado' es obligatorio.");
+                return;
+            }
+            double contadoRaw = body.get("efectivo_fisico_contado").asDouble(Double.NaN);
+            if (Double.isNaN(contadoRaw) || Double.isInfinite(contadoRaw) || contadoRaw < 0.0) {
+                state.responderError(ctx, 400, "El efectivo físico contado debe ser un número válido no negativo.");
+                return;
+            }
+            BigDecimal contado = BigDecimal.valueOf(contadoRaw).setScale(2, RoundingMode.HALF_UP);
 
+            BigDecimal esperado;
             try {
+                Optional<Caja> activaOpt = cajaService.obtenerCajaActiva();
+                if (activaOpt.isEmpty()) {
+                    state.responderError(ctx, 409, "No hay ningún turno de caja abierto para cerrar.");
+                    return;
+                }
+                Caja activa = activaOpt.get();
+                if (idCaja <= 0) {
+                    idCaja = activa.getIdCaja();
+                } else if (activa.getIdCaja() != idCaja) {
+                    state.responderError(ctx, 409, "La caja #" + idCaja + " no corresponde al turno abierto actual.");
+                    return;
+                }
+                BigDecimal ventasTurno = cajaService.calcularVentasTurno(idCaja);
+                BigDecimal gastosTurno = cajaService.calcularGastosTurno(idCaja);
+                esperado = activa.getMontoApertura().add(ventasTurno).subtract(gastosTurno)
+                        .setScale(2, RoundingMode.HALF_UP);
+
                 cajaService.cerrarTurnoCaja(idCaja, idUsuario, contado);
-            } catch (SQLException | com.foodcore.exception.NegocioException | RuntimeException e) {
-                LOGGER.log(Level.FINE, "Aviso cerrando caja en BD, cerrando en memoria", e);
+            } catch (CajaCerradaException exClosed) {
+                state.responderError(ctx, 409, exClosed.getMessage() != null ? exClosed.getMessage() : "La caja ya está cerrada.");
+                return;
+            } catch (NegocioException exNeg) {
+                state.responderError(ctx, 422, exNeg.getMessage() != null ? exNeg.getMessage() : "Validación fallida al cerrar caja.");
+                return;
+            } catch (SQLException exSql) {
+                LOGGER.log(Level.WARNING, "Error SQL cerrando caja", exSql);
+                state.responderError(ctx, 503, "No se pudo cerrar la caja en base de datos.");
+                return;
             }
 
-            BigDecimal esperado = state.cajaMontoAperturaMemoria.add(state.cajaVentasMemoria);
-            BigDecimal diferencia = contado.subtract(esperado);
-
-            state.cajaTurnoActivoMemoria.set(false);
-
+            BigDecimal diferencia = contado.subtract(esperado).setScale(2, RoundingMode.HALF_UP);
             ObjectNode resp = state.mapper.createObjectNode();
             resp.put("status", "OK");
             resp.put("id_caja", idCaja);
+            resp.put("id_usuario", idUsuario);
             resp.put("monto_esperado", esperado.doubleValue());
             resp.put("monto_contado", contado.doubleValue());
             resp.put("diferencia", diferencia.doubleValue());
             resp.put("mensaje", "Turno de caja cerrado exitosamente (Cierre Z).");
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
+        } catch (JsonProcessingException e) {
+            state.responderError(ctx, 400, "Solicitud JSON inválida al cerrar caja.");
+        } catch (RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al cerrar turno de caja", e);
-            state.responderError(ctx, 500, "No se pudo cerrar la caja: " + e.getMessage());
+            state.responderError(ctx, 500, "Error interno al cerrar turno de caja.");
         }
     }
 
+    /**
+     * POST /api/caja/cobrar — Toma {@code id_usuario} estrictamente de los claims JWT,
+     * resuelve ítems y montos autoritativos desde MySQL y persiste una {@link Venta} real vía {@link VentaService}.
+     */
     public void handleCajaCobrar(Context ctx) {
+        JwtService.JwtClaims claims = ctx.attribute(ApiSecurityFilter.ATTR_AUTH_CLAIMS);
+        if (claims == null || claims.idUsuario() <= 0) {
+            state.responderError(ctx, 401, "Autenticación requerida.");
+            return;
+        }
         try {
             JsonNode body = state.mapper.readTree(ctx.body());
+            int idUsuario = claims.idUsuario();
             int idPedido = body.hasNonNull("id_pedido") ? body.get("id_pedido").asInt(0) : 0;
-            String numeroMesa = body.hasNonNull("numero_mesa") ? body.get("numero_mesa").asText().trim() : "01";
-            String tipoComprobante = body.hasNonNull("tipo_comprobante") ? body.get("tipo_comprobante").asText().toUpperCase() : "BOLETA";
-            String medioPago = body.hasNonNull("medio_pago") ? body.get("medio_pago").asText().toUpperCase() : "EFECTIVO";
-            double montoRecibido = body.hasNonNull("monto_recibido") ? body.get("monto_recibido").asDouble(0.0) : 0.0;
-            double total = body.hasNonNull("total") ? body.get("total").asDouble(0.0) : 0.0;
-
-            if (total <= 0.0 && state.totalesMesasMemoria.containsKey(numeroMesa)) {
-                total = state.totalesMesasMemoria.get(numeroMesa);
-            }
-            if (total <= 0.0) {
-                total = 49.00;
-            }
-            if (montoRecibido < total) {
-                montoRecibido = total;
+            String numeroMesa = body.hasNonNull("numero_mesa") ? body.get("numero_mesa").asText().trim() : "";
+            String tipoComprobante = body.hasNonNull("tipo_comprobante")
+                    ? body.get("tipo_comprobante").asText().trim().toUpperCase(Locale.ROOT)
+                    : "BOLETA";
+            String medioPago = body.hasNonNull("medio_pago")
+                    ? body.get("medio_pago").asText().trim().toUpperCase(Locale.ROOT)
+                    : "EFECTIVO";
+            String idempotencyKey = state.extraerTexto(body, "idempotency_key", "uuid_local");
+            if (idempotencyKey == null || idempotencyKey.isBlank()) {
+                idempotencyKey = UUID.randomUUID().toString();
             }
 
-            BigDecimal bTotal = BigDecimal.valueOf(total).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal bSubtotal = bTotal.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
-            BigDecimal bIgv = bTotal.subtract(bSubtotal);
-            BigDecimal bVuelto = BigDecimal.valueOf(montoRecibido).subtract(bTotal).setScale(2, RoundingMode.HALF_UP);
+            if (!TIPOS_COMPROBANTE_VALIDOS.contains(tipoComprobante)) {
+                state.responderError(ctx, 400, "Tipo de comprobante inválido: " + tipoComprobante);
+                return;
+            }
+            if (!MEDIOS_PAGO_VALIDOS.contains(medioPago)) {
+                state.responderError(ctx, 400, "Medio de pago inválido: " + medioPago);
+                return;
+            }
 
-            int sec = state.secuenciaComprobantes.incrementAndGet();
-            String seriePrefix = "FACTURA".equalsIgnoreCase(tipoComprobante) ? "F001-" : "B001-";
-            String nroComprobante = seriePrefix + String.format("%06d", sec);
+            List<DetalleVenta> detallesVenta = new ArrayList<>();
+            BigDecimal totalAutoritativo = BigDecimal.ZERO;
+            Integer idPedidoPersistido = null;
+            int siguienteCorrelativo;
 
-            state.estadosMesasMemoria.put(numeroMesa, "LIBRE");
-            state.totalesMesasMemoria.put(numeroMesa, 0.0);
+            try (Connection conn = ConexionBD.getConnection()) {
+                if (conn == null) {
+                    state.responderError(ctx, 503, "Base de datos no disponible para procesar cobro.");
+                    return;
+                }
+                if (idPedido > 0) {
+                    Optional<Pedido> pedOpt = pedidoDAO.obtenerPorId(conn, idPedido);
+                    if (pedOpt.isEmpty()) {
+                        state.responderError(ctx, 404, "Pedido no encontrado para cobrar: #" + idPedido);
+                        return;
+                    }
+                    Pedido pedido = pedOpt.get();
+                    String estPed = pedido.getEstado() != null ? pedido.getEstado().trim().toUpperCase(Locale.ROOT) : "";
+                    if (ESTADOS_PEDIDO_TERMINALES.contains(estPed)) {
+                        state.responderError(ctx, 409, "El pedido #" + idPedido + " ya se encuentra en estado " + estPed + ".");
+                        return;
+                    }
+                    if (numeroMesa.isBlank() && pedido.getNumeroMesa() != null) {
+                        numeroMesa = pedido.getNumeroMesa();
+                    }
+                    List<DetallePedido> detsPed = pedidoDAO.listarDetallesPorPedido(conn, idPedido);
+                    if (detsPed.isEmpty()) {
+                        state.responderError(ctx, 422, "El pedido #" + idPedido + " no tiene ítems registrados.");
+                        return;
+                    }
+                    for (DetallePedido dp : detsPed) {
+                        BigDecimal precioU = dp.getPrecioUnitario().setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal sub = precioU.multiply(BigDecimal.valueOf(dp.getCantidad())).setScale(2, RoundingMode.HALF_UP);
+                        DetalleVenta dv = new DetalleVenta(0, 0, dp.getIdProducto(), dp.getNombreProducto(),
+                                dp.getCantidad(), precioU, sub);
+                        dv.setIdVariante(dp.getIdVariante());
+                        dv.setNombreVariante(dp.getNombreVariante());
+                        dv.setModificadoresTexto(dp.getModificadoresTexto());
+                        dv.setIdCombo(dp.getIdCombo());
+                        dv.setComboComponentesTexto(dp.getComboComponentesTexto());
+                        detallesVenta.add(dv);
+                        totalAutoritativo = totalAutoritativo.add(sub);
+                    }
+                    idPedidoPersistido = idPedido;
+                } else {
+                    JsonNode itemsNode = body.has("items") ? body.get("items") : body.get("detalles");
+                    if (itemsNode == null || !itemsNode.isArray() || itemsNode.isEmpty()) {
+                        state.responderError(ctx, 400, "Debe proporcionar un 'id_pedido' válido o una lista de 'items'.");
+                        return;
+                    }
+                    Map<Integer, Producto> catalogoPorId = new HashMap<>();
+                    for (Producto p : productoDAO.listarTodos(conn)) {
+                        catalogoPorId.put(p.getIdProducto(), p);
+                    }
+                    for (JsonNode item : itemsNode) {
+                        int idProd = extraerIdProducto(item);
+                        int cantidad = item.hasNonNull("cantidad") ? item.get("cantidad").asInt(0) : 0;
+                        if (idProd <= 0 || cantidad <= 0) {
+                            state.responderError(ctx, 400, "Cada ítem a cobrar requiere 'id_producto' y 'cantidad > 0'.");
+                            return;
+                        }
+                        Producto prod = catalogoPorId.get(idProd);
+                        if (prod == null || !prod.isDisponible() || prod.getPrecioVenta() == null) {
+                            state.responderError(ctx, 422, "Producto no válido o agotado: #" + idProd);
+                            return;
+                        }
+                        BigDecimal precioU = prod.getPrecioVenta().setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal sub = precioU.multiply(BigDecimal.valueOf(cantidad)).setScale(2, RoundingMode.HALF_UP);
+                        detallesVenta.add(new DetalleVenta(0, 0, idProd, prod.getNombre(), cantidad, precioU, sub));
+                        totalAutoritativo = totalAutoritativo.add(sub);
+                    }
+                }
+                siguienteCorrelativo = obtenerSiguienteCorrelativoComprobante(conn);
+            } catch (SQLException exSql) {
+                LOGGER.log(Level.WARNING, "Error SQL preparando cobro en POST /api/caja/cobrar", exSql);
+                state.responderError(ctx, 503, "Servicio de base de datos no disponible.");
+                return;
+            }
 
-            state.cajaVentasMemoria = state.cajaVentasMemoria.add(bTotal);
-            state.ventasAcumuladasHoyMemoria = state.ventasAcumuladasHoyMemoria.add(bTotal);
-            state.transaccionesHoyMemoria.incrementAndGet();
+            BigDecimal bTotal = totalAutoritativo.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal bMontoRecibido = bTotal;
+            if (body.hasNonNull("monto_recibido")) {
+                double recibidoRaw = body.get("monto_recibido").asDouble(Double.NaN);
+                if (Double.isNaN(recibidoRaw) || Double.isInfinite(recibidoRaw) || recibidoRaw < 0.0) {
+                    state.responderError(ctx, 400, "El monto recibido es inválido.");
+                    return;
+                }
+                bMontoRecibido = BigDecimal.valueOf(recibidoRaw).setScale(2, RoundingMode.HALF_UP);
+                if ("EFECTIVO".equals(medioPago) && bMontoRecibido.compareTo(bTotal) < 0) {
+                    state.responderError(ctx, 422, "El monto recibido (S/ " + bMontoRecibido
+                            + ") es menor al total a cobrar (S/ " + bTotal + ").");
+                    return;
+                }
+            }
+            BigDecimal bVuelto = bMontoRecibido.subtract(bTotal).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            String serie = "FACTURA".equals(tipoComprobante) ? "F001"
+                    : ("BOLETA".equals(tipoComprobante) ? "B001" : "T001");
+            String correlativo = String.format("%06d", siguienteCorrelativo);
+            String nroComprobante = serie + "-" + correlativo;
 
-            if (idPedido > 0) {
+            Venta ventaPersistida;
+            try {
+                DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(bTotal);
+                Venta venta = new Venta(0, idPedidoPersistido, 0, idUsuario, null,
+                        desglose.getSubtotalGravado(), desglose.getIgv(), desglose.getTotal(),
+                        medioPago, bMontoRecibido, bVuelto);
+                venta.setAplicarFidelizacion(false);
+                venta.setIdempotencyKey(idempotencyKey);
+
+                ComprobantePago comprobante = new ComprobantePago(0, 0, tipoComprobante, serie, correlativo, desglose.getTotal());
+                ventaPersistida = ventaService.registrarVenta(venta, detallesVenta, comprobante);
+            } catch (CajaCerradaException exClosed) {
+                state.responderError(ctx, 409, exClosed.getMessage() != null ? exClosed.getMessage() : "Debe abrir un turno de caja antes de cobrar.");
+                return;
+            } catch (StockInsuficienteException | InsumoNoEncontradoException | NegocioException exNeg) {
+                state.responderError(ctx, 422, exNeg.getMessage() != null ? exNeg.getMessage() : "No se pudo completar el cobro por validación de negocio.");
+                return;
+            } catch (SQLException exSql) {
+                LOGGER.log(Level.WARNING, "Error SQL persistiendo venta en POST /api/caja/cobrar", exSql);
+                state.responderError(ctx, 503, "No se pudo persistir la venta en base de datos.");
+                return;
+            }
+
+            boolean mesaLiberada = false;
+            if (!numeroMesa.isBlank()) {
                 try (Connection conn = ConexionBD.getConnection()) {
                     if (conn != null) {
-                        pedidoDAO.actualizarEstadoPedido(conn, idPedido, "PAGADO");
+                        try (PreparedStatement ps = conn.prepareStatement(
+                                "UPDATE mesa SET estado = 'LIBRE', id_pedido_actual = NULL WHERE numero = ?")) {
+                            ps.setString(1, numeroMesa);
+                            mesaLiberada = ps.executeUpdate() > 0;
+                        }
                     }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.FINE, "Aviso procesando operación auxiliar en BD", ex);
+                } catch (SQLException exMesa) {
+                    LOGGER.log(Level.FINE, "Aviso liberando mesa tras cobro #" + ventaPersistida.getIdVenta(), exMesa);
                 }
             }
 
             ObjectNode resp = state.mapper.createObjectNode();
             resp.put("status", "OK");
-            resp.put("id_venta", sec);
-            resp.put("id_pedido", idPedido);
+            resp.put("id_venta", ventaPersistida.getIdVenta());
+            resp.put("id_pedido", idPedidoPersistido != null ? idPedidoPersistido : 0);
+            resp.put("id_usuario", idUsuario);
             resp.put("numero_mesa", numeroMesa);
             resp.put("tipo_comprobante", tipoComprobante);
             resp.put("numero_comprobante", nroComprobante);
             resp.put("medio_pago", medioPago);
-            resp.put("subtotal", bSubtotal.doubleValue());
-            resp.put("igv", bIgv.doubleValue());
-            resp.put("total", bTotal.doubleValue());
-            resp.put("monto_recibido", montoRecibido);
+            resp.put("subtotal", ventaPersistida.getSubtotal().doubleValue());
+            resp.put("igv", ventaPersistida.getIgv().doubleValue());
+            resp.put("total", ventaPersistida.getTotal().doubleValue());
+            resp.put("monto_recibido", bMontoRecibido.doubleValue());
             resp.put("vuelto", bVuelto.doubleValue());
-            resp.put("mesa_liberada", true);
-            resp.put("fecha_emision", LocalDateTime.now().toString());
-
-            ObjectNode reciente = resp.deepCopy();
-            reciente.put("mozo", "Mateo Quispe (Mozo)");
-            state.ventasRecientesMemoria.add(0, reciente);
-            while (state.ventasRecientesMemoria.size() > 20) {
-                state.ventasRecientesMemoria.remove(state.ventasRecientesMemoria.size() - 1);
-            }
+            resp.put("mesa_liberada", mesaLiberada || !numeroMesa.isBlank());
+            resp.put("fecha_emision", LocalDateTime.now(ZONA_LIMA).toString());
 
             ctx.status(200).contentType("application/json; charset=UTF-8").result(resp.toString());
 
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
+        } catch (JsonProcessingException e) {
+            state.responderError(ctx, 400, "Solicitud JSON inválida al procesar cobro.");
+        } catch (RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al procesar cobro en caja", e);
-            state.responderError(ctx, 500, "Error al procesar cobro: " + e.getMessage());
+            state.responderError(ctx, 500, "Error interno al procesar cobro.");
         }
+    }
+
+    private int obtenerSiguienteCorrelativoComprobante(Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT COALESCE(MAX(id_comprobante), 0) + 1 FROM comprobante_pago");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return Math.max(1, rs.getInt(1));
+            }
+        }
+        return state.secuenciaComprobantes.incrementAndGet();
+    }
+
+    private Map<Integer, List<DetallePedido>> cargarDetallesEnLote(Connection conn, List<Pedido> pedidos) throws SQLException {
+        Map<Integer, List<DetallePedido>> mapa = new HashMap<>();
+        if (pedidos == null || pedidos.isEmpty()) {
+            return mapa;
+        }
+        String sql = "SELECT dp.*, p.nombre AS nombre_prod, ped.numero_mesa "
+                + "FROM detalle_pedido dp "
+                + "JOIN producto p ON dp.id_producto = p.id_producto "
+                + "JOIN pedido ped ON dp.id_pedido = ped.id_pedido "
+                + "WHERE ped.estado IN ('ABIERTO', 'PENDIENTE', 'REGISTRADO', 'EN_PREPARACION', 'LISTO', 'ENTREGADO', 'ITEMS_ADICIONALES', 'POR_COBRAR') "
+                + "ORDER BY dp.id_pedido ASC, dp.id_detalle_pedido ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                DetallePedido dp = new DetallePedido();
+                dp.setIdDetallePedido(rs.getInt("id_detalle_pedido"));
+                dp.setIdPedido(rs.getInt("id_pedido"));
+                dp.setIdProducto(rs.getInt("id_producto"));
+                dp.setNombreProducto(rs.getString("nombre_prod"));
+                dp.setCantidad(rs.getInt("cantidad"));
+                dp.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
+                dp.setSubtotal(rs.getBigDecimal("subtotal"));
+                dp.setNotasPreparacion(rs.getString("notas_preparacion"));
+                dp.setEstadoCocina(rs.getString("estado_cocina"));
+                mapa.computeIfAbsent(dp.getIdPedido(), k -> new ArrayList<>()).add(dp);
+            }
+        }
+        return mapa;
+    }
+
+    private ObjectNode construirRespuestaPedido(Pedido pedido, List<DetallePedido> detalles, boolean idempotente) {
+        String numComanda = "COM-" + String.format("%04d", pedido.getIdPedido());
+        ObjectNode resp = state.mapper.createObjectNode();
+        resp.put("status", "OK");
+        resp.put("id_pedido", pedido.getIdPedido());
+        resp.put("numero_comanda", numComanda);
+        resp.put("uuid_local", pedido.getIdempotencyKey() != null ? pedido.getIdempotencyKey() : "");
+        resp.put("numero_mesa", pedido.getNumeroMesa());
+        resp.put("estado", "PENDIENTE");
+        resp.put("estado_pedido", pedido.getEstado() != null ? pedido.getEstado() : "REGISTRADO");
+        resp.put("estado_comanda", "PENDIENTE");
+        resp.put("notificado_kds", true);
+        resp.put("total", pedido.getTotal() != null ? pedido.getTotal().doubleValue() : 0.0);
+        resp.put("id_usuario", pedido.getIdUsuario());
+        resp.put("id_usuario_creador", pedido.getIdUsuarioCreador() != null ? pedido.getIdUsuarioCreador() : pedido.getIdUsuario());
+        resp.put("idempotente", idempotente);
+
+        ArrayNode itemsResp = resp.putArray("items");
+        for (DetallePedido d : detalles) {
+            ObjectNode detNode = itemsResp.addObject();
+            detNode.put("id_detalle_pedido", d.getIdDetallePedido());
+            detNode.put("id_producto", d.getIdProducto());
+            detNode.put("nombre", d.getNombreProducto());
+            detNode.put("cantidad", d.getCantidad());
+            detNode.put("precio_unitario", d.getPrecioUnitario() != null ? d.getPrecioUnitario().doubleValue() : 0.0);
+            detNode.put("subtotal", d.getSubtotal() != null ? d.getSubtotal().doubleValue() : 0.0);
+            detNode.put("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
+            detNode.put("estado_cocina", d.getEstadoCocina() != null ? d.getEstadoCocina() : "PENDIENTE");
+        }
+        return resp;
+    }
+
+    private static int extraerIdProducto(JsonNode item) {
+        if (item.hasNonNull("id_producto")) {
+            return item.get("id_producto").asInt(0);
+        }
+        if (item.hasNonNull("idProducto")) {
+            return item.get("idProducto").asInt(0);
+        }
+        if (item.hasNonNull("id")) {
+            return item.get("id").asInt(0);
+        }
+        return 0;
     }
 
     private ObjectNode construirJsonProducto(Producto p) {
@@ -756,23 +1191,32 @@ public class PedidoController {
         return item;
     }
 
-    private void servirArchivoImagen(Context ctx, File file) {
+    private void servirArchivoImagen(Context ctx, Path file) {
         try {
-            if (file == null || !file.exists() || !file.isFile()) {
+            if (file == null || !Files.isRegularFile(file)) {
                 ctx.status(404);
                 return;
             }
-            String name = file.getName().toLowerCase();
-            String mime = "image/png";
-            if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+            Path fileNamePath = file.getFileName();
+            if (fileNamePath == null) {
+                ctx.status(404);
+                return;
+            }
+            String name = fileNamePath.toString().toLowerCase(Locale.ROOT);
+            String mime;
+            if (name.endsWith(".png")) {
+                mime = "image/png";
+            } else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
                 mime = "image/jpeg";
             } else if (name.endsWith(".webp")) {
                 mime = "image/webp";
-            } else if (name.endsWith(".svg")) {
-                mime = "image/svg+xml";
+            } else {
+                ctx.status(403);
+                return;
             }
             ctx.header("Cache-Control", "no-cache");
-            ctx.status(200).contentType(mime).result(Files.readAllBytes(file.toPath()));
+            ctx.header("X-Content-Type-Options", "nosniff");
+            ctx.status(200).contentType(mime).result(Files.readAllBytes(file));
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Error leyendo archivo de imagen", e);
             ctx.status(404);
@@ -805,7 +1249,7 @@ public class PedidoController {
 
     private List<Producto> obtenerCatalogoRespaldo() {
         if (state.catalogoRespaldoCache.isEmpty()) {
-            LocalDate hoy = LocalDate.now();
+            LocalDate hoy = LocalDate.now(ZONA_LIMA);
             state.catalogoRespaldoCache.add(new Producto(1, 1, "HAM-01", "Hamburguesa Royal Doble",
                     "Doble carne angus 180g, huevo, queso cheddar y papas", new BigDecimal("24.50"), new BigDecimal("9.50"), true, null, true, hoy));
             state.catalogoRespaldoCache.add(new Producto(2, 1, "HAM-02", "Cheese Burger Clásica",
@@ -839,17 +1283,20 @@ public class PedidoController {
             return "";
         }
         String raw = p.getImagenUrl().trim();
-        if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("data:image/") || raw.startsWith("/")) {
+        String lower = raw.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http://") || lower.startsWith("https://")) {
             return raw;
         }
         String cleanSlashes = raw.replace('\\', '/');
-        if (cleanSlashes.startsWith("uploads/")) {
+        if (cleanSlashes.startsWith("/uploads/platillos/") && !esRutaImagenSospechosa(cleanSlashes)) {
+            return cleanSlashes;
+        }
+        if (cleanSlashes.startsWith("uploads/platillos/") && !esRutaImagenSospechosa(cleanSlashes)) {
             return "/" + cleanSlashes;
         }
-        File localFile = new File(raw);
-        if (localFile.exists() && localFile.isFile()) {
+        if (resolverArchivoImagenConfinado(UPLOADS_PLATILLOS_DIR, cleanSlashes).isPresent()) {
             return "/api/productos/" + p.getIdProducto() + "/imagen";
         }
-        return raw;
+        return "";
     }
 }

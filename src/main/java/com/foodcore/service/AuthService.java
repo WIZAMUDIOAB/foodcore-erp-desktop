@@ -42,8 +42,42 @@ public class AuthService {
         return new AuthServiceImpl(usuarioDAO, encriptador).login(conn, username, password);
     }
 
+    /**
+     * Valida credenciales, estado activo y bloqueo SIN mutar {@link SesionManager} ni {@code usuarioSesionActual}.
+     * Requerido por API REST stateless y flujo Desktop 2FA previo a verificación TOTP.
+     */
+    public Usuario autenticarSoloCredenciales(String username, String password) throws NegocioException, SQLException {
+        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarSoloCredenciales(username, password);
+    }
+
+    public Usuario autenticarSoloCredenciales(Connection conn, String username, String password)
+            throws NegocioException, SQLException {
+        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarSoloCredenciales(conn, username, password);
+    }
+
     public Optional<Usuario> autenticarPorPin(int idUsuario, String username, String pin) throws SQLException {
         return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPin(idUsuario, username, pin);
+    }
+
+    /**
+     * Valida PIN por BCrypt SIN mutar {@link SesionManager} ni {@code usuarioSesionActual}.
+     * Bloquea usuarios con 2FA habilitado, roles ADMIN/SUPERVISOR, cuentas inactivas o bloqueadas.
+     */
+    public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) throws SQLException {
+        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPinStateless(idUsuario, username, pin);
+    }
+
+    public Optional<Usuario> autenticarPorPinStateless(Connection conn, int idUsuario, String username, String pin)
+            throws SQLException {
+        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPinStateless(conn, idUsuario, username, pin);
+    }
+
+    /**
+     * Establece la sesión global Desktop en {@link SesionManager} y {@link #usuarioSesionActual}
+     * tras completar todos los factores de autenticación (contraseña + 2FA TOTP si aplica).
+     */
+    public void establecerSesionActiva(Usuario usuario) {
+        new AuthServiceImpl(usuarioDAO, encriptador).establecerSesionActiva(usuario);
     }
 
     public boolean actualizarPinUsuario(int idUsuario, String nuevoPin) throws NegocioException, SQLException {

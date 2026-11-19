@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Servicio de autenticación mutua de terminales LAN (KDS/POS) mediante handshake
@@ -29,14 +30,20 @@ public class TerminalAuthService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EncriptadorPassword encriptador;
+    private final Supplier<LocalDateTime> reloj;
     private final Map<String, SesionTerminal> sesionesActivas = new ConcurrentHashMap<>();
 
     public TerminalAuthService() {
-        this(new EncriptadorPassword());
+        this(new EncriptadorPassword(), () -> LocalDateTime.now(ZONA_LIMA));
     }
 
     public TerminalAuthService(EncriptadorPassword encriptador) {
-        this.encriptador = encriptador;
+        this(encriptador, () -> LocalDateTime.now(ZONA_LIMA));
+    }
+
+    public TerminalAuthService(EncriptadorPassword encriptador, Supplier<LocalDateTime> reloj) {
+        this.encriptador = encriptador != null ? encriptador : new EncriptadorPassword();
+        this.reloj = reloj != null ? reloj : () -> LocalDateTime.now(ZONA_LIMA);
     }
 
     /**
@@ -121,7 +128,9 @@ public class TerminalAuthService {
 
         String sessionToken = UUID.randomUUID().toString();
         String sessionSecret = generarSessionSecret32Bytes();
-        LocalDateTime expiraEn = LocalDateTime.now(ZONA_LIMA).plusSeconds(TTL_SEGUNDOS);
+        LocalDateTime ahora = reloj.get();
+        purgarExpiradas(ahora);
+        LocalDateTime expiraEn = ahora.plusSeconds(TTL_SEGUNDOS);
 
         SesionTerminal sesion = new SesionTerminal(codigoTerminal.trim(), sessionToken, sessionSecret, TTL_SEGUNDOS, expiraEn);
         sesionesActivas.put(sessionToken, sesion);
@@ -132,13 +141,14 @@ public class TerminalAuthService {
         if (sessionToken == null || sessionToken.isBlank()) {
             throw new TerminalNoAutorizadaException("Token de sesión inválido.");
         }
+        LocalDateTime ahora = reloj.get();
         SesionTerminal actual = sesionesActivas.get(sessionToken);
-        if (actual == null || actual.haExpirado(LocalDateTime.now(ZONA_LIMA))) {
+        if (actual == null || actual.haExpirado(ahora)) {
             sesionesActivas.remove(sessionToken);
             throw new TerminalNoAutorizadaException("Sesión de terminal inexistente o expirada.");
         }
         String nuevoSecret = generarSessionSecret32Bytes();
-        LocalDateTime nuevaExpiracion = LocalDateTime.now(ZONA_LIMA).plusSeconds(TTL_SEGUNDOS);
+        LocalDateTime nuevaExpiracion = ahora.plusSeconds(TTL_SEGUNDOS);
         SesionTerminal renovada = new SesionTerminal(
             actual.getCodigoTerminal(),
             sessionToken,
@@ -151,10 +161,22 @@ public class TerminalAuthService {
     }
 
     public SesionTerminal obtenerSesion(String sessionToken) {
-        if (sessionToken == null) {
+        if (sessionToken == null || sessionToken.isBlank()) {
             return null;
         }
-        return sesionesActivas.get(sessionToken);
+        SesionTerminal sesion = sesionesActivas.get(sessionToken);
+        if (sesion == null) {
+            return null;
+        }
+        if (sesion.haExpirado(reloj.get())) {
+            sesionesActivas.remove(sessionToken, sesion);
+            return null;
+        }
+        return sesion;
+    }
+
+    private void purgarExpiradas(LocalDateTime ahora) {
+        sesionesActivas.entrySet().removeIf(entry -> entry.getValue().haExpirado(ahora));
     }
 
     public void limpiarSesiones() {

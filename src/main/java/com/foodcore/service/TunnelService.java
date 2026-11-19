@@ -1,5 +1,7 @@
 package com.foodcore.service;
 
+import com.foodcore.api.ApiServer;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,13 +16,15 @@ import java.util.regex.Pattern;
 
 /**
  * Servicio para gestionar el túnel público de Cloudflare ({@code cloudflared.exe})
- * en segundo plano y exponer su URL dinámica al estado global de FoodCore ERP (v4.6.0 Fase 2).
+ * en segundo plano apuntando exclusivamente al conector loopback del menú QR público
+ * y exponer su URL dinámica al estado global de FoodCore ERP (v5.7.1 Hardening).
  */
 public final class TunnelService {
 
     private static final Logger LOGGER = Logger.getLogger(TunnelService.class.getName());
     private static final Pattern TRY_CLOUDFLARE_PATTERN =
             Pattern.compile("https://[a-zA-Z0-9-]+\\.trycloudflare\\.com");
+    private static final Pattern SCRIPT_FILENAME_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+\\.ps1$");
 
     private static final Path DEFAULT_SCRIPT_PATH = Path.of("scripts", "start-tunnel.ps1");
     private static final Path DEFAULT_EXE_PATH = Path.of("scripts", "cloudflared.exe");
@@ -41,9 +45,7 @@ public final class TunnelService {
 
     /**
      * Inicia el script de túnel Cloudflare en segundo plano en Windows cuando el ejecutable
-     * y el script están disponibles. En otros entornos (por ejemplo CI Linux) omite el arranque sin fallar.
-     *
-     * @return {@code true} si se lanzó el proceso de túnel; {@code false} si se omitió o ya estaba activo.
+     * y el script están disponibles, apuntando al conector loopback del menú QR público.
      */
     public static boolean iniciarEnSegundoPlano() {
         return iniciarEnSegundoPlano(DEFAULT_SCRIPT_PATH, DEFAULT_EXE_PATH, DEFAULT_LOG_PATH);
@@ -51,11 +53,6 @@ public final class TunnelService {
 
     /**
      * Inicia el script de túnel con rutas explícitas y comienza a leer el log en tiempo real.
-     *
-     * @param scriptPath ruta al script PowerShell de arranque.
-     * @param exePath ruta al binario {@code cloudflared.exe}.
-     * @param logPath ruta al archivo {@code tunnel.log} generado por el script.
-     * @return {@code true} si el proceso se inició correctamente; {@code false} en caso contrario.
      */
     public static boolean iniciarEnSegundoPlano(Path scriptPath, Path exePath, Path logPath) {
         if (!esWindows()) {
@@ -67,34 +64,42 @@ public final class TunnelService {
             LOGGER.info("Túnel Cloudflare omitido: no se encontró scripts/start-tunnel.ps1 o scripts/cloudflared.exe.");
             return false;
         }
+        Path scriptSeguro = validarScriptTunel(scriptPath);
+        if (scriptSeguro == null) {
+            LOGGER.warning("Túnel Cloudflare rechazado: ruta de script inválida o no permitida.");
+            return false;
+        }
 
         synchronized (LOCK) {
             if (procesoTunel != null && procesoTunel.isAlive()) {
                 return false;
             }
+            detenerHiloMonitorLocked();
             URL_PUBLICA_ACTIVA.set("");
             limpiarLogPrevio(logPath);
 
-            Path absScript = scriptPath.toAbsolutePath().normalize();
-            Path absWorkDir = absScript.getParent();
+            Path absWorkDir = scriptSeguro.getParent();
+            int puertoPublico = resolverPuertoPublicoMenu();
 
             ProcessBuilder pb = new ProcessBuilder(
                     "powershell.exe",
                     "-NoProfile",
                     "-ExecutionPolicy", "Bypass",
-                    "-File", absScript.toString()
+                    "-File", ".\\start-tunnel.ps1"
             );
             if (absWorkDir != null) {
                 pb.directory(absWorkDir.toFile());
             }
-            pb.redirectErrorStream(true);
+            pb.environment().put(ApiServer.ENV_PUBLIC_MENU_PORT, String.valueOf(puertoPublico));
+            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 
             try {
                 procesoTunel = pb.start();
                 ejecucionActiva = true;
                 registrarShutdownHookUnaVez();
                 iniciarHiloMonitorLog(logPath);
-                LOGGER.info("Proceso de túnel Cloudflare iniciado en segundo plano.");
+                LOGGER.info("Proceso de túnel Cloudflare iniciado en segundo plano hacia 127.0.0.1:" + puertoPublico);
                 return true;
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "No se pudo iniciar el túnel Cloudflare: " + e.getMessage(), e);
@@ -106,9 +111,39 @@ public final class TunnelService {
     }
 
     /**
+     * Resuelve el puerto loopback del menú QR público al que debe apuntar el túnel Cloudflare.
+     */
+    public static int resolverPuertoPublicoMenu() {
+        int activo = ApiServer.getInstance().getPuertoMenuPublicoActual();
+        if (activo > 0 && activo <= 65535) {
+            return activo;
+        }
+        int configurado = ApiServer.leerPuertoPublicoMenuConfigurado();
+        return (configurado > 0 && configurado <= 65535) ? configurado : ApiServer.DEFAULT_PUBLIC_MENU_PORT;
+    }
+
+    private static Path validarScriptTunel(Path scriptPath) {
+        try {
+            Path real = scriptPath.toRealPath().normalize();
+            Path fileName = real.getFileName();
+            if (fileName == null
+                    || !"start-tunnel.ps1".equals(fileName.toString())
+                    || !SCRIPT_FILENAME_PATTERN.matcher(fileName.toString()).matches()) {
+                return null;
+            }
+            String fullStr = real.toString();
+            if (fullStr.indexOf('\0') >= 0 || fullStr.indexOf('\n') >= 0 || fullStr.indexOf('\r') >= 0
+                    || fullStr.indexOf(';') >= 0 || fullStr.indexOf('&') >= 0 || fullStr.indexOf('|') >= 0) {
+                return null;
+            }
+            return real;
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Inicia únicamente la vigilancia en tiempo real sobre un archivo {@code tunnel.log} (útil en pruebas).
-     *
-     * @param logPath archivo de log a monitorear.
      */
     static void iniciarMonitorSoloLectura(Path logPath) {
         synchronized (LOCK) {
@@ -133,28 +168,15 @@ public final class TunnelService {
         }
     }
 
-    /**
-     * Devuelve la URL pública activa del túnel (ej. {@code https://demo.trycloudflare.com}),
-     * o cadena vacía si no existe túnel conectado aún.
-     */
     public static String obtenerUrlPublicaActiva() {
         String url = URL_PUBLICA_ACTIVA.get();
         return url != null ? url : "";
     }
 
-    /**
-     * Indica si existe una URL pública activa de Cloudflare Tunnel.
-     */
     public static boolean tieneUrlActiva() {
         return !obtenerUrlPublicaActiva().isBlank();
     }
 
-    /**
-     * Combina la URL pública activa del túnel con una ruta de endpoint (ej. {@code /api/public/menu-digital}).
-     *
-     * @param rutaEndpoint ruta relativa del endpoint HTTP.
-     * @return URL completa pública, o cadena vacía si el túnel no está activo.
-     */
     public static String construirUrlPublicaEndpoint(String rutaEndpoint) {
         String base = obtenerUrlPublicaActiva();
         if (base.isBlank()) {
@@ -167,12 +189,6 @@ public final class TunnelService {
         return base + rutaNormalizada;
     }
 
-    /**
-     * Extrae la primera URL {@code https://<subdominio>.trycloudflare.com} desde una línea o texto del log.
-     *
-     * @param texto línea o contenido de {@code tunnel.log}.
-     * @return URL detectada o {@code null} si no aparece.
-     */
     public static String extraerUrlTryCloudflare(String texto) {
         if (texto == null || texto.isBlank()) {
             return null;
@@ -184,13 +200,6 @@ public final class TunnelService {
         return null;
     }
 
-    /**
-     * Inspecciona el archivo {@code tunnel.log} indicado y actualiza el estado global si detecta una URL pública.
-     * Soporta codificación UTF-8 y UTF-16LE (redirección estándar de Windows PowerShell).
-     *
-     * @param logPath archivo de log a leer.
-     * @return {@code true} si se encontró y registró una URL válida.
-     */
     public static boolean leerUrlDesdeLog(Path logPath) {
         if (logPath == null || !Files.isRegularFile(logPath)) {
             return false;
@@ -218,18 +227,10 @@ public final class TunnelService {
         return false;
     }
 
-    /**
-     * Establece manualmente una URL pública en el estado global (principalmente para pruebas unitarias/E2E).
-     *
-     * @param url URL base del túnel; {@code null} o blanco limpia el estado.
-     */
     public static void establecerUrlPublicaManual(String url) {
         URL_PUBLICA_ACTIVA.set(normalizarUrlBase(url));
     }
 
-    /**
-     * Limpia el estado y detiene cualquier monitor activo al finalizar pruebas.
-     */
     public static void limpiarEstadoParaPruebas() {
         detener();
     }
@@ -248,7 +249,12 @@ public final class TunnelService {
                 synchronized (LOCK) {
                     procActual = procesoTunel;
                 }
-                if (procActual != null && !procActual.isAlive() && !Files.isRegularFile(logPath)) {
+                if (procActual != null && !procActual.isAlive()) {
+                    // Evita bucle infinito si cloudflared terminó prematuramente: realiza una última lectura y sale.
+                    leerUrlDesdeLog(logPath);
+                    ejecucionActiva = false;
+                    LOGGER.warning("Proceso de túnel Cloudflare finalizó antes de emitir URL pública (exit="
+                            + procActual.exitValue() + ").");
                     return;
                 }
                 try {

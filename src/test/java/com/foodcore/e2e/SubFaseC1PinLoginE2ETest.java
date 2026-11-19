@@ -97,13 +97,24 @@ public class SubFaseC1PinLoginE2ETest {
             }
             assertTrue(tieneMozo, "La lista de usuarios activos debe incluir al menos al mozo");
 
-            // 4. POST /api/auth/pin-switch (cambio rápido de mozo) con Bearer JWT -> 200 OK con nuevo token
-            APIResponse respSwitchOk = PlaywrightE2ESupport.postAuthConReintento429(
+            // 4a. POST /api/auth/pin-switch hacia ADMIN debe rechazarse con 403 (sin escalada de privilegios por PIN)
+            APIResponse respSwitchAdminBloqueado = PlaywrightE2ESupport.postAuthConReintento429(
                     request, "/api/auth/pin-switch", tokenMozo, Map.of("pin", "9999", "username", "admin"));
-            assertEquals(200, respSwitchOk.status(), "Cambio de mozo a admin con PIN 9999 debe ser 200 OK");
+            assertEquals(403, respSwitchAdminBloqueado.status(),
+                    "Cambio por PIN hacia rol ADMIN debe bloquearse con HTTP 403");
+
+            // 4b. POST /api/auth/pin-switch hacia operador no-admin (cajero) con PIN '1234' -> 200 OK y revoca token anterior
+            APIResponse respSwitchOk = PlaywrightE2ESupport.postAuthConReintento429(
+                    request, "/api/auth/pin-switch", tokenMozo, Map.of("pin", "1234", "username", "cajero"));
+            assertEquals(200, respSwitchOk.status(), "Cambio de mozo a cajero con PIN 1234 debe ser 200 OK");
             JsonNode jsonSwitchOk = MAPPER.readTree(respSwitchOk.text());
             assertTrue(jsonSwitchOk.hasNonNull("token"));
-            assertEquals("admin", jsonSwitchOk.path("usuario").path("username").asText());
+            assertEquals("cajero", jsonSwitchOk.path("usuario").path("username").asText());
+
+            // 4c. El token anterior del mozo queda revocado tras pin-switch
+            APIResponse respTokenAnterior = request.get("/api/mesas",
+                    RequestOptions.create().setHeader("Authorization", "Bearer " + tokenMozo));
+            assertEquals(401, respTokenAnterior.status(), "El JWT anterior debe quedar revocado tras pin-switch");
 
             request.dispose();
         }
@@ -206,31 +217,34 @@ public class SubFaseC1PinLoginE2ETest {
             modalMozo.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
             assertTrue(modalMozo.isVisible(), "El modal de cambio rápido de mozo debe abrirse");
 
-            // 4. Seleccionar chip de Administrador si está presente
-            Locator chipAdmin = page.locator("#modalMozosList .mozo-chip-modal:has-text('Admin')");
-            if (chipAdmin.count() > 0) {
-                chipAdmin.first().click();
+            // 4. Seleccionar chip de operador no-admin (Cajero/Mozo) si está presente
+            Locator chipOperador = page.locator("#modalMozosList .mozo-chip-modal:has-text('Cajer'), #modalMozosList .mozo-chip-modal:has-text('Mozo')");
+            if (chipOperador.count() > 0) {
+                chipOperador.first().click();
             }
 
-            // Presionar PIN '9999' para switch a Administrador; el cuarto dígito auto-envía a /api/auth/pin-switch
-            Locator btn9 = page.locator("#modalCambiarMozo button:has-text('9')");
-            btn9.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
-            btn9.click();
-            btn9.click();
-            btn9.click();
+            // Presionar PIN '1234' para switch de operador; el cuarto dígito auto-envía a /api/auth/pin-switch
+            Locator btn1 = page.locator("#modalCambiarMozo button:has-text('1')");
+            Locator btn2 = page.locator("#modalCambiarMozo button:has-text('2')");
+            Locator btn3 = page.locator("#modalCambiarMozo button:has-text('3')");
+            Locator btn4 = page.locator("#modalCambiarMozo button:has-text('4')");
+            btn1.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE));
+            btn1.click();
+            btn2.click();
+            btn3.click();
             Response respSwitch = page.waitForResponse(
                     r -> r.url().contains("/api/auth/pin-switch") && "POST".equalsIgnoreCase(r.request().method()),
                     new Page.WaitForResponseOptions().setTimeout(REDIRECCION_TIMEOUT_MS),
-                    btn9::click);
+                    btn4::click);
             for (int intento = 0; intento < 3 && respSwitch.status() == 429; intento++) {
                 PlaywrightE2ESupport.esperarRetryAfter(respSwitch.headerValue("retry-after"));
-                btn9.click();
-                btn9.click();
-                btn9.click();
+                btn1.click();
+                btn2.click();
+                btn3.click();
                 respSwitch = page.waitForResponse(
                         r -> r.url().contains("/api/auth/pin-switch") && "POST".equalsIgnoreCase(r.request().method()),
                         new Page.WaitForResponseOptions().setTimeout(REDIRECCION_TIMEOUT_MS),
-                        btn9::click);
+                        btn4::click);
             }
             assertEquals(200, respSwitch.status(),
                     "POST /api/auth/pin-switch debe responder 200 OK; respuesta: " + respSwitch.text());
@@ -239,9 +253,9 @@ public class SubFaseC1PinLoginE2ETest {
             modalMozo.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.HIDDEN));
             assertFalse(modalMozo.isVisible(), "El modal debe cerrarse tras autenticar con éxito al nuevo mozo");
 
-            // 5. Verificar que el nombre del mozo activo se actualizó y el carrito permanece intacto
+            // 5. Verificar que el nombre del operador activo se actualizó y el carrito permanece intacto
             Locator lblMozo = page.locator("#lblNombreMozo");
-            assertTrue(lblMozo.innerText().contains("Admin") || lblMozo.innerText().contains("Mateo"),
+            assertFalse(lblMozo.innerText().isBlank(),
                     "El nombre del operador debe actualizarse en el topbar");
             assertEquals(itemsIniciales, cartPill.innerText(), "El carrito de comanda debe mantenerse 100% intacto tras el cambio de mozo");
 

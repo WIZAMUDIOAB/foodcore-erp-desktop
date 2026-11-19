@@ -88,26 +88,43 @@ public class SubFaseC2CajaE2ETest {
             assertTrue(jsonEstado.path("abierta").asBoolean(), "La caja debe reportar estado abierta = true");
             assertEquals(150.00, jsonEstado.path("monto_apertura").asDouble());
 
-            // 3. Procesar cobro de comanda en mesa 04
+            // 2b. Crear un pedido real en BD en mesa 04 (2 x Hamburguesa Royal Doble = S/ 49.00 autoritativo)
+            APIResponse respPedido = request.post("/api/pedidos",
+                    RequestOptions.create()
+                            .setHeader("Content-Type", "application/json")
+                            .setData(Map.of(
+                                    "uuid_local", "caja-e2e-" + java.util.UUID.randomUUID(),
+                                    "numero_mesa", "04",
+                                    "items", java.util.List.of(
+                                            Map.of("id_producto", 1, "cantidad", 2, "precio_unitario", 0.01)
+                                    )
+                            )));
+            assertTrue(respPedido.status() == 201 || respPedido.status() == 200,
+                    "POST /api/pedidos debe crear pedido real en BD; recibido " + respPedido.status() + ": " + respPedido.text());
+            JsonNode jsonPedido = MAPPER.readTree(respPedido.text());
+            int idPedidoReal = jsonPedido.path("id_pedido").asInt();
+            double totalAutoritativo = jsonPedido.path("total").asDouble();
+            assertTrue(idPedidoReal > 0, "Debe retornar un id_pedido real");
+            assertEquals(49.00, totalAutoritativo, 0.01, "El precio debe ser autoritativo desde ProductoDAO (no 0.01)");
+
+            // 3. Procesar cobro real de la comanda en mesa 04 vía VentaService
             APIResponse respCobro = request.post("/api/caja/cobrar",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of(
-                                    "id_pedido", 101,
+                                    "id_pedido", idPedidoReal,
                                     "numero_mesa", "04",
-                                    "id_usuario", 1,
                                     "tipo_comprobante", "BOLETA",
                                     "medio_pago", "EFECTIVO",
-                                    "total", 50.00,
                                     "monto_recibido", 100.00
                             )));
-            assertEquals(200, respCobro.status(), "POST /api/caja/cobrar debe responder 200 OK");
+            assertEquals(200, respCobro.status(), "POST /api/caja/cobrar debe responder 200 OK; " + respCobro.text());
             JsonNode jsonCobro = MAPPER.readTree(respCobro.text());
             assertEquals("OK", jsonCobro.path("status").asText());
             assertEquals("BOLETA", jsonCobro.path("tipo_comprobante").asText());
             assertTrue(jsonCobro.path("numero_comprobante").asText().startsWith("B001-"));
-            assertEquals(50.00, jsonCobro.path("total").asDouble());
-            assertEquals(50.00, jsonCobro.path("vuelto").asDouble());
+            assertEquals(49.00, jsonCobro.path("total").asDouble(), 0.01);
+            assertEquals(51.00, jsonCobro.path("vuelto").asDouble(), 0.01);
             assertTrue(jsonCobro.path("mesa_liberada").asBoolean(), "El cobro debe liberar automáticamente la mesa");
 
             // 4. Cerrar turno de caja (Cierre Z) con arqueo físico
