@@ -29,9 +29,31 @@ public class SubFaseC2KdsE2ETest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private static int idPedidoRealKds;
+    private static int idDetalleRealKds;
+
     @BeforeAll
-    static void setUpServer() {
+    static void setUpServer() throws Exception {
         PlaywrightE2ESupport.asegurarServidorActivo();
+        try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
+            APIRequestContext mozoReq = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "MOZO");
+            APIResponse pedResp = mozoReq.post("/api/pedidos",
+                    RequestOptions.create()
+                            .setHeader("Content-Type", "application/json")
+                            .setData(Map.of(
+                                    "uuid_local", "kds-e2e-" + java.util.UUID.randomUUID(),
+                                    "numero_mesa", "03",
+                                    "items", java.util.List.of(
+                                            Map.of("id_producto", 1, "cantidad", 1, "notas", "KDS E2E Real")
+                                    )
+                            )));
+            assertTrue(pedResp.status() == 201 || pedResp.status() == 200,
+                    "Debe crearse pedido real para KDS; recibido " + pedResp.status() + ": " + pedResp.text());
+            JsonNode pedJson = MAPPER.readTree(pedResp.text());
+            idPedidoRealKds = pedJson.path("id_pedido").asInt();
+            idDetalleRealKds = pedJson.path("items").get(0).path("id_detalle_pedido").asInt();
+            mozoReq.dispose();
+        }
     }
 
     @AfterAll
@@ -97,7 +119,7 @@ public class SubFaseC2KdsE2ETest {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
             // 1. Cambiar a EN_PREPARACION
-            APIResponse respPrep = request.patch("/api/kds/items/501/estado",
+            APIResponse respPrep = request.patch("/api/kds/items/" + idDetalleRealKds + "/estado",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of("estado", "EN_PREPARACION")));
@@ -107,7 +129,7 @@ public class SubFaseC2KdsE2ETest {
             assertEquals("EN_PREPARACION", jsonPrep.path("nuevo_estado").asText());
 
             // 2. Cambiar a LISTO
-            APIResponse respListo = request.patch("/api/kds/items/501/estado",
+            APIResponse respListo = request.patch("/api/kds/items/" + idDetalleRealKds + "/estado",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of("estado", "LISTO")));
@@ -125,7 +147,7 @@ public class SubFaseC2KdsE2ETest {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "COCINA");
 
-            APIResponse resp = request.patch("/api/pedidos/101/estado",
+            APIResponse resp = request.patch("/api/pedidos/" + idPedidoRealKds + "/estado",
                     RequestOptions.create()
                             .setHeader("Content-Type", "application/json")
                             .setData(Map.of("estado", "LISTO")));

@@ -221,8 +221,26 @@ public final class ConexionBD {
         Properties props = new Properties();
         cargarSiExiste(props, "/database.properties");
         cargarSiExiste(props, "/application.properties");
-        cargarSiExiste(props, "/application-test.properties");
+        if (esPerfilPruebasActivo()) {
+            cargarSiExiste(props, "/application-test.properties");
+        }
         return props;
+    }
+
+    /**
+     * Indica si el perfil de pruebas está activado explícitamente mediante propiedad de sistema
+     * ({@code -Dfoodcore.profile=test} o {@code -Dfoodcore.test.profile=true}) o variable de entorno
+     * ({@code FOODCORE_PROFILE=test}). En producción siempre retorna {@code false}.
+     */
+    public static boolean esPerfilPruebasActivo() {
+        String perfil = System.getProperty("foodcore.profile");
+        if (perfil == null || perfil.isBlank()) {
+            perfil = System.getenv("FOODCORE_PROFILE");
+        }
+        if (perfil != null && "test".equalsIgnoreCase(perfil.trim())) {
+            return true;
+        }
+        return "true".equalsIgnoreCase(System.getProperty("foodcore.test.profile"));
     }
 
     private static void cargarSiExiste(Properties target, String resourcePath) {

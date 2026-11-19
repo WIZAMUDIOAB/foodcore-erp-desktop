@@ -6,7 +6,6 @@ import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
 import com.foodcore.api.security.TokenBlacklistService;
-import com.foodcore.security.TotpService;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
@@ -15,9 +14,11 @@ import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.dao.UsuarioDAOImpl;
 import com.foodcore.dao.impl.MesaDAOImpl;
+import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.ConexionBD;
 import io.javalin.Javalin;
@@ -52,19 +53,30 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Servidor HTTP/HTTPS REST basado en Javalin 6 modularizado mediante controladores dedicados
- * ({@link AuthController}, {@link PedidoController}, {@link KdsController}, {@link ReportesController})
- * y empaquetado de recursos estáticos embebidos en el JAR según SPEC-FOODCORE-v4.3.0 (§1.3, §2.1).
+ * Servidor HTTP/HTTPS REST basado en Javalin modularizado mediante controladores dedicados
+ * ({@link AuthController}, {@link PedidoController}, {@link KdsController}, {@link ReportesController}),
+ * cabeceras de seguridad HTTP y conector loopback dedicado exclusivamente al menú QR público
+ * para aislamiento de Cloudflare Tunnel (v5.7.1 Hardening).
  */
 public class ApiServer {
 
     private static final Logger LOGGER = Logger.getLogger(ApiServer.class.getName());
     public static final int DEFAULT_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
+    public static final int DEFAULT_PUBLIC_MENU_PORT = 8081;
+    public static final String ENV_PUBLIC_MENU_PORT = "FOODCORE_PUBLIC_MENU_PORT";
+    public static final String PROP_PUBLIC_MENU_PORT = "api.public.menu.port";
     public static final String ENV_KEYSTORE_PASS = "FOODCORE_KEYSTORE_PASS";
     public static final String ENV_KEYSTORE_PATH = "FOODCORE_KEYSTORE_PATH";
     public static final String ENV_CERT_PATH = "FOODCORE_CERT_PATH";
     public static final int MIN_KEYSTORE_PASS_LENGTH = 8;
+
+    private static final String CSP_API_JSON =
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
+    private static final String CSP_HTML_PWA =
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; "
+            + "frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
 
     private static ApiServer instance;
 
@@ -80,28 +92,22 @@ public class ApiServer {
     private final ReportesController reportesController;
 
     private Javalin app;
+    private Javalin publicMenuApp;
     private int puertoActual = DEFAULT_PORT;
     private int puertoHttpsActual = DEFAULT_HTTPS_PORT;
+    private int puertoMenuPublicoActual = -1;
     private volatile byte[] certificadoActivo;
 
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
                 new JwtService(), CorsPolicy.cargarDesdeConfiguracion(), AuthRateLimiter.cargarDesdeConfiguracion(),
                 TokenBlacklistService.getInstance());
     }
 
     private ApiServer(AuthService authService, ProductoDAO productoDAO, MesaDAO mesaDAO,
                       PedidoDAO pedidoDAO, PedidoService pedidoService, UsuarioDAO usuarioDAO,
-                      CajaService cajaService, JwtService jwtService, CorsPolicy corsPolicy,
-                      AuthRateLimiter rateLimiter) {
-        this(authService, productoDAO, mesaDAO, pedidoDAO, pedidoService, usuarioDAO,
-                cajaService, jwtService, corsPolicy, rateLimiter, TokenBlacklistService.getInstance());
-    }
-
-    private ApiServer(AuthService authService, ProductoDAO productoDAO, MesaDAO mesaDAO,
-                      PedidoDAO pedidoDAO, PedidoService pedidoService, UsuarioDAO usuarioDAO,
-                      CajaService cajaService, JwtService jwtService, CorsPolicy corsPolicy,
+                      CajaService cajaService, VentaService ventaService, JwtService jwtService, CorsPolicy corsPolicy,
                       AuthRateLimiter rateLimiter, TokenBlacklistService tokenBlacklistService) {
         this.jwtService = jwtService != null ? jwtService : new JwtService();
         this.corsPolicy = corsPolicy != null ? corsPolicy : CorsPolicy.cargarDesdeConfiguracion();
@@ -113,7 +119,8 @@ public class ApiServer {
                 state, this.jwtService, this.rateLimiter, this.tokenBlacklistService);
         this.authController = new AuthController(
                 state, authService, usuarioDAO, this.jwtService, this.tokenBlacklistService, new TotpService());
-        this.pedidoController = new PedidoController(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService);
+        this.pedidoController = new PedidoController(
+                state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService, ventaService);
         this.kdsController = new KdsController(state, pedidoDAO);
         this.reportesController = new ReportesController(state);
     }
@@ -126,7 +133,7 @@ public class ApiServer {
             AuthRateLimiter rateLimiter,
             TokenBlacklistService tokenBlacklistService) {
         return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
                 jwtService, corsPolicy, rateLimiter, tokenBlacklistService);
     }
 
@@ -135,14 +142,15 @@ public class ApiServer {
     }
 
     /**
-     * Crea una instancia aislada para pruebas de seguridad HTTP sin interferir con el singleton compartido.
+     * Crea una instancia aislada en memoria para pruebas unitarias de seguridad HTTP sin interferir
+     * con el singleton compartido ni requerir conexión MySQL activa.
      */
     public static ApiServer crearServidorAislado(JwtService jwtService,
                                                  CorsPolicy corsPolicy,
                                                  AuthRateLimiter rateLimiter) {
         return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(),
-                jwtService, corsPolicy, rateLimiter);
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
     }
 
     static ApiServer crearServidorAisladoConAuth(JwtService jwtService,
@@ -151,8 +159,17 @@ public class ApiServer {
                                                  AuthService authService,
                                                  UsuarioDAO usuarioDAO) {
         return new ApiServer(authService, new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), usuarioDAO, new CajaService(),
-                jwtService, corsPolicy, rateLimiter);
+                new PedidoDAOImpl(), new PedidoService(), usuarioDAO, new CajaService(), new VentaService(),
+                jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
+    }
+
+    static ApiServer crearServidorAisladoConProductoDao(JwtService jwtService,
+                                                        CorsPolicy corsPolicy,
+                                                        AuthRateLimiter rateLimiter,
+                                                        ProductoDAO productoDAO) {
+        return new ApiServer(new AuthServiceImpl(), productoDAO, new MesaDAOImpl(),
+                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
     }
 
     public static synchronized ApiServer getInstance() {
@@ -179,20 +196,58 @@ public class ApiServer {
         return DEFAULT_PORT;
     }
 
+    /**
+     * Lee el puerto loopback exclusivo del menú QR público (por defecto 8081),
+     * configurable vía {@code FOODCORE_PUBLIC_MENU_PORT} o {@code api.public.menu.port}.
+     */
+    public static int leerPuertoPublicoMenuConfigurado() {
+        String configured = leerVariableOPropiedad(ENV_PUBLIC_MENU_PORT);
+        if (configured != null) {
+            try {
+                int parsed = Integer.parseInt(configured);
+                if (parsed >= 0 && parsed <= 65535) {
+                    return parsed;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        Properties props = new Properties();
+        try (InputStream is = ApiServer.class.getResourceAsStream("/application.properties")) {
+            if (is != null) {
+                props.load(is);
+                String val = props.getProperty(PROP_PUBLIC_MENU_PORT);
+                if (val != null && !val.isBlank()) {
+                    int parsed = Integer.parseInt(val.trim());
+                    if (parsed >= 0 && parsed <= 65535) {
+                        return parsed;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Usando puerto de menú público por defecto 8081", e);
+        }
+        return DEFAULT_PUBLIC_MENU_PORT;
+    }
+
     public synchronized void iniciar() {
-        iniciar(leerPuertoConfigurado(), DEFAULT_HTTPS_PORT);
+        iniciar(leerPuertoConfigurado(), DEFAULT_HTTPS_PORT, leerPuertoPublicoMenuConfigurado());
     }
 
     public synchronized void iniciar(int port) {
-        iniciar(port, DEFAULT_HTTPS_PORT);
+        iniciar(port, DEFAULT_HTTPS_PORT, -1);
     }
 
     public synchronized void iniciar(int httpPort, int httpsPort) {
+        iniciar(httpPort, httpsPort, -1);
+    }
+
+    public synchronized void iniciar(int httpPort, int httpsPort, int publicMenuPort) {
         if (app != null) {
             return;
         }
         this.puertoActual = httpPort;
         this.puertoHttpsActual = httpsPort;
+        this.puertoMenuPublicoActual = -1;
         this.certificadoActivo = null;
         File pwaDir = new File("pwa");
         SslContextFactory.Server sslContextFactory = httpsPort >= 0 ? obtenerSslContextFactory() : null;
@@ -241,8 +296,17 @@ public class ApiServer {
                 });
             }
 
-            // Seguridad HTTP: CORS por whitelist explícita + API 100% stateless (Authorization: Bearer JWT, sin cookies ni CSRF por cookie)
-            config.routes.before(ctx -> corsPolicy.apply(ctx));
+            // Seguridad HTTP global: cabeceras defensivas, bloqueo Cloudflare en rutas no públicas y CORS whitelist
+            config.routes.before(ctx -> {
+                aplicarCabecerasSeguridad(ctx);
+                if (ApiSecurityFilter.esSolicitudDesdeCloudflare(ctx)
+                        && !ApiSecurityFilter.esRutaPublicaTunel(ctx.method().name(), ctx.path())) {
+                    state.responderError(ctx, 403, "Ruta no permitida a través del túnel público.");
+                    ctx.skipRemainingHandlers();
+                    return;
+                }
+                corsPolicy.apply(ctx);
+            });
             config.routes.options("/*", ctx -> {
                 if (!ctx.res().isCommitted()) {
                     ctx.status(204);
@@ -297,7 +361,7 @@ public class ApiServer {
             config.routes.get("/api/dashboard/ventas-recientes", reportesController::handleDashboardVentasRecientes);
             config.routes.get("/api/menu-digital/view", reportesController::handleMenuDigitalView);
 
-            // 5. Rutas directas para PWAs y Certificado SSL (con soporte classpath getResourceAsStream y filesystem)
+            // 5. Rutas directas para PWAs y Certificado SSL
             config.routes.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
             config.routes.get("/kds/", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
             config.routes.get("/dashboard", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
@@ -318,7 +382,7 @@ public class ApiServer {
                         return;
                     }
                 }
-                ctx.json(Map.of("service", "FoodCore ERP API v4.4.0", "status", "ONLINE"));
+                ctx.json(Map.of("service", "FoodCore ERP API v5.7.1", "status", "ONLINE"));
             });
         });
 
@@ -326,7 +390,104 @@ public class ApiServer {
         if (httpPort == 0) {
             this.puertoActual = app.port();
         }
-        LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + this.puertoActual + ") y HTTPS SSL (puerto " + httpsPort + ")");
+        if (publicMenuPort >= 0) {
+            iniciarServidorMenuPublico(publicMenuPort);
+        }
+        LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + this.puertoActual
+                + "), HTTPS SSL (puerto " + httpsPort + ") y Menú Público loopback (puerto "
+                + this.puertoMenuPublicoActual + ")");
+    }
+
+    /**
+     * Levanta un conector Javalin/Jetty aislado exclusivamente en {@code 127.0.0.1} para el túnel Cloudflare,
+     * exponiendo únicamente {@code /api/public/*}, {@code /menu-digital/*}, {@code /fonts/*}
+     * y {@code /uploads/platillos/*}.
+     */
+    private void iniciarServidorMenuPublico(int publicMenuPort) {
+        try {
+            File menuDir = new File("pwa/menu-digital");
+            File fontsDir = new File("pwa/fonts");
+            publicMenuApp = Javalin.create(config -> {
+                config.startup.showJavalinBanner = false;
+
+                if (menuDir.exists() && menuDir.isDirectory()) {
+                    config.staticFiles.add(sf -> {
+                        sf.hostedPath = "/menu-digital";
+                        sf.directory = menuDir.getAbsolutePath();
+                        sf.location = Location.EXTERNAL;
+                    });
+                }
+                if (getClass().getResource("/pwa/menu-digital/index.html") != null) {
+                    config.staticFiles.add(sf -> {
+                        sf.hostedPath = "/menu-digital";
+                        sf.directory = "/pwa/menu-digital";
+                        sf.location = Location.CLASSPATH;
+                    });
+                }
+                if (fontsDir.exists() && fontsDir.isDirectory()) {
+                    config.staticFiles.add(sf -> {
+                        sf.hostedPath = "/fonts";
+                        sf.directory = fontsDir.getAbsolutePath();
+                        sf.location = Location.EXTERNAL;
+                    });
+                }
+
+                config.jetty.addConnector((server, httpConfig) -> {
+                    ServerConnector loopbackConnector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+                    loopbackConnector.setHost("127.0.0.1");
+                    loopbackConnector.setPort(publicMenuPort);
+                    return loopbackConnector;
+                });
+
+                config.routes.before(ctx -> {
+                    aplicarCabecerasSeguridad(ctx);
+                    if (!ApiSecurityFilter.esRutaPublicaTunel(ctx.method().name(), ctx.path())) {
+                        state.responderError(ctx, 403, "Ruta no permitida en el conector de menú público.");
+                        ctx.skipRemainingHandlers();
+                        return;
+                    }
+                    corsPolicy.apply(ctx);
+                });
+
+                config.routes.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
+                config.routes.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
+                config.routes.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
+                config.routes.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
+                config.routes.get("/uploads/platillos/{archivo}", pedidoController::handleServirUploadPlatillo);
+                config.routes.get("/menu-digital", ctx -> servirPwaHtml(ctx, "pwa/menu-digital/index.html"));
+                config.routes.get("/menu-digital/", ctx -> servirPwaHtml(ctx, "pwa/menu-digital/index.html"));
+            });
+            publicMenuApp.start();
+            this.puertoMenuPublicoActual = publicMenuApp.port();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "No se pudo iniciar el conector aislado de menú público en 127.0.0.1:" + publicMenuPort, e);
+            if (publicMenuApp != null) {
+                try {
+                    publicMenuApp.stop();
+                } catch (Exception ignored) {
+                }
+                publicMenuApp = null;
+            }
+            this.puertoMenuPublicoActual = -1;
+        }
+    }
+
+    static void aplicarCabecerasSeguridad(Context ctx) {
+        ctx.header("X-Content-Type-Options", "nosniff");
+        ctx.header("X-Frame-Options", "DENY");
+        ctx.header("Referrer-Policy", "no-referrer");
+        ctx.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+        String path = ctx.path();
+        boolean esApiJson = path.startsWith("/api/")
+                && !"/api/public/menu-digital".equals(path)
+                && !"/api/menu-digital/view".equals(path);
+        ctx.header("Content-Security-Policy", esApiJson ? CSP_API_JSON : CSP_HTML_PWA);
+        boolean esHttps = "https".equalsIgnoreCase(ctx.scheme())
+                || ctx.req().isSecure()
+                || "https".equalsIgnoreCase(ctx.header("X-Forwarded-Proto"));
+        if (esHttps) {
+            ctx.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+        }
     }
 
     private void servirPwaHtml(Context ctx, String ruta) {
@@ -511,6 +672,16 @@ public class ApiServer {
 
     public synchronized void detener() {
         this.certificadoActivo = null;
+        if (publicMenuApp != null) {
+            try {
+                publicMenuApp.stop();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Aviso al detener servidor de menú público", e);
+            } finally {
+                publicMenuApp = null;
+                puertoMenuPublicoActual = -1;
+            }
+        }
         if (app != null) {
             try {
                 app.stop();
@@ -532,6 +703,10 @@ public class ApiServer {
 
     public int getPuertoHttpsActual() {
         return puertoHttpsActual;
+    }
+
+    public int getPuertoMenuPublicoActual() {
+        return puertoMenuPublicoActual;
     }
 
     public String generarTokenJwt(int idUsuario, String username, String rol) {
@@ -604,11 +779,13 @@ public class ApiServer {
             }
         } catch (java.io.IOException ignored) {
         }
-        try (InputStream is = ApiServer.class.getResourceAsStream("/application-test.properties")) {
-            if (is != null) {
-                props.load(is);
+        if (ConexionBD.esPerfilPruebasActivo()) {
+            try (InputStream is = ApiServer.class.getResourceAsStream("/application-test.properties")) {
+                if (is != null) {
+                    props.load(is);
+                }
+            } catch (java.io.IOException ignored) {
             }
-        } catch (java.io.IOException ignored) {
         }
         return Boolean.parseBoolean(props.getProperty("app.devLogging", "false").trim());
     }

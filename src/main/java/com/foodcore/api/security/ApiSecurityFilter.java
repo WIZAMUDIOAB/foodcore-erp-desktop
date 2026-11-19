@@ -9,6 +9,7 @@ import java.util.logging.Logger;
 
 /**
  * Filtro central de seguridad HTTP para {@code /api/*}:
+ * aislamiento de tráfico proveniente de Cloudflare Tunnel a rutas públicas del menú QR,
  * rate limiting en autenticación, validación de JWT Bearer real y control de acceso por rol (RBAC).
  * API 100% stateless sin cookies de sesión HTTP, por lo que CSRF basado en cookies no aplica.
  */
@@ -48,6 +49,16 @@ public final class ApiSecurityFilter {
         String path = normalizarPath(ctx.path());
         String method = ctx.method().name();
         String clientIp = ctx.req().getRemoteAddr();
+
+        if (esSolicitudDesdeCloudflare(ctx) && !esRutaPublicaTunel(method, path)) {
+            LOGGER.warning(() -> String.format(
+                "Bloqueo de aislamiento Cloudflare Tunnel en ruta no pública (IP=%s, %s %s)",
+                clientIp, method, path
+            ));
+            state.responderError(ctx, 403, "Ruta no permitida a través del túnel público.");
+            ctx.skipRemainingHandlers();
+            return;
+        }
 
         if ("OPTIONS".equalsIgnoreCase(method)) {
             return;
@@ -107,6 +118,37 @@ public final class ApiSecurityFilter {
             state.responderError(ctx, 403, "No tiene permisos suficientes para esta operación.");
             ctx.skipRemainingHandlers();
         }
+    }
+
+    /**
+     * Detecta si la petición fue enrutada a través de Cloudflare Tunnel/Proxy
+     * mediante cabeceras estándar ({@code CF-Ray} o {@code CF-Connecting-IP}).
+     */
+    public static boolean esSolicitudDesdeCloudflare(Context ctx) {
+        if (ctx == null) {
+            return false;
+        }
+        String cfRay = ctx.header("CF-Ray");
+        String cfIp = ctx.header("CF-Connecting-IP");
+        return (cfRay != null && !cfRay.isBlank()) || (cfIp != null && !cfIp.isBlank());
+    }
+
+    /**
+     * Lista blanca estricta de rutas públicas del menú digital QR autorizadas a través del túnel.
+     */
+    public static boolean esRutaPublicaTunel(String method, String rawPath) {
+        String path = normalizarPath(rawPath);
+        boolean metodoLectura = "GET".equalsIgnoreCase(method)
+                || "HEAD".equalsIgnoreCase(method)
+                || "OPTIONS".equalsIgnoreCase(method);
+        if (!metodoLectura) {
+            return false;
+        }
+        return path.startsWith("/api/public/")
+                || "/menu-digital".equals(path)
+                || path.startsWith("/menu-digital/")
+                || path.startsWith("/fonts/")
+                || path.startsWith("/uploads/platillos/");
     }
 
     private static boolean esEndpointPublico(String method, String path) {

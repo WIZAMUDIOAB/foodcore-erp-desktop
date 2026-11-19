@@ -1,5 +1,6 @@
 package com.foodcore.service.impl;
 
+import com.foodcore.api.security.JwtService;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.UsuarioDAOImpl;
@@ -28,8 +29,8 @@ import java.util.Set;
 /**
  * Implementación canónica de {@link AuthService} en paquete {@code com.foodcore.service.impl}
  * según SPEC-FOODCORE-v1.0 (§15.4, R-01, R-18) y SPEC-FOODCORE-v4.3.0 (§1.2).
- * Contiene la lógica real de login, bloqueo por fuerza bruta, autenticación PIN,
- * cambio obligatorio de contraseña y marcación de asistencia.
+ * Contiene la lógica real de login, aislamiento de sesión Desktop/API, bloqueo atómico por fuerza bruta,
+ * autenticación PIN endurecida, cambio obligatorio de contraseña y marcación de asistencia.
  */
 public class AuthServiceImpl extends AuthService {
 
@@ -46,17 +47,31 @@ public class AuthServiceImpl extends AuthService {
 
     @Override
     public Usuario login(String username, String password) throws NegocioException, SQLException {
-        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
-            throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS, "Debe ingresar usuario y contraseña.");
-        }
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            return login(conn, username.trim(), password.trim());
-        }
+        Usuario usuario = autenticarSoloCredenciales(username, password);
+        establecerSesionActiva(usuario);
+        return usuario;
     }
 
     @Override
     public Usuario login(Connection conn, String username, String password) throws NegocioException, SQLException {
+        Usuario usuario = autenticarSoloCredenciales(conn, username, password);
+        establecerSesionActiva(usuario);
+        return usuario;
+    }
+
+    @Override
+    public Usuario autenticarSoloCredenciales(String username, String password) throws NegocioException, SQLException {
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS, "Debe ingresar usuario y contraseña.");
+        }
+        try (Connection conn = ConexionBD.getConnection()) {
+            return autenticarSoloCredenciales(conn, username.trim(), password.trim());
+        }
+    }
+
+    @Override
+    public Usuario autenticarSoloCredenciales(Connection conn, String username, String password)
+            throws NegocioException, SQLException {
         if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
             throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS, "Debe ingresar usuario y contraseña.");
         }
@@ -89,14 +104,22 @@ public class AuthServiceImpl extends AuthService {
         }
 
         String hash = usuario.getPasswordHash();
-        boolean passwordValido = (hash != null && hash.startsWith("$2"))
-                ? encriptador.verificar(password, hash)
-                : password.equals(hash);
+        boolean passwordValido = hash != null && hash.startsWith("$2") && encriptador.verificar(password, hash);
 
         if (!passwordValido) {
             int nuevosIntentos = usuario.getIntentosFallidos() + 1;
             boolean bloquear = nuevosIntentos >= MAX_INTENTOS_FALLIDOS;
             usuarioDAO.registrarIntentoFallido(conn, usuario.getIdUsuario(), nuevosIntentos, bloquear);
+
+            Optional<Usuario> actualizado = usuarioDAO.buscarPorUsername(conn, usuario.getUsername());
+            if (actualizado.isPresent()) {
+                nuevosIntentos = Math.max(nuevosIntentos, actualizado.get().getIntentosFallidos());
+                if (actualizado.get().getBloqueadoHasta() != null
+                        && actualizado.get().getBloqueadoHasta().isAfter(ahora)) {
+                    bloquear = true;
+                }
+            }
+
             auditoriaDAO.registrarEventoSeguro(
                     conn, usuario.getIdUsuario(), "LOGIN_FALLIDO", "USUARIO", null,
                     "Contraseña incorrecta para " + usuario.getUsername()
@@ -117,54 +140,112 @@ public class AuthServiceImpl extends AuthService {
         usuario.setIntentosFallidos(0);
         usuario.setBloqueadoHasta(null);
 
-        if (hash == null || !hash.startsWith("$2") || EncriptadorPassword.needsUpgrade(hash)) {
+        if (EncriptadorPassword.needsUpgrade(hash)) {
             String hashActualizado = encriptador.hashear(password);
             usuarioDAO.actualizarPasswordHash(conn, usuario.getIdUsuario(), hashActualizado);
             usuario.setPasswordHash(hashActualizado);
         }
 
-        iniciarSesionParaUsuario(usuario, ahora);
         return usuario;
     }
 
     @Override
     public Optional<Usuario> autenticarPorPin(int idUsuario, String username, String pin) throws SQLException {
+        Optional<Usuario> encontrado = autenticarPorPinStateless(idUsuario, username, pin);
+        encontrado.ifPresent(this::establecerSesionActiva);
+        return encontrado;
+    }
+
+    public Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String username, String pin)
+            throws SQLException {
+        Optional<Usuario> encontrado = autenticarPorPinStateless(conn, idUsuario, username, pin);
+        encontrado.ifPresent(this::establecerSesionActiva);
+        return encontrado;
+    }
+
+    @Override
+    public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) throws SQLException {
         if (pin == null || pin.trim().isEmpty()) {
             return Optional.empty();
         }
         try (Connection conn = ConexionBD.getConnection()) {
-            return autenticarPorPin(conn, idUsuario, username, pin.trim());
+            return autenticarPorPinStateless(conn, idUsuario, username, pin.trim());
         }
     }
 
-    public Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String username, String pin) throws SQLException {
+    @Override
+    public Optional<Usuario> autenticarPorPinStateless(Connection conn, int idUsuario, String username, String pin)
+            throws SQLException {
         if (conn == null || pin == null || pin.trim().isEmpty()) {
             return Optional.empty();
         }
         String pinLimpio = pin.trim();
+        LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
         Optional<Usuario> encontrado = Optional.empty();
 
-        if (idUsuario > 0) {
-            encontrado = usuarioDAO.autenticarPorPin(conn, idUsuario, pinLimpio);
-        } else if (username != null && !username.isBlank()) {
-            Optional<Usuario> optU = usuarioDAO.buscarPorUsername(conn, username.trim());
-            if (optU.isPresent() && verificarPinUsuario(pinLimpio, optU.get())) {
-                encontrado = optU;
+        if (idUsuario > 0 || (username != null && !username.isBlank())) {
+            Optional<Usuario> candidatoOpt = idUsuario > 0
+                    ? usuarioDAO.buscarPorId(conn, idUsuario)
+                    : usuarioDAO.buscarPorUsername(conn, username.trim());
+            if (candidatoOpt.isEmpty()) {
+                return Optional.empty();
+            }
+            Usuario candidato = candidatoOpt.get();
+            if (!esPinPermitidoParaUsuario(candidato)) {
+                return Optional.empty();
+            }
+            if (candidato.getBloqueadoHasta() != null) {
+                if (candidato.getBloqueadoHasta().isAfter(ahora)) {
+                    return Optional.empty();
+                }
+                usuarioDAO.resetearIntentosLogin(conn, candidato.getIdUsuario());
+                candidato.setIntentosFallidos(0);
+                candidato.setBloqueadoHasta(null);
+            }
+            if (verificarPinUsuario(pinLimpio, candidato)) {
+                encontrado = Optional.of(candidato);
+            } else {
+                int nuevosIntentos = candidato.getIntentosFallidos() + 1;
+                boolean bloquear = nuevosIntentos >= MAX_INTENTOS_FALLIDOS;
+                usuarioDAO.registrarIntentoFallido(conn, candidato.getIdUsuario(), nuevosIntentos, bloquear);
+                auditoriaDAO.registrarEventoSeguro(
+                        conn, candidato.getIdUsuario(), "PIN_FALLIDO", "USUARIO", null,
+                        "PIN incorrecto para " + candidato.getUsername()
+                                + " (intento " + nuevosIntentos + "/" + MAX_INTENTOS_FALLIDOS + ")");
+                return Optional.empty();
             }
         } else {
-            encontrado = usuarioDAO.autenticarPorPinGeneral(conn, pinLimpio);
+            encontrado = usuarioDAO.autenticarPorPinGeneral(conn, pinLimpio)
+                    .filter(AuthServiceImpl::esPinPermitidoParaUsuario);
         }
 
         if (encontrado.isPresent()) {
             Usuario usuarioPin = encontrado.get();
+            usuarioDAO.resetearIntentosLogin(conn, usuarioPin.getIdUsuario());
+            usuarioPin.setIntentosFallidos(0);
+            usuarioPin.setBloqueadoHasta(null);
             if (EncriptadorPassword.needsUpgrade(usuarioPin.getPinHash())) {
                 String upgradedPinHash = encriptador.hashear(pinLimpio);
-                usuarioDAO.actualizarPin(conn, usuarioPin.getIdUsuario(), pinLimpio, upgradedPinHash);
+                usuarioDAO.actualizarPin(conn, usuarioPin.getIdUsuario(), null, upgradedPinHash);
                 usuarioPin.setPinHash(upgradedPinHash);
             }
-            iniciarSesionParaUsuario(usuarioPin, LocalDateTime.now(ZONA_LIMA));
         }
         return encontrado;
+    }
+
+    /**
+     * Evalúa si un usuario puede autenticarse mediante PIN rápido (bloquea cuentas inactivas,
+     * cuentas con 2FA TOTP habilitado y roles privilegiados ADMIN / SUPERVISOR).
+     */
+    public static boolean esPinPermitidoParaUsuario(Usuario usuario) {
+        if (usuario == null || !usuario.isActivo()) {
+            return false;
+        }
+        if (usuario.isTotpHabilitado()) {
+            return false;
+        }
+        String rolNorm = JwtService.normalizarRol(usuario.getNombreRol());
+        return !"ADMIN".equals(rolNorm) && !"SUPERVISOR".equals(rolNorm);
     }
 
     public boolean verificarPinUsuario(String pinPlano, Usuario u) {
@@ -172,10 +253,15 @@ public class AuthServiceImpl extends AuthService {
             return false;
         }
         String hash = u.getPinHash();
-        if (hash != null && hash.startsWith("$2") && encriptador.verificar(pinPlano, hash)) {
-            return true;
+        return hash != null && hash.startsWith("$2") && encriptador.verificar(pinPlano, hash);
+    }
+
+    @Override
+    public void establecerSesionActiva(Usuario usuario) {
+        if (usuario == null) {
+            return;
         }
-        return pinPlano.equals(u.getPin());
+        iniciarSesionParaUsuario(usuario, LocalDateTime.now(ZONA_LIMA));
     }
 
     @Override
@@ -189,16 +275,16 @@ public class AuthServiceImpl extends AuthService {
         String pinLimpio = nuevoPin.trim();
         String pinHash = encriptador.hashear(pinLimpio);
         try (Connection conn = ConexionBD.getConnection()) {
-            return usuarioDAO.actualizarPin(conn, idUsuario, pinLimpio, pinHash);
+            return usuarioDAO.actualizarPin(conn, idUsuario, null, pinHash);
         }
     }
 
     @Override
     public void cambiarPasswordObligatorio(int idUsuario, String nuevoPassword) throws NegocioException, SQLException {
-        if (nuevoPassword == null || nuevoPassword.trim().length() < 8) {
+        if (nuevoPassword == null || !EncriptadorPassword.cumplePoliticaComplejidad(nuevoPassword.trim())) {
             throw new NegocioException(
                     CodigoError.VALIDACION_ENTRADA,
-                    "La nueva contraseña debe tener al menos 8 caracteres."
+                    "La nueva contraseña debe tener al menos 8 caracteres, incluyendo mayúscula, minúscula y dígito."
             );
         }
         try (Connection conn = ConexionBD.getConnection()) {
@@ -227,7 +313,7 @@ public class AuthServiceImpl extends AuthService {
 
             Empleado emp = empOpt.get();
             Optional<Asistencia> asistHoy = usuarioDAO.obtenerAsistenciaHoy(conn, emp.getIdEmpleado());
-            String horaActual = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            String horaActual = LocalTime.now(ZONA_LIMA).format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
             if (asistHoy.isEmpty()) {
                 Asistencia a = new Asistencia();
@@ -239,7 +325,7 @@ public class AuthServiceImpl extends AuthService {
             } else {
                 Asistencia a = asistHoy.get();
                 if (a.getHoraSalida() == null) {
-                    usuarioDAO.registrarSalidaAsistencia(conn, a.getIdAsistencia(), LocalTime.now());
+                    usuarioDAO.registrarSalidaAsistencia(conn, a.getIdAsistencia(), LocalTime.now(ZONA_LIMA));
                     return "✓ SALIDA REGISTRADA (" + horaActual + ")\nTrabajador: " + emp.getNombreCompleto() + "\n¡Buen descanso!";
                 } else {
                     return "ℹ JORNADA COMPLETA\nTrabajador: " + emp.getNombreCompleto()
