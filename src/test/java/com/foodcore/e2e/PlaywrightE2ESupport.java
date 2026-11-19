@@ -263,9 +263,61 @@ public final class PlaywrightE2ESupport {
         return context;
     }
 
+    /**
+     * Crea un contexto autenticado con un JWT recién emitido fuera de la caché compartida {@code TOKENS_POR_ROL}.
+     * Ideal para escenarios que revocan el token del contexto (como {@code /api/auth/pin-switch} o logout).
+     */
+    public static BrowserContext crearContextoAutenticadoFresco(Browser browser, int width, int height, String rol) {
+        BrowserContext context = crearContexto(browser, width, height);
+        try {
+            String tokenJson = JSON_MAPPER.writeValueAsString(obtenerTokenFrescoRol(rol));
+            context.addInitScript("if (!localStorage.getItem('fc_pwa_token')) { localStorage.setItem('fc_pwa_token', " + tokenJson + "); }");
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo inyectar token JWT fresco en BrowserContext", e);
+        }
+        return context;
+    }
+
     public static String obtenerTokenRol(String rol) {
-        String clave = rol == null ? "MOZO" : rol.trim().toUpperCase(Locale.ROOT);
-        return TOKENS_POR_ROL.computeIfAbsent(clave, PlaywrightE2ESupport::autenticarYExtraerJwt);
+        String clave = normalizarRol(rol);
+        String existente = TOKENS_POR_ROL.get(clave);
+        if (existente != null && esTokenActivo(existente)) {
+            return existente;
+        }
+        String fresco = autenticarYExtraerJwt(clave);
+        TOKENS_POR_ROL.put(clave, fresco);
+        return fresco;
+    }
+
+    public static String obtenerTokenFrescoRol(String rol) {
+        return autenticarYExtraerJwt(normalizarRol(rol));
+    }
+
+    public static void limpiarCacheTokens() {
+        TOKENS_POR_ROL.clear();
+    }
+
+    private static String normalizarRol(String rol) {
+        return rol == null ? "MOZO" : rol.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static boolean esTokenActivo(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            HttpClient client = crearInsecureHttpClient();
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(BASE_URL + "/api/usuarios/activos"))
+                    .timeout(Duration.ofSeconds(3))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            return resp.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static String autenticarYExtraerJwt(String rolNormalizado) {
