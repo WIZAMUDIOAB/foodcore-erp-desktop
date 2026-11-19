@@ -116,15 +116,32 @@ class SocketsIntegracionTest {
     }
 
     @Test
-    @DisplayName("R-02.7 (4/6): Recepción de trama ACK actualiza outbox_evento de PENDIENTE a ENVIADO")
+    @DisplayName("R-02.7 (4/6): Recepción de trama ACK autenticada actualiza outbox_evento; ACK sin sesión se rechaza")
     void recepcionDeAckDebeCambiarEstadoOutboxDePendienteAEnviado() throws Exception {
         long idEvento;
         try (Connection conn = ConexionBD.getConnection()) {
             idEvento = outboxRepository.insertar(conn, "NUEVO_PEDIDO", "{\"idPedido\":77}");
         }
 
+        // 1. ACK sin sessionToken debe ser rechazado con TerminalNoAutorizada
+        JsonObject ackSinAuth = new JsonObject();
+        ackSinAuth.addProperty("type", "ACK");
+        ackSinAuth.addProperty("idEvento", idEvento);
+        JsonObject respNoAuth = servidor.procesarTramaProtocolo(ackSinAuth.toString(), null);
+        assertEquals("ERROR", respNoAuth.get("type").getAsString());
+        assertEquals("TerminalNoAutorizada", respNoAuth.get("code").getAsString());
+
+        // 2. Autenticar terminal KDS-01 con HELLO y enviar ACK con sessionToken válido
+        JsonObject hello = new JsonObject();
+        hello.addProperty("type", "HELLO");
+        hello.addProperty("codigoTerminal", "KDS-01");
+        hello.addProperty("secreto", "Kds01#Secret2026!");
+        JsonObject welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
+        String sessionToken = welcome.get("sessionToken").getAsString();
+
         JsonObject ackFrame = new JsonObject();
         ackFrame.addProperty("type", "ACK");
+        ackFrame.addProperty("sessionToken", sessionToken);
         ackFrame.addProperty("idEvento", idEvento);
 
         JsonObject resp = servidor.procesarTramaProtocolo(ackFrame.toString(), null);

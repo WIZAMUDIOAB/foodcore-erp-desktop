@@ -69,7 +69,17 @@ class AuthControllerProductionTest {
             }
 
             @Override
+            public Usuario autenticarSoloCredenciales(String username, String password) throws NegocioException {
+                throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS, "Credenciales inválidas.");
+            }
+
+            @Override
             public Optional<Usuario> autenticarPorPin(int idUsuario, String username, String pin) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) {
                 return Optional.empty();
             }
         };

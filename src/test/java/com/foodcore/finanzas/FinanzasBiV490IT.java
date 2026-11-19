@@ -162,14 +162,16 @@ class FinanzasBiV490IT {
             }
         });
 
-        Platform.runLater(() -> cajaCtrlRef.get().handleAbrirModalGasto(null));
-
         AtomicReference<Parent> modalRootRef = new AtomicReference<>();
         esperarHasta(() -> {
             AtomicBoolean encontrado = new AtomicBoolean(false);
             try {
                 JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                     Parent host = localizarHostModalConSelector("#cbCategoriaGasto", cajaRootRef.get());
+                    if (host == null) {
+                        cajaCtrlRef.get().handleAbrirModalGasto(null);
+                        host = localizarHostModalConSelector("#cbCategoriaGasto", cajaRootRef.get());
+                    }
                     if (host != null) {
                         modalRootRef.set(host);
                         encontrado.set(true);

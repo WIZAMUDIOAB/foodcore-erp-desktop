@@ -299,10 +299,13 @@ public class HistorialVentasController {
             return;
         }
         Usuario usr = AuthService.getUsuarioSesionActual();
-        long idUsr = usr != null ? usr.getIdUsuario() : 1L;
-        String username = usr != null ? usr.getUsername() : "admin";
-        String rol = usr != null && usr.getNombreRol() != null ? usr.getNombreRol() : "ADMIN";
-        SesionUsuario sesion = autorizacionService.crearSesion(idUsr, username, rol, "POS-HISTORIAL");
+        if (usr == null || usr.getIdUsuario() <= 0 || usr.getNombreRol() == null || usr.getNombreRol().isBlank()) {
+            AnimationUtils.mostrarToast(rootHistorialVentasStack,
+                    "Acceso denegado: debe iniciar sesión con un usuario autenticado para procesar devoluciones.", true);
+            return;
+        }
+        SesionUsuario sesion = autorizacionService.crearSesion(
+                usr.getIdUsuario(), usr.getUsername(), usr.getNombreRol(), "POS-HISTORIAL");
 
         List<Integer> idsSnapshot = new ArrayList<>(idsDetallesSeleccionados);
         String motivo = txtMotivoDevolucion != null ? txtMotivoDevolucion.getText() : "Devolución parcial";

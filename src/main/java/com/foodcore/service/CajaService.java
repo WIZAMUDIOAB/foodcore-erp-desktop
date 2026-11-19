@@ -284,9 +284,13 @@ public class CajaService {
 
             Caja caja = opt.get();
             BigDecimal totalVentasEfectivo = cajaDAO.calcularTotalVentasTurno(conn, idCaja);
+            BigDecimal totalIngresosEfectivo = cajaDAO.calcularTotalIngresosEfectivoTurno(conn, idCaja);
             BigDecimal totalGastosEfectivo = cajaDAO.calcularTotalGastosTurno(conn, idCaja);
             BigDecimal montoEsperado = DesgloseFiscal.normalizarMoneda(
-                caja.getMontoApertura().add(totalVentasEfectivo).subtract(totalGastosEfectivo)
+                caja.getMontoApertura()
+                    .add(totalVentasEfectivo)
+                    .add(totalIngresosEfectivo)
+                    .subtract(totalGastosEfectivo)
             );
             BigDecimal diferencia = DesgloseFiscal.normalizarMoneda(fisicoNorm.subtract(montoEsperado));
 
@@ -299,7 +303,7 @@ public class CajaService {
 
             String glosa = String.format("Cierre Z de turno (Esperado: S/ %s | Contado: S/ %s | Dif: S/ %s)",
                 montoEsperado, fisicoNorm, diferencia);
-            MovimientoCaja movCierre = new MovimientoCaja(0, idCaja, idUsuarioCierre, "EGRESO", "EFECTIVO", fisicoNorm, glosa);
+            MovimientoCaja movCierre = new MovimientoCaja(0, idCaja, idUsuarioCierre, "CIERRE_Z", "EFECTIVO", fisicoNorm, glosa);
             cajaDAO.registrarMovimiento(conn, movCierre);
 
             List<InsumoCriticoTurno> criticos = obtenerInsumosCriticosTurno(conn);

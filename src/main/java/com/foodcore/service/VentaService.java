@@ -2,7 +2,9 @@ package com.foodcore.service;
 
 import com.foodcore.dao.*;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.dao.impl.ComboDAOImpl;
+import com.foodcore.dao.impl.CuentaPorCobrarDAOImpl;
 import com.foodcore.dao.impl.VentaDAOImpl;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.FormatoPersonalizacionUtil;
@@ -10,7 +12,6 @@ import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
-import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.exception.StockInsuficienteException;
 import com.foodcore.model.*;
 import com.foodcore.model.enums.Permiso;
@@ -30,7 +31,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
@@ -44,7 +44,6 @@ public class VentaService {
 
     private static final Logger LOGGER = Logger.getLogger(VentaService.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
-    private static final Map<String, Venta> REGISTRO_IDEMPOTENCIA = new ConcurrentHashMap<>();
 
     public record PagoSplit(String medioPago, BigDecimal monto) {
     }
@@ -72,6 +71,8 @@ public class VentaService {
     private final InsumoDAO insumoDAO;
     private final PedidoDAO pedidoDAO;
     private final ComboDAO comboDAO;
+    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
+    private final CuentaPorCobrarDAO cuentaPorCobrarDAO = new CuentaPorCobrarDAOImpl();
     private final AutorizacionService autorizacionService = new AutorizacionService();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
     private final CierreContableService cierreContableService = new CierreContableService();
@@ -146,6 +147,111 @@ public class VentaService {
     }
 
     /**
+     * Registra atómicamente una venta POS a {@code CREDITO_CORPORATIVO} junto con su
+     * {@link CuentaPorCobrar} en la MISMA transacción JDBC, validando línea de crédito bajo
+     * bloqueo pesimista {@code FOR UPDATE}. Si falla la CxC, la venta completa se revierte.
+     */
+    public Venta registrarVentaConCreditoCorporativo(Venta venta,
+                                                     List<DetalleVenta> detalles,
+                                                     ComprobantePago comprobante,
+                                                     String docCliente,
+                                                     String nombreCliente)
+            throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
+        if (venta == null) {
+            throw new NegocioException("Los datos de la venta a crédito no pueden ser nulos.");
+        }
+        validarYPrepararMontosVenta(venta, detalles, null);
+
+        return tx.executeChecked(conn -> {
+            Cliente clienteCredito = resolverClienteParaCredito(conn, venta.getIdCliente(), docCliente);
+            if (clienteCredito == null) {
+                throw new NegocioException(
+                        "Para ventas a CREDITO_CORPORATIVO debe seleccionar o registrar un cliente válido.");
+            }
+            venta.setIdCliente(clienteCredito.getIdCliente());
+
+            // Bloqueo pesimista de cliente para validar límite de crédito sin condiciones de carrera
+            BigDecimal limiteCredito = BigDecimal.ZERO;
+            int diasCredito = 30;
+            String sqlLockCli = "SELECT limite_credito, dias_credito, activo FROM cliente WHERE id_cliente = ? FOR UPDATE";
+            try (PreparedStatement psLock = conn.prepareStatement(sqlLockCli)) {
+                psLock.setInt(1, clienteCredito.getIdCliente());
+                try (ResultSet rs = psLock.executeQuery()) {
+                    if (!rs.next() || !rs.getBoolean("activo")) {
+                        throw new NegocioException("El cliente corporativo no existe o se encuentra inactivo.");
+                    }
+                    BigDecimal lim = rs.getBigDecimal("limite_credito");
+                    if (lim != null) {
+                        limiteCredito = lim;
+                    }
+                    int dias = rs.getInt("dias_credito");
+                    if (dias > 0) {
+                        diasCredito = dias;
+                    }
+                }
+            }
+
+            if (limiteCredito.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal deudaPendiente = BigDecimal.ZERO;
+                String sqlDeuda = "SELECT COALESCE(SUM(monto_total - monto_cobrado), 0) AS deuda "
+                        + "FROM cuenta_por_cobrar WHERE id_cliente = ? AND estado <> 'COBRADA'";
+                try (PreparedStatement psDeuda = conn.prepareStatement(sqlDeuda)) {
+                    psDeuda.setInt(1, clienteCredito.getIdCliente());
+                    try (ResultSet rsDeuda = psDeuda.executeQuery()) {
+                        if (rsDeuda.next() && rsDeuda.getBigDecimal("deuda") != null) {
+                            deudaPendiente = rsDeuda.getBigDecimal("deuda");
+                        }
+                    }
+                }
+                if (deudaPendiente.add(venta.getTotal()).compareTo(limiteCredito) > 0) {
+                    throw new NegocioException(String.format(Locale.US,
+                            "Límite de crédito corporativo excedido. Límite: S/ %.2f | Deuda actual: S/ %.2f | Venta: S/ %.2f",
+                            limiteCredito, deudaPendiente, venta.getTotal()));
+                }
+            }
+
+            Venta ventaRegistrada = registrarVentaEnConexion(conn, venta, detalles, comprobante, null);
+
+            String nroComprobante = comprobante != null && comprobante.getSerie() != null && comprobante.getNumero() != null
+                    ? comprobante.getSerie() + "-" + comprobante.getNumero()
+                    : "VTA-" + ventaRegistrada.getIdVenta();
+            LocalDate hoyLima = LocalDate.now(ZONA_LIMA);
+            CuentaPorCobrar cxc = new CuentaPorCobrar();
+            cxc.setIdCliente(clienteCredito.getIdCliente());
+            cxc.setIdVenta(ventaRegistrada.getIdVenta());
+            cxc.setNumeroComprobante(nroComprobante);
+            cxc.setFechaEmision(hoyLima);
+            cxc.setFechaVencimiento(hoyLima.plusDays(diasCredito));
+            cxc.setMontoTotal(ventaRegistrada.getTotal().doubleValue());
+            cxc.setMontoCobrado(0.0);
+            cxc.setEstado("PENDIENTE");
+            String etiquetaNombre = (nombreCliente != null && !nombreCliente.isBlank())
+                    ? nombreCliente.trim() : clienteCredito.getRazonSocial();
+            cxc.setObservaciones("Venta POS a credito corporativo. Cliente: " + etiquetaNombre);
+            cuentaPorCobrarDAO.insertar(conn, cxc);
+
+            return ventaRegistrada;
+        });
+    }
+
+    private Cliente resolverClienteParaCredito(Connection conn, Integer idCliente, String docCliente) throws SQLException {
+        if (idCliente != null && idCliente > 0) {
+            Optional<Cliente> optById = clienteDAO.buscarPorId(conn, idCliente);
+            if (optById.isPresent()) {
+                return optById.get();
+            }
+        }
+        if (docCliente != null && !docCliente.isBlank()) {
+            Optional<Cliente> optByDoc = clienteDAO.buscarPorDocumento(conn, docCliente.trim());
+            if (optByDoc.isPresent()) {
+                return optByDoc.get();
+            }
+            return clienteDAO.buscarPorDniOTelefono(conn, docCliente.trim()).orElse(null);
+        }
+        return null;
+    }
+
+    /**
      * División de cuenta en múltiples pagos / partes iguales (§3.1): genera la venta descontando stock
      * y registra múltiples asientos en {@code movimiento_caja} según los medios de pago indicados.
      */
@@ -162,38 +268,56 @@ public class VentaService {
 
     /**
      * División de cuenta por ítems (§3.1): genera una venta independiente por cada subcuenta
-     * con su respectivo medio de pago y comprobante interno.
+     * dentro de una ÚNICA transacción ACID (todo o nada) con correlativos sin colisiones.
      */
     public List<Venta> dividirCuentaPorItems(List<SubcuentaItems> subcuentas, int idUsuario)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         if (subcuentas == null || subcuentas.isEmpty()) {
             throw new NegocioException("Debe especificar al menos una subcuenta con ítems.");
         }
-        List<Venta> ventasGeneradas = new ArrayList<>();
-        int correlativo = 1;
+
+        List<SubcuentaItems> subcuentasValidas = new ArrayList<>();
         for (SubcuentaItems sub : subcuentas) {
-            if (sub.detalles() == null || sub.detalles().isEmpty()) {
-                continue;
+            if (sub != null && sub.detalles() != null && !sub.detalles().isEmpty()) {
+                subcuentasValidas.add(sub);
             }
-            BigDecimal suma = BigDecimal.ZERO;
-            for (DetalleVenta d : sub.detalles()) {
-                BigDecimal subLinea = d.getPrecioUnitario().multiply(BigDecimal.valueOf(d.getCantidad()));
-                d.setSubtotal(subLinea);
-                suma = suma.add(subLinea);
-            }
-            DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(suma);
-            String medio = sub.medioPago() != null ? sub.medioPago() : "EFECTIVO";
-            Venta v = new Venta(0, null, 1, idUsuario, 1,
-                desglose.getSubtotalGravado(), desglose.getIgv(), desglose.getTotal(),
-                medio, desglose.getTotal(), BigDecimal.ZERO);
-            v.setAplicarFidelizacion(false);
-            v.setIdempotencyKey(UUID.randomUUID().toString());
-            ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SP" + correlativo,
-                String.valueOf(System.currentTimeMillis() % 1000000), desglose.getTotal());
-            ventasGeneradas.add(registrarVenta(v, sub.detalles(), comp));
-            correlativo++;
         }
-        return ventasGeneradas;
+        if (subcuentasValidas.isEmpty()) {
+            throw new NegocioException("Debe especificar al menos una subcuenta con ítems válidos.");
+        }
+
+        return tx.executeChecked(conn -> {
+            List<Venta> ventasGeneradas = new ArrayList<>();
+            int correlativo = 1;
+            for (SubcuentaItems sub : subcuentasValidas) {
+                BigDecimal suma = BigDecimal.ZERO;
+                for (DetalleVenta d : sub.detalles()) {
+                    if (d == null || d.getCantidad() <= 0 || d.getPrecioUnitario() == null
+                            || d.getPrecioUnitario().compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new NegocioException("Cada ítem en la división debe tener cantidad y precio unitario mayores a cero.");
+                    }
+                    BigDecimal subLinea = d.getPrecioUnitario()
+                            .multiply(BigDecimal.valueOf(d.getCantidad()))
+                            .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+                    d.setSubtotal(subLinea);
+                    suma = suma.add(subLinea);
+                }
+                DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(suma);
+                String medio = sub.medioPago() != null && !sub.medioPago().isBlank() ? sub.medioPago() : "EFECTIVO";
+                Venta v = new Venta(0, null, 1, idUsuario, 1,
+                        desglose.getSubtotalGravado(), desglose.getIgv(), desglose.getTotal(),
+                        medio, desglose.getTotal(), BigDecimal.ZERO);
+                v.setAplicarFidelizacion(false);
+                v.setIdempotencyKey(UUID.randomUUID().toString());
+                String sufijoUnico = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
+                ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SP" + correlativo,
+                        String.format(Locale.ROOT, "%04d-%s", correlativo, sufijoUnico), desglose.getTotal());
+                validarYPrepararMontosVenta(v, sub.detalles(), null);
+                ventasGeneradas.add(registrarVentaEnConexion(conn, v, sub.detalles(), comp, null));
+                correlativo++;
+            }
+            return ventasGeneradas;
+        });
     }
 
     /**
@@ -226,7 +350,7 @@ public class VentaService {
                                             SesionUsuario sesionCajero,
                                             String pinSupervisor,
                                             String motivo) throws NegocioException, SQLException {
-        if (sesionCajero == null || sesionCajero.haExpirado(LocalDateTime.now())) {
+        if (sesionCajero == null || sesionCajero.haExpirado(LocalDateTime.now(ZONA_LIMA))) {
             throw new NegocioException(CodigoError.ACCESO_DENEGADO,
                     "Debe iniciar sesión vigente para solicitar una anulación supervisada.");
         }
@@ -247,12 +371,13 @@ public class VentaService {
                                      String usernameSolicitante) throws NegocioException, SQLException {
         tx.executeVoidChecked(conn -> {
             int idCaja;
+            Integer idCliente;
             BigDecimal totalVenta;
             String metodoPago;
             String estadoActual;
             LocalDateTime fechaVenta = null;
 
-            String sqlVenta = "SELECT id_caja, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
+            String sqlVenta = "SELECT id_caja, id_cliente, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
             try (PreparedStatement ps = conn.prepareStatement(sqlVenta)) {
                 ps.setInt(1, idVenta);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -260,6 +385,8 @@ public class VentaService {
                         throw new NegocioException("No se encontró la venta #" + idVenta + " para anular.");
                     }
                     idCaja = rs.getInt("id_caja");
+                    int rawCli = rs.getInt("id_cliente");
+                    idCliente = rs.wasNull() || rawCli <= 0 ? null : rawCli;
                     totalVenta = rs.getBigDecimal("total");
                     metodoPago = rs.getString("metodo_pago");
                     estadoActual = rs.getString("estado");
@@ -285,11 +412,15 @@ public class VentaService {
                     ? " [Autorizado por " + supervisorAutorizante.getUsername() + "]" : "";
             MovimientoCaja movAnulacion = new MovimientoCaja(
                 0, idCaja, idUsuarioMov, "ANULACION",
-                metodoPago != null ? metodoPago : "EFECTIVO",
+                normalizarMedioPagoMovimientoCaja(metodoPago),
                 totalVenta.negate(),
                 "Anulación Venta #" + idVenta + ": " + glosaMotivo + sufijoSupervisor
             );
             cajaDAO.registrarMovimiento(conn, movAnulacion);
+
+            if (idCliente != null) {
+                fidelizacionService.revertirPuntosPorAnulacionVenta(conn, idCliente, idVenta, glosaMotivo);
+            }
 
             if (supervisorAutorizante != null) {
                 auditoriaDAO.registrarEventoSeguro(
@@ -320,6 +451,11 @@ public class VentaService {
                 }
             }
 
+            Map<Long, BigDecimal> saldosBloqueadosMerma = Collections.emptyMap();
+            if (platoYaPreparado && !insumosAfectados.isEmpty()) {
+                saldosBloqueadosMerma = insumoDAO.lockearPorIds(conn, new ArrayList<>(insumosAfectados.keySet()));
+            }
+
             for (Map.Entry<Long, BigDecimal> entry : insumosAfectados.entrySet()) {
                 long idIns = entry.getKey();
                 BigDecimal cantInsumo = entry.getValue();
@@ -330,13 +466,14 @@ public class VentaService {
                     );
                 } else {
                     Insumo ins = insumoDAO.obtenerPorId(conn, idIns);
-                    BigDecimal saldoActual = ins != null ? ins.getStockActualDisponible() : BigDecimal.ZERO;
+                    BigDecimal saldoActual = saldosBloqueadosMerma.getOrDefault(
+                            idIns, ins != null ? ins.getStockActualDisponible() : BigDecimal.ZERO);
                     BigDecimal costo = ins != null && ins.getCostoUnitario() != null ? ins.getCostoUnitario() : BigDecimal.ZERO;
                     String obsMerma = "Merma por Anulación Venta #" + idVenta + " (Plato ya cocinado: " + glosaMotivo + ")";
                     insumoDAO.registrarMovimientoInventario(conn, idIns, "MERMA", cantInsumo, obsMerma, idVenta);
                     KardexMovimiento kmMerma = new KardexMovimiento(
                         0L, idIns, "MERMA", cantInsumo.negate(), saldoActual, saldoActual,
-                        costo, "ANULACION", (long) idVenta, idUsuarioSolicitante, obsMerma, LocalDateTime.now()
+                        costo, "ANULACION", (long) idVenta, idUsuarioSolicitante, obsMerma, LocalDateTime.now(ZONA_LIMA)
                     );
                     insumoDAO.insertarKardex(conn, kmMerma);
                 }
@@ -367,7 +504,8 @@ public class VentaService {
                                                            List<Integer> idsDetalleADevolver,
                                                            SesionUsuario sesion,
                                                            String motivo) throws NegocioException, SQLException {
-        if (sesion == null || sesion.haExpirado(LocalDateTime.now())) {
+        autorizacionService.exigir(sesion, Permiso.VENTA_ANULAR);
+        if (sesion.haExpirado(LocalDateTime.now(ZONA_LIMA))) {
             throw new NegocioException(CodigoError.ACCESO_DENEGADO,
                     "Debe iniciar sesión vigente para procesar devoluciones parciales.");
         }
@@ -389,12 +527,13 @@ public class VentaService {
 
         return tx.executeChecked(conn -> {
             int idCajaVenta;
+            Integer idCliente;
             BigDecimal totalActual;
             String metodoPago;
             String estadoVenta;
             LocalDateTime fechaVenta = null;
 
-            String sqlVenta = "SELECT id_caja, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
+            String sqlVenta = "SELECT id_caja, id_cliente, total, metodo_pago, estado, fecha_hora FROM venta WHERE id_venta = ? FOR UPDATE";
             try (PreparedStatement ps = conn.prepareStatement(sqlVenta)) {
                 ps.setInt(1, idVenta);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -403,6 +542,8 @@ public class VentaService {
                                 "No se encontró la venta #" + idVenta + ".");
                     }
                     idCajaVenta = rs.getInt("id_caja");
+                    int rawCli = rs.getInt("id_cliente");
+                    idCliente = rs.wasNull() || rawCli <= 0 ? null : rawCli;
                     totalActual = rs.getBigDecimal("total") != null ? rs.getBigDecimal("total") : BigDecimal.ZERO;
                     metodoPago = rs.getString("metodo_pago");
                     estadoVenta = rs.getString("estado");
@@ -449,7 +590,20 @@ public class VentaService {
                 }
             }
 
-            BigDecimal montoReembolso = DesgloseFiscal.normalizarMoneda(subtotalDevuelto.min(totalActual));
+            // Prorrateo proporcional si la venta tuvo descuento comercial o canje de puntos (evita sobre-reembolso)
+            BigDecimal brutoActivo = subtotalDevuelto.add(subtotalRestante);
+            BigDecimal montoReembolso;
+            if (subtotalRestante.compareTo(BigDecimal.ZERO) <= 0) {
+                montoReembolso = DesgloseFiscal.normalizarMoneda(totalActual);
+            } else if (brutoActivo.compareTo(BigDecimal.ZERO) > 0 && totalActual.compareTo(brutoActivo) < 0) {
+                montoReembolso = DesgloseFiscal.normalizarMoneda(
+                        totalActual.multiply(subtotalDevuelto)
+                                .divide(brutoActivo, DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO)
+                                .min(totalActual)
+                );
+            } else {
+                montoReembolso = DesgloseFiscal.normalizarMoneda(subtotalDevuelto.min(totalActual));
+            }
             BigDecimal nuevoTotal = DesgloseFiscal.normalizarMoneda(totalActual.subtract(montoReembolso).max(BigDecimal.ZERO));
             DesgloseFiscal desgloseRestante = nuevoTotal.compareTo(BigDecimal.ZERO) > 0
                     ? DesgloseFiscal.desdeTotalConImpuestos(nuevoTotal)
@@ -477,11 +631,17 @@ public class VentaService {
                     idCajaEgreso,
                     (int) sesion.getIdUsuario(),
                     "EGRESO",
-                    metodoPago != null ? metodoPago : "EFECTIVO",
+                    normalizarMedioPagoMovimientoCaja(metodoPago),
                     montoReembolso,
                     "Devolución parcial Venta #" + idVenta + " (" + aDevolver.size() + " ítem(s)): " + glosaMotivo
             );
             cajaDAO.registrarMovimiento(conn, movEgreso);
+
+            if (idCliente != null) {
+                fidelizacionService.revertirPuntosPorDevolucionParcial(
+                        conn, idCliente, idVenta, montoReembolso, "ANULADA".equalsIgnoreCase(nuevoEstado), glosaMotivo
+                );
+            }
 
             if (!insumosARevertir.isEmpty()) {
                 List<Long> idsOrdenados = new ArrayList<>(insumosARevertir.keySet());
@@ -509,7 +669,7 @@ public class VentaService {
                             (long) idVenta,
                             sesion.getIdUsuario(),
                             obsKardex,
-                            LocalDateTime.now()
+                            LocalDateTime.now(ZONA_LIMA)
                     );
                     insumoDAO.insertarKardex(conn, km);
                 }
@@ -541,6 +701,13 @@ public class VentaService {
                                          ComprobantePago comprobante,
                                          List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
+        validarYPrepararMontosVenta(venta, detalles, pagosDivididos);
+        return tx.executeChecked(conn -> registrarVentaEnConexion(conn, venta, detalles, comprobante, pagosDivididos));
+    }
+
+    private void validarYPrepararMontosVenta(Venta venta,
+                                             List<DetalleVenta> detalles,
+                                             List<PagoSplit> pagosDivididos) throws NegocioException {
         if (venta == null) {
             throw new NegocioException("Los datos de la venta no pueden ser nulos.");
         }
@@ -548,18 +715,14 @@ public class VentaService {
             throw new NegocioException("No se puede registrar una venta sin productos en el detalle.");
         }
 
-        // 1. Verificar idempotencia (SPEC-FOODCORE-v1.0 §8.1, §9.2)
-        String idemKey = venta.getIdempotencyKey();
-        if (idemKey != null && REGISTRO_IDEMPOTENCIA.containsKey(idemKey)) {
-            LOGGER.info("Idempotencia activada: devolviendo venta previamente procesada para clave " + idemKey);
-            return REGISTRO_IDEMPOTENCIA.get(idemKey);
-        }
-
-        // 2. Recalcular total desde las líneas de detalle con redondeo HALF_EVEN y descuento si aplica (§3.2)
+        // Recalcular total desde las líneas de detalle validando cantidad > 0 y precioUnitario > 0
         BigDecimal sumaLineas = BigDecimal.ZERO;
         for (DetalleVenta det : detalles) {
-            if (det.getCantidad() <= 0) {
+            if (det == null || det.getCantidad() <= 0) {
                 throw new NegocioException("La cantidad de cada ítem de venta debe ser mayor a cero.");
+            }
+            if (det.getPrecioUnitario() == null || det.getPrecioUnitario().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new NegocioException("El precio unitario de cada ítem de venta debe ser mayor a cero.");
             }
             BigDecimal subtotalLinea = det.getPrecioUnitario()
                 .multiply(BigDecimal.valueOf(det.getCantidad()))
@@ -575,18 +738,37 @@ public class VentaService {
             throw new NegocioException("El descuento aplicado es inválido respecto al total de la venta.");
         }
         BigDecimal totalTrasDescuentoComercial = sumaLineas.subtract(descuentoAplicado);
-
         DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(totalTrasDescuentoComercial);
 
-        // El canje de puntos reduce únicamente el Total a pagar sin alterar la base imponible ni el IGV (SPEC v5.0.0 §2.3)
-        BigDecimal descuentoPuntos = venta.getDescuentoPuntos() != null
+        // Derivar descuentoPuntos ESTRICTAMENTE desde puntosACanjear + ConfiguracionFidelizacion (nunca confiar en caller)
+        int puntosSolicitados = venta.getPuntosACanjear();
+        BigDecimal descuentoPuntosCaller = venta.getDescuentoPuntos() != null
             ? venta.getDescuentoPuntos().setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO)
             : BigDecimal.ZERO;
-        if (descuentoPuntos.compareTo(BigDecimal.ZERO) < 0 || descuentoPuntos.compareTo(totalTrasDescuentoComercial) > 0) {
-            throw new NegocioException("El descuento por canje de puntos excede el importe de la venta.");
+        if (puntosSolicitados < 0) {
+            throw new NegocioException("Los puntos a canjear no pueden ser negativos.");
         }
+        if (puntosSolicitados == 0 && descuentoPuntosCaller.compareTo(BigDecimal.ZERO) > 0) {
+            throw new NegocioException(
+                    "Descuento por puntos rechazado: no se puede aplicar descuento de fidelización con 0 puntos a canjear.");
+        }
+        BigDecimal descuentoPuntos;
+        if (puntosSolicitados > 0) {
+            if (venta.getIdCliente() == null || venta.getIdCliente() <= 0 || !venta.isAplicarFidelizacion()) {
+                throw new NegocioException(
+                        "El canje de puntos requiere un cliente válido con fidelización habilitada.");
+            }
+            descuentoPuntos = fidelizacionService.calcularDescuentoExactoParaCanjeVenta(
+                    puntosSolicitados, totalTrasDescuentoComercial);
+        } else {
+            descuentoPuntos = BigDecimal.ZERO.setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+        }
+
         BigDecimal totalFinal = totalTrasDescuentoComercial.subtract(descuentoPuntos)
             .setScale(DesgloseFiscal.ESCALA_MONETARIA, DesgloseFiscal.MODO_REDONDEO);
+        if (totalFinal.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new NegocioException("El total final de la venta debe ser estrictamente mayor a cero.");
+        }
 
         venta.setSubtotal(desglose.getSubtotalGravado());
         venta.setIgv(desglose.getIgv());
@@ -597,6 +779,9 @@ public class VentaService {
         if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
             BigDecimal sumaPagos = BigDecimal.ZERO;
             for (PagoSplit p : pagosDivididos) {
+                if (p == null || p.monto() == null || p.monto().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new NegocioException("Cada pago en cuenta dividida debe tener un monto estrictamente positivo.");
+                }
                 sumaPagos = sumaPagos.add(p.monto());
             }
             if (sumaPagos.setScale(2, RoundingMode.HALF_EVEN).compareTo(totalFinal) != 0) {
@@ -604,132 +789,146 @@ public class VentaService {
                     + ") no coincide con el total de la venta (S/ " + totalFinal + ").");
             }
         }
+    }
 
-        // 3. Ejecutar unidad de trabajo atómica ACID vía TransactionManager (§7.1, §9.1, R-09, R-10, R-11)
-        return tx.executeChecked(conn -> {
-            cierreContableService.validarPeriodoAbierto(conn, venta.getFechaHora());
-
-            Optional<Caja> cajaAbierta = cajaDAO.obtenerCajaAbierta(conn);
-            if (cajaAbierta.isEmpty()) {
-                throw new CajaCerradaException();
+    private Venta registrarVentaEnConexion(Connection conn,
+                                           Venta venta,
+                                           List<DetalleVenta> detalles,
+                                           ComprobantePago comprobante,
+                                           List<PagoSplit> pagosDivididos)
+            throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
+        // 1. Verificar idempotencia contra BD (nunca cachear ventas revertidas en un mapa estático en memoria)
+        String idemKey = venta.getIdempotencyKey();
+        if (idemKey != null && !idemKey.isBlank()) {
+            Optional<Venta> existente = ventaDAO.buscarPorIdempotencyKey(conn, idemKey.trim());
+            if (existente.isPresent()) {
+                LOGGER.info("Idempotencia BD activada: devolviendo venta existente #" + existente.get().getIdVenta());
+                return existente.get();
             }
-            int idCaja = cajaAbierta.get().getIdCaja();
-            venta.setIdCaja(idCaja);
+        }
 
-            // 3.1 Consolidar requerimientos de insumos de todas las líneas (explotando combos) ordenados por id_insumo (R-09, v4.8.0)
-            TreeMap<Long, BigDecimal> requerimientosPorInsumo = new TreeMap<>();
-            for (DetalleVenta detalle : detalles) {
-                completarTrazabilidadComboDetalle(conn, detalle);
-                acumularInsumosParaLinea(
-                        conn, requerimientosPorInsumo, detalle.getIdCombo(), detalle.getIdProducto(), detalle.getCantidad()
-                );
+        cierreContableService.validarPeriodoAbierto(conn, venta.getFechaHora());
+
+        Optional<Caja> cajaAbierta = cajaDAO.obtenerCajaAbierta(conn);
+        if (cajaAbierta.isEmpty()) {
+            throw new CajaCerradaException();
+        }
+        int idCaja = cajaAbierta.get().getIdCaja();
+        venta.setIdCaja(idCaja);
+
+        BigDecimal totalFinal = venta.getTotal();
+        BigDecimal descuentoPuntos = venta.getDescuentoPuntos() != null ? venta.getDescuentoPuntos() : BigDecimal.ZERO;
+
+        // 2. Consolidar requerimientos de insumos de todas las líneas (explotando combos) ordenados por id_insumo (R-09, v4.8.0)
+        TreeMap<Long, BigDecimal> requerimientosPorInsumo = new TreeMap<>();
+        for (DetalleVenta detalle : detalles) {
+            completarTrazabilidadComboDetalle(conn, detalle);
+            acumularInsumosParaLinea(
+                    conn, requerimientosPorInsumo, detalle.getIdCombo(), detalle.getIdProducto(), detalle.getCantidad()
+            );
+        }
+
+        // 3. Adquirir bloqueo pesimista SELECT ... FOR UPDATE en orden ascendente de id_insumo (R-09)
+        List<Long> idsOrdenados = new ArrayList<>(requerimientosPorInsumo.keySet());
+        Map<Long, BigDecimal> saldosAnteriores = insumoDAO.lockearPorIds(conn, idsOrdenados);
+
+        // 4. Insertar cabecera y detalle de venta
+        int idVenta = ventaDAO.insertarVenta(conn, venta);
+        venta.setIdVenta(idVenta);
+
+        for (DetalleVenta detalle : detalles) {
+            detalle.setIdVenta(idVenta);
+            ventaDAO.insertarDetalleVenta(conn, detalle);
+        }
+
+        // 5. Descontar stock en orden ascendente y registrar kardex_movimiento con saldo_anterior/posterior (R-02.3, R-09, R-11)
+        for (Long idInsumo : idsOrdenados) {
+            if (!saldosAnteriores.containsKey(idInsumo)) {
+                throw new InsumoNoEncontradoException(idInsumo);
             }
+            BigDecimal cantidadADescontar = requerimientosPorInsumo.get(idInsumo)
+                .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+            BigDecimal saldoAnterior = saldosAnteriores.get(idInsumo);
 
-            // 3.2 Adquirir bloqueo pesimista SELECT ... FOR UPDATE en orden ascendente de id_insumo (R-09)
-            List<Long> idsOrdenados = new ArrayList<>(requerimientosPorInsumo.keySet());
-            Map<Long, BigDecimal> saldosAnteriores = insumoDAO.lockearPorIds(conn, idsOrdenados);
+            // Lanza directamente StockInsuficienteException si stock_actual_disponible < cantidadADescontar
+            insumoDAO.descontarStock(conn, idInsumo, cantidadADescontar);
 
-            // 3.3 Insertar cabecera y detalle de venta
-            int idVenta = ventaDAO.insertarVenta(conn, venta);
-            venta.setIdVenta(idVenta);
+            BigDecimal saldoPosterior = saldoAnterior.subtract(cantidadADescontar)
+                .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
+            Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
+            BigDecimal costoUnit = (ins != null && ins.getCostoUnitario() != null)
+                ? ins.getCostoUnitario() : BigDecimal.ZERO;
 
-            for (DetalleVenta detalle : detalles) {
-                detalle.setIdVenta(idVenta);
-                ventaDAO.insertarDetalleVenta(conn, detalle);
-            }
+            String glosa = "Venta #" + idVenta;
+            insumoDAO.registrarMovimientoInventario(conn, idInsumo, "SALIDA", cantidadADescontar, glosa, idVenta);
 
-            // 3.4 Descontar stock en orden ascendente y registrar kardex_movimiento con saldo_anterior/posterior (R-02.3, R-09, R-11)
-            for (Long idInsumo : idsOrdenados) {
-                if (!saldosAnteriores.containsKey(idInsumo)) {
-                    throw new InsumoNoEncontradoException(idInsumo);
-                }
-                BigDecimal cantidadADescontar = requerimientosPorInsumo.get(idInsumo)
-                    .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
-                BigDecimal saldoAnterior = saldosAnteriores.get(idInsumo);
+            KardexMovimiento km = new KardexMovimiento(
+                0L,
+                idInsumo,
+                "SALIDA",
+                cantidadADescontar.negate(), // Cantidad firmada negativa para SALIDA (§8.2)
+                saldoAnterior,
+                saldoPosterior,
+                costoUnit,
+                "VENTA",
+                (long) idVenta,
+                venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1L,
+                glosa,
+                LocalDateTime.now(ZONA_LIMA)
+            );
+            insumoDAO.insertarKardex(conn, km);
+        }
 
-                // Lanza directamente StockInsuficienteException si stock_actual_disponible < cantidadADescontar
-                insumoDAO.descontarStock(conn, idInsumo, cantidadADescontar);
-
-                BigDecimal saldoPosterior = saldoAnterior.subtract(cantidadADescontar)
-                    .setScale(DesgloseFiscal.ESCALA_STOCK, DesgloseFiscal.MODO_REDONDEO);
-                Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
-                BigDecimal costoUnit = (ins != null && ins.getCostoUnitario() != null)
-                    ? ins.getCostoUnitario() : BigDecimal.ZERO;
-
-                String glosa = "Venta #" + idVenta;
-                insumoDAO.registrarMovimientoInventario(conn, idInsumo, "SALIDA", cantidadADescontar, glosa, idVenta);
-
-                KardexMovimiento km = new KardexMovimiento(
-                    0L,
-                    idInsumo,
-                    "SALIDA",
-                    cantidadADescontar.negate(), // Cantidad firmada negativa para SALIDA (§8.2)
-                    saldoAnterior,
-                    saldoPosterior,
-                    costoUnit,
-                    "VENTA",
-                    (long) idVenta,
-                    venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1L,
-                    glosa,
-                    LocalDateTime.now()
-                );
-                insumoDAO.insertarKardex(conn, km);
-            }
-
-            // 3.5 Registrar movimiento(s) en libro de caja (tipo VENTA) (§3.1)
-            int idUsrMov = venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1;
-            if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
-                int idxPago = 1;
-                for (PagoSplit p : pagosDivididos) {
-                    String medio = p.medioPago() != null ? p.medioPago() : "EFECTIVO";
-                    MovimientoCaja movSplit = new MovimientoCaja(
-                        0, idCaja, idUsrMov,
-                        "VENTA", medio, p.monto().setScale(2, RoundingMode.HALF_EVEN),
-                        "Cobro Split (" + idxPago + "/" + pagosDivididos.size() + ") Venta #" + idVenta + " [" + medio + "]"
-                    );
-                    cajaDAO.registrarMovimiento(conn, movSplit);
-                    idxPago++;
-                }
-            } else {
-                String medioPago = venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO";
-                MovimientoCaja movVenta = new MovimientoCaja(
+        // 6. Registrar movimiento(s) en libro de caja (tipo VENTA) (§3.1)
+        int idUsrMov = venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1;
+        if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
+            int idxPago = 1;
+            for (PagoSplit p : pagosDivididos) {
+                String medio = normalizarMedioPagoMovimientoCaja(p.medioPago());
+                MovimientoCaja movSplit = new MovimientoCaja(
                     0, idCaja, idUsrMov,
-                    "VENTA", medioPago, totalFinal,
-                    "Cobro Venta #" + idVenta + " [" + medioPago + "]"
+                    "VENTA", medio, p.monto().setScale(2, RoundingMode.HALF_EVEN),
+                    "Cobro Split (" + idxPago + "/" + pagosDivididos.size() + ") Venta #" + idVenta + " [" + medio + "]"
                 );
-                cajaDAO.registrarMovimiento(conn, movVenta);
+                cajaDAO.registrarMovimiento(conn, movSplit);
+                idxPago++;
             }
+        } else {
+            String medioPago = normalizarMedioPagoMovimientoCaja(venta.getMetodoPago());
+            MovimientoCaja movVenta = new MovimientoCaja(
+                0, idCaja, idUsrMov,
+                "VENTA", medioPago, totalFinal,
+                "Cobro Venta #" + idVenta + " [" + medioPago + "]"
+            );
+            cajaDAO.registrarMovimiento(conn, movVenta);
+        }
 
-            // 3.6 Emitir Comprobante de Pago
-            if (comprobante != null) {
-                comprobante.setIdVenta(idVenta);
-                comprobante.setTotal(totalFinal);
-                ventaDAO.insertarComprobante(conn, comprobante);
-            }
+        // 7. Emitir Comprobante de Pago
+        if (comprobante != null) {
+            comprobante.setIdVenta(idVenta);
+            comprobante.setTotal(totalFinal);
+            ventaDAO.insertarComprobante(conn, comprobante);
+        }
 
-            // 3.7 Si la venta proviene de un pedido de salón, marcar pedido como COBRADO en la misma transacción
-            if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
-                pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
-            }
+        // 8. Si la venta proviene de un pedido de salón, marcar pedido como COBRADO en la misma transacción
+        if (venta.getIdPedido() != null && venta.getIdPedido() > 0) {
+            pedidoDAO.actualizarEstadoPedido(conn, venta.getIdPedido(), "COBRADO");
+        }
 
-            // 3.8 Fidelización CRM (v5.0.0): redimir puntos usados y acumular puntos ganados en historial_puntos ACID
-            if (venta.getIdCliente() != null && venta.getIdCliente() > 0 && venta.isAplicarFidelizacion()) {
-                if (venta.getPuntosACanjear() > 0 && descuentoPuntos.compareTo(BigDecimal.ZERO) > 0) {
-                    fidelizacionService.canjearPuntosConfiguradosEnVenta(
-                            conn, venta.getIdCliente(), idVenta, venta.getPuntosACanjear(), descuentoPuntos
-                    );
-                }
-                if (totalFinal.compareTo(BigDecimal.ZERO) > 0) {
-                    fidelizacionService.acumularPuntosPorVenta(conn, venta.getIdCliente(), idVenta, totalFinal);
-                }
+        // 9. Fidelización CRM (v5.0.0): redimir puntos usados y acumular puntos ganados en historial_puntos ACID
+        if (venta.getIdCliente() != null && venta.getIdCliente() > 0 && venta.isAplicarFidelizacion()) {
+            if (venta.getPuntosACanjear() > 0 && descuentoPuntos.compareTo(BigDecimal.ZERO) > 0) {
+                fidelizacionService.canjearPuntosConfiguradosEnVenta(
+                        conn, venta.getIdCliente(), idVenta, venta.getPuntosACanjear(), descuentoPuntos
+                );
             }
+            if (totalFinal.compareTo(BigDecimal.ZERO) > 0) {
+                fidelizacionService.acumularPuntosPorVenta(conn, venta.getIdCliente(), idVenta, totalFinal);
+            }
+        }
 
-            if (idemKey != null) {
-                REGISTRO_IDEMPOTENCIA.put(idemKey, venta);
-            }
-            LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + totalFinal + ").");
-            return venta;
-        });
+        LOGGER.info("Venta #" + idVenta + " registrada exitosamente (Total: S/ " + totalFinal + ").");
+        return venta;
     }
 
     private void completarTrazabilidadComboDetalle(java.sql.Connection conn, DetalleVenta detalle) throws SQLException {
@@ -781,5 +980,20 @@ public class VentaService {
             );
             destino.merge(rec.getIdInsumo(), cantRequerida, BigDecimal::add);
         }
+    }
+
+    /**
+     * Normaliza el medio de pago para {@code movimiento_caja.medio_pago} ({@code VARCHAR(15)} en V1):
+     * mapea {@code CREDITO_CORPORATIVO} a {@code CREDITO} y acota longitudes mayores a 15 caracteres.
+     */
+    public static String normalizarMedioPagoMovimientoCaja(String medioPago) {
+        if (medioPago == null || medioPago.isBlank()) {
+            return "EFECTIVO";
+        }
+        String limpio = medioPago.trim().toUpperCase(Locale.ROOT);
+        if ("CREDITO_CORPORATIVO".equals(limpio)) {
+            return "CREDITO";
+        }
+        return limpio.length() > 15 ? limpio.substring(0, 15) : limpio;
     }
 }

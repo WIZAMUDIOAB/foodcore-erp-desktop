@@ -17,6 +17,7 @@ import com.foodcore.util.ConexionBD;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -45,17 +46,26 @@ public class InventarioFisicoService {
     private final TransactionManager tx;
     private final InsumoDAO insumoDAO;
     private final AuditoriaDAOImpl auditoriaDAO;
+    private final CierreContableService cierreContableService;
 
     public InventarioFisicoService() {
-        this(new JdbcTransactionManager(), new InsumoDAOImpl(), new AuditoriaDAOImpl());
+        this(new JdbcTransactionManager(), new InsumoDAOImpl(), new AuditoriaDAOImpl(), new CierreContableService());
     }
 
     public InventarioFisicoService(TransactionManager tx,
                                    InsumoDAO insumoDAO,
                                    AuditoriaDAOImpl auditoriaDAO) {
+        this(tx, insumoDAO, auditoriaDAO, new CierreContableService());
+    }
+
+    public InventarioFisicoService(TransactionManager tx,
+                                   InsumoDAO insumoDAO,
+                                   AuditoriaDAOImpl auditoriaDAO,
+                                   CierreContableService cierreContableService) {
         this.tx = tx;
         this.insumoDAO = insumoDAO;
         this.auditoriaDAO = auditoriaDAO;
+        this.cierreContableService = cierreContableService != null ? cierreContableService : new CierreContableService();
     }
 
     public List<ItemInventarioFisico> listarInsumosParaConteo() throws SQLException {
@@ -88,7 +98,9 @@ public class InventarioFisicoService {
                     "Debe proporcionar al menos un insumo en la toma de inventario físico.");
         }
 
-        List<ItemInventarioFisico> conDiferencia = new ArrayList<>();
+        // Recolectar TODOS los ítems válidos sin filtrar por stockSistema obsoleto en memoria:
+        // la diferencia real debe calcularse DESPUÉS de adquirir SELECT ... FOR UPDATE en BD.
+        List<ItemInventarioFisico> itemsValidos = new ArrayList<>();
         for (ItemInventarioFisico item : conteos) {
             if (item == null || item.getIdInsumo() <= 0 || item.getStockContado() == null) {
                 continue;
@@ -97,14 +109,12 @@ public class InventarioFisicoService {
                 throw new NegocioException(CodigoError.VALIDACION_ENTRADA,
                         "El stock contado no puede ser negativo (" + item.getNombre() + ").");
             }
-            if (item.tieneDiferencia()) {
-                conDiferencia.add(item);
-            }
+            itemsValidos.add(item);
         }
 
-        if (conDiferencia.isEmpty()) {
+        if (itemsValidos.isEmpty()) {
             throw new NegocioException(CodigoError.VALIDACION_ENTRADA,
-                    "No se detectaron diferencias entre el stock del sistema y el stock contado.");
+                    "Debe proporcionar al menos un insumo válido en la toma de inventario físico.");
         }
 
         String motivoBase = (motivoGeneral != null && !motivoGeneral.isBlank())
@@ -112,7 +122,9 @@ public class InventarioFisicoService {
         long idUsr = idUsuario > 0 ? idUsuario : 1L;
 
         return tx.executeChecked(conn -> {
-            List<Long> idsOrdenados = conDiferencia.stream()
+            cierreContableService.validarPeriodoAbierto(conn, LocalDate.now(ZONA_LIMA));
+
+            List<Long> idsOrdenados = itemsValidos.stream()
                     .map(ItemInventarioFisico::getIdInsumo)
                     .distinct()
                     .sorted()
@@ -124,7 +136,7 @@ public class InventarioFisicoService {
             List<String> detalles = new ArrayList<>();
             LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
 
-            for (ItemInventarioFisico item : conDiferencia) {
+            for (ItemInventarioFisico item : itemsValidos) {
                 long idIns = item.getIdInsumo();
                 if (!saldosBloqueados.containsKey(idIns)) {
                     throw new InsumoNoEncontradoException(idIns);

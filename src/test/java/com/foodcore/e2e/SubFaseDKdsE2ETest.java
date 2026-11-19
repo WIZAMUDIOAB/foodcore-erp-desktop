@@ -1,15 +1,24 @@
 package com.foodcore.e2e;
 
+import com.microsoft.playwright.APIRequestContext;
+import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
+import com.microsoft.playwright.options.RequestOptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,6 +33,33 @@ public class SubFaseDKdsE2ETest {
     @BeforeAll
     static void setUpServer() {
         PlaywrightE2ESupport.asegurarServidorActivo();
+        sembrarPedidosPendientesParaKds();
+    }
+
+    private static void sembrarPedidosPendientesParaKds() {
+        try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
+            APIRequestContext mozoReq = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "MOZO");
+            crearPedidoKds(mozoReq, "04", 1, "KDS E2E - Hamburguesa Royal");
+            crearPedidoKds(mozoReq, "06", 3, "KDS E2E - Alitas BBQ");
+            crearPedidoKds(mozoReq, "08", 2, "KDS E2E - Hamburguesa Clasica");
+            mozoReq.dispose();
+        }
+    }
+
+    private static void crearPedidoKds(APIRequestContext mozoReq, String mesa, int idProducto, String nota) {
+        APIResponse resp = mozoReq.post("/api/pedidos",
+                RequestOptions.create()
+                        .setHeader("Content-Type", "application/json")
+                        .setData(Map.of(
+                                "uuid_local", UUID.randomUUID().toString(),
+                                "numero_mesa", mesa,
+                                "items", List.of(
+                                        Map.of("id_producto", idProducto, "cantidad", 1, "notas", nota)
+                                )
+                        )));
+        assertTrue(resp.status() == 201 || resp.status() == 200,
+                "Debe crearse pedido real PENDIENTE para KDS en mesa " + mesa
+                        + "; recibido " + resp.status() + ": " + resp.text());
     }
 
     @AfterAll
@@ -93,7 +129,10 @@ public class SubFaseDKdsE2ETest {
             // 1. Iniciar preparación en la primera comanda pendiente
             Locator btnIniciar = page.locator("#colPendiente .btn-iniciar").first();
             assertNotNull(btnIniciar);
-            btnIniciar.click();
+            Response respIniciar = page.waitForResponse(
+                    r -> r.url().contains("/api/kds/items/") && "PATCH".equalsIgnoreCase(r.request().method()),
+                    btnIniciar::click);
+            assertEquals(200, respIniciar.status(), "PATCH a EN_PREPARACION debe responder 200 OK");
 
             // Esperar que la tarjeta se traslade a En Preparación
             page.waitForCondition(() -> page.locator("#colPreparacion .kds-card").count() > prepAntes);
@@ -103,7 +142,10 @@ public class SubFaseDKdsE2ETest {
             // 2. Marcar como 'Listo' en la columna de En Preparación
             int listosAntes = page.locator("#colListo .kds-card").count();
             Locator btnListo = page.locator("#colPreparacion .btn-listo").first();
-            btnListo.click();
+            Response respListo = page.waitForResponse(
+                    r -> r.url().contains("/api/kds/items/") && "PATCH".equalsIgnoreCase(r.request().method()),
+                    btnListo::click);
+            assertEquals(200, respListo.status(), "PATCH a LISTO debe responder 200 OK");
 
             page.waitForCondition(() -> page.locator("#colListo .kds-card").count() > listosAntes);
             assertTrue(page.locator("#colListo .kds-card").count() > listosAntes,
@@ -112,7 +154,10 @@ public class SubFaseDKdsE2ETest {
             // 3. Entregar al mozo (archivo de comanda)
             int listosParaEntregar = page.locator("#colListo .kds-card").count();
             Locator btnEntregar = page.locator("#colListo .btn-entregar").first();
-            btnEntregar.click();
+            Response respEntregar = page.waitForResponse(
+                    r -> r.url().contains("/api/kds/items/") && "PATCH".equalsIgnoreCase(r.request().method()),
+                    btnEntregar::click);
+            assertEquals(200, respEntregar.status(), "PATCH a ENTREGADO debe responder 200 OK");
 
             page.waitForCondition(() -> page.locator("#colListo .kds-card").count() < listosParaEntregar);
 

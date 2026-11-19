@@ -7,7 +7,6 @@ import com.foodcore.model.Venta;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,6 +16,7 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -154,28 +154,30 @@ public class VentaDAOImpl implements VentaDAO {
             throws SQLException {
         List<Venta> lista = new ArrayList<>();
         String filtro = textoBusqueda != null && !textoBusqueda.isBlank()
-                ? "%" + textoBusqueda.trim().toLowerCase() + "%" : null;
+                ? "%" + escaparLike(textoBusqueda.trim().toLowerCase(Locale.ROOT)) + "%" : null;
         String sql = "SELECT * FROM venta "
-                + "WHERE (? IS NULL OR DATE(fecha_hora) >= ?) "
-                + "  AND (? IS NULL OR DATE(fecha_hora) <= ?) "
-                + "  AND (? IS NULL OR CAST(id_venta AS CHAR) LIKE ? OR LOWER(metodo_pago) LIKE ? OR LOWER(estado) LIKE ?) "
+                + "WHERE (? IS NULL OR fecha_hora >= ?) "
+                + "  AND (? IS NULL OR fecha_hora < ?) "
+                + "  AND (? IS NULL OR CAST(id_venta AS CHAR) LIKE ? ESCAPE '\\\\' "
+                + "       OR LOWER(metodo_pago) LIKE ? ESCAPE '\\\\' "
+                + "       OR LOWER(estado) LIKE ? ESCAPE '\\\\') "
                 + "ORDER BY fecha_hora DESC, id_venta DESC LIMIT 200";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             if (desde != null) {
-                Date d = Date.valueOf(desde);
-                ps.setDate(1, d);
-                ps.setDate(2, d);
+                Timestamp tsDesde = Timestamp.valueOf(desde.atStartOfDay());
+                ps.setTimestamp(1, tsDesde);
+                ps.setTimestamp(2, tsDesde);
             } else {
-                ps.setNull(1, Types.DATE);
-                ps.setNull(2, Types.DATE);
+                ps.setNull(1, Types.TIMESTAMP);
+                ps.setNull(2, Types.TIMESTAMP);
             }
             if (hasta != null) {
-                Date h = Date.valueOf(hasta);
-                ps.setDate(3, h);
-                ps.setDate(4, h);
+                Timestamp tsHastaExcl = Timestamp.valueOf(hasta.plusDays(1).atStartOfDay());
+                ps.setTimestamp(3, tsHastaExcl);
+                ps.setTimestamp(4, tsHastaExcl);
             } else {
-                ps.setNull(3, Types.DATE);
-                ps.setNull(4, Types.DATE);
+                ps.setNull(3, Types.TIMESTAMP);
+                ps.setNull(4, Types.TIMESTAMP);
             }
             if (filtro != null) {
                 ps.setString(5, filtro);
@@ -197,11 +199,35 @@ public class VentaDAOImpl implements VentaDAO {
         return lista;
     }
 
+    private static String escaparLike(String valor) {
+        return valor
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+    }
+
     @Override
     public Optional<Venta> buscarVentaPorId(Connection conn, int idVenta) throws SQLException {
         String sql = "SELECT * FROM venta WHERE id_venta = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idVenta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearVentaCompleta(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<Venta> buscarPorIdempotencyKey(Connection conn, String idempotencyKey) throws SQLException {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return Optional.empty();
+        }
+        String sql = "SELECT * FROM venta WHERE idempotency_key = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, idempotencyKey.trim());
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapearVentaCompleta(rs));
@@ -306,44 +332,25 @@ public class VentaDAOImpl implements VentaDAO {
         v.setMontoRecibido(rs.getBigDecimal("monto_recibido"));
         v.setVuelto(rs.getBigDecimal("vuelto"));
         v.setEstado(rs.getString("estado"));
+        try {
+            v.setIdempotencyKey(rs.getString("idempotency_key"));
+        } catch (SQLException ignored) {
+            v.setIdempotencyKey(null);
+        }
         return v;
     }
 
     @Override
     public List<Venta> listarVentasDelDia(Connection conn) throws SQLException {
         List<Venta> lista = new ArrayList<>();
-        String sql = "SELECT * FROM venta WHERE DATE(fecha_hora) = CURRENT_DATE() ORDER BY fecha_hora DESC";
+        String sql = "SELECT * FROM venta "
+                + "WHERE fecha_hora >= CURRENT_DATE() "
+                + "  AND fecha_hora < DATE_ADD(CURRENT_DATE(), INTERVAL 1 DAY) "
+                + "ORDER BY fecha_hora DESC";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                Venta v = new Venta();
-                v.setIdVenta(rs.getInt("id_venta"));
-                int idPed = rs.getInt("id_pedido");
-                v.setIdPedido(rs.wasNull() ? null : idPed);
-                v.setIdCaja(rs.getInt("id_caja"));
-                v.setIdUsuario(rs.getInt("id_usuario"));
-                int idCli = rs.getInt("id_cliente");
-                v.setIdCliente(rs.wasNull() ? null : idCli);
-                Timestamp ts = rs.getTimestamp("fecha_hora");
-                if (ts != null) {
-                    v.setFechaHora(ts.toLocalDateTime());
-                }
-                v.setSubtotal(rs.getBigDecimal("subtotal"));
-                v.setIgv(rs.getBigDecimal("igv"));
-                v.setDescuento(rs.getBigDecimal("descuento"));
-                try {
-                    BigDecimal dp = rs.getBigDecimal("descuento_puntos");
-                    v.setDescuentoPuntos(dp != null ? dp : BigDecimal.ZERO);
-                } catch (SQLException ignored) {
-                    v.setDescuentoPuntos(BigDecimal.ZERO);
-                }
-                v.setTotal(rs.getBigDecimal("total"));
-                v.setMetodoPago(rs.getString("metodo_pago"));
-                v.setMontoRecibido(rs.getBigDecimal("monto_recibido"));
-                v.setVuelto(rs.getBigDecimal("vuelto"));
-                v.setEstado(rs.getString("estado"));
-                v.setIdempotencyKey(rs.getString("idempotency_key"));
-                lista.add(v);
+                lista.add(mapearVentaCompleta(rs));
             }
         }
         return lista;

@@ -7,33 +7,42 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 TARGET_JAR="${PROJECT_ROOT}/target/foodcore-erp.jar"
 DIST_DIR="${PROJECT_ROOT}/dist"
 DEB_FILE="${DIST_DIR}/FoodCoreERP-${APP_VERSION}.deb"
-JPACKAGE_IN="/var/tmp/foodcore_jpackage_in"
-JPACKAGE_OUT="/var/tmp/foodcore_jpackage_out"
 
 if [ ! -f "${TARGET_JAR}" ]; then
     echo "ERROR: No se encuentra ${TARGET_JAR}" >&2
     exit 1
 fi
 
-rm -rf "${JPACKAGE_IN}" "${JPACKAGE_OUT}"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/foodcore_jpackage.XXXXXX")"
+cleanup() {
+    rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT INT TERM
+
+JPACKAGE_IN="${WORK_DIR}/in"
+JPACKAGE_OUT="${WORK_DIR}/out"
 mkdir -p "${JPACKAGE_IN}/scripts" "${JPACKAGE_OUT}"
 cp "${TARGET_JAR}" "${JPACKAGE_IN}/foodcore-erp.jar"
 
 if [ -d "${PROJECT_ROOT}/pwa" ]; then
     cp -r "${PROJECT_ROOT}/pwa" "${JPACKAGE_IN}/pwa"
+    find "${JPACKAGE_IN}/pwa" -type f -name "*.cer" -delete
 fi
 if [ -f "${PROJECT_ROOT}/keystore.jks.example" ]; then
     cp "${PROJECT_ROOT}/keystore.jks.example" "${JPACKAGE_IN}/keystore.jks.example"
-fi
-if [ -f "${PROJECT_ROOT}/foodcore.cer" ]; then
-    cp "${PROJECT_ROOT}/foodcore.cer" "${JPACKAGE_IN}/foodcore.cer"
 fi
 if [ -f "${PROJECT_ROOT}/src/main/resources/application.properties" ]; then
     cp "${PROJECT_ROOT}/src/main/resources/application.properties" "${JPACKAGE_IN}/application.properties.example"
 fi
 
+# Copiar scripts operativos excluyendo semillas de prueba/demo y certificados de laboratorio
 for f in "${PROJECT_ROOT}/scripts"/*.sh "${PROJECT_ROOT}/scripts"/*.ps1 "${PROJECT_ROOT}/scripts"/*.sql; do
-    [ -e "$f" ] && cp "$f" "${JPACKAGE_IN}/scripts/"
+    [ -e "$f" ] || continue
+    base_name="$(basename "$f")"
+    if [ "${base_name}" = "seed_full_operational.sql" ]; then
+        continue
+    fi
+    cp "$f" "${JPACKAGE_IN}/scripts/"
 done
 
 jpackage --type deb \
@@ -51,8 +60,7 @@ jpackage --type deb \
 
 mkdir -p "${DIST_DIR}"
 rm -f "${DEB_FILE}"
-GENERATED_DEB=$(find "${JPACKAGE_OUT}" -maxdepth 1 -name "*.deb" | head -n 1)
+GENERATED_DEB="$(find "${JPACKAGE_OUT}" -maxdepth 1 -name "*.deb" | head -n 1)"
 cp "${GENERATED_DEB}" "${DEB_FILE}"
-rm -rf "${JPACKAGE_IN}" "${JPACKAGE_OUT}"
 
 echo "[OK] Paquete Debian jpackage ${APP_VERSION} (con JRE embebido) generado exitosamente: ${DEB_FILE}"

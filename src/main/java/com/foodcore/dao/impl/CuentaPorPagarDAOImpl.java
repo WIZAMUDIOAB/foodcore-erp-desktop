@@ -4,6 +4,8 @@ import com.foodcore.dao.CuentaPorPagarDAO;
 import com.foodcore.model.CuentaPorPagar;
 import com.foodcore.model.PagoProveedor;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -96,6 +98,24 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
     }
 
     @Override
+    public Optional<CuentaPorPagar> buscarPorIdParaActualizar(Connection conn, int idCuentaPagar) throws SQLException {
+        String sql = "SELECT cxp.*, p.razon_social AS razon_social_proveedor, p.ruc AS ruc_proveedor "
+                + "FROM cuenta_por_pagar cxp "
+                + "JOIN proveedor p ON cxp.id_proveedor = p.id_proveedor "
+                + "WHERE cxp.id_cuenta_pagar = ? FOR UPDATE";
+
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCuentaPagar);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapearCxp(rs));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public int insertar(Connection conn, CuentaPorPagar cxp) throws SQLException {
         String sql = "INSERT INTO cuenta_por_pagar (id_proveedor, numero_documento, fecha_emision, fecha_vencimiento, "
                 + "monto_total, monto_pagado, estado, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
@@ -104,8 +124,8 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
             ps.setString(2, cxp.getNumeroDocumento());
             ps.setDate(3, Date.valueOf(cxp.getFechaEmision()));
             ps.setDate(4, Date.valueOf(cxp.getFechaVencimiento()));
-            ps.setDouble(5, cxp.getMontoTotal());
-            ps.setDouble(6, cxp.getMontoPagado());
+            ps.setBigDecimal(5, BigDecimal.valueOf(cxp.getMontoTotal()).setScale(2, RoundingMode.HALF_UP));
+            ps.setBigDecimal(6, BigDecimal.valueOf(cxp.getMontoPagado()).setScale(2, RoundingMode.HALF_UP));
             ps.setString(7, cxp.getEstado());
             ps.setString(8, cxp.getObservaciones());
             ps.executeUpdate();
@@ -121,7 +141,32 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
 
     @Override
     public boolean registrarPago(Connection conn, PagoProveedor pago) throws SQLException {
-        // 1. Insertar detalle de pago
+        if (pago == null || Double.isNaN(pago.getMonto()) || Double.isInfinite(pago.getMonto()) || pago.getMonto() <= 0.0) {
+            return false;
+        }
+        BigDecimal montoPago = BigDecimal.valueOf(pago.getMonto()).setScale(2, RoundingMode.HALF_UP);
+
+        // 1. Actualizar monto_pagado y estado de forma atómica con guarda anti-sobrepago.
+        // En MySQL SET evalúa de izquierda a derecha: tras monto_pagado = monto_pagado + ?,
+        // la expresión CASE ya lee el nuevo monto_pagado (sin duplicar + ?).
+        String sqlUpdate = "UPDATE cuenta_por_pagar SET "
+                + "monto_pagado = monto_pagado + ?, "
+                + "estado = CASE WHEN (monto_total - monto_pagado) <= 0.001 THEN 'PAGADA' "
+                + "              WHEN fecha_vencimiento < CURRENT_DATE THEN 'VENCIDA' "
+                + "              ELSE 'PENDIENTE' END "
+                + "WHERE id_cuenta_pagar = ? AND (monto_pagado + ?) <= monto_total + 0.001";
+        int actualizados;
+        try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
+            ps.setBigDecimal(1, montoPago);
+            ps.setInt(2, pago.getIdCuentaPagar());
+            ps.setBigDecimal(3, montoPago);
+            actualizados = ps.executeUpdate();
+        }
+        if (actualizados <= 0) {
+            return false;
+        }
+
+        // 2. Insertar detalle de pago solo cuando la actualización con guarda fue aceptada
         String sqlPago = "INSERT INTO pago_proveedor (id_cuenta_pagar, id_caja, id_usuario, monto, metodo_pago, nota) "
                 + "VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sqlPago, Statement.RETURN_GENERATED_KEYS)) {
@@ -132,25 +177,12 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
                 ps.setNull(2, java.sql.Types.INTEGER);
             }
             ps.setInt(3, pago.getIdUsuario());
-            ps.setDouble(4, pago.getMonto());
+            ps.setBigDecimal(4, montoPago);
             ps.setString(5, pago.getMetodoPago());
             ps.setString(6, pago.getNota());
             ps.executeUpdate();
         }
-
-        // 2. Actualizar monto pagado y estado en cuenta_por_pagar
-        String sqlUpdate = "UPDATE cuenta_por_pagar SET "
-                + "monto_pagado = monto_pagado + ?, "
-                + "estado = CASE WHEN (monto_total - (monto_pagado + ?)) <= 0.001 THEN 'PAGADA' "
-                + "              WHEN fecha_vencimiento < CURRENT_DATE THEN 'VENCIDA' "
-                + "              ELSE 'PENDIENTE' END "
-                + "WHERE id_cuenta_pagar = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
-            ps.setDouble(1, pago.getMonto());
-            ps.setDouble(2, pago.getMonto());
-            ps.setInt(3, pago.getIdCuentaPagar());
-            return ps.executeUpdate() > 0;
-        }
+        return true;
     }
 
     @Override

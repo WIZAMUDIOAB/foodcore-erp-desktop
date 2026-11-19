@@ -4,14 +4,20 @@ import com.foodcore.api.security.TokenBlacklistService;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.dao.UsuarioDAOImpl;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.exception.CodigoError;
+import com.foodcore.exception.NegocioException;
+import com.foodcore.model.Usuario;
+import com.foodcore.model.enums.Permiso;
+import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.EncriptadorPassword;
+import com.foodcore.security.SesionManager;
+import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -20,17 +26,16 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.ContentDisplay;
-import javafx.scene.control.TableCell;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import java.util.Optional;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -38,6 +43,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -162,7 +168,7 @@ public class UsuariosController {
             () -> {
                 List<FilaUsuario> filas = new ArrayList<>();
                 String sql = "SELECT id_usuario, username, COALESCE(nombre_completo, username) AS nom, codigo_rol, "
-                    + "cambio_password_requerido, activo, pin, pin_hash, COALESCE(totp_habilitado, 0) AS totp_habilitado "
+                    + "cambio_password_requerido, activo, pin_hash, COALESCE(totp_habilitado, 0) AS totp_habilitado "
                     + "FROM usuario ORDER BY id_usuario ASC";
                 try (Connection conn = ConexionBD.getConnection();
                      PreparedStatement ps = conn.prepareStatement(sql);
@@ -175,8 +181,7 @@ public class UsuariosController {
                             rs.getString("codigo_rol"),
                             rs.getBoolean("cambio_password_requerido"),
                             rs.getBoolean("activo"),
-                            (rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank())
-                                    || (rs.getString("pin") != null && !rs.getString("pin").isBlank()),
+                            rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank(),
                             rs.getBoolean("totp_habilitado")
                         ));
                     }
@@ -191,10 +196,50 @@ public class UsuariosController {
     }
 
     /**
+     * Evalúa en modo fail-closed si el operador autenticado posee {@link Permiso#USUARIO_GESTIONAR}.
+     */
+    public static boolean tienePermisoGestionUsuarios() {
+        SesionUsuario sesion = SesionManager.getSesionActiva();
+        Usuario actual = AuthService.getUsuarioSesionActual();
+        if (actual != null) {
+            if (sesion != null && sesion.getIdUsuario() == actual.getIdUsuario()
+                    && actual.getNombreRol() != null
+                    && actual.getNombreRol().equalsIgnoreCase(sesion.getCodigoRol())) {
+                return sesion.tienePermiso(Permiso.USUARIO_GESTIONAR);
+            }
+            if (actual.getNombreRol() == null || actual.getNombreRol().isBlank()) {
+                return false;
+            }
+            return AutorizacionService.permisosPorDefectoParaRol(actual.getNombreRol())
+                    .contains(Permiso.USUARIO_GESTIONAR);
+        }
+        return sesion != null && sesion.tienePermiso(Permiso.USUARIO_GESTIONAR);
+    }
+
+    private void exigirPermisoGestionUsuarios() throws NegocioException {
+        if (!tienePermisoGestionUsuarios()) {
+            throw new NegocioException(
+                    CodigoError.ACCESO_DENEGADO,
+                    "Acceso denegado: Se requiere el permiso USUARIO_GESTIONAR para administrar usuarios.");
+        }
+    }
+
+    private static void validarPasswordTemporal(String passwordTemporal) throws NegocioException {
+        if (passwordTemporal == null || passwordTemporal.isBlank()
+                || !EncriptadorPassword.cumplePoliticaComplejidad(passwordTemporal)) {
+            throw new NegocioException(
+                    CodigoError.VALIDACION_ENTRADA,
+                    "Debe ingresar una contraseña temporal válida (mínimo 8 caracteres, mayúscula, minúscula y dígito).");
+        }
+    }
+
+    /**
      * Resetea la contraseña de un usuario forzando {@code cambio_password_requerido = 1} (§2.4).
      */
     public void resetearPasswordForzandoCambio(int idUsuario, String passwordTemporal) throws Exception {
-        String hash = encriptador.hashear(passwordTemporal != null && !passwordTemporal.isBlank() ? passwordTemporal : "Temporal#2026!");
+        exigirPermisoGestionUsuarios();
+        validarPasswordTemporal(passwordTemporal);
+        String hash = encriptador.hashear(passwordTemporal);
         String sql = "UPDATE usuario SET password_hash = ?, hash_password = ?, cambio_password_requerido = 1, "
             + "intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id_usuario = ?";
         try (Connection conn = ConexionBD.getConnection();
@@ -208,13 +253,23 @@ public class UsuariosController {
 
     @FXML
     public void handleCrearUsuario(ActionEvent event) {
+        if (!tienePermisoGestionUsuarios()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Acceso denegado: requiere permiso USUARIO_GESTIONAR.", true);
+            return;
+        }
         String user = txtUsername.getText() != null ? txtUsername.getText().trim() : "";
         String nom = txtNombreCompleto.getText() != null ? txtNombreCompleto.getText().trim() : user;
         String rol = cmbRol.getValue() != null ? cmbRol.getValue() : "CAJERO";
-        String pass = txtPasswordTemporal.getText() != null && !txtPasswordTemporal.getText().isBlank()
-            ? txtPasswordTemporal.getText() : "Temporal#2026!";
+        String pass = txtPasswordTemporal != null ? txtPasswordTemporal.getText() : null;
         if (user.isEmpty()) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Ingrese el username del usuario.", true);
+            return;
+        }
+        if (pass == null || pass.isBlank() || !EncriptadorPassword.cumplePoliticaComplejidad(pass)) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Ingrese una contraseña temporal válida (mínimo 8 caracteres, mayúscula, minúscula y dígito).",
+                    true);
             return;
         }
         int idRol = switch (rol) {
@@ -244,10 +299,11 @@ public class UsuariosController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
+                exigirPermisoGestionUsuarios();
                 String hash = encriptador.hashear(pass);
                 String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
-                    + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, sueldo_base, horario_laboral) "
-                    + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?) "
+                    + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, pin_hash, sueldo_base, horario_laboral) "
+                    + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, NULL, ?, ?) "
                     + "ON DUPLICATE KEY UPDATE nombre_completo = VALUES(nombre_completo), codigo_rol = VALUES(codigo_rol), activo = VALUES(activo), "
                     + "dni = VALUES(dni), sueldo_base = VALUES(sueldo_base), horario_laboral = VALUES(horario_laboral)";
                 try (Connection conn = ConexionBD.getConnection();
@@ -261,9 +317,8 @@ public class UsuariosController {
                     ps.setString(7, rol);
                     ps.setBoolean(8, activoSel);
                     ps.setString(9, dni);
-                    ps.setString(10, dni != null && dni.length() >= 4 ? dni.substring(dni.length() - 4) : "1234");
-                    ps.setBigDecimal(11, java.math.BigDecimal.valueOf(sueldoFinal));
-                    ps.setString(12, horario);
+                    ps.setBigDecimal(10, java.math.BigDecimal.valueOf(sueldoFinal));
+                    ps.setString(11, horario);
                     ps.executeUpdate();
                 }
             },
@@ -285,12 +340,23 @@ public class UsuariosController {
 
     @FXML
     public void handleResetearPassword(ActionEvent event) {
+        if (!tienePermisoGestionUsuarios()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Acceso denegado: requiere permiso USUARIO_GESTIONAR.", true);
+            return;
+        }
         FilaUsuario sel = tblUsuarios.getSelectionModel().getSelectedItem();
         if (sel == null) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario de la tabla.", true);
             return;
         }
-        String temp = txtPasswordTemporal.getText();
+        String temp = txtPasswordTemporal != null ? txtPasswordTemporal.getText() : null;
+        if (temp == null || temp.isBlank() || !EncriptadorPassword.cumplePoliticaComplejidad(temp)) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Ingrese una contraseña temporal válida (mínimo 8 caracteres, mayúscula, minúscula y dígito).",
+                    true);
+            return;
+        }
         if (btnResetearPassword != null) {
             btnResetearPassword.setDisable(true);
         }
@@ -314,6 +380,11 @@ public class UsuariosController {
 
     @FXML
     public void handleConfigurarPin(ActionEvent event) {
+        if (!tienePermisoGestionUsuarios()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Acceso denegado: requiere permiso USUARIO_GESTIONAR.", true);
+            return;
+        }
         FilaUsuario sel = tblUsuarios.getSelectionModel().getSelectedItem();
         if (sel == null) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario para configurar su PIN.", true);
@@ -321,7 +392,7 @@ public class UsuariosController {
         }
 
         Optional<String> res = DialogService.crearTextInputDialog(
-                "1234",
+                "",
                 "Configurar PIN Tablet",
                 "Configurar PIN de 4 a 6 dígitos para: " + sel.username(),
                 "Nuevo PIN numérico:").showAndWait();
@@ -355,13 +426,18 @@ public class UsuariosController {
     }
 
     public void actualizarPinUsuario(int idUsuario, String pin) throws Exception {
-        String hash = EncriptadorPassword.generarHash(pin);
-        String sql = "UPDATE usuario SET pin = ?, pin_hash = ? WHERE id_usuario = ?";
+        exigirPermisoGestionUsuarios();
+        if (pin == null || !pin.trim().matches("^\\d{4,6}$")) {
+            throw new NegocioException(
+                    CodigoError.VALIDACION_ENTRADA,
+                    "El PIN debe contener entre 4 y 6 dígitos numéricos.");
+        }
+        String hash = EncriptadorPassword.generarHash(pin.trim());
+        String sql = "UPDATE usuario SET pin = NULL, pin_hash = ? WHERE id_usuario = ?";
         try (Connection conn = ConexionBD.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, pin);
-            ps.setString(2, hash);
-            ps.setInt(3, idUsuario);
+            ps.setString(1, hash);
+            ps.setInt(2, idUsuario);
             ps.executeUpdate();
         }
     }
@@ -371,6 +447,11 @@ public class UsuariosController {
      */
     @FXML
     public void handleConfigurar2FA(ActionEvent event) {
+        if (!tienePermisoGestionUsuarios()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Acceso denegado: requiere permiso USUARIO_GESTIONAR.", true);
+            return;
+        }
         FilaUsuario sel = resolverUsuarioSeleccionadoOAdmin();
         if (sel == null) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario administrador para configurar 2FA.", true);
@@ -423,6 +504,10 @@ public class UsuariosController {
         if (usuario2faEnEdicion == null || secretoTemporal2fa == null) {
             return;
         }
+        if (!tienePermisoGestionUsuarios()) {
+            mostrarError2FA("Acceso denegado: requiere permiso USUARIO_GESTIONAR.");
+            return;
+        }
         String codigo = txtCodigoVerificacion2fa != null ? txtCodigoVerificacion2fa.getText() : "";
         if (!totpService.verificarCodigo(secretoTemporal2fa, codigo)) {
             mostrarError2FA("Código TOTP inválido. Verifique los 6 dígitos de su aplicación.");
@@ -437,6 +522,7 @@ public class UsuariosController {
         final String secretoFinal = secretoTemporal2fa;
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
+                exigirPermisoGestionUsuarios();
                 try (Connection conn = ConexionBD.getConnection()) {
                     usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, secretoFinal, true);
                     int actor = AuthService.getUsuarioSesionActual() != null
@@ -471,10 +557,15 @@ public class UsuariosController {
         if (usuario2faEnEdicion == null) {
             return;
         }
+        if (!tienePermisoGestionUsuarios()) {
+            mostrarError2FA("Acceso denegado: requiere permiso USUARIO_GESTIONAR.");
+            return;
+        }
         final int idObjetivo = usuario2faEnEdicion.idUsuario();
         final String usernameObj = usuario2faEnEdicion.username();
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
+                exigirPermisoGestionUsuarios();
                 try (Connection conn = ConexionBD.getConnection()) {
                     usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, null, false);
                     int actor = AuthService.getUsuarioSesionActual() != null
@@ -509,6 +600,11 @@ public class UsuariosController {
      */
     @FXML
     public void handleCerrarSesionRemota(ActionEvent event) {
+        if (!tienePermisoGestionUsuarios()) {
+            AnimationUtils.mostrarToast(rootUsuariosStack,
+                    "Acceso denegado: requiere permiso USUARIO_GESTIONAR.", true);
+            return;
+        }
         FilaUsuario sel = tblUsuarios != null ? tblUsuarios.getSelectionModel().getSelectedItem() : null;
         if (sel == null) {
             AnimationUtils.mostrarToast(rootUsuariosStack, "Seleccione un usuario para cerrar sus sesiones remotas.", true);
@@ -520,8 +616,11 @@ public class UsuariosController {
         int adminId = AuthService.getUsuarioSesionActual() != null
                 ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> tokenBlacklistService.forzarCierreSesionUsuario(
-                    sel.idUsuario(), adminId, "Cierre remoto desde Administración de Usuarios"),
+            () -> {
+                exigirPermisoGestionUsuarios();
+                tokenBlacklistService.forzarCierreSesionUsuario(
+                        sel.idUsuario(), adminId, "Cierre remoto desde Administración de Usuarios");
+            },
             () -> {
                 if (btnCerrarSesionRemota != null) {
                     btnCerrarSesionRemota.setDisable(false);

@@ -65,4 +65,73 @@
         <Class name="~com\.foodcore\.dao\.impl\.(CajaDAOImpl|InsumoDAOImpl|PedidoDAOImpl|UsuarioDAOImpl)"/>
         <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
     </Match>
+
+    <!-- Justificación FindSecBugs (Riesgo aceptado R1 / R-KDS-TLS-01 en docs/RISK_ACCEPTANCE.md): El canal TCP 9090 de KDS opera sin TLS en subred LAN cableada aislada con autenticación HELLO/AUTH_TERMINAL y firma HMAC-SHA256. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.util.ServidorSockets"/>
+        <Method name="~.*iniciar.*"/>
+        <Bug pattern="UNENCRYPTED_SERVER_SOCKET"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): Sonda TCP exclusivamente contra loopback (127.0.0.1) para verificar disponibilidad de puerto local sin intercambiar datos sensibles. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.service.SistemaMonitorService"/>
+        <Method name="puertoLocalAbierto"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo RFC 3207): Conexión TCP inicial SMTP en puerto 587 requerida por protocolo antes de negociar STARTTLS y actualizar a SSLSocket con validación de hostname HTTPS. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.service.AlertaService"/>
+        <Method name="abrirSocketSmtp"/>
+        <Bug pattern="UNENCRYPTED_SOCKET"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): Todos los campos dinámicos interpolados en construirMenuDigitalHtmlDinamico pasan previamente por escapeHtml() (&, <, >, "). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.service.MenuQrService"/>
+        <Method name="construirMenuDigitalHtmlDinamico"/>
+        <Bug pattern="POTENTIAL_XML_INJECTION"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): SqlQueryBuilder.buildInPlaceholders genera exclusivamente marcadores '?' separados por coma; los valores se vinculan vía PreparedStatement.setLong. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.dao.InsumoDAOImpl"/>
+        <Method name="lockearPorIds"/>
+        <Bug pattern="SQL_INJECTION_JDBC"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): eliminarDocumento valida confinamiento con rutaDoc.startsWith(baseAbs) tras normalize() y sanitizarNombreArchivo extrae getFileName() con lista blanca [^a-zA-Z0-9._-]. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl"/>
+        <Or>
+            <Method name="eliminarDocumento"/>
+            <Method name="sanitizarNombreArchivo"/>
+        </Or>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): El destino proviene directamente del FileChooser nativo del usuario de escritorio JavaFX y solo añade la extensión de exportación (.pdf/.xlsx/.csv). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.util.ExportFileChooserHelper"/>
+        <Method name="asegurarExtensionEnArchivo"/>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): La ruta por defecto del acta se construye únicamente con entero idCaja y timestamp LocalDateTime formateado (sin entrada textual de usuario). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.service.CajaService"/>
+        <Method name="cerrarTurnoConActaPdf"/>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
+
+    <!-- Justificación FindSecBugs (Falso positivo): Rutas de keystore y certificado X.509 provienen exclusivamente de variables de entorno de configuración de servidor del operador (FOODCORE_KEYSTORE_PATH / FOODCORE_CERT_PATH). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <Match>
+        <Class name="com.foodcore.api.ApiServer"/>
+        <Or>
+            <Method name="servirCertificadoSsl"/>
+            <Method name="obtenerSslContextFactory"/>
+        </Or>
+        <Bug pattern="PATH_TRAVERSAL_IN"/>
+    </Match>
 </FindBugsFilter>

@@ -171,18 +171,38 @@ public class PromocionService {
         return new ResultadoEvaluacion(descuentoTotal.setScale(2, RoundingMode.HALF_UP), totalFinal, aplicadas);
     }
 
-    private boolean aplicaDiaYHora(Promocion p, DayOfWeek dia, LocalTime hora) {
-        if (p.getDiasSemana() != null && !p.getDiasSemana().isBlank()) {
-            String diaAbrev = traducirDia(dia);
-            if (!p.getDiasSemana().toUpperCase().contains(diaAbrev)) {
+    boolean aplicaDiaYHora(Promocion p, DayOfWeek dia, LocalTime hora) {
+        if (p == null || dia == null || hora == null) {
+            return false;
+        }
+        LocalTime inicio = p.getHoraInicio();
+        LocalTime fin = p.getHoraFin();
+        DayOfWeek diaEfectivo = dia;
+
+        if (inicio != null && fin != null && fin.isBefore(inicio)) {
+            // Ventana nocturna que cruza medianoche (ej. 22:00 a 02:00)
+            boolean enTramoNocturno = !hora.isBefore(inicio);
+            boolean enTramoMadrugada = !hora.isAfter(fin);
+            if (!enTramoNocturno && !enTramoMadrugada) {
+                return false;
+            }
+            if (enTramoMadrugada) {
+                diaEfectivo = dia.minus(1);
+            }
+        } else {
+            if (inicio != null && hora.isBefore(inicio)) {
+                return false;
+            }
+            if (fin != null && hora.isAfter(fin)) {
                 return false;
             }
         }
-        if (p.getHoraInicio() != null && hora.isBefore(p.getHoraInicio())) {
-            return false;
-        }
-        if (p.getHoraFin() != null && hora.isAfter(p.getHoraFin())) {
-            return false;
+
+        if (p.getDiasSemana() != null && !p.getDiasSemana().isBlank()) {
+            String diaAbrev = traducirDia(diaEfectivo);
+            if (!p.getDiasSemana().toUpperCase(java.util.Locale.ROOT).contains(diaAbrev)) {
+                return false;
+            }
         }
         return true;
     }

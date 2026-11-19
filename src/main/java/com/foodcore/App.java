@@ -5,6 +5,7 @@ import com.foodcore.api.ApiServer;
 import com.foodcore.config.FlywayMigrator;
 import com.foodcore.config.LoggingBootstrap;
 import com.foodcore.controller.SplashController;
+import com.foodcore.offline.SyncWorker;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
@@ -48,6 +49,7 @@ public class App extends Application {
     @Override
     public void start(Stage stage) {
         LoggingBootstrap.installBridge();
+        registrarManejadorExcepcionesNoCapturadas();
         setPrimaryStage(stage);
         registrarShutdownHookUnaVez();
         stage.setOnCloseRequest(event -> detenerServiciosAplicacion());
@@ -383,6 +385,16 @@ public class App extends Application {
         return primaryStage;
     }
 
+    public static void registrarManejadorExcepcionesNoCapturadas() {
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
+            LOGGER.log(
+                Level.SEVERE,
+                "Excepción no capturada en hilo " + (thread != null ? thread.getName() : "desconocido"),
+                throwable
+            )
+        );
+    }
+
     public static void registrarShutdownHookUnaVez() {
         if (SHUTDOWN_HOOK_REGISTRADO.compareAndSet(false, true)) {
             Runtime.getRuntime().addShutdownHook(
@@ -392,10 +404,15 @@ public class App extends Application {
     }
 
     /**
-     * Detiene de forma ordenada e idempotente el túnel externo, la API HTTP/HTTPS (8080/8443)
-     * y el servidor TCP KDS (9090) para liberar todos los puertos al cerrar la aplicación.
+     * Detiene de forma ordenada e idempotente SyncWorker, el túnel externo, la API HTTP/HTTPS (8080/8443),
+     * el servidor TCP KDS (9090), el pool asíncrono UI y el pool HikariCP al cerrar la aplicación.
      */
     public static void detenerServiciosAplicacion() {
+        try {
+            SyncWorker.getInstancia().detenerServicioSyncPeriodico();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al detener SyncWorker durante el cierre", e);
+        }
         try {
             com.foodcore.service.TunnelService.detener();
         } catch (Exception e) {
@@ -411,6 +428,16 @@ public class App extends Application {
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Aviso al detener ServidorSockets durante el cierre", e);
         }
+        try {
+            UiAsyncExecutor.shutdown();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al detener UiAsyncExecutor durante el cierre", e);
+        }
+        try {
+            ConexionBD.closePool();
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Aviso al cerrar pool HikariCP durante el cierre", e);
+        }
     }
 
     @Override
@@ -420,6 +447,7 @@ public class App extends Application {
     }
 
     public static void main(String[] args) {
+        registrarManejadorExcepcionesNoCapturadas();
         launch(args);
     }
 }

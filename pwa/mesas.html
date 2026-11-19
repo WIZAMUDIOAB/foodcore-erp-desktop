@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#F9F7F4" />
-  <title>FoodCore ERP v5.4 — Selección de Mesa</title>
+  <title>FoodCore ERP v5.7 — Selección de Mesa</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -37,7 +37,7 @@
       <button type="button" id="btnThemeToggle" class="btn-theme-toggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </button>
-      <a href="index.html" class="btn-touch btn-secondary btn-compact-nav">Cambiar Operador</a>
+      <button type="button" id="btnCerrarSesionPwa" class="btn-touch btn-secondary btn-compact-nav">Cerrar Sesión</button>
     </div>
   </header>
 
@@ -48,12 +48,12 @@
         <p class="section-subtitle">Toque una mesa para abrir o adicionar platos a la comanda</p>
       </div>
       <div class="filter-pills">
-        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('TODAS')">Todas (12)</button>
-        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('LIBRE')">
+        <button type="button" class="btn-touch btn-secondary" data-filter-mesas="TODAS">Todas (12)</button>
+        <button type="button" class="btn-touch btn-secondary" data-filter-mesas="LIBRE">
           <span class="status-indicator-dot success"></span>
           <span>Libres</span>
         </button>
-        <button type="button" class="btn-touch btn-secondary" onclick="FoodCorePWA.cargarMesas('OCUPADA')">
+        <button type="button" class="btn-touch btn-secondary" data-filter-mesas="OCUPADA">
           <span class="status-indicator-dot brand"></span>
           <span>Ocupadas</span>
         </button>

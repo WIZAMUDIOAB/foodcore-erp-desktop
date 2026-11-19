@@ -57,9 +57,13 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * Controlador de Gestión de Menú y Fotografías según SPEC-FOODCORE-v1.2 (§2.2):
@@ -217,8 +221,9 @@ public class MenuController {
                     setText(null);
                     return;
                 }
-                if (item != null && !item.isBlank() && new File(item).exists()) {
-                    Image img = new Image(new File(item).toURI().toString(), 44, 34, true, true);
+                Path rutaSegura = resolverImagenPlatilloSegura(item);
+                if (rutaSegura != null) {
+                    Image img = new Image(rutaSegura.toUri().toString(), 44, 34, true, true);
                     ImageView iv = new ImageView(img);
                     iv.setFitWidth(44);
                     iv.setFitHeight(34);
@@ -486,12 +491,62 @@ public class MenuController {
         }
     }
 
+    /**
+     * Resuelve de forma confinada una imagen de platillo estrictamente dentro de {@code uploads/platillos},
+     * enumerando entradas reales del directorio para rechazar path traversal ({@code ..}), symlinks externos
+     * o extensiones no permitidas.
+     */
+    public static Path resolverImagenPlatilloSegura(String imagenUrl) {
+        if (imagenUrl == null || imagenUrl.isBlank()) {
+            return null;
+        }
+        String limpio = imagenUrl.trim().replace('\\', '/');
+        if (limpio.startsWith("/")) {
+            limpio = limpio.substring(1);
+        }
+        String nombreArchivo;
+        if (limpio.startsWith("uploads/platillos/")) {
+            nombreArchivo = limpio.substring("uploads/platillos/".length());
+        } else if (!limpio.contains("/")) {
+            nombreArchivo = limpio;
+        } else {
+            return null;
+        }
+        if (nombreArchivo.contains("..")
+                || !nombreArchivo.matches("^[A-Za-z0-9._-]+\\.(?i)(png|jpg|jpeg|webp)$")) {
+            return null;
+        }
+        try {
+            Path baseDir = DIRECTORIO_UPLOADS.toAbsolutePath().normalize();
+            if (!Files.isDirectory(baseDir)) {
+                return null;
+            }
+            Path baseReal = baseDir.toRealPath();
+            try (Stream<Path> entradas = Files.list(baseReal)) {
+                Optional<Path> match = entradas
+                        .filter(p -> p.getFileName() != null && p.getFileName().toString().equals(nombreArchivo))
+                        .filter(Files::isRegularFile)
+                        .findFirst();
+                if (match.isEmpty()) {
+                    return null;
+                }
+                Path candidatoReal = match.get().toRealPath();
+                return candidatoReal.startsWith(baseReal) ? candidatoReal : null;
+            }
+        } catch (IOException ex) {
+            LOGGER.log(Level.FINE, "Imagen de platillo fuera de directorio permitido o inaccesible", ex);
+            return null;
+        }
+    }
+
     private void actualizarVistaPreviaImagen(String rutaRelativa) {
         if (rutaRelativa != null && !rutaRelativa.isBlank()) {
             lblRutaImagen.setText(rutaRelativa);
-            File f = new File(rutaRelativa);
-            if (f.exists() && imgPreview != null) {
-                imgPreview.setImage(new Image(f.toURI().toString(), 72, 56, true, true));
+            Path rutaSegura = resolverImagenPlatilloSegura(rutaRelativa);
+            if (rutaSegura != null && imgPreview != null) {
+                imgPreview.setImage(new Image(rutaSegura.toUri().toString(), 72, 56, true, true));
+            } else if (imgPreview != null) {
+                imgPreview.setImage(null);
             }
         } else {
             lblRutaImagen.setText("Sin imagen seleccionada");
@@ -501,18 +556,47 @@ public class MenuController {
         }
     }
 
+    private static String resolverExtensionImagenSegura(String nombreArchivo) {
+        if (nombreArchivo == null) {
+            return null;
+        }
+        String lower = nombreArchivo.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png")) {
+            return ".png";
+        }
+        if (lower.endsWith(".jpg")) {
+            return ".jpg";
+        }
+        if (lower.endsWith(".jpeg")) {
+            return ".jpeg";
+        }
+        if (lower.endsWith(".webp")) {
+            return ".webp";
+        }
+        return null;
+    }
+
     /**
-     * Copia un archivo de imagen hacia {@code uploads/platillos/} y devuelve la ruta relativa normalizada (§2.2).
+     * Copia un archivo de imagen hacia {@code uploads/platillos/} con nombre aleatorio seguro
+     * y devuelve la ruta relativa normalizada (§2.2).
      */
     public String copiarImagenAUploads(File archivoOrigen) throws IOException {
-        if (archivoOrigen == null || !archivoOrigen.exists()) {
+        if (archivoOrigen == null || !archivoOrigen.exists() || !archivoOrigen.isFile()) {
             throw new IOException("El archivo de imagen seleccionado no existe.");
         }
+        String extSegura = resolverExtensionImagenSegura(archivoOrigen.getName());
+        if (extSegura == null) {
+            throw new IOException("Formato de imagen no permitido. Use PNG, JPG, JPEG o WEBP.");
+        }
         Files.createDirectories(DIRECTORIO_UPLOADS);
-        String nombreLimpio = archivoOrigen.getName().replaceAll("[^a-zA-Z0-9._-]", "_");
-        Path destino = DIRECTORIO_UPLOADS.resolve(nombreLimpio);
+        Path baseReal = DIRECTORIO_UPLOADS.toAbsolutePath().normalize().toRealPath();
+        String nombreSeguro = "platillo_" + UUID.randomUUID() + extSegura;
+        Path destino = baseReal.resolve(nombreSeguro).normalize();
+        if (!destino.startsWith(baseReal)) {
+            throw new IOException("Ruta destino fuera del directorio permitido de platillos.");
+        }
         Files.copy(archivoOrigen.toPath(), destino, StandardCopyOption.REPLACE_EXISTING);
-        String rutaRelativa = "uploads/platillos/" + nombreLimpio;
+        String rutaRelativa = "uploads/platillos/" + nombreSeguro;
         this.rutaImagenRelativaActual = rutaRelativa;
         actualizarVistaPreviaImagen(rutaRelativa);
         return rutaRelativa;

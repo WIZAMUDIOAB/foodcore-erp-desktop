@@ -12,6 +12,7 @@ permissions:
 jobs:
   e2e-testing:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       mysql:
         image: mysql:8.0.36
@@ -41,16 +42,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: '24'
-
       - name: Provision Least-Privilege MySQL Accounts (DDL vs DML)
+        timeout-minutes: 5
         env:
           CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
         run: |
-          if [ -z "$CI_MYSQL_ROOT_PASSWORD" ]; then
+          set -euo pipefail
+          if [ -z "${CI_MYSQL_ROOT_PASSWORD}" ]; then
             echo "::error::Secret CI_MYSQL_ROOT_PASSWORD is required."
             exit 1
           fi
@@ -64,17 +62,31 @@ jobs:
           echo "FOODCORE_MIGRATOR_PASS=$MIGRATOR_PASS" >> "$GITHUB_ENV"
           echo "FOODCORE_DB_PASS=$APP_PASS" >> "$GITHUB_ENV"
 
-          mysql --host=127.0.0.1 --port=3306 --ssl-mode=REQUIRED -u root -p"$CI_MYSQL_ROOT_PASSWORD" <<SQL
-          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'%' IDENTIFIED BY '${MIGRATOR_PASS}';
-          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'127.0.0.1' IDENTIFIED BY '${MIGRATOR_PASS}';
-          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'localhost' IDENTIFIED BY '${MIGRATOR_PASS}';
+          MYSQL_CNF=""
+          cleanup_cnf() {
+            if [ -n "${MYSQL_CNF}" ] && [ -f "${MYSQL_CNF}" ]; then
+              rm -f "${MYSQL_CNF}"
+            fi
+          }
+          trap cleanup_cnf EXIT INT TERM
+          OLD_UMASK="$(umask)"
+          umask 077
+          MYSQL_CNF="$(mktemp "${RUNNER_TEMP}/ci_mysql_root_XXXXXX.cnf")"
+          umask "${OLD_UMASK}"
+          chmod 600 "${MYSQL_CNF}"
+          printf '[client]\nuser="root"\npassword="%s"\n' "${CI_MYSQL_ROOT_PASSWORD//\"/\\\"}" > "${MYSQL_CNF}"
+
+          mysql --defaults-extra-file="${MYSQL_CNF}" --host=127.0.0.1 --port=3306 --ssl-mode=REQUIRED <<SQL
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'%' IDENTIFIED BY '${MIGRATOR_PASS}' REQUIRE SSL;
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'127.0.0.1' IDENTIFIED BY '${MIGRATOR_PASS}' REQUIRE SSL;
+          CREATE USER IF NOT EXISTS 'foodcore_migrator'@'localhost' IDENTIFIED BY '${MIGRATOR_PASS}' REQUIRE SSL;
           GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'%' WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'127.0.0.1' WITH GRANT OPTION;
           GRANT ALL PRIVILEGES ON foodcore_test.* TO 'foodcore_migrator'@'localhost' WITH GRANT OPTION;
 
-          CREATE USER IF NOT EXISTS 'foodcore_app'@'%' IDENTIFIED BY '${APP_PASS}';
-          CREATE USER IF NOT EXISTS 'foodcore_app'@'127.0.0.1' IDENTIFIED BY '${APP_PASS}';
-          CREATE USER IF NOT EXISTS 'foodcore_app'@'localhost' IDENTIFIED BY '${APP_PASS}';
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'%' IDENTIFIED BY '${APP_PASS}' REQUIRE SSL;
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'127.0.0.1' IDENTIFIED BY '${APP_PASS}' REQUIRE SSL;
+          CREATE USER IF NOT EXISTS 'foodcore_app'@'localhost' IDENTIFIED BY '${APP_PASS}' REQUIRE SSL;
           GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'%';
           GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'127.0.0.1';
           GRANT SELECT, INSERT, UPDATE, DELETE ON foodcore_test.* TO 'foodcore_app'@'localhost';
@@ -82,14 +94,16 @@ jobs:
           SQL
 
       - name: Prepare Database with Flyway
-        run: |
-          mvn compile flyway:migrate \
-            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
-            -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
-            -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
+        timeout-minutes: 5
+        env:
+          FLYWAY_URL: jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima
+          FLYWAY_USER: ${{ env.FOODCORE_MIGRATOR_USER }}
+          FLYWAY_PASSWORD: ${{ env.FOODCORE_MIGRATOR_PASS }}
+        run: mvn -B compile flyway:migrate
 
       - name: Install Playwright Browsers
-        run: mvn test-compile exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
+        timeout-minutes: 10
+        run: mvn -B test-compile exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium"
 
       - name: Quality Gate (Maven Verify — Unit, Integration, E2E, Checkstyle, SpotBugs, OWASP)
         timeout-minutes: 20
@@ -101,7 +115,7 @@ jobs:
           if [ -n "${NVD_API_KEY:-}" ]; then
             DC_ARGS="-DnvdApiKey=${NVD_API_KEY}"
           fi
-          mvn clean verify \
+          mvn -B clean verify \
             -DreuseForks=false \
             -DforkCount=1 \
             -Dtestfx.headless=true \
@@ -115,18 +129,21 @@ jobs:
 
       - name: Coverage Gate
         timeout-minutes: 5
-        run: mvn jacoco:check@jacoco-check
+        run: mvn -B jacoco:check@jacoco-check
 
       - name: Reset Database with Flyway for Standalone E2E Server
-        run: |
-          mvn -B flyway:clean flyway:migrate \
-            -Dflyway.cleanDisabled=false \
-            -Dflyway.url="jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima" \
-            -Dflyway.user="$FOODCORE_MIGRATOR_USER" \
-            -Dflyway.password="$FOODCORE_MIGRATOR_PASS"
+        timeout-minutes: 5
+        env:
+          FLYWAY_URL: jdbc:mysql://127.0.0.1:3306/foodcore_test?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=America/Lima
+          FLYWAY_USER: ${{ env.FOODCORE_MIGRATOR_USER }}
+          FLYWAY_PASSWORD: ${{ env.FOODCORE_MIGRATOR_PASS }}
+          FLYWAY_CLEAN_DISABLED: "false"
+        run: mvn -B flyway:clean flyway:migrate
 
       - name: Start FoodCore Server (Javalin)
+        timeout-minutes: 5
         run: |
+          set -euo pipefail
           OFFLINE_KEY="$(openssl rand -hex 32)"
           JWT_KEY="$(openssl rand -hex 32)"
           KS_PASS="$(openssl rand -hex 16)"
@@ -135,13 +152,14 @@ jobs:
           echo "::add-mask::$OFFLINE_KEY"
           echo "::add-mask::$JWT_KEY"
           echo "::add-mask::$KS_PASS"
+          export KS_PASS
           keytool -genkeypair -noprompt \
             -alias foodcore -keyalg RSA -keysize 2048 -storetype PKCS12 -validity 2 \
-            -keystore "$KS_PATH" -storepass "$KS_PASS" -keypass "$KS_PASS" \
+            -keystore "$KS_PATH" -storepass:env KS_PASS -keypass:env KS_PASS \
             -dname "CN=localhost, OU=FoodCore-CI, O=FoodCore, L=Lima, C=PE" \
             -ext "SAN=DNS:localhost,IP:127.0.0.1"
           keytool -exportcert -noprompt \
-            -alias foodcore -keystore "$KS_PATH" -storepass "$KS_PASS" -file "$CERT_PATH"
+            -alias foodcore -keystore "$KS_PATH" -storepass:env KS_PASS -file "$CERT_PATH"
           if [ ! -f target/foodcore-erp.jar ]; then
             mvn -B package -DskipTests
           fi
@@ -149,15 +167,30 @@ jobs:
             FOODCORE_KEYSTORE_PASS="$KS_PASS" FOODCORE_KEYSTORE_PATH="$KS_PATH" FOODCORE_CERT_PATH="$CERT_PATH" \
             SPRING_PROFILES_ACTIVE="e2e-test" \
             nohup java -Dspring.profiles.active=e2e-test -Dsecurity.auth.rateLimit.max=200 -jar target/foodcore-erp.jar > target/foodcore-server.log 2>&1 &
-          echo "SERVER_PID=$!" >> "$GITHUB_ENV"
-          npx --yes wait-on http://127.0.0.1:8080/health --timeout 60000
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              echo "[OK] FoodCore server healthy on attempt ${i}"
+              exit 0
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::FoodCore server process exited unexpectedly during startup."
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "::error::FoodCore server did not respond healthy on http://127.0.0.1:8080/health within 60s."
+          exit 1
 
       - name: Run E2E Tests (Playwright)
         timeout-minutes: 10
-        run: mvn test -Dtest="*E2ETest" -DreuseForks=false -DforkCount=1
+        run: mvn -B test -Dtest="*E2ETest" -DreuseForks=false -DforkCount=1
 
       - name: Stop FoodCore Server
         if: always()
+        timeout-minutes: 2
         run: |
           if [ -n "${SERVER_PID:-}" ]; then
             kill "$SERVER_PID" || true
@@ -165,6 +198,7 @@ jobs:
 
       - name: Show Server Log on Failure
         if: failure()
+        timeout-minutes: 2
         run: |
           if [ -f target/foodcore-server.log ]; then
             cat target/foodcore-server.log
@@ -174,6 +208,7 @@ jobs:
 
       - name: Upload Playwright Report & Screenshots
         if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-evidence

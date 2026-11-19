@@ -18,6 +18,7 @@ public interface CajaDAO {
     void cerrarCaja(Connection conn, int idCaja, int idUsuarioCierre, BigDecimal saldoFinalTeorico, BigDecimal saldoFinalContado, BigDecimal diferencia) throws SQLException;
     void registrarMovimiento(Connection conn, MovimientoCaja mov) throws SQLException;
     BigDecimal calcularTotalVentasTurno(Connection conn, int idCaja) throws SQLException;
+    BigDecimal calcularTotalIngresosEfectivoTurno(Connection conn, int idCaja) throws SQLException;
     BigDecimal calcularTotalGastosTurno(Connection conn, int idCaja) throws SQLException;
     Map<String, BigDecimal> obtenerTotalesPorMedioPago(Connection conn, int idCaja) throws SQLException;
     List<CategoriaGasto> listarCategoriasGastoActivas(Connection conn) throws SQLException;

@@ -120,9 +120,13 @@ class SpecFoodcoreV20Subfase4BTest {
             assertEquals("PRESENTE", abierta.get().getEstado());
         }
 
-        // Segundo marcaje para el mismo colaborador: debe ser SALIDA
-        AsistenciaService.ResultadoMarcaje resSalida = asistenciaService.registrarMarcajeKiosco("1001"); // PIN de admin
-        assertTrue(resSalida.isExitoso(), "El segundo marcaje debe procesar la salida");
+        // El PIN administrativo heredado ("1001") debe rechazarse tras hardening V25 (pin=NULL + bloqueo PIN ADMIN)
+        AsistenciaService.ResultadoMarcaje resPinAdmin = asistenciaService.registrarMarcajeKiosco("1001");
+        assertFalse(resPinAdmin.isExitoso(), "El PIN de administrador no debe permitir marcaje en kiosco");
+
+        // Segundo marcaje para el mismo colaborador vía DNI: debe ser SALIDA
+        AsistenciaService.ResultadoMarcaje resSalida = asistenciaService.registrarMarcajeKiosco("45892147");
+        assertTrue(resSalida.isExitoso(), "El segundo marcaje por DNI debe procesar la salida");
         assertEquals("SALIDA", resSalida.getTipo(), "Debe registrarse como tipo SALIDA");
         assertEquals("FINALIZADO", resSalida.getAsistencia().getEstado());
     }

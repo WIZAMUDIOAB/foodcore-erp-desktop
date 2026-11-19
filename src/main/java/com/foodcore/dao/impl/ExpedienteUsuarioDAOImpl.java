@@ -34,13 +34,18 @@ public class ExpedienteUsuarioDAOImpl implements ExpedienteUsuarioDAO {
                     + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
                     + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado ";
 
+    private static final String SQL_LISTAR_TODOS =
+            SELECT_BASE + "ORDER BY empleado_nombre ASC, u.id_usuario ASC";
+
+    private static final String SQL_LISTAR_ACTIVOS =
+            SELECT_BASE + "WHERE u.activo = 1 ORDER BY empleado_nombre ASC, u.id_usuario ASC";
+
     @Override
     public List<Usuario> listarTodos(Connection conn, boolean soloActivos) throws SQLException {
-        String sql = SELECT_BASE
-                + (soloActivos ? "WHERE u.activo = 1 " : "")
-                + "ORDER BY empleado_nombre ASC, u.id_usuario ASC";
         List<Usuario> lista = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql);
+        try (PreparedStatement ps = soloActivos
+                ? conn.prepareStatement(SQL_LISTAR_ACTIVOS)
+                : conn.prepareStatement(SQL_LISTAR_TODOS);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 lista.add(mapear(rs));

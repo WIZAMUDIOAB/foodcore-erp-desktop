@@ -11,27 +11,33 @@ import com.foodcore.util.ConexionBD;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class AnalisisMermasService {
 
-    private static final Logger LOGGER = Logger.getLogger(AnalisisMermasService.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     private final MermaDAO mermaDAO;
     private final InsumoDAO insumoDAO;
+    private final CierreContableService cierreContableService;
 
     public AnalisisMermasService() {
-        this(new MermaDAOImpl(), new InsumoDAOImpl());
+        this(new MermaDAOImpl(), new InsumoDAOImpl(), new CierreContableService());
     }
 
     public AnalisisMermasService(MermaDAO mermaDAO, InsumoDAO insumoDAO) {
+        this(mermaDAO, insumoDAO, new CierreContableService());
+    }
+
+    public AnalisisMermasService(MermaDAO mermaDAO, InsumoDAO insumoDAO, CierreContableService cierreContableService) {
         this.mermaDAO = mermaDAO;
         this.insumoDAO = insumoDAO;
+        this.cierreContableService = cierreContableService != null ? cierreContableService : new CierreContableService();
     }
 
     public int registrarMerma(long idInsumo, int idUsuario, BigDecimal cantidad, String motivo, String observacion) throws Exception {
@@ -45,9 +51,13 @@ public class AnalisisMermasService {
         try (Connection conn = ConexionBD.getConnection()) {
             conn.setAutoCommit(false);
             try {
+                cierreContableService.validarPeriodoAbierto(conn, LocalDate.now(ZONA_LIMA));
+
                 Insumo ins = insumoDAO.obtenerPorId(conn, idInsumo);
-                BigDecimal costoUnit = ins != null && ins.getCostoUnitario() != null
-                        ? ins.getCostoUnitario() : BigDecimal.ZERO;
+                if (ins == null) {
+                    throw new IllegalArgumentException("No se encontró el insumo #" + idInsumo);
+                }
+                BigDecimal costoUnit = ins.getCostoUnitario() != null ? ins.getCostoUnitario() : BigDecimal.ZERO;
                 BigDecimal costoTotal = cantidad.multiply(costoUnit);
 
                 Merma m = new Merma();
@@ -58,18 +68,14 @@ public class AnalisisMermasService {
                 m.setCostoUnitario(costoUnit);
                 m.setCostoTotal(costoTotal);
                 m.setObservacion(observacion);
-                m.setFechaHora(LocalDateTime.now());
+                m.setFechaHora(LocalDateTime.now(ZONA_LIMA));
 
                 int idMerma = mermaDAO.registrarMerma(conn, m);
 
-                // Descuento atómico de stock e inserción en kardex
-                try {
-                    insumoDAO.registrarMovimientoKardexAtomico(
-                            conn, idInsumo, "MERMA", cantidad, idUsuario > 0 ? idUsuario : 1,
-                            "Merma (" + motivo + "): " + (observacion != null ? observacion : ""));
-                } catch (Exception exKardex) {
-                    LOGGER.log(Level.FINE, "No se pudo actualizar kardex directamente, continuando merma", exKardex);
-                }
+                // Descuento atómico de stock e inserción en kardex — cualquier fallo revierte toda la transacción
+                insumoDAO.registrarMovimientoKardexAtomico(
+                        conn, idInsumo, "MERMA", cantidad, idUsuario > 0 ? idUsuario : 1,
+                        "Merma (" + m.getMotivo() + "): " + (observacion != null ? observacion : ""));
 
                 conn.commit();
                 return idMerma;

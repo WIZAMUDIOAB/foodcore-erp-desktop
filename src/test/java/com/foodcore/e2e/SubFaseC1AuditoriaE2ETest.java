@@ -95,7 +95,7 @@ public class SubFaseC1AuditoriaE2ETest {
     @DisplayName("Sub-Fase C.1: API — POST /api/pedidos registra y audita 'id_usuario_creador'")
     void testCrearPedidoAuditaUsuarioCreador() throws Exception {
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
-            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "ADMIN");
+            APIRequestContext request = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "MOZO");
 
             String uuidPedido = UUID.randomUUID().toString();
             Map<String, Object> payload = Map.of(
