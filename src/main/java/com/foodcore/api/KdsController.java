@@ -67,6 +67,10 @@ public class KdsController {
                         itemsPorPedido.computeIfAbsent(dp.getIdPedido(), k -> new ArrayList<>()).add(dp);
                     }
                     for (Pedido p : pedidos) {
+                        List<DetallePedido> detalles = itemsPorPedido.getOrDefault(p.getIdPedido(), List.of());
+                        if (detalles.isEmpty()) {
+                            continue;
+                        }
                         ObjectNode pNode = root.addObject();
                         pNode.put("id_pedido", p.getIdPedido());
                         pNode.put("uuid", p.getIdempotencyKey());
@@ -78,7 +82,6 @@ public class KdsController {
                         pNode.put("creado_en", p.getFechaHora() != null ? p.getFechaHora().toString() : Instant.now().toString());
 
                         ArrayNode itemsArr = pNode.putArray("items");
-                        List<DetallePedido> detalles = itemsPorPedido.getOrDefault(p.getIdPedido(), List.of());
                         for (DetallePedido dp : detalles) {
                             ObjectNode itemNode = itemsArr.addObject();
                             itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
