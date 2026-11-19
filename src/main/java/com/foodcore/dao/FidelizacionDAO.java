@@ -18,8 +18,13 @@ public interface FidelizacionDAO {
     List<CompraClienteResumen> listarUltimasComprasCliente(Connection conn, int idCliente, int limite) throws SQLException;
     int obtenerPuntosActuales(Connection conn, int idCliente) throws SQLException;
     boolean actualizarPuntosCliente(Connection conn, int idCliente, int nuevosPuntos) throws SQLException;
+    boolean descontarPuntosAtomico(Connection conn, int idCliente, int puntosADescontar) throws SQLException;
+    boolean acreditarPuntosAtomico(Connection conn, int idCliente, int deltaPuntos) throws SQLException;
+    int obtenerPuntosNetosPorVenta(Connection conn, int idCliente, int idVenta) throws SQLException;
+    int obtenerPuntosGanadosNetosPorVenta(Connection conn, int idCliente, int idVenta) throws SQLException;
     Optional<CuponCumpleanos> buscarCuponCumpleanosActivo(Connection conn, int idCliente, int mesActual) throws SQLException;
     int generarCuponCumpleanos(Connection conn, CuponCumpleanos cupon) throws SQLException;
     boolean marcarCuponUsado(Connection conn, String codigoCupon) throws SQLException;
+    boolean marcarCuponUsado(Connection conn, String codigoCupon, int idCliente) throws SQLException;
     Optional<CuponCumpleanos> buscarCuponPorCodigo(Connection conn, String codigoCupon) throws SQLException;
 }

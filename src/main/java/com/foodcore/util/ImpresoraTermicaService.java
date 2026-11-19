@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -37,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Servicio de formateo e impresión térmica ESC/POS de 80 mm (48 columnas)
@@ -45,6 +47,8 @@ import java.util.logging.Logger;
 public class ImpresoraTermicaService {
 
     private static final Logger LOGGER = Logger.getLogger(ImpresoraTermicaService.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x1F\\x7F]");
 
     public static final int ANCHO_COLUMNAS = 48;
     private static final byte[] ESC_POS_INIT = new byte[]{0x1B, 0x40};
@@ -114,20 +118,21 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_SIMPLE);
 
         String tipoDoc = (comprobante != null && comprobante.getTipoComprobante() != null)
-            ? comprobante.getTipoComprobante() : "TICKET";
+            ? sanitizarTextoEscPos(comprobante.getTipoComprobante()) : "TICKET";
         String serieCorr = (comprobante != null && comprobante.getSerie() != null && comprobante.getCorrelativo() != null)
-            ? comprobante.getSerie() + "-" + comprobante.getCorrelativo()
-            : String.format("T001-%08d", venta.getIdVenta());
+            ? sanitizarTextoEscPos(comprobante.getSerie()) + "-" + sanitizarTextoEscPos(comprobante.getCorrelativo())
+            : String.format(Locale.US, "T001-%08d", venta.getIdVenta());
 
+        LocalDateTime fechaTicket = venta.getFechaHora() != null ? venta.getFechaHora() : LocalDateTime.now(ZONA_LIMA);
         lineas.add(ajustarLinea(tipoDoc + ": " + serieCorr));
-        lineas.add(ajustarLinea("FECHA : " + LocalDateTime.now().format(FMT_FECHA)));
+        lineas.add(ajustarLinea("FECHA : " + fechaTicket.format(FMT_FECHA)));
         if (comprobante != null && comprobante.getNombreCliente() != null) {
-            lineas.add(ajustarLinea("CLIENTE: " + comprobante.getNombreCliente()));
+            lineas.add(ajustarLinea("CLIENTE: " + sanitizarTextoEscPos(comprobante.getNombreCliente())));
         }
         if (comprobante != null && comprobante.getDocumentoCliente() != null) {
-            lineas.add(ajustarLinea("DOC ID : " + comprobante.getDocumentoCliente()));
+            lineas.add(ajustarLinea("DOC ID : " + sanitizarTextoEscPos(comprobante.getDocumentoCliente())));
         }
-        String medioPago = venta.getMetodoPago() != null ? venta.getMetodoPago() : "EFECTIVO";
+        String medioPago = venta.getMetodoPago() != null ? sanitizarTextoEscPos(venta.getMetodoPago()) : "EFECTIVO";
         lineas.add(ajustarLinea("PAGO   : " + medioPago));
         lineas.add(SEPARADOR_SIMPLE);
 
@@ -136,16 +141,17 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_SIMPLE);
 
         for (DetalleVenta det : detalles) {
-            String cantStr = String.format("%3dx", det.getCantidad());
-            String baseDesc = det.getNombreProducto() != null ? det.getNombreProducto() : ("ITEM #" + det.getIdProducto());
+            String cantStr = String.format(Locale.US, "%3dx", det.getCantidad());
+            String baseDesc = det.getNombreProducto() != null
+                ? sanitizarTextoEscPos(det.getNombreProducto()) : ("ITEM #" + det.getIdProducto());
             String descConVar = (det.getNombreVariante() != null && !det.getNombreVariante().isBlank())
-                ? baseDesc + " (" + det.getNombreVariante().trim() + ")"
+                ? baseDesc + " (" + sanitizarTextoEscPos(det.getNombreVariante().trim()) + ")"
                 : baseDesc;
-            String subtotalStr = String.format("S/ %8s",
+            String subtotalStr = String.format(Locale.US, "S/ %8s",
                 DesgloseFiscal.normalizarMoneda(det.getSubtotal()).toPlainString());
             lineas.add(alinearColumnas(cantStr, descConVar, subtotalStr));
-            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                det.getModificadoresSeleccionados(), det.getModificadoresTexto());
+            String mods = sanitizarTextoEscPos(FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                det.getModificadoresSeleccionados(), det.getModificadoresTexto()));
             if (!mods.isEmpty()) {
                 agregarLineasEnvolventes(lineas, "     + " + mods, "       ");
             }
@@ -163,6 +169,17 @@ public class ImpresoraTermicaService {
     }
 
     /**
+     * Elimina caracteres de control ASCII ({@code 0x00-0x1F}, {@code 0x7F}) para prevenir inyección
+     * de comandos ESC/POS (como apertura no autorizada de cajón monedero {@code 0x1B 0x70}).
+     */
+    public static String sanitizarTextoEscPos(String texto) {
+        if (texto == null || texto.isEmpty()) {
+            return "";
+        }
+        return CONTROL_CHARS.matcher(texto).replaceAll("");
+    }
+
+    /**
      * Construye el payload binario ESC/POS completo incluyendo secuencia de inicialización
      * ({@code 0x1B 0x40}), cuerpo codificado en CP850 (o degradado a ASCII) y comando de corte
      * ({@code 0x1D 0x56 0x41 0x10}) según §8.6.
@@ -174,9 +191,10 @@ public class ImpresoraTermicaService {
 
             Charset charset = obtenerCharsetImpresion(forzarDegradacionAscii);
             for (String linea : lineas) {
+                String sinControl = sanitizarTextoEscPos(linea);
                 String procesada = (forzarDegradacionAscii || charset.equals(StandardCharsets.US_ASCII))
-                    ? degradarAAscii(linea)
-                    : linea;
+                    ? degradarAAscii(sinControl)
+                    : sinControl;
                 String truncada = ajustarLinea(procesada);
                 baos.write((truncada + "\n").getBytes(charset));
             }
@@ -225,6 +243,10 @@ public class ImpresoraTermicaService {
     }
 
     public void escribirFallbackEnLog(List<String> lineas) {
+        escribirFallbackEnLogConEstado(lineas);
+    }
+
+    private boolean escribirFallbackEnLogConEstado(List<String> lineas) {
         synchronized (LOCK_LOG) {
             try {
                 Path parent = rutaLogFallback.getParent();
@@ -240,8 +262,10 @@ public class ImpresoraTermicaService {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND
                 );
+                return true;
             } catch (IOException ioEx) {
                 LOGGER.log(Level.SEVERE, "Error escribiendo respaldo de ticket en " + rutaLogFallback, ioEx);
+                return false;
             }
         }
     }
@@ -366,12 +390,13 @@ public class ImpresoraTermicaService {
         lineas.add(centrar("*** NO ES COMPROBANTE DE PAGO ***"));
         lineas.add(SEPARADOR_SIMPLE);
 
-        String mesaStr = pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "01";
+        String mesaStr = pedido.getNumeroMesa() != null ? sanitizarTextoEscPos(pedido.getNumeroMesa()) : "01";
+        LocalDateTime fechaPed = pedido.getFechaHora() != null ? pedido.getFechaHora() : LocalDateTime.now(ZONA_LIMA);
         lineas.add(ajustarLinea("MESA   : " + mesaStr));
         lineas.add(ajustarLinea("PEDIDO : #" + pedido.getIdPedido()));
-        lineas.add(ajustarLinea("FECHA  : " + LocalDateTime.now().format(FMT_FECHA)));
+        lineas.add(ajustarLinea("FECHA  : " + fechaPed.format(FMT_FECHA)));
         if (pedido.getClienteNombre() != null && !pedido.getClienteNombre().isBlank()) {
-            lineas.add(ajustarLinea("CLIENTE: " + pedido.getClienteNombre()));
+            lineas.add(ajustarLinea("CLIENTE: " + sanitizarTextoEscPos(pedido.getClienteNombre())));
         }
         lineas.add(SEPARADOR_SIMPLE);
 
@@ -379,19 +404,20 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_SIMPLE);
 
         for (DetallePedido item : detalles) {
-            String baseNom = item.getNombreProducto() != null ? item.getNombreProducto() : "Plato #" + item.getIdProducto();
+            String baseNom = item.getNombreProducto() != null
+                ? sanitizarTextoEscPos(item.getNombreProducto()) : "Plato #" + item.getIdProducto();
             String nomVar = (item.getNombreVariante() != null && !item.getNombreVariante().isBlank())
-                ? baseNom + " (" + item.getNombreVariante().trim() + ")"
+                ? baseNom + " (" + sanitizarTextoEscPos(item.getNombreVariante().trim()) + ")"
                 : baseNom;
-            String totalFmt = String.format("S/ %.2f", item.getSubtotal());
+            String totalFmt = String.format(Locale.US, "S/ %.2f", item.getSubtotal());
             lineas.add(alinearColumnas(String.valueOf(item.getCantidad()), nomVar, totalFmt));
-            String mods = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                item.getModificadoresSeleccionados(), item.getModificadoresTexto());
+            String mods = sanitizarTextoEscPos(FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                item.getModificadoresSeleccionados(), item.getModificadoresTexto()));
             if (!mods.isEmpty()) {
                 agregarLineasEnvolventes(lineas, "  + " + mods, "    ");
             }
             if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
-                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion(), "   ");
+                agregarLineasEnvolventes(lineas, " * Nota: " + sanitizarTextoEscPos(item.getNotasPreparacion()), "   ");
             }
         }
 
@@ -423,22 +449,23 @@ public class ImpresoraTermicaService {
         lineas.add(SEPARADOR_DOBLE);
         lineas.add(centrar("COMANDA DE COCINA (KDS)"));
         lineas.add(SEPARADOR_SIMPLE);
-        String mesaStr = pedido.getNumeroMesa() != null ? pedido.getNumeroMesa() : "01";
+        String mesaStr = pedido.getNumeroMesa() != null ? sanitizarTextoEscPos(pedido.getNumeroMesa()) : "01";
+        LocalDateTime fechaPed = pedido.getFechaHora() != null ? pedido.getFechaHora() : LocalDateTime.now(ZONA_LIMA);
         lineas.add(ajustarLinea("MESA / CANAL : " + mesaStr));
         lineas.add(ajustarLinea("PEDIDO       : #" + pedido.getIdPedido()));
-        lineas.add(ajustarLinea("FECHA        : " + LocalDateTime.now().format(FMT_FECHA)));
+        lineas.add(ajustarLinea("FECHA        : " + fechaPed.format(FMT_FECHA)));
         lineas.add(SEPARADOR_SIMPLE);
 
         for (DetallePedido item : detalles) {
-            String descCocina = FormatoPersonalizacionUtil.formatearDescripcionItem(item);
+            String descCocina = sanitizarTextoEscPos(FormatoPersonalizacionUtil.formatearDescripcionItem(item));
             agregarLineasEnvolventes(lineas, item.getCantidad() + "x " + descCocina, "   ");
             List<String> componentesCombo = FormatoPersonalizacionUtil.extraerLineasDesgloseCombo(
                     item.getComboComponentesTexto(), item.getCantidad());
             for (String comp : componentesCombo) {
-                agregarLineasEnvolventes(lineas, "   - " + comp, "     ");
+                agregarLineasEnvolventes(lineas, "   - " + sanitizarTextoEscPos(comp), "     ");
             }
             if (item.getNotasPreparacion() != null && !item.getNotasPreparacion().isBlank()) {
-                agregarLineasEnvolventes(lineas, " * Nota: " + item.getNotasPreparacion().trim(), "   ");
+                agregarLineasEnvolventes(lineas, " * Nota: " + sanitizarTextoEscPos(item.getNotasPreparacion().trim()), "   ");
             }
         }
 
@@ -573,10 +600,10 @@ public class ImpresoraTermicaService {
             List<String> lineas = formatearLineasComandaCocina(pedido, detalles);
             List<String> lineasConDestino = new ArrayList<>(lineas.size() + 1);
             String impTag = (nombreImpresora != null && !nombreImpresora.isBlank())
-                    ? nombreImpresora.trim() : IMPRESORA_COCINA_DEFECTO;
+                    ? sanitizarTextoEscPos(nombreImpresora.trim()) : IMPRESORA_COCINA_DEFECTO;
             lineasConDestino.add(ajustarLinea("[IMPRESORA: " + impTag + "]"));
             lineasConDestino.addAll(lineas);
-            escribirFallbackEnLog(lineasConDestino);
+            boolean logEscrito = escribirFallbackEnLogConEstado(lineasConDestino);
 
             if (nombreImpresora != null && !nombreImpresora.isBlank()) {
                 try {
@@ -588,11 +615,13 @@ public class ImpresoraTermicaService {
                         job.print(doc, null);
                         return true;
                     }
+                    LOGGER.warning("No se encontró impresora física '" + nombreImpresora + "' en spooler.");
                 } catch (PrintException | RuntimeException pe) {
                     LOGGER.log(Level.WARNING, "No se pudo enviar comanda a impresora '" + nombreImpresora + "'", pe);
                 }
+                return false;
             }
-            return false;
+            return logEscrito;
         } catch (NegocioException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error al emitir ticket de comanda para impresora '" + nombreImpresora + "'", ex);
             return false;
@@ -600,13 +629,7 @@ public class ImpresoraTermicaService {
     }
 
     public boolean imprimirComandaCocina(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
-        try {
-            despacharComandaEnImpresora(pedido, detalles, nombreImpresora);
-            return true;
-        } catch (RuntimeException ex) {
-            LOGGER.log(Level.WARNING, "Error al emitir ticket de comanda para cocina", ex);
-            return false;
-        }
+        return despacharComandaEnImpresora(pedido, detalles, nombreImpresora);
     }
 
     private static void agregarLineasEnvolventes(List<String> destino, String texto, String prefijoContinuacion) {
@@ -631,7 +654,7 @@ public class ImpresoraTermicaService {
     public boolean imprimirPreCuenta(Pedido pedido, List<DetallePedido> detalles, String nombreImpresora) {
         try {
             List<String> lineas = formatearLineasPreCuenta(pedido, detalles);
-            escribirFallbackEnLog(lineas);
+            boolean logEscrito = escribirFallbackEnLogConEstado(lineas);
             if (nombreImpresora != null && !nombreImpresora.isBlank()) {
                 try {
                     byte[] bytesEscPos = generarBytesEscPos(lineas, true);
@@ -640,12 +663,15 @@ public class ImpresoraTermicaService {
                         DocPrintJob job = printService.createPrintJob();
                         Doc doc = new SimpleDoc(bytesEscPos, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
                         job.print(doc, null);
+                        return true;
                     }
+                    LOGGER.warning("No se encontró impresora física '" + nombreImpresora + "' para pre-cuenta.");
                 } catch (Exception pe) {
                     LOGGER.log(Level.WARNING, "No se pudo enviar pre-cuenta al spooler físico", pe);
                 }
+                return false;
             }
-            return true;
+            return logEscrito;
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error al emitir pre-cuenta", ex);
             return false;

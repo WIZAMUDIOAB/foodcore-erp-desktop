@@ -97,6 +97,14 @@ class ImportacionMasivaIT {
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM producto WHERE codigo LIKE 'T5-%'")) {
                 ps.executeUpdate();
             }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM kardex_movimiento WHERE id_insumo IN (SELECT id_insumo FROM insumo WHERE codigo LIKE 'T5INS-%')")) {
+                ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM movimiento_inventario WHERE id_insumo IN (SELECT id_insumo FROM insumo WHERE codigo LIKE 'T5INS-%')")) {
+                ps.executeUpdate();
+            }
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM insumo WHERE codigo LIKE 'T5INS-%'")) {
                 ps.executeUpdate();
             }

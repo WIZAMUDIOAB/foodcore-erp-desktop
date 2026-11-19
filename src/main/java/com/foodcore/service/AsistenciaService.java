@@ -34,19 +34,22 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AsistenciaService {
 
     private static final Logger LOGGER = Logger.getLogger(AsistenciaService.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private static final int TOLERANCIA_ATRASO_MIN = 5;
+    private static final long MAX_HORAS_TURNO_NOCTURNO = 24L;
     private static final DateTimeFormatter FMT_HORA = DateTimeFormatter.ofPattern("HH:mm");
 
     private final AsistenciaDAO asistenciaDAO;
@@ -104,9 +107,20 @@ public class AsistenciaService {
     }
 
     public ResultadoMarcaje registrarMarcajeKiosco(String credencialDniOPin) throws SQLException {
+        return registrarMarcajeKioscoEnInstante(credencialDniOPin, LocalDateTime.now(ZONA_LIMA));
+    }
+
+    /**
+     * Registra entrada o salida en el instante indicado (soporta salidas de turnos nocturnos
+     * iniciados el día calendario anterior hasta 24h después del ingreso).
+     */
+    public ResultadoMarcaje registrarMarcajeKioscoEnInstante(String credencialDniOPin, LocalDateTime instante)
+            throws SQLException {
         if (credencialDniOPin == null || credencialDniOPin.trim().isEmpty()) {
             return new ResultadoMarcaje(false, null, null, null, "Ingrese un DNI o PIN válido.");
         }
+        LocalDateTime ahora = instante != null ? instante : LocalDateTime.now(ZONA_LIMA);
+        LocalDate hoy = ahora.toLocalDate();
 
         try (Connection conn = ConexionBD.getConnection()) {
             Optional<Usuario> userOpt = usuarioDAO.buscarPorDniOPin(conn, credencialDniOPin.trim());
@@ -115,16 +129,14 @@ public class AsistenciaService {
             }
 
             Usuario user = userOpt.get();
-            LocalDate hoy = LocalDate.now();
-            LocalDateTime ahora = LocalDateTime.now();
-
-            Optional<Asistencia> abiertaOpt = asistenciaDAO.buscarMarcajeAbierto(conn, user.getIdUsuario(), hoy);
+            Optional<Asistencia> abiertaOpt = asistenciaDAO.buscarMarcajeAbierto(conn, user.getIdUsuario(), hoy)
+                    .filter(a -> esTurnoAbiertoCerrable(a, ahora));
 
             if (abiertaOpt.isPresent()) {
-                // Registrar Salida
+                // Registrar Salida (incluye turnos nocturnos cruzando medianoche)
                 Asistencia abierta = abiertaOpt.get();
-                Duration dur = Duration.between(abierta.getHoraEntrada(), ahora);
-                double horas = Math.round((dur.toMinutes() / 60.0) * 100.0) / 100.0;
+                long minutosTotales = Math.max(0L, Duration.between(abierta.getHoraEntrada(), ahora).toMinutes());
+                double horas = Math.round((minutosTotales / 60.0) * 100.0) / 100.0;
                 double horasExtra = horas > 8.0 ? Math.round((horas - 8.0) * 100.0) / 100.0 : 0.0;
 
                 boolean ok = asistenciaDAO.registrarSalida(conn, abierta.getIdAsistencia(), ahora, horas, horasExtra);
@@ -133,7 +145,8 @@ public class AsistenciaService {
                 abierta.setHorasExtra(horasExtra);
                 abierta.setEstado("FINALIZADO");
 
-                String msg = String.format("Salida registrada para %s (%s). Horas laboradas: %.2f hrs (Extra: %.2f hrs)",
+                String msg = String.format(Locale.US,
+                        "Salida registrada para %s (%s). Horas laboradas: %.2f hrs (Extra: %.2f hrs)",
                         user.getNombreEmpleado() != null ? user.getNombreEmpleado() : user.getUsername(),
                         user.getNombreRol(), horas, horasExtra);
                 return new ResultadoMarcaje(ok, "SALIDA", user, abierta, msg);
@@ -146,7 +159,7 @@ public class AsistenciaService {
                 String estado = "PRESENTE";
                 if (horaActual.isAfter(horaProg)) {
                     long minDif = Duration.between(horaProg, horaActual).toMinutes();
-                    if (minDif > 5) {
+                    if (minDif > TOLERANCIA_ATRASO_MIN) {
                         tardanzaMin = (int) minDif;
                         estado = "TARDE";
                     }
@@ -156,7 +169,7 @@ public class AsistenciaService {
 
                 Asistencia nueva = new Asistencia();
                 nueva.setIdUsuario(user.getIdUsuario());
-                nueva.setIdEmpleado(user.getIdUsuario());
+                nueva.setIdEmpleado(user.getIdEmpleado() > 0 ? user.getIdEmpleado() : user.getIdUsuario());
                 nueva.setFecha(hoy);
                 nueva.setHoraEntrada(ahora);
                 nueva.setTardanzaMinutos(tardanzaMin);
@@ -175,6 +188,16 @@ public class AsistenciaService {
                 return new ResultadoMarcaje(idAsist > 0, "ENTRADA", user, nueva, msg);
             }
         }
+    }
+
+    private static boolean esTurnoAbiertoCerrable(Asistencia abierta, LocalDateTime ahora) {
+        if (abierta == null || abierta.getHoraEntrada() == null || ahora == null) {
+            return false;
+        }
+        if (abierta.getHoraEntrada().isAfter(ahora)) {
+            return false;
+        }
+        return Duration.between(abierta.getHoraEntrada(), ahora).toHours() <= MAX_HORAS_TURNO_NOCTURNO;
     }
 
     public List<Asistencia> listarAsistenciaPorFecha(LocalDate fecha) throws SQLException {

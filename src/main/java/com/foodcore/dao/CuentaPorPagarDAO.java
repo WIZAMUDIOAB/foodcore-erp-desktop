@@ -13,6 +13,9 @@ public interface CuentaPorPagarDAO {
     List<CuentaPorPagar> listarPorEstado(Connection conn, String estado) throws SQLException;
     List<CuentaPorPagar> listarPorProveedor(Connection conn, int idProveedor) throws SQLException;
     Optional<CuentaPorPagar> buscarPorId(Connection conn, int idCuentaPagar) throws SQLException;
+    default Optional<CuentaPorPagar> buscarPorIdParaActualizar(Connection conn, int idCuentaPagar) throws SQLException {
+        return buscarPorId(conn, idCuentaPagar);
+    }
     int insertar(Connection conn, CuentaPorPagar cxp) throws SQLException;
     boolean registrarPago(Connection conn, PagoProveedor pago) throws SQLException;
     int contarVencidas(Connection conn) throws SQLException;

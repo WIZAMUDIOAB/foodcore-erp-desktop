@@ -9,16 +9,18 @@ import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.Insumo;
+import com.foodcore.model.KardexMovimiento;
 import com.foodcore.model.Producto;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.UnidadMedidaFormatter;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -38,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.sql.Savepoint;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,6 +61,12 @@ import java.util.logging.Logger;
 public class ImportacionMasivaService {
 
     private static final Logger LOGGER = Logger.getLogger(ImportacionMasivaService.class.getName());
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+    public static final long MAX_FILE_SIZE_BYTES = 10L * 1024L * 1024L;
+    public static final int MAX_FILAS_IMPORTACION = 10_000;
+    private static final double ZIP_MIN_INFLATE_RATIO = 0.01;
+    private static final long ZIP_MAX_ENTRY_SIZE = 50L * 1024L * 1024L;
+    private static final long ZIP_MAX_TEXT_SIZE = 10L * 1024L * 1024L;
 
     public static final List<String> COLUMNAS_PLANTILLA_MENU = List.of(
             "Codigo_SKU", "Nombre_Platillo", "Categoria", "Precio_Venta", "Descripcion", "Estado");
@@ -120,6 +131,7 @@ public class ImportacionMasivaService {
     private final CategoriaDAO categoriaDAO;
     private final InsumoDAO insumoDAO;
     private final TransactionManager tx;
+    private final CierreContableService cierreContableService = new CierreContableService();
 
     public ImportacionMasivaService() {
         this(new ProductoDAOImpl(), new CategoriaDAOImpl(), new InsumoDAOImpl(), new JdbcTransactionManager());
@@ -291,6 +303,10 @@ public class ImportacionMasivaService {
         }
 
         return tx.executeChecked(conn -> {
+            cierreContableService.validarPeriodoAbierto(conn, LocalDate.now(ZONA_LIMA));
+            long idUsuarioActual = AuthService.getUsuarioSesionActual() != null
+                    ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1L;
+            LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
             int creados = 0;
             int actualizados = 0;
             for (FilaInsumoValida fila : pre.filasValidas()) {
@@ -309,14 +325,44 @@ public class ImportacionMasivaService {
                         insumoDAO.crear(conn, nuevo);
                         creados++;
                     } else {
+                        long idIns = existente.getIdInsumo();
+                        Map<Long, BigDecimal> saldosBloqueados = insumoDAO.lockearPorIds(conn, List.of(idIns));
+                        BigDecimal saldoAnterior = DesgloseFiscal.normalizarStock(
+                                saldosBloqueados.getOrDefault(idIns,
+                                        existente.getStockActualDisponible() != null
+                                                ? existente.getStockActualDisponible() : BigDecimal.ZERO));
+                        BigDecimal stockNuevo = DesgloseFiscal.normalizarStock(fila.stockActual());
+                        BigDecimal delta = DesgloseFiscal.normalizarStock(stockNuevo.subtract(saldoAnterior));
+
                         existente.setCodigo(fila.sku());
                         existente.setNombre(fila.nombre());
                         existente.setUnidadMedida(fila.unidadMedida());
-                        existente.setStockActualDisponible(fila.stockActual());
+                        existente.setStockActualDisponible(stockNuevo);
                         existente.setStockMinimo(fila.stockMinimo());
                         existente.setCostoUnitario(fila.costoUnitario());
                         insumoDAO.actualizar(conn, existente);
-                        insumoDAO.reactivar(conn, existente.getIdInsumo());
+                        insumoDAO.reactivar(conn, idIns);
+
+                        if (delta.compareTo(BigDecimal.ZERO) != 0) {
+                            String glosa = "Importación masiva SKU " + fila.sku()
+                                    + " (Sistema: " + saldoAnterior + " -> Importado: " + stockNuevo + ")";
+                            insumoDAO.registrarMovimientoInventario(conn, idIns, "AJUSTE_INV", delta, glosa, null);
+                            KardexMovimiento km = new KardexMovimiento(
+                                    0L,
+                                    idIns,
+                                    "AJUSTE_INV",
+                                    delta,
+                                    saldoAnterior,
+                                    stockNuevo,
+                                    fila.costoUnitario() != null ? fila.costoUnitario() : BigDecimal.ZERO,
+                                    "IMPORTACION_MASIVA",
+                                    null,
+                                    idUsuarioActual,
+                                    glosa,
+                                    ahora
+                            );
+                            insumoDAO.insertarKardex(conn, km);
+                        }
                         actualizados++;
                     }
                     conn.releaseSavepoint(sp);
@@ -416,6 +462,9 @@ public class ImportacionMasivaService {
         if (archivo == null || !archivo.exists() || !archivo.isFile()) {
             throw new IllegalArgumentException("El archivo seleccionado no existe o no es válido.");
         }
+        if (archivo.length() > MAX_FILE_SIZE_BYTES) {
+            throw new IllegalArgumentException("El archivo excede el límite máximo permitido de 10 MB.");
+        }
         String nombreLower = archivo.getName().toLowerCase(Locale.ROOT);
         if (nombreLower.endsWith(".csv")) {
             return leerCsv(archivo);
@@ -427,6 +476,10 @@ public class ImportacionMasivaService {
     }
 
     private TablaLeida leerExcel(File archivo) throws IOException {
+        ZipSecureFile.setMinInflateRatio(ZIP_MIN_INFLATE_RATIO);
+        ZipSecureFile.setMaxEntrySize(ZIP_MAX_ENTRY_SIZE);
+        ZipSecureFile.setMaxTextSize(ZIP_MAX_TEXT_SIZE);
+
         try (FileInputStream fis = new FileInputStream(archivo);
              Workbook workbook = WorkbookFactory.create(fis)) {
             if (workbook.getNumberOfSheets() == 0) {
@@ -434,7 +487,6 @@ public class ImportacionMasivaService {
             }
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter formatter = new DataFormatter(Locale.ROOT);
-            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 
             int headerRowIdx = sheet.getFirstRowNum();
             Row headerRow = sheet.getRow(headerRowIdx);
@@ -445,7 +497,7 @@ public class ImportacionMasivaService {
             Map<String, Integer> headers = new LinkedHashMap<>();
             int maxCol = headerRow.getLastCellNum();
             for (int c = 0; c < maxCol; c++) {
-                String raw = formatter.formatCellValue(headerRow.getCell(c), evaluator);
+                String raw = leerValorCeldaSinEvaluarFormula(headerRow.getCell(c), formatter, headerRowIdx + 1);
                 String norm = normalizarHeader(raw);
                 if (!norm.isEmpty()) {
                     headers.putIfAbsent(norm, c);
@@ -464,18 +516,33 @@ public class ImportacionMasivaService {
                 List<String> valores = new ArrayList<>(maxCol);
                 boolean vacia = true;
                 for (int c = 0; c < maxCol; c++) {
-                    String val = formatter.formatCellValue(row.getCell(c), evaluator).trim();
+                    String val = leerValorCeldaSinEvaluarFormula(row.getCell(c), formatter, r + 1).trim();
                     if (!val.isEmpty()) {
                         vacia = false;
                     }
                     valores.add(val);
                 }
                 if (!vacia) {
+                    if (filas.size() >= MAX_FILAS_IMPORTACION) {
+                        throw new IllegalArgumentException(
+                                "El archivo supera el límite máximo permitido de " + MAX_FILAS_IMPORTACION + " filas.");
+                    }
                     filas.add(new FilaCruda(r + 1, valores));
                 }
             }
             return new TablaLeida(headers, filas);
         }
+    }
+
+    private static String leerValorCeldaSinEvaluarFormula(Cell cell, DataFormatter formatter, int numeroFila) {
+        if (cell == null) {
+            return "";
+        }
+        if (cell.getCellType() == CellType.FORMULA) {
+            throw new IllegalArgumentException(
+                    "Fila " + numeroFila + ": las fórmulas de Excel no están permitidas en importaciones masivas.");
+        }
+        return formatter.formatCellValue(cell);
     }
 
     private TablaLeida leerCsv(File archivo) throws IOException {
@@ -512,6 +579,10 @@ public class ImportacionMasivaService {
                 List<String> vals = parsearLineaCsv(line, separador);
                 boolean vacia = vals.stream().allMatch(String::isBlank);
                 if (!vacia) {
+                    if (filas.size() >= MAX_FILAS_IMPORTACION) {
+                        throw new IllegalArgumentException(
+                                "El archivo CSV supera el límite máximo permitido de " + MAX_FILAS_IMPORTACION + " filas.");
+                    }
                     filas.add(new FilaCruda(rowNum, vals));
                 }
                 rowNum++;

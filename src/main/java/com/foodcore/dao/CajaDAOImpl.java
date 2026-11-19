@@ -22,7 +22,7 @@ public class CajaDAOImpl implements CajaDAO {
 
     @Override
     public Optional<Caja> obtenerCajaAbierta(Connection conn) throws SQLException {
-        String sql = "SELECT * FROM caja WHERE estado IN ('ABIERTA', 'ABIERTO') ORDER BY id_caja DESC LIMIT 1";
+        String sql = "SELECT * FROM caja WHERE estado IN ('ABIERTA', 'ABIERTO') ORDER BY id_caja DESC LIMIT 1 FOR UPDATE";
         try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
@@ -151,11 +151,28 @@ public class CajaDAOImpl implements CajaDAO {
     }
 
     @Override
+    public BigDecimal calcularTotalIngresosEfectivoTurno(Connection conn, int idCaja) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(monto), 0.00) FROM movimiento_caja "
+            + "WHERE id_caja = ? AND tipo_movimiento = 'INGRESO' "
+            + "AND COALESCE(medio_pago, 'EFECTIVO') = 'EFECTIVO' "
+            + "AND COALESCE(concepto, '') NOT LIKE 'Fondo de apertura%'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCaja);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBigDecimal(1);
+                }
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
+    @Override
     public BigDecimal calcularTotalGastosTurno(Connection conn, int idCaja) throws SQLException {
         String sql = "SELECT COALESCE(SUM(ABS(monto)), 0.00) FROM movimiento_caja "
-            + "WHERE id_caja = ? AND tipo_movimiento IN ('EGRESO', 'ANULACION') "
+            + "WHERE id_caja = ? AND tipo_movimiento IN ('EGRESO', 'ANULACION', 'DEVOLUCION') "
             + "AND COALESCE(medio_pago, 'EFECTIVO') = 'EFECTIVO' "
-            + "AND concepto NOT LIKE 'Cierre Z de turno%'";
+            + "AND COALESCE(concepto, '') NOT LIKE 'Cierre Z de turno%'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idCaja);
             try (ResultSet rs = ps.executeQuery()) {
@@ -170,8 +187,18 @@ public class CajaDAOImpl implements CajaDAO {
     @Override
     public Map<String, BigDecimal> obtenerTotalesPorMedioPago(Connection conn, int idCaja) throws SQLException {
         Map<String, BigDecimal> totales = new LinkedHashMap<>();
-        String sql = "SELECT COALESCE(medio_pago, 'EFECTIVO') AS medio, COALESCE(SUM(monto), 0.00) AS total "
-            + "FROM movimiento_caja WHERE id_caja = ? AND tipo_movimiento = 'VENTA' GROUP BY COALESCE(medio_pago, 'EFECTIVO')";
+        String sql = "SELECT COALESCE(medio_pago, 'EFECTIVO') AS medio, "
+            + "COALESCE(SUM(CASE "
+            + "  WHEN tipo_movimiento = 'VENTA' THEN monto "
+            + "  WHEN tipo_movimiento IN ('ANULACION', 'DEVOLUCION') THEN -ABS(monto) "
+            + "  WHEN tipo_movimiento = 'EGRESO' AND LOWER(COALESCE(concepto, '')) LIKE 'devoluci%' THEN -ABS(monto) "
+            + "  ELSE 0.00 "
+            + "END), 0.00) AS total "
+            + "FROM movimiento_caja "
+            + "WHERE id_caja = ? "
+            + "  AND (tipo_movimiento IN ('VENTA', 'ANULACION', 'DEVOLUCION') "
+            + "       OR (tipo_movimiento = 'EGRESO' AND LOWER(COALESCE(concepto, '')) LIKE 'devoluci%')) "
+            + "GROUP BY COALESCE(medio_pago, 'EFECTIVO')";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idCaja);
             try (ResultSet rs = ps.executeQuery()) {

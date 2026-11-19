@@ -22,16 +22,18 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
 
     @Override
     public Optional<Asistencia> buscarMarcajeAbierto(Connection conn, int idUsuario, LocalDate fecha) throws SQLException {
+        // Incluye fecha actual y día anterior para soportar salidas de turnos nocturnos (cruce de medianoche)
         String sql = "SELECT a.*, u.username, COALESCE(u.nombre_completo, u.username) AS nombre_empleado, u.dni, r.nombre AS rol_nombre "
                 + "FROM asistencia a "
                 + "JOIN usuario u ON a.id_usuario = u.id_usuario "
                 + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
-                + "WHERE a.id_usuario = ? AND a.fecha = ? AND a.hora_salida IS NULL "
-                + "ORDER BY a.id_asistencia DESC LIMIT 1";
+                + "WHERE a.id_usuario = ? AND a.fecha IN (?, ?) AND a.hora_salida IS NULL "
+                + "ORDER BY a.hora_entrada DESC, a.id_asistencia DESC LIMIT 1";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idUsuario);
             ps.setDate(2, Date.valueOf(fecha));
+            ps.setDate(3, Date.valueOf(fecha.minusDays(1)));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return Optional.of(mapearAsistencia(rs));
@@ -133,7 +135,7 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
                 + "FROM asistencia a "
                 + "JOIN usuario u ON a.id_usuario = u.id_usuario "
                 + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
-                + "WHERE a.fecha = CURRENT_DATE() AND a.hora_salida IS NULL "
+                + "WHERE a.fecha >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) AND a.hora_salida IS NULL "
                 + "ORDER BY a.hora_entrada DESC";
 
         List<Asistencia> lista = new ArrayList<>();
@@ -148,6 +150,8 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
 
     @Override
     public List<FilaPlanilla> calcularPlanillaMensual(Connection conn, int anio, int mes) throws SQLException {
+        LocalDate inicioMes = LocalDate.of(anio, mes, 1);
+        LocalDate finMesExcl = inicioMes.plusMonths(1);
         String sql = "SELECT u.id_usuario, u.username, COALESCE(u.nombre_completo, u.username) AS nombre_empleado, u.dni, u.sueldo_base, r.nombre AS rol_nombre, "
                 + "COUNT(DISTINCT a.fecha) AS dias_trabajados, "
                 + "COALESCE(SUM(a.horas_trabajadas), 0.0) AS horas_totales, "
@@ -155,15 +159,15 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
                 + "COALESCE(SUM(a.tardanza_minutos), 0) AS tardanza_minutos "
                 + "FROM usuario u "
                 + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
-                + "LEFT JOIN asistencia a ON u.id_usuario = a.id_usuario AND YEAR(a.fecha) = ? AND MONTH(a.fecha) = ? "
+                + "LEFT JOIN asistencia a ON u.id_usuario = a.id_usuario AND a.fecha >= ? AND a.fecha < ? "
                 + "WHERE u.activo = 1 "
                 + "GROUP BY u.id_usuario, u.username, u.nombre_completo, u.dni, u.sueldo_base, r.nombre "
                 + "ORDER BY u.id_usuario ASC";
 
         List<FilaPlanilla> lista = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, anio);
-            ps.setInt(2, mes);
+            ps.setDate(1, Date.valueOf(inicioMes));
+            ps.setDate(2, Date.valueOf(finMesExcl));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     FilaPlanilla p = new FilaPlanilla();
@@ -203,8 +207,10 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
     private Asistencia mapearAsistencia(ResultSet rs) throws SQLException {
         Asistencia a = new Asistencia();
         a.setIdAsistencia(rs.getInt("id_asistencia"));
-        a.setIdUsuario(rs.getInt("id_usuario"));
-        a.setIdEmpleado(rs.getInt("id_usuario"));
+        int idUsuario = rs.getInt("id_usuario");
+        a.setIdUsuario(idUsuario);
+        int idEmpleado = rs.getInt("id_empleado");
+        a.setIdEmpleado(rs.wasNull() || idEmpleado <= 0 ? idUsuario : idEmpleado);
         a.setFecha(rs.getDate("fecha").toLocalDate());
 
         Timestamp tsEntrada = rs.getTimestamp("hora_entrada");

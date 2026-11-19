@@ -226,14 +226,8 @@ public class ExportFileChooserHelper {
     }
 
     private List<FileChooser.ExtensionFilter> construirFiltrosExportacion(FormatoExportacion principal) {
-        List<FileChooser.ExtensionFilter> filtros = new ArrayList<>();
-        filtros.add(principal.toExtensionFilter());
-        for (FormatoExportacion f : List.of(FormatoExportacion.PDF, FormatoExportacion.EXCEL, FormatoExportacion.CSV)) {
-            if (f != principal) {
-                filtros.add(f.toExtensionFilter());
-            }
-        }
-        return filtros;
+        // Exponer únicamente el filtro del formato exacto que generará el exportador seleccionado
+        return List.of(principal.toExtensionFilter());
     }
 
     private void guardarDirectorioPadre(String prefKey, File archivo) {
@@ -260,12 +254,13 @@ public class ExportFileChooserHelper {
     }
 
     private File asegurarExtensionEnArchivo(File archivo, FormatoExportacion formato) {
+        String extRequerida = formato.getExtensionPrincipal();
         String nombreLower = archivo.getName().toLowerCase(Locale.ROOT);
-        if (nombreLower.endsWith(".pdf") || nombreLower.endsWith(".xlsx") || nombreLower.endsWith(".csv")) {
+        if (nombreLower.endsWith(extRequerida.toLowerCase(Locale.ROOT))) {
             return archivo;
         }
         File parent = archivo.getParentFile();
-        String nombreConExt = archivo.getName() + formato.getExtensionPrincipal();
+        String nombreConExt = archivo.getName() + extRequerida;
         return parent != null ? new File(parent, nombreConExt) : new File(nombreConExt);
     }
 }

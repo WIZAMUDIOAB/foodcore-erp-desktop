@@ -37,9 +37,9 @@ public class ReporteDAOImpl implements ReporteDAO {
     @Override
     public Map<String, Integer> obtenerPlatosBajaRotacion(Connection conn, int limite) throws SQLException {
         Map<String, Integer> mapa = new LinkedHashMap<>();
-        String sql = "SELECT p.nombre, COALESCE(SUM(dv.cantidad), 0) AS total_vendido " +
+        String sql = "SELECT p.nombre, COALESCE(SUM(CASE WHEN v.id_venta IS NOT NULL THEN dv.cantidad ELSE 0 END), 0) AS total_vendido " +
                      "FROM producto p " +
-                     "LEFT JOIN detalle_venta dv ON p.id_producto = dv.id_producto " +
+                     "LEFT JOIN detalle_venta dv ON p.id_producto = dv.id_producto AND COALESCE(dv.estado, 'COMPLETADO') <> 'DEVUELTO' " +
                      "LEFT JOIN venta v ON dv.id_venta = v.id_venta AND v.estado = 'COMPLETADA' " +
                      "WHERE p.activo = 1 " +
                      "GROUP BY p.id_producto, p.nombre " +
@@ -108,6 +108,7 @@ public class ReporteDAOImpl implements ReporteDAO {
                         "JOIN producto p ON dv.id_producto = p.id_producto " +
                         "JOIN venta v ON dv.id_venta = v.id_venta " +
                         "WHERE v.estado = 'COMPLETADA' " +
+                        "  AND COALESCE(dv.estado, 'COMPLETADO') <> 'DEVUELTO' " +
                         "  AND (? <= 0 OR v.fecha_hora >= DATE_SUB(NOW(), INTERVAL ? DAY)) " +
                         "GROUP BY p.id_producto, p.nombre " +
                         "ORDER BY total_qty DESC " +

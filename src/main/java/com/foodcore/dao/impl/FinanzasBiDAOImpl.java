@@ -17,6 +17,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -46,8 +47,8 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
     @Override
     public EstadoResultadosReporte generarEstadoResultados(Connection conn, LocalDate desde, LocalDate hasta)
             throws SQLException {
-        Date sqlDesde = Date.valueOf(desde);
-        Date sqlHasta = Date.valueOf(hasta);
+        Timestamp tsDesde = Timestamp.valueOf(desde.atStartOfDay());
+        Timestamp tsHastaExcl = Timestamp.valueOf(hasta.plusDays(1).atStartOfDay());
 
         int cantidadVentas = 0;
         BigDecimal ingresosBrutos = CERO;
@@ -59,10 +60,10 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "COALESCE(SUM(subtotal), 0.00) AS subtotal_ventas, "
                 + "COALESCE(SUM(igv), 0.00) AS igv_ventas "
                 + "FROM venta "
-                + "WHERE estado = 'COMPLETADA' AND DATE(fecha_hora) BETWEEN ? AND ?";
+                + "WHERE estado = 'COMPLETADA' AND fecha_hora >= ? AND fecha_hora < ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlVentas)) {
-            ps.setDate(1, sqlDesde);
-            ps.setDate(2, sqlHasta);
+            ps.setTimestamp(1, tsDesde);
+            ps.setTimestamp(2, tsHastaExcl);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     cantidadVentas = rs.getInt("cnt");
@@ -73,7 +74,7 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
             }
         }
 
-        BigDecimal costoVentas = calcularCostoVentasPeriodo(conn, sqlDesde, sqlHasta);
+        BigDecimal costoVentas = calcularCostoVentasPeriodo(conn, tsDesde, tsHastaExcl);
 
         List<GastoTemp> gastosTemp = new ArrayList<>();
         BigDecimal gastosOperativos = CERO;
@@ -83,12 +84,12 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "LEFT JOIN categoria_gasto cg ON m.id_categoria_gasto = cg.id_categoria_gasto "
                 + "WHERE m.tipo_movimiento = 'EGRESO' "
                 + "AND m.concepto NOT LIKE 'Cierre Z de turno%' "
-                + "AND DATE(m.fecha_hora) BETWEEN ? AND ? "
+                + "AND m.fecha_hora >= ? AND m.fecha_hora < ? "
                 + "GROUP BY COALESCE(cg.nombre, 'Otros / Sin Categoría') "
                 + "ORDER BY monto DESC, categoria ASC";
         try (PreparedStatement ps = conn.prepareStatement(sqlGastos)) {
-            ps.setDate(1, sqlDesde);
-            ps.setDate(2, sqlHasta);
+            ps.setTimestamp(1, tsDesde);
+            ps.setTimestamp(2, tsHastaExcl);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     BigDecimal montoCat = normalizarMoneda(rs.getBigDecimal("monto"));
@@ -140,7 +141,7 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
         );
     }
 
-    private BigDecimal calcularCostoVentasPeriodo(Connection conn, Date sqlDesde, Date sqlHasta) throws SQLException {
+    private BigDecimal calcularCostoVentasPeriodo(Connection conn, Timestamp tsDesde, Timestamp tsHastaExcl) throws SQLException {
         Map<Integer, BigDecimal> kardexPorVenta = new HashMap<>();
         String sqlKardex = "SELECT k.referencia_id AS id_venta, "
                 + "COALESCE(SUM(ABS(k.cantidad) * CASE WHEN k.costo_unitario > 0 "
@@ -151,11 +152,11 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "WHERE k.referencia_tipo = 'VENTA' "
                 + "AND k.tipo_movimiento = 'SALIDA' "
                 + "AND v.estado = 'COMPLETADA' "
-                + "AND DATE(v.fecha_hora) BETWEEN ? AND ? "
+                + "AND v.fecha_hora >= ? AND v.fecha_hora < ? "
                 + "GROUP BY k.referencia_id";
         try (PreparedStatement ps = conn.prepareStatement(sqlKardex)) {
-            ps.setDate(1, sqlDesde);
-            ps.setDate(2, sqlHasta);
+            ps.setTimestamp(1, tsDesde);
+            ps.setTimestamp(2, tsHastaExcl);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     kardexPorVenta.put(rs.getInt("id_venta"), rs.getBigDecimal("costo_kardex"));
@@ -169,10 +170,10 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "FROM venta v "
                 + "JOIN detalle_venta dv ON v.id_venta = dv.id_venta "
                 + "JOIN producto p ON dv.id_producto = p.id_producto "
-                + "WHERE v.estado = 'COMPLETADA' AND DATE(v.fecha_hora) BETWEEN ? AND ?";
+                + "WHERE v.estado = 'COMPLETADA' AND v.fecha_hora >= ? AND v.fecha_hora < ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlDetalle)) {
-            ps.setDate(1, sqlDesde);
-            ps.setDate(2, sqlHasta);
+            ps.setTimestamp(1, tsDesde);
+            ps.setTimestamp(2, tsHastaExcl);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     int idVenta = rs.getInt("id_venta");
@@ -275,21 +276,23 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
         BigDecimal ventasMesAnterior = CERO;
 
         String sql = "SELECT "
-                + "COALESCE(SUM(CASE WHEN DATE(fecha_hora) = ? THEN total ELSE 0 END), 0.00) AS v_hoy, "
-                + "COALESCE(SUM(CASE WHEN DATE(fecha_hora) = ? THEN total ELSE 0 END), 0.00) AS v_ayer, "
-                + "COALESCE(SUM(CASE WHEN DATE(fecha_hora) BETWEEN ? AND ? THEN total ELSE 0 END), 0.00) AS v_mes_act, "
-                + "COALESCE(SUM(CASE WHEN DATE(fecha_hora) BETWEEN ? AND ? THEN total ELSE 0 END), 0.00) AS v_mes_ant "
+                + "COALESCE(SUM(CASE WHEN fecha_hora >= ? AND fecha_hora < ? THEN total ELSE 0 END), 0.00) AS v_hoy, "
+                + "COALESCE(SUM(CASE WHEN fecha_hora >= ? AND fecha_hora < ? THEN total ELSE 0 END), 0.00) AS v_ayer, "
+                + "COALESCE(SUM(CASE WHEN fecha_hora >= ? AND fecha_hora < ? THEN total ELSE 0 END), 0.00) AS v_mes_act, "
+                + "COALESCE(SUM(CASE WHEN fecha_hora >= ? AND fecha_hora < ? THEN total ELSE 0 END), 0.00) AS v_mes_ant "
                 + "FROM venta "
-                + "WHERE estado = 'COMPLETADA' AND DATE(fecha_hora) BETWEEN ? AND ?";
+                + "WHERE estado = 'COMPLETADA' AND fecha_hora >= ? AND fecha_hora < ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(hoy));
-            ps.setDate(2, Date.valueOf(ayer));
-            ps.setDate(3, Date.valueOf(inicioMesActual));
-            ps.setDate(4, Date.valueOf(finMesActual));
-            ps.setDate(5, Date.valueOf(inicioMesAnterior));
-            ps.setDate(6, Date.valueOf(finMesAnterior));
-            ps.setDate(7, Date.valueOf(limiteInferior));
-            ps.setDate(8, Date.valueOf(limiteSuperior));
+            ps.setTimestamp(1, Timestamp.valueOf(hoy.atStartOfDay()));
+            ps.setTimestamp(2, Timestamp.valueOf(hoy.plusDays(1).atStartOfDay()));
+            ps.setTimestamp(3, Timestamp.valueOf(ayer.atStartOfDay()));
+            ps.setTimestamp(4, Timestamp.valueOf(ayer.plusDays(1).atStartOfDay()));
+            ps.setTimestamp(5, Timestamp.valueOf(inicioMesActual.atStartOfDay()));
+            ps.setTimestamp(6, Timestamp.valueOf(finMesActual.plusDays(1).atStartOfDay()));
+            ps.setTimestamp(7, Timestamp.valueOf(inicioMesAnterior.atStartOfDay()));
+            ps.setTimestamp(8, Timestamp.valueOf(finMesAnterior.plusDays(1).atStartOfDay()));
+            ps.setTimestamp(9, Timestamp.valueOf(limiteInferior.atStartOfDay()));
+            ps.setTimestamp(10, Timestamp.valueOf(limiteSuperior.plusDays(1).atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     ventasHoy = normalizarMoneda(rs.getBigDecimal("v_hoy"));
@@ -326,10 +329,10 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "JOIN venta v ON dv.id_venta = v.id_venta "
                 + "JOIN producto p ON dv.id_producto = p.id_producto "
                 + "JOIN categoria c ON p.id_categoria = c.id_categoria "
-                + "WHERE v.estado = 'COMPLETADA' AND DATE(v.fecha_hora) BETWEEN ? AND ?";
+                + "WHERE v.estado = 'COMPLETADA' AND v.fecha_hora >= ? AND v.fecha_hora < ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(desde));
-            ps.setDate(2, Date.valueOf(hasta));
+            ps.setTimestamp(1, Timestamp.valueOf(desde.atStartOfDay()));
+            ps.setTimestamp(2, Timestamp.valueOf(hasta.plusDays(1).atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     int idCat = rs.getInt("id_categoria");
@@ -388,10 +391,10 @@ public class FinanzasBiDAOImpl implements FinanzasBiDAO {
                 + "LEFT JOIN pedido p ON v.id_pedido = p.id_pedido "
                 + "WHERE v.estado = 'COMPLETADA' "
                 + "AND COALESCE(v.id_cliente, p.id_cliente) IS NOT NULL "
-                + "AND DATE(v.fecha_hora) <= ? "
+                + "AND v.fecha_hora < ? "
                 + "ORDER BY fecha_compra ASC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(corte));
+            ps.setTimestamp(1, Timestamp.valueOf(corte.plusDays(1).atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     int idCli = rs.getInt("id_cli");

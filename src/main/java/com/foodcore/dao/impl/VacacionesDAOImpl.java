@@ -72,13 +72,25 @@ public class VacacionesDAOImpl implements VacacionesDAO {
 
     @Override
     public void incrementarDiasGozados(Connection conn, int idUsuario, int anio, int dias) throws SQLException {
+        if (!incrementarDiasGozadosSiDisponible(conn, idUsuario, anio, dias)) {
+            throw new SQLException("Saldo insuficiente de vacaciones disponibles para el usuario #" + idUsuario
+                    + " en el periodo " + anio + ".");
+        }
+    }
+
+    @Override
+    public boolean incrementarDiasGozadosSiDisponible(Connection conn, int idUsuario, int anio, int dias) throws SQLException {
+        if (dias <= 0) {
+            return false;
+        }
         String sql = "UPDATE vacaciones SET dias_gozados = dias_gozados + ?, fecha_corte = CURRENT_DATE "
-                + "WHERE id_usuario = ? AND periodo_anio = ?";
+                + "WHERE id_usuario = ? AND periodo_anio = ? AND (dias_gozados + ?) <= dias_asignados";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, Math.max(0, dias));
+            ps.setInt(1, dias);
             ps.setInt(2, idUsuario);
             ps.setInt(3, anio);
-            ps.executeUpdate();
+            ps.setInt(4, dias);
+            return ps.executeUpdate() > 0;
         }
     }
 }

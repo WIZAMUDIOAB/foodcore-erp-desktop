@@ -216,11 +216,76 @@ public class FidelizacionDAOImpl implements FidelizacionDAO {
     public boolean actualizarPuntosCliente(Connection conn, int idCliente, int nuevosPuntos) throws SQLException {
         String sql = "UPDATE cliente SET puntos_acumulados = ?, puntos_fidelidad = ? WHERE id_cliente = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, nuevosPuntos);
-            ps.setInt(2, nuevosPuntos);
+            int safe = Math.max(0, nuevosPuntos);
+            ps.setInt(1, safe);
+            ps.setInt(2, safe);
             ps.setInt(3, idCliente);
             return ps.executeUpdate() > 0;
         }
+    }
+
+    @Override
+    public boolean descontarPuntosAtomico(Connection conn, int idCliente, int puntosADescontar) throws SQLException {
+        if (idCliente <= 0 || puntosADescontar <= 0) {
+            return false;
+        }
+        String sql = "UPDATE cliente "
+                + "SET puntos_acumulados = puntos_acumulados - ?, puntos_fidelidad = puntos_acumulados "
+                + "WHERE id_cliente = ? AND puntos_acumulados >= ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, puntosADescontar);
+            ps.setInt(2, idCliente);
+            ps.setInt(3, puntosADescontar);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean acreditarPuntosAtomico(Connection conn, int idCliente, int deltaPuntos) throws SQLException {
+        if (idCliente <= 0 || deltaPuntos == 0) {
+            return false;
+        }
+        String sql = "UPDATE cliente "
+                + "SET puntos_acumulados = GREATEST(0, puntos_acumulados + ?), puntos_fidelidad = puntos_acumulados "
+                + "WHERE id_cliente = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, deltaPuntos);
+            ps.setInt(2, idCliente);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public int obtenerPuntosNetosPorVenta(Connection conn, int idCliente, int idVenta) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(puntos_ganados), 0) AS neto "
+                + "FROM historial_puntos WHERE id_cliente = ? AND id_venta = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCliente);
+            ps.setInt(2, idVenta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("neto");
+                }
+            }
+        }
+        return 0;
+    }
+
+    @Override
+    public int obtenerPuntosGanadosNetosPorVenta(Connection conn, int idCliente, int idVenta) throws SQLException {
+        String sql = "SELECT COALESCE(SUM(CASE WHEN tipo_movimiento IN ('ACUMULACION', 'REVERSION') "
+                + "THEN puntos_ganados ELSE 0 END), 0) AS neto_ganado "
+                + "FROM historial_puntos WHERE id_cliente = ? AND id_venta = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCliente);
+            ps.setInt(2, idVenta);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("neto_ganado");
+                }
+            }
+        }
+        return 0;
     }
 
     @Override
@@ -266,9 +331,25 @@ public class FidelizacionDAOImpl implements FidelizacionDAO {
 
     @Override
     public boolean marcarCuponUsado(Connection conn, String codigoCupon) throws SQLException {
-        String sql = "UPDATE cupon_cumpleanos SET usado = 1 WHERE codigo_cupon = ?";
+        if (codigoCupon == null || codigoCupon.isBlank()) {
+            return false;
+        }
+        String sql = "UPDATE cupon_cumpleanos SET usado = 1 WHERE codigo_cupon = ? AND usado = 0";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codigoCupon);
+            ps.setString(1, codigoCupon.trim());
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean marcarCuponUsado(Connection conn, String codigoCupon, int idCliente) throws SQLException {
+        if (codigoCupon == null || codigoCupon.isBlank() || idCliente <= 0) {
+            return false;
+        }
+        String sql = "UPDATE cupon_cumpleanos SET usado = 1 WHERE codigo_cupon = ? AND id_cliente = ? AND usado = 0";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codigoCupon.trim());
+            ps.setInt(2, idCliente);
             return ps.executeUpdate() > 0;
         }
     }
