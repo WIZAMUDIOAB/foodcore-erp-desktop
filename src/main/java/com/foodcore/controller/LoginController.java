@@ -4,6 +4,10 @@ import com.foodcore.App;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.enums.Permiso;
+import com.foodcore.security.AutorizacionService;
+import com.foodcore.security.SesionManager;
+import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
@@ -39,11 +43,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Controlador de la pantalla de inicio de sesión (§3 y §4 de UI-REDESIGN-SPEC-FOODCORE-v1.1).
@@ -180,6 +189,8 @@ public class LoginController {
         return auroraCanvas;
     }
 
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+
     @FXML
     private void handleLogin() {
         if (autenticating) {
@@ -192,7 +203,7 @@ public class LoginController {
         setEstadoCarga(true);
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> authService.login(user, pass),
+            () -> autenticarCredencialesSinSesion(user, pass),
             usuario -> {
                 setEstadoCarga(false);
                 procesarUsuarioAutenticado(usuario);
@@ -205,7 +216,92 @@ public class LoginController {
     }
 
     /**
+     * Valida credenciales sin establecer sesión activa en {@link SesionManager} cuando 2FA TOTP está habilitado.
+     * Utiliza {@code AuthService.autenticarSoloCredenciales(String, String)} si está disponible.
+     */
+    private Usuario autenticarCredencialesSinSesion(String user, String pass) throws Exception {
+        Method stateless = buscarMetodoStatelessSiAplica(authService);
+        if (stateless != null) {
+            try {
+                return (Usuario) stateless.invoke(authService, user, pass);
+            } catch (InvocationTargetException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof Exception e) {
+                    throw e;
+                }
+                if (cause instanceof Error err) {
+                    throw err;
+                }
+                throw new IllegalStateException("Error invocando autenticarSoloCredenciales", cause);
+            }
+        }
+        Usuario usuario = authService.login(user, pass);
+        if (usuario != null && usuario.isTotpHabilitado()) {
+            AuthService.logout();
+        }
+        return usuario;
+    }
+
+    private static Method buscarMetodoStatelessSiAplica(AuthService service) {
+        Class<?> clazz = service.getClass();
+        Method stateless;
+        try {
+            stateless = clazz.getMethod("autenticarSoloCredenciales", String.class, String.class);
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        }
+        // Si una subclase de prueba sobrescribe únicamente login(String, String), respetarla sin saltar el mock.
+        boolean declaraLoginEnSubclase = false;
+        boolean declaraStatelessEnSubclase = false;
+        if (clazz != AuthService.class && clazz != AuthServiceImpl.class) {
+            try {
+                clazz.getDeclaredMethod("login", String.class, String.class);
+                declaraLoginEnSubclase = true;
+            } catch (NoSuchMethodException ignored) {
+                declaraLoginEnSubclase = false;
+            }
+            try {
+                clazz.getDeclaredMethod("autenticarSoloCredenciales", String.class, String.class);
+                declaraStatelessEnSubclase = true;
+            } catch (NoSuchMethodException ignored) {
+                declaraStatelessEnSubclase = false;
+            }
+        }
+        if (declaraLoginEnSubclase && !declaraStatelessEnSubclase) {
+            return null;
+        }
+        return stateless;
+    }
+
+    private void establecerSesionActiva(Usuario usuario) {
+        if (usuario == null) {
+            return;
+        }
+        try {
+            Method m = authService.getClass().getMethod("establecerSesionActiva", Usuario.class);
+            m.invoke(authService, usuario);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // Fallback previo a merge con swarm/auth-api-sec
+        } catch (IllegalAccessException | InvocationTargetException ex) {
+            LOGGER.warn("No se pudo invocar AuthService.establecerSesionActiva; usando respaldo directo", ex);
+        }
+        Set<Permiso> permisos = AutorizacionService.permisosPorDefectoParaRol(usuario.getNombreRol());
+        SesionUsuario sesion = new SesionUsuario(
+                usuario.getIdUsuario(),
+                usuario.getNombreEmpleado() != null ? usuario.getNombreEmpleado() : usuario.getUsername(),
+                usuario.getNombreRol(),
+                permisos,
+                "POS-01",
+                LocalDateTime.now(ZONA_LIMA)
+        );
+        SesionManager.iniciarSesion(sesion, usuario.isCambioPasswordRequerido());
+        AuthService.setUsuarioSesionActual(usuario);
+    }
+
+    /**
      * Evalúa requisitos post-contraseña (2FA TOTP y cambio de clave obligatorio).
+     * Nunca establece {@link SesionManager} antes de superar la verificación 2FA TOTP.
      *
      * @param usuario Usuario autenticado por credenciales.
      */
@@ -215,6 +311,7 @@ public class LoginController {
             return;
         }
         if (usuario.isTotpHabilitado()) {
+            AuthService.logout();
             abrirModalTotp(usuario);
             return;
         }
@@ -297,6 +394,7 @@ public class LoginController {
     }
 
     private void completarPostLogin(Usuario usuario) {
+        establecerSesionActiva(usuario);
         if (usuario.isCambioPasswordRequerido()) {
             // Regla §3.2 y §4.3: Abrir diálogo modal automáticamente, NUNCA mostrar label rojo en el login
             abrirDialogoCambioPassword(usuario);

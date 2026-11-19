@@ -107,7 +107,8 @@ const FoodCoreOfflineDB = (() => {
     return new Promise((resolve) => {
       const tx = db.transaction([STORE_PRODUCTOS], 'readwrite');
       const store = tx.objectStore(STORE_PRODUCTOS);
-      productos.forEach((p) => store.put(p));
+      store.clear();
+      (Array.isArray(productos) ? productos : []).forEach((p) => store.put(p));
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => resolve(false);
     });
@@ -129,7 +130,8 @@ const FoodCoreOfflineDB = (() => {
     return new Promise((resolve) => {
       const tx = db.transaction([STORE_MESAS], 'readwrite');
       const store = tx.objectStore(STORE_MESAS);
-      mesas.forEach((m) => store.put(m));
+      store.clear();
+      (Array.isArray(mesas) ? mesas : []).forEach((m) => store.put(m));
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => resolve(false);
     });
@@ -146,6 +148,36 @@ const FoodCoreOfflineDB = (() => {
     });
   }
 
+  async function limpiarBaseDatos() {
+    if (dbInstance) {
+      try {
+        await new Promise((resolve) => {
+          const tx = dbInstance.transaction([STORE_OUTBOX, STORE_PRODUCTOS, STORE_MESAS], 'readwrite');
+          tx.objectStore(STORE_OUTBOX).clear();
+          tx.objectStore(STORE_PRODUCTOS).clear();
+          tx.objectStore(STORE_MESAS).clear();
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+          tx.onabort = () => resolve(false);
+        });
+      } catch (_) {}
+      try {
+        dbInstance.close();
+      } catch (_) {}
+      dbInstance = null;
+    }
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => resolve(false);
+        req.onblocked = () => resolve(false);
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
   return {
     abrirDB,
     guardarPedidoOutbox,
@@ -154,6 +186,7 @@ const FoodCoreOfflineDB = (() => {
     guardarCatalogoCache,
     obtenerCatalogoCache,
     guardarMesasCache,
-    obtenerMesasCache
+    obtenerMesasCache,
+    limpiarBaseDatos
   };
 })();

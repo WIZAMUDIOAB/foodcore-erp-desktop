@@ -1,16 +1,67 @@
 /**
- * Controlador Principal Frontend — FoodCore ERP v4.0 Tablet PWA (SPEC-FOODCORE-v4.0 §3, §4)
+ * Controlador Principal Frontend — FoodCore ERP v5.7.1 Tablet PWA
  * Gestiona autenticación JWT, selección de mesas, toma de comanda táctil, envío a KDS
- * y sincronización automática cada 10s desde IndexedDB (`outbox_pedidos`).
+ * y sincronización automática segura desde IndexedDB (`outbox_pedidos`).
  */
 const FoodCorePWA = (() => {
   const THEME_STORAGE_KEY = 'fc_theme';
-  const ICON_SUN_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
-  const ICON_MOON_SVG = '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const PIN_AUTO_SUBMIT_DELAY_MS = 450;
 
   const API_BASE = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file://'))
     ? `${window.location.origin}/api`
     : 'https://localhost:8443/api';
+
+  function crearSvgElemento(tag, attrs = {}) {
+    const el = document.createElementNS(SVG_NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
+    return el;
+  }
+
+  function crearIconoTemaSvg(esOscuro) {
+    const svg = crearSvgElemento('svg', {
+      class: 'ui-icon',
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '2',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true'
+    });
+    if (esOscuro) {
+      svg.appendChild(crearSvgElemento('circle', { cx: '12', cy: '12', r: '4' }));
+      ['M12 2v2', 'M12 20v2', 'm4.93 4.93 1.41 1.41', 'm17.66 17.66 1.41 1.41',
+        'M2 12h2', 'M20 12h2', 'm6.34 17.66-1.41 1.41', 'm19.07 4.93-1.41 1.41'].forEach((d) => {
+        svg.appendChild(crearSvgElemento('path', { d }));
+      });
+    } else {
+      svg.appendChild(crearSvgElemento('path', { d: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' }));
+    }
+    return svg;
+  }
+
+  /**
+   * Valida estrictamente el esquema de imagen_url:
+   * permite únicamente rutas relativas (/uploads/... o /...) o URLs http:// / https://.
+   */
+  function esUrlImagenSegura(url) {
+    if (typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return false;
+    if (/^\/(?!\/)/.test(trimmed)) {
+      return !trimmed.includes('..');
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return false;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_) {
+      return false;
+    }
+  }
 
   function resolverTemaInicial() {
     try {
@@ -34,7 +85,7 @@ const FoodCorePWA = (() => {
     }
     const btn = document.getElementById('btnThemeToggle');
     if (btn) {
-      btn.innerHTML = esOscuro ? ICON_SUN_SVG : ICON_MOON_SVG;
+      btn.replaceChildren(crearIconoTemaSvg(esOscuro));
       btn.setAttribute('aria-pressed', esOscuro ? 'true' : 'false');
     }
   }
@@ -77,6 +128,7 @@ const FoodCorePWA = (() => {
   let itemSeleccionadoId = null;
   let modoOfflineSimulado = false;
   let estadoOnline = true;
+  let syncEnProgreso = false;
 
   const CATALOGO_FALLBACK = [
     {
@@ -158,11 +210,6 @@ const FoodCorePWA = (() => {
     }
   ];
 
-  /**
-   * Extrae las iniciales profesionales del producto para el contenedor fallback SaaS (v4.0.1):
-   * - Primera letra de la primera y última palabra del nombre del producto.
-   * - Si el nombre es de una sola palabra, usa las dos primeras letras.
-   */
   function obtenerInicialesProducto(nombre) {
     const limpio = String(nombre || '').trim();
     if (!limpio) {
@@ -178,14 +225,18 @@ const FoodCorePWA = (() => {
   }
 
   function generarUUIDv4() {
-    if (window.crypto && window.crypto.randomUUID) {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
       return window.crypto.randomUUID();
     }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+    throw new Error('Web Crypto API no disponible para generar identificadores seguros.');
   }
 
   function registrarServiceWorker() {
@@ -203,6 +254,39 @@ const FoodCorePWA = (() => {
     }
   }
 
+  /**
+   * Cierre de sesión real de la PWA: limpia tokens y datos locales (localStorage, sessionStorage e IndexedDB).
+   */
+  async function cerrarSesionPwa(redirectUrl = 'index.html') {
+    carrito = [];
+    usuariosActivosCache = [];
+    usuarioSeleccionadoPin = null;
+    usuarioSeleccionadoModal = null;
+    try {
+      localStorage.removeItem('fc_pwa_token');
+      localStorage.removeItem('fc_pwa_user');
+      localStorage.clear();
+    } catch (_) {}
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
+    try {
+      if (typeof FoodCoreOfflineDB !== 'undefined' && typeof FoodCoreOfflineDB.limpiarBaseDatos === 'function') {
+        await FoodCoreOfflineDB.limpiarBaseDatos();
+      } else if (typeof indexedDB !== 'undefined') {
+        await new Promise((resolve) => {
+          const req = indexedDB.deleteDatabase('foodcore_pwa_db');
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => resolve(false);
+          req.onblocked = () => resolve(false);
+        });
+      }
+    } catch (_) {}
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }
+
   function mostrarToast(mensaje) {
     const toast = document.getElementById('toastBanner');
     if (!toast) return;
@@ -214,9 +298,6 @@ const FoodCorePWA = (() => {
     }, 3400);
   }
 
-  /**
-   * Actualiza el indicador visual circular verde/rojo y el contador de Outbox IndexedDB.
-   */
   async function actualizarIndicadorConexion(conectado) {
     estadoOnline = conectado && !modoOfflineSimulado;
     const dot = document.getElementById('statusDot');
@@ -257,14 +338,18 @@ const FoodCorePWA = (() => {
   }
 
   /**
-   * Ciclo de sincronización cada 10 segundos (SPEC-FOODCORE-v4.0 §4):
-   * Reintenta enviar los pedidos de `outbox_pedidos` a `POST /api/pedidos` y los elimina al tener éxito.
+   * Ciclo de sincronización protegido por mutex `syncEnProgreso`.
+   * No reintenta ni trata HTTP 400/401/403 como fallos de conectividad offline.
    */
   async function sincronizarOutbox() {
+    if (syncEnProgreso) {
+      return;
+    }
     if (modoOfflineSimulado || typeof FoodCoreOfflineDB === 'undefined') {
       await actualizarIndicadorConexion(false);
       return;
     }
+    syncEnProgreso = true;
     try {
       const pendientes = await FoodCoreOfflineDB.obtenerPedidosPendientes();
       if (pendientes.length === 0) {
@@ -272,7 +357,7 @@ const FoodCorePWA = (() => {
         return;
       }
 
-      let huboFallo = false;
+      let huboFalloRed = false;
       for (const pedido of pendientes) {
         try {
           const res = await fetch(`${API_BASE}/pedidos`, {
@@ -283,16 +368,31 @@ const FoodCorePWA = (() => {
           if (res.ok) {
             await FoodCoreOfflineDB.eliminarPedidoOutbox(pedido.uuid_local);
             mostrarToast(`✓ Pedido sincronizado con Cocina (Mesa ${pedido.numero_mesa})`);
+          } else if (res.status === 401) {
+            mostrarToast('⚠ Sesión expirada. Inicie sesión para sincronizar pedidos pendientes.');
+            return;
+          } else if (res.status === 400 || res.status === 403) {
+            await FoodCoreOfflineDB.eliminarPedidoOutbox(pedido.uuid_local);
+            let msgErr = 'Pedido rechazado por validación del servidor.';
+            try {
+              const errData = await res.json();
+              if (errData && (errData.message || errData.error)) {
+                msgErr = errData.message || errData.error;
+              }
+            } catch (_) {}
+            mostrarToast(`⚠ ${msgErr}`);
           } else {
-            huboFallo = true;
+            huboFalloRed = true;
           }
         } catch (_) {
-          huboFallo = true;
+          huboFalloRed = true;
         }
       }
-      await actualizarIndicadorConexion(!huboFallo);
+      await actualizarIndicadorConexion(!huboFalloRed);
     } catch (_) {
       await actualizarIndicadorConexion(false);
+    } finally {
+      syncEnProgreso = false;
     }
   }
 
@@ -359,6 +459,22 @@ const FoodCorePWA = (() => {
       lblMozo.textContent = `${user.nombre}`;
     }
 
+    const btnLogout = document.getElementById('btnCerrarSesionPwa');
+    if (btnLogout && !btnLogout.dataset.bound) {
+      btnLogout.dataset.bound = '1';
+      btnLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        cerrarSesionPwa('index.html');
+      });
+    }
+
+    document.querySelectorAll('[data-filter-mesas]').forEach((btn) => {
+      if (!btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => cargarMesas(btn.dataset.filterMesas || 'TODAS'));
+      }
+    });
+
     await cargarMesas('TODAS');
     setInterval(sincronizarOutbox, 4000);
   }
@@ -370,6 +486,10 @@ const FoodCorePWA = (() => {
         cache: 'no-store',
         headers: getAuthHeaders()
       });
+      if (res.status === 401) {
+        await cerrarSesionPwa('index.html');
+        return;
+      }
       if (res.ok) {
         listaMesas = await res.json();
         await FoodCoreOfflineDB.guardarMesasCache(listaMesas);
@@ -380,22 +500,7 @@ const FoodCorePWA = (() => {
     } catch (_) {
       await actualizarIndicadorConexion(false);
       const cache = await FoodCoreOfflineDB.obtenerMesasCache();
-      if (cache && cache.length > 0) {
-        listaMesas = cache;
-      } else {
-        listaMesas = Array.from({ length: 12 }, (_, idx) => {
-          const num = String(idx + 1).padStart(2, '0');
-          const ocupada = idx === 0 || idx === 1 || idx === 3;
-          return {
-            id: idx + 1,
-            numero: num,
-            capacidad: (idx % 3 === 0) ? 6 : 4,
-            zona: idx < 8 ? 'Salón Principal' : 'Terraza Lounge',
-            estado: ocupada ? 'OCUPADA' : 'LIBRE',
-            total_actual: ocupada ? 74.50 : 0.0
-          };
-        });
-      }
+      listaMesas = Array.isArray(cache) ? cache : [];
     }
     renderizarMesas(filtroEstado);
   }
@@ -403,38 +508,64 @@ const FoodCorePWA = (() => {
   function renderizarMesas(filtro = 'TODAS') {
     const grid = document.getElementById('mesasGrid');
     if (!grid) return;
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     const filtradas = listaMesas.filter((m) => {
       if (filtro === 'TODAS') return true;
       return (m.estado || 'LIBRE').toUpperCase() === filtro;
     });
 
+    if (filtradas.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'cart-empty';
+      empty.textContent = 'No hay mesas disponibles para mostrar en este filtro.';
+      grid.appendChild(empty);
+      return;
+    }
+
     filtradas.forEach((m) => {
       const estado = (m.estado || 'LIBRE').toUpperCase();
       const claseEstado = estado === 'OCUPADA' ? 'ocupada' : 'libre';
+      const numeroMesa = String(m.numero ?? '');
+
       const card = document.createElement('div');
       card.className = `mesa-card ${claseEstado}`;
-      card.onclick = () => {
-        window.location.href = `catalogo.html?mesa=${encodeURIComponent(m.numero)}`;
-      };
-      const totalTexto = m.total_actual && m.total_actual > 0
+      card.addEventListener('click', () => {
+        window.location.href = `catalogo.html?mesa=${encodeURIComponent(numeroMesa)}`;
+      });
+
+      const top = document.createElement('div');
+      top.className = 'mesa-top';
+
+      const numSpan = document.createElement('span');
+      numSpan.className = 'mesa-number';
+      numSpan.textContent = `Mesa ${numeroMesa}`;
+
+      const badgeSpan = document.createElement('span');
+      badgeSpan.className = `mesa-badge ${claseEstado}`;
+      badgeSpan.textContent = estado;
+      top.append(numSpan, badgeSpan);
+
+      const meta = document.createElement('div');
+      meta.className = 'mesa-meta';
+
+      const zonaSpan = document.createElement('span');
+      zonaSpan.textContent = `${m.zona || 'Salón Principal'} · ${Number(m.capacidad) || 4} pax`;
+
+      const totalSpan = document.createElement('span');
+      totalSpan.className = 'mesa-total';
+      totalSpan.textContent = (m.total_actual && Number(m.total_actual) > 0)
         ? `S/ ${Number(m.total_actual).toFixed(2)}`
         : 'Disponible';
+      meta.append(zonaSpan, totalSpan);
 
-      card.innerHTML = `
-        <div class="mesa-top">
-          <span class="mesa-number">Mesa ${m.numero}</span>
-          <span class="mesa-badge ${claseEstado}">${estado}</span>
-        </div>
-        <div class="mesa-meta">
-          <span>${m.zona || 'Salón Principal'} · ${m.capacidad || 4} pax</span>
-          <span class="mesa-total">${totalTexto}</span>
-        </div>
-        <button type="button" class="btn-touch ${estado === 'OCUPADA' ? 'btn-primary' : 'btn-secondary'}" style="width:100%;">
-          ${estado === 'OCUPADA' ? 'Ver / Adicionar Comanda' : '+ Tomar Pedido'}
-        </button>
-      `;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn-touch ${estado === 'OCUPADA' ? 'btn-primary' : 'btn-secondary'}`;
+      btn.style.width = '100%';
+      btn.textContent = estado === 'OCUPADA' ? 'Ver / Adicionar Comanda' : '+ Tomar Pedido';
+
+      card.append(top, meta, btn);
       grid.appendChild(card);
     });
   }
@@ -471,6 +602,8 @@ const FoodCorePWA = (() => {
       });
     }
 
+    vincularEventosCatalogo();
+
     await cargarCatalogoProductos();
 
     if (esDemo && carrito.length === 0 && catalogoProductos.length >= 3) {
@@ -482,10 +615,41 @@ const FoodCorePWA = (() => {
     renderizarCarrito();
     setInterval(sincronizarOutbox, 4000);
 
-    // Auto-refresco del catálogo cada 30 segundos (v4.2.0 Sub-Fase A)
     setInterval(async () => {
       await cargarCatalogoProductos(true);
     }, 30000);
+  }
+
+  function vincularEventosCatalogo() {
+    const bindClick = (id, handler) => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.bound) {
+        el.dataset.bound = '1';
+        el.addEventListener('click', handler);
+      }
+    };
+
+    bindClick('btnCambiarMozo', () => abrirModalCambiarMozo());
+    bindClick('btnEnviarCocina', () => enviarPedidoACocina());
+    bindClick('btnCerrarModalMozo', () => cerrarModalCambiarMozo());
+    bindClick('btnCancelarCambioMozo', () => cerrarModalCambiarMozo());
+    bindClick('btnConfirmarCambioMozo', () => confirmarCambioMozoPin());
+    bindClick('btnModalPinClear', () => limpiarPinModal());
+    bindClick('btnModalPinDelete', () => borrarDigitoPinModal());
+
+    document.querySelectorAll('.note-chip[data-note]').forEach((chip) => {
+      if (!chip.dataset.bound) {
+        chip.dataset.bound = '1';
+        chip.addEventListener('click', () => aplicarChipNota(chip.dataset.note));
+      }
+    });
+
+    document.querySelectorAll('#modalCambiarMozo .pin-btn[data-modal-digit]').forEach((btn) => {
+      if (!btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => presionarDigitoPinModal(btn.dataset.modalDigit));
+      }
+    });
   }
 
   async function cargarCatalogoProductos(silencioso = false) {
@@ -522,7 +686,6 @@ const FoodCorePWA = (() => {
     const container = document.getElementById('categoryTabs');
     if (!container) return;
 
-    // Recolectar categorías presentes en el catálogo
     const categoriasSet = new Set();
     catalogoProductos.forEach((p) => {
       if (p.categoria && p.categoria.trim()) {
@@ -531,32 +694,29 @@ const FoodCorePWA = (() => {
     });
     const categoriasUnicas = Array.from(categoriasSet);
 
-    container.innerHTML = '';
+    container.replaceChildren();
 
-    // 1. Tab Todos los Platos
     const btnTodos = document.createElement('button');
     btnTodos.type = 'button';
     btnTodos.className = `cat-tab ${categoriaActiva === 'TODOS' ? 'active' : ''}`;
     btnTodos.textContent = 'Todos los Platos';
-    btnTodos.onclick = () => filtrarCategoria('TODOS', btnTodos);
+    btnTodos.addEventListener('click', () => filtrarCategoria('TODOS', btnTodos));
     container.appendChild(btnTodos);
 
-    // 2. Tab Menú del Día
     const btnMenuDia = document.createElement('button');
     btnMenuDia.type = 'button';
     btnMenuDia.className = `cat-tab tab-menu-dia ${categoriaActiva === 'MENU_DEL_DIA' ? 'active' : ''}`;
-    btnMenuDia.innerHTML = '⭐ Menú del Día';
-    btnMenuDia.onclick = () => filtrarCategoria('MENU_DEL_DIA', btnMenuDia);
+    btnMenuDia.textContent = '⭐ Menú del Día';
+    btnMenuDia.addEventListener('click', () => filtrarCategoria('MENU_DEL_DIA', btnMenuDia));
     container.appendChild(btnMenuDia);
 
-    // 3. Categorías dinámicas
     categoriasUnicas.forEach((cat) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       const esActiva = categoriaActiva.toLowerCase() === cat.toLowerCase();
       btn.className = `cat-tab ${esActiva ? 'active' : ''}`;
       btn.textContent = cat;
-      btn.onclick = () => filtrarCategoria(cat, btn);
+      btn.addEventListener('click', () => filtrarCategoria(cat, btn));
       container.appendChild(btn);
     });
   }
@@ -570,10 +730,18 @@ const FoodCorePWA = (() => {
     renderizarCatalogo();
   }
 
+  function crearFallbackThumb(nombre, iniciales) {
+    const fallbackDiv = document.createElement('div');
+    fallbackDiv.className = 'dish-thumb-fallback';
+    fallbackDiv.setAttribute('aria-label', String(nombre || 'Producto'));
+    fallbackDiv.textContent = iniciales;
+    return fallbackDiv;
+  }
+
   function renderizarCatalogo() {
     const grid = document.getElementById('dishesGrid');
     if (!grid) return;
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     const filtrados = catalogoProductos.filter((p) => {
       let coincideCat = false;
@@ -585,10 +753,11 @@ const FoodCorePWA = (() => {
         coincideCat = p.categoria && (p.categoria.toLowerCase() === categoriaActiva.toLowerCase() || p.categoria.toLowerCase().includes(categoriaActiva.toLowerCase()));
       }
 
+      const nombre = String(p.nombre || '');
       const coincideTexto = !textoBusqueda
-        || p.nombre.toLowerCase().includes(textoBusqueda)
-        || (p.descripcion && p.descripcion.toLowerCase().includes(textoBusqueda))
-        || (p.codigo && p.codigo.toLowerCase().includes(textoBusqueda));
+        || nombre.toLowerCase().includes(textoBusqueda)
+        || (p.descripcion && String(p.descripcion).toLowerCase().includes(textoBusqueda))
+        || (p.codigo && String(p.codigo).toLowerCase().includes(textoBusqueda));
 
       return coincideCat && coincideTexto;
     });
@@ -597,67 +766,91 @@ const FoodCorePWA = (() => {
       const card = document.createElement('div');
       const disponible = (p.disponible !== false && p.disponible !== 0);
       const esMenuDia = (p.es_menu_del_dia === true || p.es_menu_del_dia === 1);
+      const nombreProd = String(p.nombre || 'Platillo');
 
       card.className = `dish-card ${disponible ? '' : 'dish-card-agotado'}`.trim();
-      const iniciales = obtenerInicialesProducto(p.nombre);
+      const iniciales = obtenerInicialesProducto(nombreProd);
       const imgUrl = (typeof p.imagen_url === 'string') ? p.imagen_url.trim() : '';
-      const tieneImagenValida = Boolean(imgUrl && imgUrl !== 'null' && imgUrl !== 'undefined');
 
-      const mediaHtml = tieneImagenValida
-        ? `<img class="dish-thumb" src="${imgUrl}" alt="${p.nombre}" style="object-fit: cover;" onerror="const d=document.createElement('div'); d.className='dish-thumb-fallback'; d.setAttribute('aria-label', '${(p.nombre || '').replace(/'/g, "\\'")}'); d.textContent='${iniciales}'; this.replaceWith(d);" />`
-        : `<div class="dish-thumb-fallback" aria-label="${p.nombre}">${iniciales}</div>`;
+      const thumbWrapper = document.createElement('div');
+      thumbWrapper.className = 'dish-thumb-wrapper';
 
-      const badgeMenuDia = esMenuDia ? `<span class="dish-badge-menu-dia">⭐ Menú del Día</span>` : '';
-      const badgeAgotado = !disponible ? `<span class="dish-badge-agotado">AGOTADO</span>` : '';
-
-      card.innerHTML = `
-        <div class="dish-thumb-wrapper">${mediaHtml}</div>
-        <div class="dish-body">
-          <div style="display:flex; align-items:center; flex-wrap:wrap;">
-            <span class="dish-category-tag">${p.categoria || 'Especialidad'}</span>
-            ${badgeMenuDia}
-            ${badgeAgotado}
-          </div>
-          <div class="dish-title">${p.nombre}</div>
-          <div class="dish-desc">${p.descripcion || 'Preparación al instante en cocina'}</div>
-          <div class="dish-footer">
-            <span class="dish-price">S/ ${Number(p.precio).toFixed(2)}</span>
-            <button type="button" class="btn-add-dish ${disponible ? '' : 'disabled'}" ${disponible ? '' : 'disabled'} aria-label="${disponible ? 'Agregar ' + p.nombre : p.nombre + ' agotado'}">
-              ${disponible ? '+' : '✕'}
-            </button>
-          </div>
-        </div>
-      `;
-
-      const imgEl = card.querySelector('img.dish-thumb');
-      if (imgEl) {
+      if (esUrlImagenSegura(imgUrl)) {
+        const imgEl = document.createElement('img');
+        imgEl.className = 'dish-thumb';
+        imgEl.alt = nombreProd;
+        imgEl.style.objectFit = 'cover';
         const replaceWithFallback = () => {
-          const fallbackDiv = document.createElement('div');
-          fallbackDiv.className = 'dish-thumb-fallback';
-          fallbackDiv.setAttribute('aria-label', p.nombre);
-          fallbackDiv.textContent = iniciales;
           if (imgEl.parentNode) {
-            imgEl.replaceWith(fallbackDiv);
+            imgEl.replaceWith(crearFallbackThumb(nombreProd, iniciales));
           }
         };
-        imgEl.addEventListener('error', replaceWithFallback);
+        imgEl.addEventListener('error', replaceWithFallback, { once: true });
+        imgEl.src = imgUrl;
+        thumbWrapper.appendChild(imgEl);
         if (imgEl.complete && imgEl.naturalWidth === 0) {
           replaceWithFallback();
         }
-        imgEl.addEventListener('error', () => {
-          const fallbackDiv = document.createElement('div');
-          fallbackDiv.className = 'dish-thumb-fallback';
-          fallbackDiv.setAttribute('aria-label', p.nombre);
-          fallbackDiv.textContent = iniciales;
-          imgEl.replaceWith(fallbackDiv);
-        });
+      } else {
+        thumbWrapper.appendChild(crearFallbackThumb(nombreProd, iniciales));
       }
 
+      const body = document.createElement('div');
+      body.className = 'dish-body';
+
+      const tagsRow = document.createElement('div');
+      tagsRow.style.display = 'flex';
+      tagsRow.style.alignItems = 'center';
+      tagsRow.style.flexWrap = 'wrap';
+
+      const catTag = document.createElement('span');
+      catTag.className = 'dish-category-tag';
+      catTag.textContent = p.categoria || 'Especialidad';
+      tagsRow.appendChild(catTag);
+
+      if (esMenuDia) {
+        const badgeMenu = document.createElement('span');
+        badgeMenu.className = 'dish-badge-menu-dia';
+        badgeMenu.textContent = '⭐ Menú del Día';
+        tagsRow.appendChild(badgeMenu);
+      }
+      if (!disponible) {
+        const badgeAgot = document.createElement('span');
+        badgeAgot.className = 'dish-badge-agotado';
+        badgeAgot.textContent = 'AGOTADO';
+        tagsRow.appendChild(badgeAgot);
+      }
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'dish-title';
+      titleEl.textContent = nombreProd;
+
+      const descEl = document.createElement('div');
+      descEl.className = 'dish-desc';
+      descEl.textContent = p.descripcion || 'Preparación al instante en cocina';
+
+      const footerEl = document.createElement('div');
+      footerEl.className = 'dish-footer';
+
+      const priceEl = document.createElement('span');
+      priceEl.className = 'dish-price';
+      priceEl.textContent = `S/ ${Number(p.precio || 0).toFixed(2)}`;
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = `btn-add-dish ${disponible ? '' : 'disabled'}`.trim();
+      addBtn.disabled = !disponible;
+      addBtn.setAttribute('aria-label', disponible ? `Agregar ${nombreProd}` : `${nombreProd} agotado`);
+      addBtn.textContent = disponible ? '+' : '✕';
       if (disponible) {
-        card.querySelector('.btn-add-dish').addEventListener('click', () => {
+        addBtn.addEventListener('click', () => {
           agregarAlCarritoPorObjeto(p, 1, '');
         });
       }
+
+      footerEl.append(priceEl, addBtn);
+      body.append(tagsRow, titleEl, descEl, footerEl);
+      card.append(thumbWrapper, body);
       grid.appendChild(card);
     });
   }
@@ -730,52 +923,98 @@ const FoodCorePWA = (() => {
     if (igvEl) igvEl.textContent = `S/ ${igvMonto.toFixed(2)}`;
     if (totEl) totEl.textContent = `S/ ${totalMonto.toFixed(2)}`;
 
+    listEl.replaceChildren();
     if (carrito.length === 0) {
-      listEl.innerHTML = `<div class="cart-empty">Aún no hay platos en la comanda.<br/>Toque el botón <strong>+</strong> de cualquier plato para agregarlo.</div>`;
+      const empty = document.createElement('div');
+      empty.className = 'cart-empty';
+      empty.append(
+        document.createTextNode('Aún no hay platos en la comanda.'),
+        document.createElement('br'),
+        document.createTextNode('Toque el botón ')
+      );
+      const strong = document.createElement('strong');
+      strong.textContent = '+';
+      empty.append(strong, document.createTextNode(' de cualquier plato para agregarlo.'));
+      listEl.appendChild(empty);
       return;
     }
 
-    listEl.innerHTML = '';
     carrito.forEach((item) => {
       const sub = item.cantidad * item.precio_unitario;
       const div = document.createElement('div');
       div.className = 'cart-item';
-      div.onclick = () => {
+      div.addEventListener('click', () => {
         itemSeleccionadoId = item.id_producto;
-      };
-      div.innerHTML = `
-        <div class="cart-item-top">
-          <span class="cart-item-name">${item.nombre}</span>
-          <span class="cart-item-subtotal">S/ ${sub.toFixed(2)}</span>
-        </div>
-        <div class="cart-item-controls">
-          <span style="font-size:12.5px;color:var(--text-secondary);font-variant-numeric:tabular-nums;">P.U. S/ ${item.precio_unitario.toFixed(2)}</span>
-          <div class="qty-stepper">
-            <button type="button" class="btn-qty" data-action="dec">-</button>
-            <span class="qty-value">${item.cantidad}</span>
-            <button type="button" class="btn-qty" data-action="inc">+</button>
-          </div>
-        </div>
-        <input type="text" class="cart-item-note-input" placeholder="Nota de cocina (ej. sin cremas, término 3/4)..." value="${item.notas || ''}" />
-      `;
-      div.querySelector('[data-action="dec"]').addEventListener('click', (e) => {
+      });
+
+      const top = document.createElement('div');
+      top.className = 'cart-item-top';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'cart-item-name';
+      nameSpan.textContent = String(item.nombre || '');
+
+      const subSpan = document.createElement('span');
+      subSpan.className = 'cart-item-subtotal';
+      subSpan.textContent = `S/ ${sub.toFixed(2)}`;
+      top.append(nameSpan, subSpan);
+
+      const controls = document.createElement('div');
+      controls.className = 'cart-item-controls';
+
+      const puSpan = document.createElement('span');
+      puSpan.style.fontSize = '12.5px';
+      puSpan.style.color = 'var(--text-secondary)';
+      puSpan.style.fontVariantNumeric = 'tabular-nums';
+      puSpan.textContent = `P.U. S/ ${Number(item.precio_unitario).toFixed(2)}`;
+
+      const stepper = document.createElement('div');
+      stepper.className = 'qty-stepper';
+
+      const btnDec = document.createElement('button');
+      btnDec.type = 'button';
+      btnDec.className = 'btn-qty';
+      btnDec.dataset.action = 'dec';
+      btnDec.textContent = '-';
+      btnDec.addEventListener('click', (e) => {
         e.stopPropagation();
         cambiarCantidadCarrito(item.id_producto, -1);
       });
-      div.querySelector('[data-action="inc"]').addEventListener('click', (e) => {
+
+      const qtyVal = document.createElement('span');
+      qtyVal.className = 'qty-value';
+      qtyVal.textContent = String(item.cantidad);
+
+      const btnInc = document.createElement('button');
+      btnInc.type = 'button';
+      btnInc.className = 'btn-qty';
+      btnInc.dataset.action = 'inc';
+      btnInc.textContent = '+';
+      btnInc.addEventListener('click', (e) => {
         e.stopPropagation();
         cambiarCantidadCarrito(item.id_producto, 1);
       });
-      div.querySelector('.cart-item-note-input').addEventListener('input', (e) => {
+
+      stepper.append(btnDec, qtyVal, btnInc);
+      controls.append(puSpan, stepper);
+
+      const noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.className = 'cart-item-note-input';
+      noteInput.placeholder = 'Nota de cocina (ej. sin cremas, término 3/4)...';
+      noteInput.value = item.notas || '';
+      noteInput.addEventListener('input', (e) => {
         actualizarNotaItem(item.id_producto, e.target.value);
       });
+
+      div.append(top, controls, noteInput);
       listEl.appendChild(div);
     });
   }
 
   /**
    * Envía el pedido a `POST /api/pedidos` con `uuid_local` idempotente.
-   * Si la API no responde (o está en modo Offline), lo guarda en IndexedDB (`outbox_pedidos`) con estado `PENDIENTE`.
+   * Rechazos HTTP 400/401/403 NO se encolan como fallos offline.
    */
   async function enviarPedidoACocina() {
     if (carrito.length === 0) {
@@ -818,8 +1057,28 @@ const FoodCorePWA = (() => {
         body: JSON.stringify(pedidoPayload)
       });
 
+      if (res.status === 401) {
+        mostrarToast('⚠ Sesión expirada o no autorizada. Inicie sesión nuevamente.');
+        await cerrarSesionPwa('index.html');
+        return;
+      }
+
+      if (res.status === 400 || res.status === 403) {
+        let mensajeError = res.status === 403
+          ? 'No tiene permisos para enviar pedidos.'
+          : 'El pedido contiene datos inválidos o productos agotados.';
+        try {
+          const errJson = await res.json();
+          if (errJson && (errJson.message || errJson.error)) {
+            mensajeError = errJson.message || errJson.error;
+          }
+        } catch (_) {}
+        mostrarToast(`⚠ ${mensajeError}`);
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error('Servidor API no disponible');
+        throw new Error('Servidor API temporalmente no disponible');
       }
 
       const data = await res.json();
@@ -828,12 +1087,11 @@ const FoodCorePWA = (() => {
       await actualizarIndicadorConexion(true);
       mostrarToast(`✓ Comanda ${data.numero_comanda} enviada a Cocina (Mesa ${numeroMesa})`);
     } catch (_) {
-      // Flujo Offline garantizado por IndexedDB (SPEC §4)
       await FoodCoreOfflineDB.guardarPedidoOutbox(pedidoPayload);
       carrito = [];
       renderizarCarrito();
       await actualizarIndicadorConexion(false);
-      mostrarToast(`📦 Sin conexión: Pedido guardado en IndexedDB (outbox_pedidos PENDIENTE)`);
+      mostrarToast('📦 Sin conexión: Pedido guardado en IndexedDB (outbox_pedidos PENDIENTE)');
     }
   }
 
@@ -845,17 +1103,22 @@ const FoodCorePWA = (() => {
   }
 
   // =========================================================================
-  // SUB-FASE C.1: MODO MOZO Y SEGURIDAD PIN (v4.2.0)
+  // SUB-FASE C.1: MODO MOZO Y SEGURIDAD PIN (4 a 6 dígitos)
   // =========================================================================
   let pinActual = '';
   let usuarioSeleccionadoPin = null;
   let pinModalActual = '';
   let usuarioSeleccionadoModal = null;
   let usuariosActivosCache = [];
+  let pinAutoSubmitTimer = null;
+  let pinModalAutoSubmitTimer = null;
+  let pinSubmitEnProgreso = false;
+  let pinModalSubmitEnProgreso = false;
 
   async function iniciarPinLoginView() {
     inicializarTemaPwa();
     registrarServiceWorker();
+    vincularEventosPinLogin();
     await verificarSaludApi();
     await cargarUsuariosActivosPinLogin();
 
@@ -872,10 +1135,35 @@ const FoodCorePWA = (() => {
     });
   }
 
+  function vincularEventosPinLogin() {
+    document.querySelectorAll('#pinKeypad .pin-btn[data-digit]').forEach((btn) => {
+      if (!btn.dataset.bound) {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => presionarDigitoPin(btn.dataset.digit));
+      }
+    });
+    const btnClear = document.getElementById('btnPinClear');
+    if (btnClear && !btnClear.dataset.bound) {
+      btnClear.dataset.bound = '1';
+      btnClear.addEventListener('click', limpiarPin);
+    }
+    const btnDel = document.getElementById('btnPinDelete');
+    if (btnDel && !btnDel.dataset.bound) {
+      btnDel.dataset.bound = '1';
+      btnDel.addEventListener('click', borrarUltimoDigitoPin);
+    }
+    const btnSubmit = document.getElementById('btnPinSubmit');
+    if (btnSubmit && !btnSubmit.dataset.bound) {
+      btnSubmit.dataset.bound = '1';
+      btnSubmit.addEventListener('click', () => ejecutarPinLogin());
+    }
+  }
+
   async function cargarUsuariosActivosPinLogin() {
     const grid = document.getElementById('mozosGrid');
     if (!grid) return;
 
+    usuariosActivosCache = [];
     try {
       if (localStorage.getItem('fc_pwa_token')) {
         const res = await fetch(`${API_BASE}/usuarios/activos`, {
@@ -892,33 +1180,49 @@ const FoodCorePWA = (() => {
     }
 
     if (usuariosActivosCache && usuariosActivosCache.length > 0) {
-      grid.innerHTML = '';
+      grid.replaceChildren();
       usuariosActivosCache.forEach((u, index) => {
         const card = document.createElement('div');
         const esActivo = index === 0;
+        const userId = u.id || u.id_usuario;
+        const nombreStr = String(u.nombre || u.username || 'Operador');
+        const rolStr = String(u.rol || 'MOZO');
         card.className = `mozo-card ${esActivo ? 'active' : ''}`;
-        card.dataset.id = u.id || u.id_usuario;
-        card.dataset.username = u.username;
-        card.dataset.nombre = u.nombre;
-        const iniciales = obtenerInicialesNombre(u.nombre);
-        const esAdmin = (u.rol || '').toUpperCase().includes('ADMIN');
+        card.dataset.id = String(userId || '');
+        card.dataset.username = String(u.username || '');
+        card.dataset.nombre = nombreStr;
+        const iniciales = obtenerInicialesNombre(nombreStr);
+        const esAdmin = rolStr.toUpperCase().includes('ADMIN');
 
-        card.innerHTML = `
-          <div class="mozo-avatar-circle ${esAdmin ? 'admin' : ''}">${iniciales}</div>
-          <div class="mozo-info">
-            <span class="mozo-name">${u.nombre}</span>
-            <span class="mozo-role-badge ${esAdmin ? 'badge-admin' : ''}">${u.rol || 'MOZO'}</span>
-          </div>
-          <span class="pin-ready-dot" title="${u.tiene_pin ? 'PIN configurado' : 'Sin PIN'}"></span>
-        `;
-        card.onclick = () => seleccionarUsuarioPin(card);
+        const avatar = document.createElement('div');
+        avatar.className = `mozo-avatar-circle ${esAdmin ? 'admin' : ''}`.trim();
+        avatar.textContent = iniciales;
+
+        const info = document.createElement('div');
+        info.className = 'mozo-info';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'mozo-name';
+        nameEl.textContent = nombreStr;
+
+        const roleEl = document.createElement('span');
+        roleEl.className = `mozo-role-badge ${esAdmin ? 'badge-admin' : ''}`.trim();
+        roleEl.textContent = rolStr;
+        info.append(nameEl, roleEl);
+
+        const dot = document.createElement('span');
+        dot.className = 'pin-ready-dot';
+        dot.title = u.tiene_pin ? 'PIN configurado' : 'Sin PIN';
+
+        card.append(avatar, info, dot);
+        card.addEventListener('click', () => seleccionarUsuarioPin(card));
         grid.appendChild(card);
 
         if (esActivo) {
           usuarioSeleccionadoPin = {
-            id: u.id || u.id_usuario,
+            id: userId,
             username: u.username,
-            nombre: u.nombre
+            nombre: nombreStr
           };
           actualizarLabelTargetMozo();
         }
@@ -927,12 +1231,12 @@ const FoodCorePWA = (() => {
   }
 
   function seleccionarUsuarioPin(element) {
-    document.querySelectorAll('.mozo-card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.mozo-card').forEach((c) => c.classList.remove('active'));
     element.classList.add('active');
     usuarioSeleccionadoPin = {
-      id: parseInt(element.dataset.id, 10),
-      username: element.dataset.username,
-      nombre: element.dataset.nombre
+      id: parseInt(element.dataset.id, 10) || 0,
+      username: element.dataset.username || '',
+      nombre: element.dataset.nombre || 'Operador por PIN'
     };
     actualizarLabelTargetMozo();
     limpiarPin();
@@ -945,18 +1249,32 @@ const FoodCorePWA = (() => {
     }
   }
 
+  function cancelarAutoSubmitPin() {
+    if (pinAutoSubmitTimer !== null) {
+      clearTimeout(pinAutoSubmitTimer);
+      pinAutoSubmitTimer = null;
+    }
+  }
+
   function presionarDigitoPin(digito) {
-    if (pinActual.length >= 6) return;
-    pinActual += digito;
+    if (!/^\d$/.test(String(digito)) || pinActual.length >= 6) return;
+    cancelarAutoSubmitPin();
+    pinActual += String(digito);
     actualizarDotsPin();
     ocultarErrorPin();
 
     if (pinActual.length === 4) {
-      ejecutarPinLogin();
+      pinAutoSubmitTimer = setTimeout(() => {
+        pinAutoSubmitTimer = null;
+        if (pinActual.length === 4 && !pinSubmitEnProgreso) {
+          ejecutarPinLogin();
+        }
+      }, PIN_AUTO_SUBMIT_DELAY_MS);
     }
   }
 
   function borrarUltimoDigitoPin() {
+    cancelarAutoSubmitPin();
     if (pinActual.length > 0) {
       pinActual = pinActual.slice(0, -1);
       actualizarDotsPin();
@@ -965,25 +1283,28 @@ const FoodCorePWA = (() => {
   }
 
   function limpiarPin() {
+    cancelarAutoSubmitPin();
     pinActual = '';
     actualizarDotsPin();
     ocultarErrorPin();
   }
 
   function actualizarDotsPin() {
+    const display = document.getElementById('pinDotsDisplay');
     for (let i = 0; i < 4; i++) {
       const dot = document.getElementById(`dot-${i}`);
       if (dot) {
-        if (i < pinActual.length) {
-          dot.classList.add('filled');
-        } else {
-          dot.classList.remove('filled');
-        }
+        dot.classList.toggle('filled', i < pinActual.length);
       }
     }
-    const input = document.getElementById('txtPinInput');
-    if (input) {
-      input.value = pinActual;
+    if (display) {
+      display.querySelectorAll('.pin-dot-extra').forEach((extra) => extra.remove());
+      for (let i = 4; i < pinActual.length; i++) {
+        const extraDot = document.createElement('span');
+        extraDot.className = 'pin-dot pin-dot-extra filled';
+        extraDot.id = `dot-${i}`;
+        display.appendChild(extraDot);
+      }
     }
   }
 
@@ -1003,8 +1324,12 @@ const FoodCorePWA = (() => {
   }
 
   async function ejecutarPinLogin() {
-    if (pinActual.length < 4) {
-      mostrarErrorPin('Ingrese un PIN de 4 dígitos.');
+    cancelarAutoSubmitPin();
+    if (pinSubmitEnProgreso) {
+      return;
+    }
+    if (pinActual.length < 4 || pinActual.length > 6) {
+      mostrarErrorPin('Ingrese un PIN de 4 a 6 dígitos.');
       return;
     }
 
@@ -1014,6 +1339,7 @@ const FoodCorePWA = (() => {
       username: usuarioSeleccionadoPin ? usuarioSeleccionadoPin.username : ''
     };
 
+    pinSubmitEnProgreso = true;
     try {
       const res = await fetch(`${API_BASE}/auth/pin-login`, {
         method: 'POST',
@@ -1033,10 +1359,11 @@ const FoodCorePWA = (() => {
       setTimeout(() => {
         window.location.href = 'mesas.html';
       }, 400);
-
     } catch (_) {
       mostrarErrorPin('No se pudo conectar con el servidor para validar el PIN.');
       limpiarPin();
+    } finally {
+      pinSubmitEnProgreso = false;
     }
   }
 
@@ -1045,9 +1372,7 @@ const FoodCorePWA = (() => {
     const modal = document.getElementById('modalCambiarMozo');
     if (!modal) return;
     modal.style.display = 'flex';
-    pinModalActual = '';
-    actualizarDotsPinModal();
-    ocultarErrorPinModal();
+    limpiarPinModal();
 
     await cargarMozosParaModalSwitch();
   }
@@ -1057,9 +1382,7 @@ const FoodCorePWA = (() => {
     if (modal) {
       modal.style.display = 'none';
     }
-    pinModalActual = '';
-    actualizarDotsPinModal();
-    ocultarErrorPinModal();
+    limpiarPinModal();
   }
 
   async function cargarMozosParaModalSwitch() {
@@ -1082,56 +1405,84 @@ const FoodCorePWA = (() => {
     }
 
     const currentUser = obtenerUsuarioSesion();
-    container.innerHTML = '';
+    container.replaceChildren();
     if (!usuariosActivosCache || usuariosActivosCache.length === 0) {
-      container.innerHTML = '<div style="padding:10px; color:var(--text-secondary); font-size:13px;">No se pudieron cargar los operadores activos del servidor.</div>';
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.padding = '10px';
+      emptyMsg.style.color = 'var(--text-secondary)';
+      emptyMsg.style.fontSize = '13px';
+      emptyMsg.textContent = 'No se pudieron cargar los operadores activos del servidor.';
+      container.appendChild(emptyMsg);
       return;
     }
+
     usuariosActivosCache.forEach((u, index) => {
       const chip = document.createElement('div');
       const esActual = u.username === currentUser.username;
+      const userId = u.id || u.id_usuario;
+      const nombreStr = String(u.nombre || u.username || 'Operador');
+
       chip.className = `mozo-chip-modal ${index === 0 ? 'active' : ''}`;
-      chip.dataset.id = u.id || u.id_usuario;
-      chip.dataset.username = u.username;
-      chip.dataset.nombre = u.nombre;
-      chip.innerHTML = `
-        <span class="mozo-avatar-mini">${obtenerInicialesNombre(u.nombre)}</span>
-        <span>${u.nombre} ${esActual ? '(Actual)' : ''}</span>
-      `;
-      chip.onclick = () => {
-        container.querySelectorAll('.mozo-chip-modal').forEach(c => c.classList.remove('active'));
+      chip.dataset.id = String(userId || '');
+      chip.dataset.username = String(u.username || '');
+      chip.dataset.nombre = nombreStr;
+
+      const avatarMini = document.createElement('span');
+      avatarMini.className = 'mozo-avatar-mini';
+      avatarMini.textContent = obtenerInicialesNombre(nombreStr);
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = esActual ? `${nombreStr} (Actual)` : nombreStr;
+
+      chip.append(avatarMini, labelSpan);
+      chip.addEventListener('click', () => {
+        container.querySelectorAll('.mozo-chip-modal').forEach((c) => c.classList.remove('active'));
         chip.classList.add('active');
         usuarioSeleccionadoModal = {
-          id: parseInt(chip.dataset.id, 10),
-          username: chip.dataset.username,
-          nombre: chip.dataset.nombre
+          id: parseInt(chip.dataset.id, 10) || 0,
+          username: chip.dataset.username || '',
+          nombre: chip.dataset.nombre || nombreStr
         };
         limpiarPinModal();
-      };
+      });
       container.appendChild(chip);
 
       if (index === 0) {
         usuarioSeleccionadoModal = {
-          id: u.id || u.id_usuario,
+          id: userId,
           username: u.username,
-          nombre: u.nombre
+          nombre: nombreStr
         };
       }
     });
   }
 
+  function cancelarAutoSubmitPinModal() {
+    if (pinModalAutoSubmitTimer !== null) {
+      clearTimeout(pinModalAutoSubmitTimer);
+      pinModalAutoSubmitTimer = null;
+    }
+  }
+
   function presionarDigitoPinModal(digit) {
-    if (pinModalActual.length >= 6) return;
-    pinModalActual += digit;
+    if (!/^\d$/.test(String(digit)) || pinModalActual.length >= 6) return;
+    cancelarAutoSubmitPinModal();
+    pinModalActual += String(digit);
     actualizarDotsPinModal();
     ocultarErrorPinModal();
 
     if (pinModalActual.length === 4) {
-      confirmarCambioMozoPin();
+      pinModalAutoSubmitTimer = setTimeout(() => {
+        pinModalAutoSubmitTimer = null;
+        if (pinModalActual.length === 4 && !pinModalSubmitEnProgreso) {
+          confirmarCambioMozoPin();
+        }
+      }, PIN_AUTO_SUBMIT_DELAY_MS);
     }
   }
 
   function borrarDigitoPinModal() {
+    cancelarAutoSubmitPinModal();
     if (pinModalActual.length > 0) {
       pinModalActual = pinModalActual.slice(0, -1);
       actualizarDotsPinModal();
@@ -1140,20 +1491,27 @@ const FoodCorePWA = (() => {
   }
 
   function limpiarPinModal() {
+    cancelarAutoSubmitPinModal();
     pinModalActual = '';
     actualizarDotsPinModal();
     ocultarErrorPinModal();
   }
 
   function actualizarDotsPinModal() {
+    const display = document.getElementById('modalPinDots');
     for (let i = 0; i < 4; i++) {
       const dot = document.getElementById(`mdot-${i}`);
       if (dot) {
-        if (i < pinModalActual.length) {
-          dot.classList.add('filled');
-        } else {
-          dot.classList.remove('filled');
-        }
+        dot.classList.toggle('filled', i < pinModalActual.length);
+      }
+    }
+    if (display) {
+      display.querySelectorAll('.pin-dot-extra').forEach((extra) => extra.remove());
+      for (let i = 4; i < pinModalActual.length; i++) {
+        const extraDot = document.createElement('span');
+        extraDot.className = 'pin-dot pin-dot-extra filled';
+        extraDot.id = `mdot-${i}`;
+        display.appendChild(extraDot);
       }
     }
   }
@@ -1174,8 +1532,12 @@ const FoodCorePWA = (() => {
   }
 
   async function confirmarCambioMozoPin() {
-    if (pinModalActual.length < 4) {
-      mostrarErrorPinModal('Ingrese un PIN de 4 dígitos.');
+    cancelarAutoSubmitPinModal();
+    if (pinModalSubmitEnProgreso) {
+      return;
+    }
+    if (pinModalActual.length < 4 || pinModalActual.length > 6) {
+      mostrarErrorPinModal('Ingrese un PIN de 4 a 6 dígitos.');
       return;
     }
 
@@ -1185,6 +1547,7 @@ const FoodCorePWA = (() => {
       username: usuarioSeleccionadoModal ? usuarioSeleccionadoModal.username : ''
     };
 
+    pinModalSubmitEnProgreso = true;
     try {
       const res = await fetch(`${API_BASE}/auth/pin-switch`, {
         method: 'POST',
@@ -1212,19 +1575,20 @@ const FoodCorePWA = (() => {
 
       cerrarModalCambiarMozo();
       mostrarToast(`✓ Mozo activo transferido a: ${data.usuario.nombre}`);
-
     } catch (_) {
       mostrarErrorPinModal('No se pudo conectar con el servidor para validar el PIN.');
       limpiarPinModal();
+    } finally {
+      pinModalSubmitEnProgreso = false;
     }
   }
 
   async function alternarSimulacionOffline() {
-    modoOfflineSimulado = !modoOfflineSimulado;
-    const btn = document.getElementById('btnToggleOffline');
-    if (btn) {
-      btn.textContent = modoOfflineSimulado ? 'Reconectar API' : 'Simular Caída API';
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('debug') !== '1') {
+      return;
     }
+    modoOfflineSimulado = !modoOfflineSimulado;
     if (!modoOfflineSimulado) {
       await sincronizarOutbox();
     } else {
@@ -1236,6 +1600,8 @@ const FoodCorePWA = (() => {
   return {
     inicializarTemaPwa,
     alternarTemaPwa,
+    esUrlImagenSegura,
+    cerrarSesionPwa,
     iniciarLoginView,
     iniciarPinLoginView,
     seleccionarUsuarioPin,

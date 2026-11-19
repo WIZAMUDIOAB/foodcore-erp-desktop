@@ -48,8 +48,10 @@ public final class LocalDatabaseManager {
         Path dbFilePath = Path.of(dbPath).toAbsolutePath().normalize();
         Path parent = dbFilePath.getParent();
         try {
-            if (parent != null && Files.notExists(parent)) {
-                Files.createDirectories(parent);
+            if (parent != null) {
+                if (Files.notExists(parent)) {
+                    Files.createDirectories(parent);
+                }
                 aplicarPermisosRestrictivos(parent);
             }
             if (Files.notExists(dbFilePath)) {
