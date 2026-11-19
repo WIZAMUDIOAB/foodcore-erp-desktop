@@ -301,4 +301,25 @@ class HardeningFinanceUnitTest {
         ToastService.mostrarInfo(null, "Info test");
         assertEquals(ToastService.TipoToast.INFO, ToastService.getUltimoTipoToast());
     }
+
+    @Test
+    @DisplayName("ExportacionContableService genera PDF válido sin Stream Closed y VentaService acota medio_pago <= 15")
+    void testExportacionPdfValidoYNormalizacionMedioPago(@TempDir Path tempDir) throws Exception {
+        ExportacionContableService exp = new ExportacionContableService();
+        File pdf = tempDir.resolve("reporte-prueba.pdf").toFile();
+        exp.exportarReporteGenericoPdf(
+                "Reporte Hardening",
+                List.of("Columna", "Valor"),
+                List.of(List.of("Item 1", "S/ 45.00"), List.of("Item 2", "S/ 55.00")),
+                pdf
+        );
+        byte[] bytes = Files.readAllBytes(pdf.toPath());
+        assertTrue(bytes.length > 100, "El PDF exportado debe contener contenido válido");
+        assertEquals("%PDF-", new String(bytes, 0, 5, StandardCharsets.US_ASCII));
+
+        assertEquals("CREDITO", VentaService.normalizarMedioPagoMovimientoCaja("CREDITO_CORPORATIVO"));
+        assertEquals("EFECTIVO", VentaService.normalizarMedioPagoMovimientoCaja(null));
+        assertEquals("EFECTIVO", VentaService.normalizarMedioPagoMovimientoCaja("   "));
+        assertTrue(VentaService.normalizarMedioPagoMovimientoCaja("MEDIO_EXTREMADAMENTE_LARGO").length() <= 15);
+    }
 }
