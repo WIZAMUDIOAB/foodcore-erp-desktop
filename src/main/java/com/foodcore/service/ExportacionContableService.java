@@ -36,8 +36,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,8 +47,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ExportacionContableService {
+
+    private static final Logger LOGGER = Logger.getLogger(ExportacionContableService.class.getName());
 
     private final VentaDAO ventaDAO;
     private final CompraDAO compraDAO;
@@ -557,6 +563,81 @@ public class ExportacionContableService {
             }
         }
         return lista;
+    }
+
+    /**
+     * Consulta el resumen contable de un período: ventas registradas y acumulados de
+     * total, base imponible, IGV y compras.
+     *
+     * @param ini Fecha inicial del período (incluida).
+     * @param fin Fecha final del período (incluida).
+     * @return Resumen del período; ante error retorna ventas y acumulados en cero.
+     */
+    public PeriodoContableResumen consultarResumenPeriodoContable(LocalDate ini, LocalDate fin) {
+        List<VentaRegistroSunat> ventas = new ArrayList<>();
+        double sumTotal = 0.0;
+        double sumBase = 0.0;
+        double sumIgv = 0.0;
+        double sumCompras = 0.0;
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            String sqlVentas = "SELECT v.*, p.cliente_nombre "
+                    + "FROM venta v "
+                    + "LEFT JOIN pedido p ON v.id_pedido = p.id_pedido "
+                    + "WHERE DATE(v.fecha_hora) BETWEEN ? AND ? "
+                    + "ORDER BY v.fecha_hora DESC";
+
+            try (PreparedStatement ps = conn.prepareStatement(sqlVentas)) {
+                ps.setDate(1, Date.valueOf(ini));
+                ps.setDate(2, Date.valueOf(fin));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        VentaRegistroSunat r = new VentaRegistroSunat();
+                        r.idVenta = rs.getInt("id_venta");
+                        r.fechaEmision = rs.getTimestamp("fecha_hora").toLocalDateTime().toLocalDate().toString();
+                        r.serie = "B001";
+                        String cli = rs.getString("cliente_nombre");
+                        r.nombreCliente = (cli != null && !cli.isBlank()) ? cli : "CLIENTES VARIOS";
+                        r.subtotal = rs.getDouble("subtotal");
+                        r.igv = rs.getDouble("igv");
+                        r.total = rs.getDouble("total");
+                        r.medioPago = rs.getString("metodo_pago");
+                        r.estado = "COMPLETADA".equalsIgnoreCase(rs.getString("estado")) ? "1" : "2";
+
+                        ventas.add(r);
+                        sumTotal += r.total;
+                        sumBase += r.subtotal;
+                        sumIgv += r.igv;
+                    }
+                }
+            }
+
+            List<Compra> compras = compraDAO.listarPorRangoFecha(conn, ini, fin);
+            for (Compra c : compras) {
+                sumCompras += c.getTotal();
+            }
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
+        }
+
+        return new PeriodoContableResumen(ventas, sumTotal, sumBase, sumIgv, sumCompras);
+    }
+
+    /**
+     * Resumen contable de un período: ventas SUNAT y acumulados de total, base, IGV y compras.
+     *
+     * @param ventas     Ventas del período.
+     * @param sumTotal   Suma de totales de venta.
+     * @param sumBase    Suma de base imponible.
+     * @param sumIgv     Suma de IGV.
+     * @param sumCompras Suma de totales de compra.
+     */
+    public record PeriodoContableResumen(
+            List<VentaRegistroSunat> ventas,
+            double sumTotal,
+            double sumBase,
+            double sumIgv,
+            double sumCompras) {
     }
 
     public static class VentaRegistroSunat {
