@@ -1,10 +1,10 @@
 package com.foodcore.model.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.exception.TerminalNoAutorizadaException;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.foodcore.util.JsonMapperProvider;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -27,7 +27,7 @@ public class EventoKdsDTO {
     public static final int VERSION_PROTOCOLO = 1;
     public static final int MAX_PAYLOAD_BYTES = 1024 * 1024; // 1 MB máximo (§11)
     private static final String ALGORITMO_HMAC = "HmacSHA256";
-    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
+    private static final ObjectMapper MAPPER = JsonMapperProvider.getMapper();
 
     private int v;
     private String eventId;
@@ -35,25 +35,25 @@ public class EventoKdsDTO {
     private String type;
     private String token;
     private String hmac;
-    private JsonObject payload;
+    private ObjectNode payload;
 
     public EventoKdsDTO() {
     }
 
-    public EventoKdsDTO(int v, String eventId, String ts, String type, String token, String hmac, JsonObject payload) {
+    public EventoKdsDTO(int v, String eventId, String ts, String type, String token, String hmac, ObjectNode payload) {
         this.v = v;
         this.eventId = eventId;
         this.ts = ts;
         this.type = type;
         this.token = token;
         this.hmac = hmac;
-        this.payload = payload != null ? payload : new JsonObject();
+        this.payload = payload != null ? payload : MAPPER.createObjectNode();
     }
 
     /**
      * Crea y firma criptográficamente un nuevo envelope de evento KDS con {@code HMAC-SHA256} (§11).
      */
-    public static EventoKdsDTO crearFirmado(String type, String sessionToken, String sessionSecret, JsonObject payload) {
+    public static EventoKdsDTO crearFirmado(String type, String sessionToken, String sessionSecret, ObjectNode payload) {
         Objects.requireNonNull(type, "El tipo de evento KDS es obligatorio.");
         Objects.requireNonNull(sessionToken, "El token de sesión es obligatorio.");
         Objects.requireNonNull(sessionSecret, "El secreto de sesión para HMAC es obligatorio.");
@@ -61,7 +61,7 @@ public class EventoKdsDTO {
         String id = UUID.randomUUID().toString();
         String timestamp = OffsetDateTime.now(ZoneOffset.ofHours(-5))
             .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        JsonObject cuerpo = payload != null ? payload : new JsonObject();
+        ObjectNode cuerpo = payload != null ? payload : MAPPER.createObjectNode();
 
         String firma = calcularHmacBase64(sessionSecret, VERSION_PROTOCOLO, id, timestamp, type, cuerpo);
         return new EventoKdsDTO(VERSION_PROTOCOLO, id, timestamp, type, sessionToken, firma, cuerpo);
@@ -75,12 +75,12 @@ public class EventoKdsDTO {
                                             String eventId,
                                             String ts,
                                             String type,
-                                            JsonElement payload) {
+                                            JsonNode payload) {
         if (sessionSecret == null || sessionSecret.isEmpty()) {
             throw new IllegalArgumentException("El secreto HMAC no puede ser nulo ni vacío.");
         }
         try {
-            String payloadCanonical = (payload == null || payload.isJsonNull()) ? "{}" : GSON.toJson(payload);
+            String payloadCanonical = (payload == null || payload.isNull()) ? "{}" : MAPPER.writeValueAsString(payload);
             String mensaje = version + "|" +
                 (eventId != null ? eventId : "") + "|" +
                 (ts != null ? ts : "") + "|" +
@@ -123,14 +123,22 @@ public class EventoKdsDTO {
     }
 
     public String toJson() {
-        return GSON.toJson(this);
+        try {
+            return JsonMapperProvider.getMapper().writeValueAsString(this);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Error serializando el envelope KDS a JSON.", ex);
+        }
     }
 
     public static EventoKdsDTO fromJson(String json) {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("El JSON del evento KDS no puede ser nulo ni vacío.");
         }
-        return GSON.fromJson(json, EventoKdsDTO.class);
+        try {
+            return JsonMapperProvider.getMapper().readValue(json, EventoKdsDTO.class);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("JSON del evento KDS malformado.", ex);
+        }
     }
 
     /**
@@ -212,11 +220,11 @@ public class EventoKdsDTO {
         this.hmac = hmac;
     }
 
-    public JsonObject getPayload() {
+    public ObjectNode getPayload() {
         return payload;
     }
 
-    public void setPayload(JsonObject payload) {
+    public void setPayload(ObjectNode payload) {
         this.payload = payload;
     }
 }

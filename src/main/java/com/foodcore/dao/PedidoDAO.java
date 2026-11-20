@@ -23,7 +23,9 @@ public interface PedidoDAO {
     List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException;
     List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException;
     List<DetallePedido> listarItemsPendientesCocina(Connection conn) throws SQLException;
+    List<DetallePedido> listarItemsPendientesCocinaPorPedido(Connection conn, int idPedido) throws SQLException;
     boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException;
+    String obtenerEstadoCocinaDetalle(Connection conn, int idDetallePedido) throws SQLException;
     void actualizarEstadoPedido(Connection conn, int idPedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoDetalleCocina(Connection conn, int idDetallePedido, String nuevoEstado) throws SQLException;
     void actualizarPrioridadesCocina(Connection conn, List<Integer> idsDetalleOrdenDescendente) throws SQLException;

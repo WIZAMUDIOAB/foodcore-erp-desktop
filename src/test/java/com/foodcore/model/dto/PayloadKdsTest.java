@@ -3,8 +3,10 @@ package com.foodcore.model.dto;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.TerminalNoAutorizadaException;
 import com.foodcore.model.enums.TipoEventoKds;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.foodcore.util.JsonMapperProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,15 +24,16 @@ class PayloadKdsTest {
     @Test
     @DisplayName("Contrato §11 / §15.1: Debe serializar/deserializar el envelope JSON y verificar HMAC-SHA256 válido")
     void debeSerializarDeserializarYValidarHmacCorrecto() {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("idPedido", 42);
-        payload.addProperty("mesa", "MESA 04");
-        JsonArray items = new JsonArray();
-        JsonObject item = new JsonObject();
-        item.addProperty("producto", "Alitas BBQ x6");
-        item.addProperty("cantidad", 2);
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("idPedido", 42);
+        payload.put("mesa", "MESA 04");
+        ArrayNode items = mapper.createArrayNode();
+        ObjectNode item = mapper.createObjectNode();
+        item.put("producto", "Alitas BBQ x6");
+        item.put("cantidad", 2);
         items.add(item);
-        payload.add("items", items);
+        payload.set("items", items);
 
         EventoKdsDTO original = EventoKdsDTO.crearFirmado(
             TipoEventoKds.ITEMS_ADICIONALES.name(),
@@ -49,7 +52,7 @@ class PayloadKdsTest {
         assertEquals(original.getEventId(), deserializado.getEventId());
         assertEquals("ITEMS_ADICIONALES", deserializado.getType());
         assertEquals(SESSION_TOKEN, deserializado.getToken());
-        assertEquals("MESA 04", deserializado.getPayload().get("mesa").getAsString());
+        assertEquals("MESA 04", deserializado.getPayload().get("mesa").asText());
 
         assertTrue(deserializado.verificarHmac(SESSION_SECRET));
         assertDoesNotThrow(() -> deserializado.exigirHmacValido(SESSION_SECRET));
@@ -58,9 +61,10 @@ class PayloadKdsTest {
     @Test
     @DisplayName("Contrato §11 / §15.1: Debe rechazar firma HMAC inválida o payload adulterado en tránsito")
     void debeRechazarHmacInvalidoOPayloadAdulterado() {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("idPedido", 100);
-        payload.addProperty("mesa", "MESA 01");
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("idPedido", 100);
+        payload.put("mesa", "MESA 01");
 
         EventoKdsDTO evento = EventoKdsDTO.crearFirmado(
             TipoEventoKds.COMANDA_NUEVA.name(),
@@ -73,7 +77,7 @@ class PayloadKdsTest {
         assertFalse(evento.verificarHmac("SecretoFalsoDeAtacante"));
 
         // 2. Adulterar el payload después de firmado debe invalidar el HMAC
-        evento.getPayload().addProperty("mesa", "MESA 99 ADULTERADA");
+        evento.getPayload().put("mesa", "MESA 99 ADULTERADA");
         assertFalse(evento.verificarHmac(SESSION_SECRET));
 
         TerminalNoAutorizadaException ex = assertThrows(TerminalNoAutorizadaException.class,
@@ -84,8 +88,9 @@ class PayloadKdsTest {
     @Test
     @DisplayName("Contrato §11: Debe empaquetar y desempaquetar frame TCP con longitud big-endian de 4 bytes")
     void debeEmpaquetarYDesempaquetarFrameTcpBigEndian() {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("idDetallePedido", 501);
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
+        ObjectNode payload = mapper.createObjectNode();
+        payload.put("idDetallePedido", 501);
 
         EventoKdsDTO original = EventoKdsDTO.crearFirmado(
             TipoEventoKds.ITEM_LISTO.name(),

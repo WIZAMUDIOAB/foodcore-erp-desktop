@@ -22,9 +22,9 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.support.JavaFxTestSupport;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
-import com.google.gson.JsonObject;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -367,8 +367,8 @@ class HardeningOfflineAndUiTest {
                 ctrl.stopTimers();
 
                 // Emitir un mensaje tras stopTimers(): no debe llegar a ningún listener retenido
-                JsonObject msg = new JsonObject();
-                msg.addProperty("evento", "TEST_CLEANUP");
+                ObjectNode msg = JsonMapperProvider.getMapper().createObjectNode();
+                msg.put("evento", "TEST_CLEANUP");
                 ServidorSockets.getInstance().emitirMensaje(msg);
                 assertEquals(0, recibidos.get(), "Tras stopTimers() no debe quedar listener activo en ServidorSockets");
             } catch (Exception ex) {

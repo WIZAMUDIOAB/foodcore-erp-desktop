@@ -1,5 +1,9 @@
 package com.foodcore.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
@@ -8,11 +12,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.util.ConexionBD;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
+import com.foodcore.util.JsonMapperProvider;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -55,7 +55,7 @@ import java.util.logging.Logger;
 public class DeliveryWebhookService {
 
     private static final Logger LOGGER = Logger.getLogger(DeliveryWebhookService.class.getName());
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = JsonMapperProvider.getMapper();
     public static final int MAX_BODY_BYTES = 65_536; // 64 KB
     public static final String ENV_WEBHOOK_SECRET = "FOODCORE_DELIVERY_WEBHOOK_SECRET";
     public static final String HEADER_SIGNATURE = "X-FoodCore-Signature";

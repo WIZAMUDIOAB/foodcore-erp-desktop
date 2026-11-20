@@ -361,6 +361,29 @@ public class PedidoDAOImpl implements PedidoDAO {
         return lista;
     }
 
+    @Override
+    public List<DetallePedido> listarItemsPendientesCocinaPorPedido(Connection conn, int idPedido) throws SQLException {
+        List<DetallePedido> lista = new ArrayList<>();
+        String sql = "SELECT dp.*, p.nombre AS nombre_prod, ped.numero_mesa " +
+                     "FROM detalle_pedido dp " +
+                     "JOIN producto p ON dp.id_producto = p.id_producto " +
+                     "JOIN pedido ped ON dp.id_pedido = ped.id_pedido " +
+                     "WHERE dp.id_pedido = ? AND dp.estado_cocina IN ('PENDIENTE', 'EN_PREPARACION', 'LISTO') " +
+                     "ORDER BY dp.prioridad DESC, dp.id_detalle_pedido ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idPedido);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapearDetallePedido(rs));
+                }
+            }
+        }
+        if (!lista.isEmpty()) {
+            adjuntarModificadores(lista, personalizacionDAO.listarModificadoresDetallesActivosCocina(conn));
+        }
+        return lista;
+    }
+
     private void adjuntarModificadores(List<DetallePedido> lista, Map<Integer, List<ProductoModificador>> modsPorDetalle) {
         for (DetallePedido dp : lista) {
             List<ProductoModificador> mods = modsPorDetalle.get(dp.getIdDetallePedido());
@@ -385,6 +408,21 @@ public class PedidoDAOImpl implements PedidoDAO {
             }
         }
         return false;
+    }
+
+    @Override
+    public String obtenerEstadoCocinaDetalle(Connection conn, int idDetallePedido) throws SQLException {
+        String sql = "SELECT estado_cocina FROM detalle_pedido WHERE id_detalle_pedido = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idDetallePedido);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String val = rs.getString("estado_cocina");
+                    return val != null ? val.trim().toUpperCase(Locale.ROOT) : "PENDIENTE";
+                }
+            }
+        }
+        return null;
     }
 
     private DetallePedido mapearDetallePedido(ResultSet rs) throws SQLException {

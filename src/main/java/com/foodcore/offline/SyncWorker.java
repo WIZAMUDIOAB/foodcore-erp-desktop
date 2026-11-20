@@ -2,14 +2,12 @@ package com.foodcore.offline;
 
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
+import com.foodcore.model.dto.OfflineOrderPayloadDTO;
 import com.foodcore.service.PedidoService;
 import com.foodcore.util.ConexionBD;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.reflect.TypeToken;
+import com.foodcore.util.JsonMapperProvider;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -38,12 +36,6 @@ public class SyncWorker {
     public static final int MAX_INTENTOS_OUTBOX = 5;
 
     private static final Logger LOGGER = Logger.getLogger(SyncWorker.class.getName());
-    private static final Gson GSON = new com.google.gson.GsonBuilder()
-            .registerTypeAdapter(java.time.LocalDateTime.class, (com.google.gson.JsonSerializer<java.time.LocalDateTime>) (src, typeOfSrc, context) ->
-                    new com.google.gson.JsonPrimitive(src != null ? src.toString() : ""))
-            .registerTypeAdapter(java.time.LocalDateTime.class, (com.google.gson.JsonDeserializer<java.time.LocalDateTime>) (json, typeOfT, context) ->
-                    json != null && !json.getAsString().isEmpty() ? java.time.LocalDateTime.parse(json.getAsString()) : null)
-            .create();
 
     private static final SyncWorker INSTANCIA = new SyncWorker();
 
@@ -266,11 +258,9 @@ public class SyncWorker {
                     ps.executeBatch();
                 }
 
-                JsonObject payload = new JsonObject();
-                payload.add("pedido", GSON.toJsonTree(pedido));
-                payload.add("detalles", GSON.toJsonTree(detalles));
+                OfflineOrderPayloadDTO payload = new OfflineOrderPayloadDTO(pedido, detalles);
 
-                String payloadCifrado = OfflineCryptoService.encrypt(cryptoKey, payload.toString());
+                String payloadCifrado = OfflineCryptoService.encrypt(cryptoKey, JsonMapperProvider.getMapper().writeValueAsString(payload));
                 String sqlOutbox = "INSERT INTO outbox_sync (id_pedido_local, idempotency_key, payload_json, estado) VALUES (?, ?, ?, 'PENDIENTE')";
                 try (PreparedStatement ps = conn.prepareStatement(sqlOutbox)) {
                     ps.setInt(1, idPedidoLocal);
@@ -336,10 +326,9 @@ public class SyncWorker {
             for (OutboxItem item : pendientes) {
                 try {
                     String jsonPlano = OfflineCryptoService.decrypt(cryptoKey, item.payloadJson);
-                    JsonObject obj = GSON.fromJson(jsonPlano, JsonObject.class);
-                    Pedido pedido = GSON.fromJson(obj.get("pedido"), Pedido.class);
-                    Type listType = new TypeToken<List<DetallePedido>>() { }.getType();
-                    List<DetallePedido> detalles = GSON.fromJson(obj.get("detalles"), listType);
+                    OfflineOrderPayloadDTO obj = JsonMapperProvider.getMapper().readValue(jsonPlano, OfflineOrderPayloadDTO.class);
+                    Pedido pedido = obj.getPedido();
+                    List<DetallePedido> detalles = obj.getDetalles();
 
                     pedidoService.registrarPedidoYEnviarComanda(pedido, detalles);
 

@@ -20,9 +20,9 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.DeliveryWebhookService;
 import com.foodcore.service.TunnelService;
 import com.foodcore.service.impl.AuthServiceImpl;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
-import com.google.gson.JsonObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -601,17 +601,17 @@ class HardeningAuthApiSecurityTest {
         ServidorSockets servidor = ServidorSockets.getInstance();
         servidor.detener();
         servidor.cerrarSesionesActivas();
-        AtomicReference<JsonObject> recibidoListener = new AtomicReference<>();
-        servidor.setMensajeListener(recibidoListener::set);
+        AtomicReference<ObjectNode> recibidoListener = new AtomicReference<>();
+                servidor.setMensajeListener(recibidoListener::set);
 
-        JsonObject desconocida = servidor.procesarTramaProtocolo("{\"accion\":\"HACKEO\"}", null);
-        assertEquals("ERROR", desconocida.get("type").getAsString());
-        assertEquals("FRAME_NO_AUTORIZADO", desconocida.get("code").getAsString());
+                ObjectNode desconocida = servidor.procesarTramaProtocolo("{\"accion\":\"HACKEO\"}", null);
+                assertEquals("ERROR", desconocida.get("type").asText());
+                assertEquals("FRAME_NO_AUTORIZADO", desconocida.get("code").asText());
         assertNull(recibidoListener.get(), "Trama no autenticada nunca debe invocar mensajeListener");
 
         servidor.emitirMensajeInterno("{\"accion\":\"NUEVA_COMANDA\",\"idPedido\":42}");
         assertNotNull(recibidoListener.get());
-        assertEquals(42, recibidoListener.get().get("idPedido").getAsInt());
+        assertEquals(42, recibidoListener.get().get("idPedido").asInt());
 
         int tcpPort = puertoLibre();
         servidor.iniciar(tcpPort);

@@ -139,13 +139,6 @@
             <version>10.15.0</version>
         </dependency>
 
-        <!-- Manejo de JSON Ligero para Sockets -->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.10.1</version>
-        </dependency>
-
         <!-- Generación de Códigos QR (Sub-Fase 4D Menú Digital) -->
         <dependency>
             <groupId>com.google.zxing</groupId>
