@@ -84,12 +84,14 @@ public class PromocionesController {
                 } else {
                     Label badge = new Label(item);
                     badge.getStyleClass().add("badge-pill-accent");
+                    badge.getStyleClass().removeAll(
+                            "fc-promo-badge-combo", "fc-promo-badge-pct", "fc-promo-badge-fixed");
                     if (item.contains("2x1") || item.contains("3x2")) {
-                        badge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-combo");
                     } else if (item.contains("%")) {
-                        badge.setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-pct");
                     } else {
-                        badge.setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #EA580C; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-fixed");
                     }
                     HBox box = new HBox(badge);
                     box.setAlignment(Pos.CENTER_LEFT);

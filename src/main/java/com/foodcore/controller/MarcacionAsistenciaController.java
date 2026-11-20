@@ -46,14 +46,17 @@ public class MarcacionAsistenciaController {
         String dni = txtDni.getText();
         try {
             String resultado = authService.marcarAsistenciaInteligente(dni);
-            lblEstado.setStyle("-fx-text-fill: #2a9d8f; -fx-font-size: 13px;");
+            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
+            lblEstado.getStyleClass().add("fc-status-ok");
             lblEstado.setText(resultado);
             txtDni.clear();
         } catch (NegocioException e) {
-            lblEstado.setStyle("-fx-text-fill: #e63946; -fx-font-size: 13px;");
+            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
+            lblEstado.getStyleClass().add("fc-status-error");
             lblEstado.setText(e.getMessage());
         } catch (Exception e) {
-            lblEstado.setStyle("-fx-text-fill: #e63946; -fx-font-size: 13px;");
+            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
+            lblEstado.getStyleClass().add("fc-status-error");
             lblEstado.setText("Error al registrar marcación: " + e.getMessage());
         }
     }

@@ -23,8 +23,9 @@ import org.slf4j.LoggerFactory;
 public class ReportesController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ReportesController.class);
-    private static final String[] PALETA_PERMITIDA = {
-        "#EA580C", "#D97706", "#DC2626", "#A39D94"
+
+    private static final String[] PALETA_DONUT = {
+        "fc-donut-palette-0", "fc-donut-palette-1", "fc-donut-palette-2", "fc-donut-palette-3"
     };
 
     @FXML private ComboBox<String> cmbPeriodo;
@@ -73,19 +74,18 @@ public class ReportesController {
         }
         int idx = 0;
         for (PieChart.Data slice : chart.getData()) {
-            String color = PALETA_PERMITIDA[idx % PALETA_PERMITIDA.length];
             Node node = slice.getNode();
             if (node != null) {
-                node.setStyle("-fx-pie-color: " + color + "; -fx-background-color: " + color
-                        + "; -fx-border-color: #FFFFFF; -fx-border-width: 2px;");
+                node.getStyleClass().removeAll(PALETA_DONUT);
+                node.getStyleClass().add(PALETA_DONUT[idx % PALETA_DONUT.length]);
             }
             idx++;
         }
         Set<Node> symbols = chart.lookupAll(".chart-legend-item-symbol");
         int sIdx = 0;
         for (Node sym : symbols) {
-            String color = PALETA_PERMITIDA[sIdx % PALETA_PERMITIDA.length];
-            sym.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6px;");
+            sym.getStyleClass().removeAll(PALETA_DONUT);
+            sym.getStyleClass().add(PALETA_DONUT[sIdx % PALETA_DONUT.length]);
             sIdx++;
         }
     }

@@ -43,7 +43,7 @@ public final class DialogService {
     public static final String PROP_SHAKE_TRANSITION = "fc_shake_transition";
 
     private static final String LIGHT_CSS = "/css/foodcore.css";
-    private static final String DARK_CSS = "/com/foodcore/css/dark-theme.css";
+    private static final String DARK_CSS = "/css/dark-theme.css";
 
     private DialogService() {
     }

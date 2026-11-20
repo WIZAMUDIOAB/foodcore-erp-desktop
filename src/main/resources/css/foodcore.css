@@ -46,6 +46,10 @@
     -fc-kds-danger: #F87171;
     -fc-kds-danger-bg: rgba(248, 113, 113, 0.12);
 
+    /* Info (kiosk / avisos informativos) */
+    -fc-info-bg: rgba(59, 130, 246, 0.12);
+    -fc-info-text: #3B82F6;
+
     /* Aliases internos FoodCore / AtlantaFX */
     -fc-bg-canvas: -bg-canvas;
     -fc-bg-sidebar: -bg-sidebar;
@@ -68,6 +72,11 @@
     -fc-danger-soft: -status-danger-bg;
     -fc-neutral-soft: -bg-surface-hover;
     -fc-neutral-text: -text-secondary;
+    -fc-success-bg: -status-success-bg;
+    -fc-success-border: -status-success;
+    -fc-info-bg: -brand-soft;
+    -fc-info-text: -brand-primary;
+    -fc-surface-card: -bg-surface;
 
     -color-bg-default: -bg-canvas;
     -color-bg-subtle: -bg-sidebar;
@@ -2134,4 +2143,602 @@
 
 .card > .btn-primary {
     -fx-min-width: 112px;
+}
+
+/* --------------------------------------------------------------------------
+   17. Ola 1C — Clases semanticas para controladores (solo tokens de .root)
+   -------------------------------------------------------------------------- */
+.fc-status-ok {
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
+    -fx-alignment: CENTER;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+}
+
+.fc-status-warning {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+    -fx-alignment: CENTER;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+}
+
+.fc-status-neutral {
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-secondary;
+    -fx-alignment: CENTER;
+    -fx-background-radius: 12;
+}
+
+.fc-status-error {
+    -fx-background-color: -status-danger-bg;
+    -fx-text-fill: -status-danger;
+    -fx-alignment: CENTER;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+}
+
+.fc-status-msg-ok {
+    -fx-text-fill: -status-success;
+    -fx-font-weight: bold;
+}
+
+.fc-status-msg-error {
+    -fx-text-fill: -status-danger;
+    -fx-font-weight: bold;
+}
+
+.fc-banner-success {
+    -fx-background-color: -fc-success-bg;
+    -fx-padding: 10 16;
+    -fx-background-radius: 8;
+    -fx-border-color: -fc-success-border;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.fc-schedule-header {
+    -fx-background-color: -fc-surface-card;
+    -fx-padding: 8 6;
+    -fx-background-radius: 8;
+    -fx-border-color: -fc-border;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.fc-schedule-day-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-text-fill: -text-primary;
+}
+
+.fc-schedule-day-count {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-secondary;
+}
+
+.fc-schedule-col {
+    -fx-background-color: -bg-surface-hover;
+    -fx-padding: 8;
+    -fx-background-radius: 8;
+}
+
+.fc-schedule-empty {
+    -fx-text-fill: -text-muted;
+    -fx-font-style: italic;
+    -fx-font-size: 11px;
+}
+
+.fc-schedule-card {
+    -fx-background-color: -bg-surface;
+    -fx-background-radius: 8;
+    -fx-border-color: -border-subtle;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.03), 4, 0, 0, 1);
+}
+
+.fc-schedule-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.fc-schedule-delete-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: -text-muted;
+    -fx-font-size: 10px;
+    -fx-cursor: hand;
+    -fx-padding: 0 4;
+}
+
+.fc-schedule-emp-name {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-primary;
+}
+
+.fc-schedule-emp-role {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-secondary;
+}
+
+.fc-schedule-turno-detail {
+    -fx-font-size: 10px;
+    -fx-text-fill: -text-secondary;
+    -fx-line-spacing: 1px;
+}
+
+.fc-shift-badge-morning,
+.fc-shift-badge-afternoon,
+.fc-shift-badge-night,
+.fc-shift-badge-off {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 6;
+    -fx-background-radius: 6;
+}
+
+.fc-shift-badge-morning {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+}
+
+.fc-shift-badge-afternoon {
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
+}
+
+.fc-shift-badge-night {
+    -fx-background-color: -bg-sidebar;
+    -fx-text-fill: -text-secondary;
+}
+
+.fc-shift-badge-off {
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-secondary;
+}
+
+.fc-my-schedule-card-active {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -fc-accent;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.fc-my-schedule-card-off {
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.fc-my-schedule-time-mono {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-secondary;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+}
+
+.fc-my-schedule-free-day {
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-muted;
+}
+
+.fc-btn-compact {
+    -fx-font-size: 11px;
+    -fx-padding: 4 10;
+}
+
+.fc-promo-badge-combo,
+.fc-promo-badge-pct,
+.fc-promo-badge-fixed {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 8;
+    -fx-background-radius: 6;
+}
+
+.fc-promo-badge-combo {
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-primary;
+}
+
+.fc-promo-badge-pct {
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
+}
+
+.fc-promo-badge-fixed {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+}
+
+.fc-option-row-interactive {
+    -fx-cursor: hand;
+    -fx-background-radius: 8;
+}
+
+.fc-option-row-interactive:hover {
+    -fx-background-color: -bg-surface-hover;
+}
+
+.fc-kiosk-badge-warning,
+.fc-kiosk-badge-success,
+.fc-kiosk-badge-info,
+.fc-kiosk-badge-danger {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 2 10;
+    -fx-background-radius: 9999px;
+}
+
+.fc-kiosk-badge-warning {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+}
+
+.fc-kiosk-badge-success {
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
+}
+
+.fc-kiosk-badge-info {
+    -fx-background-color: -fc-info-bg;
+    -fx-text-fill: -fc-info-text;
+}
+
+.fc-kiosk-badge-danger {
+    -fx-background-color: -status-danger-bg;
+    -fx-text-fill: -status-danger;
+}
+
+.fc-donut-palette-0 {
+    -fx-pie-color: -brand-primary;
+    -fx-background-color: -brand-primary;
+    -fx-border-color: -bg-surface;
+    -fx-border-width: 1;
+}
+
+.fc-donut-palette-1 {
+    -fx-pie-color: -status-warning;
+    -fx-background-color: -status-warning;
+    -fx-border-color: -bg-surface;
+    -fx-border-width: 1;
+}
+
+.fc-donut-palette-2 {
+    -fx-pie-color: -status-danger;
+    -fx-background-color: -status-danger;
+    -fx-border-color: -bg-surface;
+    -fx-border-width: 1;
+}
+
+.fc-donut-palette-3 {
+    -fx-pie-color: -text-muted;
+    -fx-background-color: -text-muted;
+    -fx-border-color: -bg-surface;
+    -fx-border-width: 1;
+}
+
+/* ==========================================================================
+   20. CLASES SEMANTICAS COMPARTIDAS (estado, agenda, turnos, promos, kiosk)
+   Solo tokens de .root; nunca hex hardcodeado en esta seccion.
+   ========================================================================== */
+
+/* --- Estado / mensajes ---------------------------------------------------- */
+.fc-status-ok,
+.fc-status-msg-ok {
+    -fx-text-fill: -status-success;
+    -fx-font-weight: bold;
+}
+
+.fc-status-error,
+.fc-status-msg-error {
+    -fx-text-fill: -status-danger;
+    -fx-font-weight: bold;
+}
+
+.fc-status-ok,
+.fc-status-error {
+    -fx-font-size: 13px;
+}
+
+.fc-text-danger {
+    -fx-text-fill: -status-danger;
+}
+
+.fc-banner-success {
+    -fx-background-color: -status-success-bg;
+    -fx-border-color: -status-success;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 10px 14px;
+    -fx-text-fill: -status-success;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+/* --- Agenda / programacion de turnos ------------------------------------- */
+.fc-schedule-header {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: transparent transparent -border-subtle transparent;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 10px 16px;
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+}
+
+.fc-schedule-day-title {
+    -fx-text-fill: -text-primary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 15px;
+    -fx-font-weight: 700;
+}
+
+.fc-schedule-day-count {
+    -fx-text-fill: -text-secondary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.fc-schedule-col {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+    -fx-padding: 10px;
+    -fx-spacing: 8px;
+}
+
+.fc-schedule-empty {
+    -fx-text-fill: -text-muted;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-alignment: center;
+    -fx-padding: 12px;
+}
+
+.fc-schedule-card {
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 8px 10px;
+    -fx-spacing: 4px;
+}
+
+.fc-schedule-card:hover {
+    -fx-background-color: -border-subtle;
+}
+
+.fc-schedule-scroll {
+    -fx-background-color: transparent;
+    -fx-padding: 12px;
+}
+
+.fc-schedule-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.fc-schedule-delete-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: -status-danger;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+    -fx-padding: 2px 6px;
+}
+
+.fc-schedule-delete-btn:hover {
+    -fx-background-color: -status-danger-bg;
+    -fx-background-radius: 6px;
+}
+
+.fc-schedule-emp-name {
+    -fx-text-fill: -text-primary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.fc-schedule-emp-role {
+    -fx-text-fill: -text-secondary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 11px;
+}
+
+.fc-schedule-turno-detail {
+    -fx-text-fill: -text-muted;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
+/* --- Turnos (badge por franja horaria) ------------------------------------ */
+.fc-shift-badge-morning {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-min-height: 24px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-shift-badge-afternoon {
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-primary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-min-height: 24px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-shift-badge-night {
+    -fx-background-color: -bg-surface-hover;
+    -fx-text-fill: -text-secondary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-min-height: 24px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-shift-badge-off {
+    -fx-background-color: -status-danger-bg;
+    -fx-text-fill: -status-danger;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-min-height: 24px;
+    -fx-padding: 2px 10px;
+}
+
+/* --- Mi agenda / botones compactos ---------------------------------------- */
+.fc-my-schedule-card-active {
+    -fx-background-color: -status-success-bg;
+    -fx-border-color: -status-success;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 8px 12px;
+}
+
+.fc-my-schedule-card-off {
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 8px 12px;
+}
+
+.fc-my-schedule-time-mono {
+    -fx-text-fill: -text-primary;
+    -fx-font-family: "JetBrains Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+.fc-btn-compact {
+    -fx-min-height: 32px;
+    -fx-padding: 4px 12px;
+    -fx-font-size: 12px;
+    -fx-background-radius: 8px;
+    -fx-cursor: hand;
+}
+
+/* --- Promociones ---------------------------------------------------------- */
+.fc-promo-badge-combo {
+    -fx-background-color: -brand-soft;
+    -fx-text-fill: -brand-primary;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 6px;
+    -fx-padding: 2px 8px;
+}
+
+.fc-promo-badge-pct {
+    -fx-background-color: -status-success-bg;
+    -fx-text-fill: -status-success;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 6px;
+    -fx-padding: 2px 8px;
+}
+
+.fc-promo-badge-fixed {
+    -fx-background-color: -status-warning-bg;
+    -fx-text-fill: -status-warning;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 6px;
+    -fx-padding: 2px 8px;
+}
+
+.fc-option-row-interactive {
+    -fx-background-color: -bg-surface;
+    -fx-border-color: -border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 8px 12px;
+    -fx-cursor: hand;
+}
+
+.fc-option-row-interactive:hover {
+    -fx-background-color: -bg-surface-hover;
+    -fx-border-color: -border-strong;
+}
+
+/* --- Kiosk ---------------------------------------------------------------- */
+.fc-kiosk-badge-warning {
+    -fx-background-color: -fc-kds-warning-bg;
+    -fx-text-fill: -fc-kds-warning;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-kiosk-badge-success {
+    -fx-background-color: -fc-kds-success-bg;
+    -fx-text-fill: -fc-kds-success;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-kiosk-badge-info {
+    -fx-background-color: -fc-info-bg;
+    -fx-text-fill: -fc-info-text;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-padding: 2px 10px;
+}
+
+.fc-kiosk-badge-danger {
+    -fx-background-color: -fc-kds-danger-bg;
+    -fx-text-fill: -fc-kds-danger;
+    -fx-font-family: "Inter", system-ui, sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-background-radius: 9999px;
+    -fx-padding: 2px 10px;
+}
+
+/* --- Graficos (paleta donut) ---------------------------------------------- */
+.fc-donut-palette-0 {
+    -fx-fill: -brand-primary;
+}
+
+.fc-donut-palette-1 {
+    -fx-fill: -status-success;
+}
+
+.fc-donut-palette-2 {
+    -fx-fill: -status-warning;
+}
+
+.fc-donut-palette-3 {
+    -fx-fill: -text-muted;
 }

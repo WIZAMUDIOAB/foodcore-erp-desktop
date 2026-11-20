@@ -135,8 +135,7 @@ public class PersonalizacionProductoController {
             HBox fila = new HBox(10.0);
             fila.setAlignment(Pos.CENTER_LEFT);
             fila.setPadding(new Insets(8, 10, 8, 10));
-            fila.getStyleClass().add("surface-card-subtle");
-            fila.setStyle("-fx-cursor: hand; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+            fila.getStyleClass().add("fc-option-row-interactive");
 
             RadioButton rb = new RadioButton(var.getNombreVariante());
             rb.setId("rbVariante_" + var.getIdVariante());
@@ -171,8 +170,7 @@ public class PersonalizacionProductoController {
             HBox fila = new HBox(10.0);
             fila.setAlignment(Pos.CENTER_LEFT);
             fila.setPadding(new Insets(7, 10, 7, 10));
-            fila.getStyleClass().add("surface-card-subtle");
-            fila.setStyle("-fx-cursor: hand; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+            fila.getStyleClass().add("fc-option-row-interactive");
 
             CheckBox chk = new CheckBox(mod.getNombre());
             chk.setId("chkMod_" + mod.getIdModificador());
