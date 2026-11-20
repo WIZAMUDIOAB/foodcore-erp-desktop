@@ -117,14 +117,23 @@ public class RelojAsistenciaController {
             Asistencia a = res.getAsistencia();
             if (a != null && a.getTardanzaMinutos() > 0) {
                 lblConfirmacionBadge.setText("⚠ ENTRADA CON TARDANZA (" + a.getTardanzaMinutos() + " MIN)");
-                lblConfirmacionBadge.setStyle("-fx-background-color: -fc-warning-bg; -fx-text-fill: -fc-warning-text;");
+                lblConfirmacionBadge.getStyleClass().removeAll(
+                        "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
+                        "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
+                lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-warning");
             } else {
                 lblConfirmacionBadge.setText("✓ ENTRADA REGISTRADA PUNTUAL");
-                lblConfirmacionBadge.setStyle("-fx-background-color: -fc-success-bg; -fx-text-fill: -fc-success-text;");
+                lblConfirmacionBadge.getStyleClass().removeAll(
+                        "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
+                        "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
+                lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-success");
             }
         } else {
             lblConfirmacionBadge.setText("✓ SALIDA REGISTRADA");
-            lblConfirmacionBadge.setStyle("-fx-background-color: -fc-info-bg; -fc-text-fill: -fc-info-text;");
+            lblConfirmacionBadge.getStyleClass().removeAll(
+                    "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
+                    "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
+            lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-info");
         }
 
         PauseTransition pause = new PauseTransition(Duration.seconds(4));
@@ -136,7 +145,10 @@ public class RelojAsistenciaController {
         cardConfirmacion.setVisible(true);
         AnimationUtils.animateModalEnter(cardConfirmacion);
         lblConfirmacionBadge.setText("✕ NO REGISTRADO");
-        lblConfirmacionBadge.setStyle("-fx-background-color: -fc-danger-bg; -fx-text-fill: -fc-danger-text;");
+        lblConfirmacionBadge.getStyleClass().removeAll(
+                "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
+                "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
+        lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-danger");
         lblConfirmacionNombre.setText("Atención");
         lblConfirmacionDetalle.setText(error);
 

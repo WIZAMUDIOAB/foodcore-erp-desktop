@@ -306,12 +306,14 @@ public class PlanillaController {
     }
 
     private void mostrarOk(String msg) {
-        lblEstadoPlanilla.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
+        lblEstadoPlanilla.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+        lblEstadoPlanilla.getStyleClass().add("fc-status-msg-ok");
         lblEstadoPlanilla.setText("✅ " + msg);
     }
 
     private void mostrarError(String msg) {
-        lblEstadoPlanilla.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
+        lblEstadoPlanilla.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+        lblEstadoPlanilla.getStyleClass().add("fc-status-msg-error");
         lblEstadoPlanilla.setText("⚠️ " + msg);
     }
 

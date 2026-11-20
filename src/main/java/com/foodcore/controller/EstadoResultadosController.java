@@ -361,9 +361,10 @@ public class EstadoResultadosController {
 
         lblPnlUtilidadNeta.setText("S/ " + rep.utilidadNeta());
         if (rep.utilidadNeta().compareTo(BigDecimal.ZERO) < 0) {
-            lblPnlUtilidadNeta.setStyle("-fx-text-fill: #DC2626;");
+            lblPnlUtilidadNeta.getStyleClass().removeAll("fc-text-danger");
+            lblPnlUtilidadNeta.getStyleClass().add("fc-text-danger");
         } else {
-            lblPnlUtilidadNeta.setStyle("");
+            lblPnlUtilidadNeta.getStyleClass().remove("fc-text-danger");
         }
         lblPnlGastosOperativosSub.setText(
                 "Gastos op.: S/ " + rep.gastosOperativos() + " · Margen neto: " + rep.margenNetoPct() + "%"

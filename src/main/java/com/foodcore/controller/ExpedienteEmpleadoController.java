@@ -406,12 +406,14 @@ public class ExpedienteEmpleadoController {
     }
 
     private void mostrarOk(String mensaje) {
-        lblMensajeEstado.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
+        lblMensajeEstado.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+        lblMensajeEstado.getStyleClass().add("fc-status-msg-ok");
         lblMensajeEstado.setText("✅ " + mensaje);
     }
 
     private void mostrarError(String mensaje) {
-        lblMensajeEstado.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
+        lblMensajeEstado.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+        lblMensajeEstado.getStyleClass().add("fc-status-msg-error");
         lblMensajeEstado.setText("⚠️ " + mensaje);
     }
 

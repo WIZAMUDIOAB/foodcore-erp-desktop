@@ -197,15 +197,16 @@ public class MiHorarioController {
                 if (empty || estado == null) {
                     setText(null);
                     setGraphic(null);
-                    setStyle("");
+                    getStyleClass().removeAll("fc-status-ok", "fc-status-warning", "fc-status-neutral");
                 } else {
                     setText(estado);
+                    getStyleClass().removeAll("fc-status-ok", "fc-status-warning", "fc-status-neutral");
                     if ("PRESENTE".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #E8F6EE; -fx-text-fill: #1F9D55; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-ok");
                     } else if ("TARDE".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-warning");
                     } else {
-                        setStyle("-fx-background-color: #EEF0F3; -fx-text-fill: #5C6470; -fx-alignment: CENTER; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-neutral");
                     }
                 }
             }
@@ -250,8 +251,7 @@ public class MiHorarioController {
             private final Button btnPdf = new Button("PDF");
 
             {
-                btnPdf.getStyleClass().add("btn-secondary");
-                btnPdf.setStyle("-fx-font-size: 11px; -fx-padding: 4 10;");
+                btnPdf.getStyleClass().add("fc-btn-compact");
                 AnimationUtils.attachTactileFeedback(btnPdf);
             }
 
@@ -480,24 +480,24 @@ public class MiHorarioController {
             HBox.setHgrow(card, Priority.ALWAYS);
 
             Label lblDia = new Label(dia);
-            lblDia.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: -fc-text-primary;");
+            lblDia.getStyleClass().add("fc-schedule-day-title");
 
             TurnoProgramado tp = mapaTurnos.get(dia);
             if (tp != null) {
-                card.setStyle("-fx-background-color: white; -fx-border-color: -fc-accent; -fx-border-width: 1.5; -fx-border-radius: 8; -fx-background-radius: 8;");
+                card.getStyleClass().add("fc-my-schedule-card-active");
                 Label lblTurno = new Label(tp.getTurno());
-                lblTurno.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #92400E; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+                lblTurno.getStyleClass().add("fc-shift-badge-morning");
 
                 Label lblHorario = new Label(tp.getHorarioTexto());
-                lblHorario.setStyle("-fx-font-size: 11px; -fx-text-fill: -fc-text-secondary; -fx-font-family: 'JetBrains Mono', monospace;");
+                lblHorario.getStyleClass().add("fc-my-schedule-time-mono");
 
                 card.getChildren().addAll(lblDia, lblTurno, lblHorario);
             } else {
-                card.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+                card.getStyleClass().add("fc-my-schedule-card-off");
                 Label lblDescanso = new Label("DESCANSO");
-                lblDescanso.setStyle("-fx-background-color: #E2E8F0; -fx-text-fill: #64748B; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+                lblDescanso.getStyleClass().add("fc-shift-badge-off");
                 Label lblLibre = new Label("Día libre");
-                lblLibre.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+                lblLibre.getStyleClass().add("fc-my-schedule-free-day");
                 card.getChildren().addAll(lblDia, lblDescanso, lblLibre);
             }
 
@@ -585,12 +585,14 @@ public class MiHorarioController {
             }
             cargarSaldoYSolicitudesVacaciones(idUser);
             if (lblVacEstadoMsg != null) {
-                lblVacEstadoMsg.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
+                lblVacEstadoMsg.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+                lblVacEstadoMsg.getStyleClass().add("fc-status-msg-ok");
                 lblVacEstadoMsg.setText("✅ Solicitud registrada para aprobación gerencial.");
             }
         } catch (Exception e) {
             if (lblVacEstadoMsg != null) {
-                lblVacEstadoMsg.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
+                lblVacEstadoMsg.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+                lblVacEstadoMsg.getStyleClass().add("fc-status-msg-error");
                 lblVacEstadoMsg.setText("⚠️ " + e.getMessage());
             }
         }

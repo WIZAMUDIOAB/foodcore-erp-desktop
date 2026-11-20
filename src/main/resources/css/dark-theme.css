@@ -35,6 +35,10 @@
     -fc-kds-text: #FAFAFA;
     -fc-kds-text-secondary: #A1A1AA;
 
+    /* Info (kiosk / avisos informativos) */
+    -fc-info-bg: rgba(96, 165, 250, 0.15);
+    -fc-info-text: #60A5FA;
+
     -fc-bg-canvas: -bg-canvas;
     -fc-bg-sidebar: -bg-sidebar;
     -fc-bg-surface: -bg-surface;
@@ -47,6 +51,17 @@
     -fc-accent: -brand-primary;
     -fc-accent-hover: -brand-hover;
     -fc-accent-soft: -brand-soft;
+    -fc-success: -status-success;
+    -fc-success-soft: -status-success-bg;
+    -fc-warning: -status-warning;
+    -fc-warning-soft: -status-warning-bg;
+    -fc-danger: -status-danger;
+    -fc-danger-soft: -status-danger-bg;
+    -fc-success-bg: -status-success-bg;
+    -fc-success-border: -status-success;
+    -fc-info-bg: -brand-soft;
+    -fc-info-text: -brand-primary;
+    -fc-surface-card: -bg-surface;
 
     -color-bg-default: -bg-canvas;
     -color-bg-subtle: -bg-sidebar;
@@ -377,4 +392,8 @@
 .skeleton-bar,
 .skeleton-shimmer {
     -fx-background-color: linear-gradient(to right, -bg-surface-hover 0%, -border-subtle 50%, -bg-surface-hover 100%);
+}
+
+.fc-schedule-card {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.40), 2, 0, 0, 1);
 }
