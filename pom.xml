@@ -5,7 +5,7 @@
 
     <groupId>com.foodcore</groupId>
     <artifactId>foodcore-desktop</artifactId>
-    <version>5.7.0</version>
+    <version>5.8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -13,6 +13,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <javafx.version>21.0.2</javafx.version>
+        <app.package.version>5.8.0</app.package.version>
         <odc.ossindex.enabled>false</odc.ossindex.enabled>
         <testfx.headless>true</testfx.headless>
         <testfx.robot>glass</testfx.robot>
@@ -583,7 +584,7 @@
                         <version>1.6.0</version>
                         <configuration>
                             <name>FoodCoreERP</name>
-                            <appVersion>5.7.0</appVersion>
+                            <appVersion>${app.package.version}</appVersion>
                             <vendor>FoodCore S.A.C.</vendor>
                             <destination>${project.basedir}/dist</destination>
                             <input>${project.build.directory}</input>

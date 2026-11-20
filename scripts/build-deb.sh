@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_VERSION="5.7.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+APP_VERSION="$(sed -n 's|.*<version>\([0-9][0-9.]*\)\(-[^<]*\)\?</version>.*|\1|p' "${PROJECT_ROOT}/pom.xml" | head -n 1)"
+if [ -z "${APP_VERSION}" ]; then
+    echo "ERROR: No se pudo resolver la version desde ${PROJECT_ROOT}/pom.xml" >&2
+    exit 1
+fi
 TARGET_JAR="${PROJECT_ROOT}/target/foodcore-erp.jar"
 DIST_DIR="${PROJECT_ROOT}/dist"
 DEB_FILE="${DIST_DIR}/FoodCoreERP-${APP_VERSION}.deb"

@@ -1,19 +1,24 @@
 ﻿# ==============================================================================
-# FoodCore ERP v5.7.1 - Empaquetador Nativo Reproducible jpackage (GA)
+# FoodCore ERP v5.8.0 - Empaquetador Nativo Reproducible jpackage (GA)
 # Incluye: fat-JAR (todos los modulos), pwa/, keystore.jks.example, scripts/
 # (excluyendo seed_full_operational.sql) y application.properties.example.
 # Excluye intencionalmente certificados de laboratorio (foodcore.cer) y semillas
-# operacionales; cada despliegue debe generar su propio TLS con keystore.jks.example.
+# operacionales; cada despliegue debe generar su propio TLS con init-client-keystore.ps1.
 # Auto-detecta WiX Toolset:
-#   - Si WiX esta instalado: genera instalador nativo dist/FoodCoreERP-5.7.0.msi
-#   - Si WiX NO esta instalado: genera dist/FoodCoreERP-5.7.0-windows-portable.zip
+#   - Si WiX esta instalado: genera instalador nativo dist/FoodCoreERP-<version>.msi
+#   - Si WiX NO esta instalado: genera dist/FoodCoreERP-<version>-windows-portable.zip
 #     (NUNCA renombra un .zip a .msi)
 # ==============================================================================
 param()
 $ErrorActionPreference = "Stop"
 
-$AppVersion  = "5.7.0"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+[xml]$PomXml = Get-Content (Join-Path $ProjectRoot "pom.xml") -Raw
+$RawPomVersion = ([string]$PomXml.project.version).Trim()
+if ([string]::IsNullOrWhiteSpace($RawPomVersion)) {
+    throw "No se pudo leer <project><version> desde pom.xml."
+}
+$AppVersion  = ($RawPomVersion -replace '-.*$', '').Trim()
 $TargetDir   = Join-Path $ProjectRoot "target"
 $DistDir     = Join-Path $ProjectRoot "dist"
 $JpkgInput   = Join-Path $TargetDir "jpackage-input"

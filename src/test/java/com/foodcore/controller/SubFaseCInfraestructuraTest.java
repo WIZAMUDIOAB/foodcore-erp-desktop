@@ -66,25 +66,29 @@ class SubFaseCInfraestructuraTest {
     }
 
     @Test
-    @DisplayName("Ítem 1: Empaquetador jpackage 5.7.0 y recursos pwa/keystore/scripts incluidos")
+    @DisplayName("Ítem 1: Empaquetador jpackage 5.8.0 dinámico y recursos pwa/keystore/scripts incluidos")
     void item1EmpaquetadoInstallerYRecursosVersion530() throws Exception {
         String pomXml = Files.readString(Path.of("pom.xml"), StandardCharsets.UTF_8);
-        assertTrue(pomXml.contains("<appVersion>5.7.0</appVersion>"),
-                "pom.xml perfil release debe declarar appVersion 5.7.0");
+        assertTrue(pomXml.contains("<app.package.version>5.8.0</app.package.version>")
+                        && pomXml.contains("<appVersion>${app.package.version}</appVersion>"),
+                "pom.xml perfil release debe declarar appVersion dinámico 5.8.0");
 
         String pkgPs1 = Files.readString(Path.of("scripts", "package-release.ps1"), StandardCharsets.UTF_8);
-        assertTrue(pkgPs1.contains("$AppVersion  = \"5.7.0\""));
+        assertTrue(pkgPs1.contains("pom.xml") && pkgPs1.contains("$PomXml.project.version"),
+                "package-release.ps1 debe resolver la versión dinámicamente desde pom.xml");
         assertTrue(pkgPs1.contains("FoodCoreERP-$AppVersion.msi"));
         assertTrue(pkgPs1.contains("pwa"));
         assertTrue(pkgPs1.contains("keystore.jks.example"));
         assertTrue(pkgPs1.contains("scripts"));
 
         String debSh = Files.readString(Path.of("scripts", "build-deb.sh"), StandardCharsets.UTF_8);
-        assertTrue(debSh.contains("APP_VERSION=\"5.7.0\""));
+        assertTrue(debSh.contains("APP_VERSION=") && debSh.contains("pom.xml"),
+                "build-deb.sh debe resolver APP_VERSION dinámicamente desde pom.xml");
         assertTrue(debSh.contains("pwa"));
         assertTrue(debSh.contains("keystore.jks.example"));
 
         assertTrue(Files.isRegularFile(Path.of("keystore.jks.example")));
+        assertTrue(Files.isRegularFile(Path.of("scripts", "init-client-keystore.ps1")));
         assertTrue(Files.isRegularFile(Path.of("pwa", "index.html")));
         assertTrue(Files.isRegularFile(Path.of("scripts", "backup-auto.ps1")));
         assertTrue(Files.isRegularFile(Path.of("scripts", "backup-auto.sh")));
@@ -92,7 +96,7 @@ class SubFaseCInfraestructuraTest {
         assertTrue(Files.isRegularFile(Path.of("scripts", "restore-auto.sh")));
 
         String readme = Files.readString(Path.of("README.md"), StandardCharsets.UTF_8);
-        assertTrue(readme.contains("FoodCoreERP-5.7.0.msi"));
+        assertTrue(readme.contains("FoodCoreERP-5.8.0"));
         assertTrue(readme.contains("backup-auto.ps1"));
         assertTrue(readme.contains("restore-auto.ps1"));
     }

@@ -35,6 +35,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - name: Repository Hygiene Guard (Block Forbidden Binaries & Secrets)
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          FORBIDDEN="$(git ls-files | grep -E '\.(db|db-wal|db-shm|sql\.gz|exe|jks|p12|keystore|cer)$' || true)"
+          if [ -n "${FORBIDDEN}" ]; then
+            echo "::error::Se detectaron archivos prohibidos rastreados por Git:"
+            echo "${FORBIDDEN}"
+            exit 1
+          fi
+          echo "[OK] Sin binarios, bases de datos locales ni certificados/keystores rastreados."
+
       - name: Set up JDK 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
