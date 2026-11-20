@@ -24,4 +24,5 @@ public interface CajaDAO {
     List<CategoriaGasto> listarCategoriasGastoActivas(Connection conn) throws SQLException;
     Optional<CategoriaGasto> obtenerCategoriaGastoPorId(Connection conn, int idCategoriaGasto) throws SQLException;
     List<MovimientoCaja> listarGastosTurno(Connection conn, int idCaja) throws SQLException;
+    Map<String, Object[]> obtenerResumenVentasCierreZ(Connection conn, int idCaja) throws SQLException;
 }

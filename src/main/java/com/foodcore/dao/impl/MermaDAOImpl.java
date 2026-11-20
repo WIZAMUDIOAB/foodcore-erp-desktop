@@ -211,6 +211,36 @@ public class MermaDAOImpl implements MermaDAO {
         return 0;
     }
 
+    @Override
+    public List<Merma> listarMovimientosMermaRecientes(Connection conn, int limite) throws SQLException {
+        String sql = "SELECT k.created_at, i.nombre AS insumo_nombre, i.unidad_medida, "
+                + "k.cantidad, k.saldo_posterior, k.observacion "
+                + "FROM kardex_movimiento k JOIN insumo i ON k.id_insumo = i.id_insumo "
+                + "WHERE k.tipo_movimiento LIKE 'MERMA%' ORDER BY k.id_kardex DESC LIMIT ?";
+        List<Merma> lista = new ArrayList<>();
+        int lim = limite > 0 ? limite : 100;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, lim);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Merma m = new Merma();
+                    m.setNombreInsumo(rs.getString("insumo_nombre"));
+                    m.setUnidadMedida(rs.getString("unidad_medida"));
+                    m.setCantidad(rs.getBigDecimal("cantidad"));
+                    m.setObservacion(rs.getString("observacion"));
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    if (ts != null) {
+                        m.setFechaHora(ts.toLocalDateTime());
+                    }
+                    // {@code saldo_posterior} no existe en el modelo {@link Merma}: se conserva la
+                    // observación del movimiento de Kárdex y la cantidad como magnitud de la merma.
+                    lista.add(m);
+                }
+            }
+        }
+        return lista;
+    }
+
     private Merma mapearMerma(ResultSet rs) throws SQLException {
         Merma m = new Merma();
         m.setIdMerma(rs.getInt("id_merma"));

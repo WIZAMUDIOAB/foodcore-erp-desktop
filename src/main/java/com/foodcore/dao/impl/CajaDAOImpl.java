@@ -49,4 +49,9 @@ public class CajaDAOImpl extends com.foodcore.dao.CajaDAOImpl {
     public Map<String, BigDecimal> obtenerTotalesPorMedioPago(Connection conn, int idCaja) throws SQLException {
         return super.obtenerTotalesPorMedioPago(conn, idCaja);
     }
+
+    @Override
+    public Map<String, Object[]> obtenerResumenVentasCierreZ(Connection conn, int idCaja) throws SQLException {
+        return super.obtenerResumenVentasCierreZ(conn, idCaja);
+    }
 }

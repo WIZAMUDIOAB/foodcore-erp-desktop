@@ -276,6 +276,25 @@ public class CajaDAOImpl implements CajaDAO {
         return lista;
     }
 
+    @Override
+    public Map<String, Object[]> obtenerResumenVentasCierreZ(Connection conn, int idCaja) throws SQLException {
+        Map<String, Object[]> resumen = new LinkedHashMap<>();
+        String sql = "SELECT metodo_pago, COUNT(*) AS ops, COALESCE(SUM(total), 0) AS monto "
+            + "FROM venta WHERE id_caja = ? AND estado = 'COMPLETADA' GROUP BY metodo_pago";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idCaja);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    resumen.put(rs.getString("metodo_pago"), new Object[]{
+                        rs.getInt("ops"),
+                        rs.getBigDecimal("monto")
+                    });
+                }
+            }
+        }
+        return resumen;
+    }
+
     private CategoriaGasto mapearCategoriaGasto(ResultSet rs) throws SQLException {
         return new CategoriaGasto(
             rs.getInt("id_categoria_gasto"),
