@@ -78,4 +78,65 @@ class ControllerThreadingArchitectureTest {
 
         assertTrue(violaciones.isEmpty(), "Archivos con referencias prohibidas: " + violaciones);
     }
+
+    @Test
+    @DisplayName("Ola 1: Ningún controlador JavaFX usa JDBC o ConexionBD directamente")
+    void ningunControladorUsaJdbcDirecto() throws IOException {
+        Path controllersDir = Path.of("src", "main", "java", "com", "foodcore", "controller");
+        List<String> prohibidos = List.of(
+                "ConexionBD",
+                "java.sql.Connection",
+                "PreparedStatement",
+                "ResultSet",
+                "DriverManager");
+        List<String> violaciones = new ArrayList<>();
+
+        try (Stream<Path> files = Files.walk(controllersDir)) {
+            files.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
+                try {
+                    List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+                    for (int i = 0; i < lines.size(); i++) {
+                        for (String prohibido : prohibidos) {
+                            if (lines.get(i).contains(prohibido)) {
+                                violaciones.add(path.getFileName() + ":" + (i + 1)
+                                        + " -> " + lines.get(i).trim());
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        assertTrue(violaciones.isEmpty(),
+                "Los controladores deben delegar el acceso JDBC en servicios: " + violaciones);
+    }
+
+    @Test
+    @DisplayName("Ola 1: Cero referencias a Gson en src y pom.xml")
+    void ceroReferenciasAGsonEnCodigoFuente() throws IOException {
+        String firmaGson = "com.google." + "gson";
+        List<String> violaciones = new ArrayList<>();
+
+        try (Stream<Path> files = Files.walk(Path.of("src"))) {
+            files.filter(p -> p.toString().endsWith(".java")).forEach(path -> {
+                try {
+                    String content = Files.readString(path, StandardCharsets.UTF_8);
+                    if (content.contains(firmaGson)) {
+                        violaciones.add(path.toString());
+                    }
+                } catch (IOException ignored) {
+                    // Ignorar archivos no legibles como UTF-8
+                }
+            });
+        }
+
+        Path pom = Path.of("pom.xml");
+        if (Files.exists(pom) && Files.readString(pom, StandardCharsets.UTF_8).contains(firmaGson)) {
+            violaciones.add(pom.toString());
+        }
+
+        assertTrue(violaciones.isEmpty(), "Referencias a Gson prohibidas: " + violaciones);
+    }
 }
