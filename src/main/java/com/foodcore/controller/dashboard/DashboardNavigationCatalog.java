@@ -14,7 +14,7 @@ public class DashboardNavigationCatalog {
     }
 
     public String resolverRutaBreadcrumbs(String fxmlPath, String textoBotonFallback) {
-        String breadcrumb = breadcrumbs.get(fxmlPath);
+        String breadcrumb = fxmlPath != null ? breadcrumbs.get(fxmlPath) : null;
         if (breadcrumb != null) {
             return breadcrumb;
         }
