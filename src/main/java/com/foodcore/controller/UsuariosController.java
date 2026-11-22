@@ -1,10 +1,6 @@
 package com.foodcore.controller;
 
 import com.foodcore.api.security.TokenBlacklistService;
-import com.foodcore.dao.UsuarioDAO;
-import com.foodcore.dao.UsuarioDAOImpl;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
-import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.enums.Permiso;
@@ -14,8 +10,9 @@ import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
+import com.foodcore.exception.CodigoError;
+import com.foodcore.service.UsuarioGestionService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -37,10 +34,6 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -97,10 +90,9 @@ public class UsuariosController {
     @FXML private Button btnDesactivar2FA;
     @FXML private Button btnConfirmar2FA;
 
-    private final EncriptadorPassword encriptador = new EncriptadorPassword();
+
     private final TotpService totpService = new TotpService();
-    private final UsuarioDAO usuarioDAO = new UsuarioDAOImpl();
-    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+    private final UsuarioGestionService usuarioGestionService = new UsuarioGestionService();
     private final TokenBlacklistService tokenBlacklistService = TokenBlacklistService.getInstance();
     private final ObservableList<FilaUsuario> listaUsuarios = FXCollections.observableArrayList();
 
@@ -166,27 +158,19 @@ public class UsuariosController {
     public void cargarUsuarios() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
+                List<UsuarioGestionService.UsuarioResumen> resumenes = usuarioGestionService.listarUsuarios();
                 List<FilaUsuario> filas = new ArrayList<>();
-                String sql = "SELECT id_usuario, username, COALESCE(nombre_completo, username) AS nom, codigo_rol, "
-                    + "cambio_password_requerido, activo, pin_hash, COALESCE(totp_habilitado, 0) AS totp_habilitado "
-                    + "FROM usuario ORDER BY id_usuario ASC";
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        filas.add(new FilaUsuario(
-                            rs.getInt("id_usuario"),
-                            rs.getString("username"),
-                            rs.getString("nom"),
-                            rs.getString("codigo_rol"),
-                            rs.getBoolean("cambio_password_requerido"),
-                            rs.getBoolean("activo"),
-                            rs.getString("pin_hash") != null && !rs.getString("pin_hash").isBlank(),
-                            rs.getBoolean("totp_habilitado")
-                        ));
-                    }
-                } catch (SQLException e) {
-                    LOGGER.log(Level.FINE, "Error cargando usuarios", e);
+                for (UsuarioGestionService.UsuarioResumen r : resumenes) {
+                    filas.add(new FilaUsuario(
+                        r.idUsuario(),
+                        r.username(),
+                        r.nombreCompleto(),
+                        r.rol(),
+                        r.cambioRequerido(),
+                        r.activo(),
+                        r.pinConfigurado(),
+                        r.totpHabilitado()
+                    ));
                 }
                 return filas;
             },
@@ -199,56 +183,18 @@ public class UsuariosController {
      * Evalúa en modo fail-closed si el operador autenticado posee {@link Permiso#USUARIO_GESTIONAR}.
      */
     public static boolean tienePermisoGestionUsuarios() {
-        SesionUsuario sesion = SesionManager.getSesionActiva();
-        Usuario actual = AuthService.getUsuarioSesionActual();
-        if (actual != null) {
-            if (sesion != null && sesion.getIdUsuario() == actual.getIdUsuario()
-                    && actual.getNombreRol() != null
-                    && actual.getNombreRol().equalsIgnoreCase(sesion.getCodigoRol())) {
-                return sesion.tienePermiso(Permiso.USUARIO_GESTIONAR);
-            }
-            if (actual.getNombreRol() == null || actual.getNombreRol().isBlank()) {
-                return false;
-            }
-            return AutorizacionService.permisosPorDefectoParaRol(actual.getNombreRol())
-                    .contains(Permiso.USUARIO_GESTIONAR);
-        }
-        return sesion != null && sesion.tienePermiso(Permiso.USUARIO_GESTIONAR);
+        return new UsuarioGestionService().tienePermisoGestionUsuarios();
     }
 
     private void exigirPermisoGestionUsuarios() throws NegocioException {
-        if (!tienePermisoGestionUsuarios()) {
-            throw new NegocioException(
-                    CodigoError.ACCESO_DENEGADO,
-                    "Acceso denegado: Se requiere el permiso USUARIO_GESTIONAR para administrar usuarios.");
-        }
-    }
-
-    private static void validarPasswordTemporal(String passwordTemporal) throws NegocioException {
-        if (passwordTemporal == null || passwordTemporal.isBlank()
-                || !EncriptadorPassword.cumplePoliticaComplejidad(passwordTemporal)) {
-            throw new NegocioException(
-                    CodigoError.VALIDACION_ENTRADA,
-                    "Debe ingresar una contraseña temporal válida (mínimo 8 caracteres, mayúscula, minúscula y dígito).");
-        }
+        usuarioGestionService.exigirPermisoGestionUsuarios();
     }
 
     /**
      * Resetea la contraseña de un usuario forzando {@code cambio_password_requerido = 1} (§2.4).
      */
     public void resetearPasswordForzandoCambio(int idUsuario, String passwordTemporal) throws Exception {
-        exigirPermisoGestionUsuarios();
-        validarPasswordTemporal(passwordTemporal);
-        String hash = encriptador.hashear(passwordTemporal);
-        String sql = "UPDATE usuario SET password_hash = ?, hash_password = ?, cambio_password_requerido = 1, "
-            + "intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id_usuario = ?";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, hash);
-            ps.setString(2, hash);
-            ps.setInt(3, idUsuario);
-            ps.executeUpdate();
-        }
+        usuarioGestionService.resetearPasswordForzandoCambio(idUsuario, passwordTemporal);
     }
 
     @FXML
@@ -299,28 +245,8 @@ public class UsuariosController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                String hash = encriptador.hashear(pass);
-                String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
-                    + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, pin_hash, sueldo_base, horario_laboral) "
-                    + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, NULL, ?, ?) "
-                    + "ON DUPLICATE KEY UPDATE nombre_completo = VALUES(nombre_completo), codigo_rol = VALUES(codigo_rol), activo = VALUES(activo), "
-                    + "dni = VALUES(dni), sueldo_base = VALUES(sueldo_base), horario_laboral = VALUES(horario_laboral)";
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, idRol);
-                    ps.setString(2, user);
-                    ps.setString(3, user);
-                    ps.setString(4, nom);
-                    ps.setString(5, hash);
-                    ps.setString(6, hash);
-                    ps.setString(7, rol);
-                    ps.setBoolean(8, activoSel);
-                    ps.setString(9, dni);
-                    ps.setBigDecimal(10, java.math.BigDecimal.valueOf(sueldoFinal));
-                    ps.setString(11, horario);
-                    ps.executeUpdate();
-                }
+                usuarioGestionService.crearOActualizarUsuario(idRol, user, nom, rol, pass,
+                        activoSel, dni, sueldoFinal, horario);
             },
             () -> {
                 if (btnCrearUsuario != null) {
@@ -427,19 +353,7 @@ public class UsuariosController {
 
     public void actualizarPinUsuario(int idUsuario, String pin) throws Exception {
         exigirPermisoGestionUsuarios();
-        if (pin == null || !pin.trim().matches("^\\d{4,6}$")) {
-            throw new NegocioException(
-                    CodigoError.VALIDACION_ENTRADA,
-                    "El PIN debe contener entre 4 y 6 dígitos numéricos.");
-        }
-        String hash = EncriptadorPassword.generarHash(pin.trim());
-        String sql = "UPDATE usuario SET pin = NULL, pin_hash = ? WHERE id_usuario = ?";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, hash);
-            ps.setInt(2, idUsuario);
-            ps.executeUpdate();
-        }
+        usuarioGestionService.actualizarPinUsuario(idUsuario, pin);
     }
 
     /**
@@ -522,15 +436,10 @@ public class UsuariosController {
         final String secretoFinal = secretoTemporal2fa;
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, secretoFinal, true);
-                    int actor = AuthService.getUsuarioSesionActual() != null
-                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                    auditoriaDAO.registrarEventoSeguro(
-                            conn, actor, "ACTIVAR_2FA", "USUARIO", null,
-                            "2FA TOTP activado para usuario " + usernameObj);
-                }
+                int actor = AuthService.getUsuarioSesionActual() != null
+                        ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                usuarioGestionService.actualizarConfiguracion2FA(idObjetivo, usernameObj,
+                        secretoFinal, true, actor);
             },
             () -> {
                 if (btnConfirmar2FA != null) {
@@ -565,15 +474,10 @@ public class UsuariosController {
         final String usernameObj = usuario2faEnEdicion.username();
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, null, false);
-                    int actor = AuthService.getUsuarioSesionActual() != null
-                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                    auditoriaDAO.registrarEventoSeguro(
-                            conn, actor, "DESACTIVAR_2FA", "USUARIO", null,
-                            "2FA TOTP desactivado para usuario " + usernameObj);
-                }
+                int actor = AuthService.getUsuarioSesionActual() != null
+                        ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                usuarioGestionService.actualizarConfiguracion2FA(idObjetivo, usernameObj,
+                        null, false, actor);
             },
             () -> {
                 handleCerrarModal2FA(null);

@@ -1,8 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.ConfiguracionImpresoraDAO;
-import com.foodcore.dao.impl.ConfiguracionImpresoraDAOImpl;
+
 import com.foodcore.model.ConfiguracionImpresora;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.enums.Permiso;
@@ -13,10 +12,11 @@ import com.foodcore.service.AlertaService;
 import com.foodcore.service.AlertaService.AlertaEmitida;
 import com.foodcore.service.AlertaService.ConfiguracionAlertaEmail;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.ConfiguracionSistemaService;
 import com.foodcore.service.DemoDataService;
 import com.foodcore.service.DemoDataService.ResumenDemo;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -46,11 +46,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -73,14 +71,7 @@ public class ConfiguracionController {
 
     private static final Logger LOGGER = Logger.getLogger(ConfiguracionController.class.getName());
     private static final int SCRIPT_TIMEOUT_SECONDS = 120;
-    private static final String SQL_CARGAR_CONFIG = "SELECT nombre_restaurante, direccion, telefono, ruc, nombre_impresora "
-            + "FROM configuracion_restaurante WHERE id_config = 1";
-    private static final String SQL_GUARDAR_CONFIG = "INSERT INTO configuracion_restaurante "
-            + "(id_config, nombre_restaurante, direccion, telefono, ruc, nombre_impresora) "
-            + "VALUES (1, ?, ?, ?, ?, ?) "
-            + "ON DUPLICATE KEY UPDATE nombre_restaurante = VALUES(nombre_restaurante), "
-            + "direccion = VALUES(direccion), telefono = VALUES(telefono), "
-            + "ruc = VALUES(ruc), nombre_impresora = VALUES(nombre_impresora)";
+
 
     public record CategoriaOpcion(int idCategoria, String nombre) {
         @Override
@@ -134,7 +125,7 @@ public class ConfiguracionController {
     @FXML private Button btnBorrarDatosDemo;
     @FXML private Label lblEstadoDemo;
 
-    private final ConfiguracionImpresoraDAO configImpresoraDAO = new ConfiguracionImpresoraDAOImpl();
+    private final ConfiguracionSistemaService configuracionService = new ConfiguracionSistemaService();
     private final DemoDataService demoDataService = new DemoDataService();
     private final ObservableList<ConfiguracionImpresora> asignaciones = FXCollections.observableArrayList();
 
@@ -241,20 +232,11 @@ public class ConfiguracionController {
     public void cargarRuteoImpresorasAsync() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    Map<Integer, String> categorias = configImpresoraDAO.obtenerMapaNombreCategorias(conn);
-                    List<ConfiguracionImpresora> lista = configImpresoraDAO.listarTodas(conn);
-                    Map<String, Object> res = new LinkedHashMap<>();
-                    res.put("categorias", categorias);
-                    res.put("lista", lista);
-                    return res;
-                }
+                return configuracionService.cargarRuteoImpresoras();
             },
             res -> {
-                @SuppressWarnings("unchecked")
-                Map<Integer, String> categorias = (Map<Integer, String>) res.get("categorias");
-                @SuppressWarnings("unchecked")
-                List<ConfiguracionImpresora> lista = (List<ConfiguracionImpresora>) res.get("lista");
+                Map<Integer, String> categorias = res.categorias();
+                List<ConfiguracionImpresora> lista = res.asignaciones();
 
                 if (cmbCategoriaImpresora != null && categorias != null) {
                     cmbCategoriaImpresora.getItems().clear();
@@ -287,9 +269,7 @@ public class ConfiguracionController {
         final String impresoraFinal = impresoraRaw.trim();
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    configImpresoraDAO.guardarOActualizar(conn, catSel.idCategoria(), impresoraFinal);
-                }
+                configuracionService.asignarImpresoraCategoria(catSel.idCategoria(), impresoraFinal);
             },
             () -> {
                 AnimationUtils.mostrarToast(rootConfigStack,
@@ -311,9 +291,7 @@ public class ConfiguracionController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    configImpresoraDAO.eliminarPorCategoria(conn, sel.getIdCategoriaProducto());
-                }
+                configuracionService.eliminarImpresoraCategoria(sel.getIdCategoriaProducto());
             },
             () -> {
                 AnimationUtils.mostrarToast(rootConfigStack, "Asignación de impresora eliminada.", false);
@@ -965,28 +943,16 @@ public class ConfiguracionController {
     public void cargarConfiguracion() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(SQL_CARGAR_CONFIG);
-                     ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        return new String[] {
-                            rs.getString("nombre_restaurante"),
-                            rs.getString("direccion"),
-                            rs.getString("telefono"),
-                            rs.getString("ruc"),
-                            rs.getString("nombre_impresora")
-                        };
-                    }
-                    return null;
-                }
+                return configuracionService.cargarConfiguracionRestaurante();
             },
             datos -> {
-                if (datos != null) {
-                    txtNombreRestaurante.setText(datos[0]);
-                    txtDireccion.setText(datos[1]);
-                    txtTelefono.setText(datos[2]);
-                    txtRuc.setText(datos[3] != null ? datos[3] : "");
-                    txtImpresora.setText(datos[4]);
+                if (datos.isPresent()) {
+                    var config = datos.get();
+                    txtNombreRestaurante.setText(config.nombreRestaurante());
+                    txtDireccion.setText(config.direccion());
+                    txtTelefono.setText(config.telefono());
+                    txtRuc.setText(config.ruc() != null ? config.ruc() : "");
+                    txtImpresora.setText(config.nombreImpresora());
                 }
             },
             e -> LOGGER.log(Level.FINE, "Usando configuración por defecto", e)
@@ -1006,15 +972,9 @@ public class ConfiguracionController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(SQL_GUARDAR_CONFIG)) {
-                    ps.setString(1, nombre);
-                    ps.setString(2, direccion);
-                    ps.setString(3, telefono);
-                    ps.setString(4, ruc);
-                    ps.setString(5, impresora);
-                    ps.executeUpdate();
-                }
+                configuracionService.guardarConfiguracionRestaurante(
+                        new ConfiguracionSistemaService.DatosRestauranteConfig(
+                                nombre, direccion, telefono, ruc, impresora));
             },
             () -> {
                 if (btnGuardarConfig != null) {
