@@ -34,6 +34,17 @@ import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
+import com.foodcore.controller.venta.DefaultVentaCarritoHandler;
+import com.foodcore.controller.venta.DefaultVentaCobroCoordinator;
+import com.foodcore.controller.venta.DefaultVentaFidelizacionCoordinator;
+import com.foodcore.controller.venta.DefaultVentaMesasCanalCoordinator;
+import com.foodcore.controller.venta.VentaCarritoHandler;
+import com.foodcore.controller.venta.VentaCatalogoPresenter;
+import com.foodcore.controller.venta.VentaCobroCoordinator;
+import com.foodcore.controller.venta.VentaFidelizacionCoordinator;
+import com.foodcore.controller.venta.VentaMesasCanalCoordinator;
+import com.foodcore.controller.venta.VentaMesasCanalUiRenderer;
+import com.foodcore.controller.venta.VentaPosModalHelper;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -55,7 +66,6 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ContentDisplay;
-import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -119,6 +129,9 @@ public class VentaController {
     public static final String MODALIDAD_SPLIT_2 = "Dividir en 2 partes iguales (50% Efectivo / 50% Tarjeta)";
     public static final String MODALIDAD_SPLIT_4 = "Dividir en 4 partes iguales (25% c/u)";
     public static final String MODALIDAD_SPLIT_ITEMS = "Dividir por ítems (Subcuenta A y Subcuenta B)";
+    private static final VentaMesasCanalCoordinator CANAL_STATICS = new DefaultVentaMesasCanalCoordinator(null);
+    private static final VentaCobroCoordinator COBRO_STATICS = new DefaultVentaCobroCoordinator(
+            new VentaService(), new AutorizacionService());
 
     @FXML private TabPane tabPanePosCatalogo;
     @FXML private Tab tabCatalogo;
@@ -184,6 +197,33 @@ public class VentaController {
     private final FidelizacionService fidelizacionService = new FidelizacionService();
     private final AutorizacionService autorizacionService = new AutorizacionService();
 
+    private final VentaMesasCanalCoordinator mesasCanalCoordinator;
+    private final VentaMesasCanalUiRenderer mesasCanalUiRenderer;
+    private final VentaCatalogoPresenter catalogoPresenter;
+    private final VentaCarritoHandler carritoHandler;
+    private final VentaCobroCoordinator cobroCoordinator;
+    private final VentaFidelizacionCoordinator fidelizacionCoordinator;
+
+    public VentaController() {
+        this.mesasCanalCoordinator = new DefaultVentaMesasCanalCoordinator(posConsultaService);
+        this.mesasCanalUiRenderer = new VentaMesasCanalUiRenderer();
+        this.catalogoPresenter = new VentaCatalogoPresenter(posConsultaService);
+        this.carritoHandler = new DefaultVentaCarritoHandler(promocionService, ventaService);
+        this.cobroCoordinator = new DefaultVentaCobroCoordinator(ventaService, autorizacionService);
+        this.fidelizacionCoordinator = new DefaultVentaFidelizacionCoordinator(posConsultaService, fidelizacionService);
+    }
+
+    public VentaController(VentaMesasCanalCoordinator mesasCanalCoordinator,
+            VentaMesasCanalUiRenderer mesasCanalUiRenderer, VentaCatalogoPresenter catalogoPresenter,
+            VentaCarritoHandler carritoHandler, VentaCobroCoordinator cobroCoordinator,
+            VentaFidelizacionCoordinator fidelizacionCoordinator) {
+        this.mesasCanalCoordinator = java.util.Objects.requireNonNull(mesasCanalCoordinator);
+        this.mesasCanalUiRenderer = java.util.Objects.requireNonNull(mesasCanalUiRenderer);
+        this.catalogoPresenter = java.util.Objects.requireNonNull(catalogoPresenter);
+        this.carritoHandler = java.util.Objects.requireNonNull(carritoHandler);
+        this.cobroCoordinator = java.util.Objects.requireNonNull(cobroCoordinator);
+        this.fidelizacionCoordinator = java.util.Objects.requireNonNull(fidelizacionCoordinator);
+    }
 
     private boolean descuentoManualFijado = false;
     private final AtomicBoolean cobroEnProgreso = new AtomicBoolean(false);
@@ -340,172 +380,40 @@ public class VentaController {
         }
 
         pedidosPorMesa.clear();
-        List<Pedido> ordenesExternas = new ArrayList<>();
-        for (Pedido p : pedidosActivosMulticanal) {
-            String tipo = determinarCanalPedido(p);
-            if ("MESA".equals(tipo)) {
-                String numNorm = normalizarNumeroMesa(p.getNumeroMesa());
-                pedidosPorMesa.putIfAbsent(numNorm, p);
-            } else {
-                ordenesExternas.add(p);
-            }
-        }
-
+        VentaMesasCanalCoordinator.ResumenCanalesPos resumen = mesasCanalCoordinator.particionarPedidosActivos(pedidosActivosMulticanal);
+        pedidosPorMesa.putAll(resumen.pedidosPorMesa());
         renderizarGridMesasPos();
-        renderizarPedidosMulticanal(ordenesExternas);
+        renderizarPedidosMulticanal(resumen.ordenesExternas());
         renderizarBarraRapidaOrdenes(pedidosActivosMulticanal);
     }
 
     public static String determinarCanalPedido(Pedido p) {
-        if (p == null) {
-            return "MESA";
-        }
-        String tipo = p.getTipoPedido() != null ? p.getTipoPedido().trim().toUpperCase(Locale.ROOT) : "";
-        String mesa = p.getNumeroMesa() != null ? p.getNumeroMesa().trim().toUpperCase(Locale.ROOT) : "";
-        if (tipo.contains("KIOSCO") || mesa.startsWith("T-") || mesa.contains("KIOSCO")) {
-            return "KIOSCO";
-        }
-        if (tipo.contains("DELIVERY") || mesa.startsWith("DL-") || mesa.contains("DELIVERY")) {
-            return "DELIVERY";
-        }
-        return "MESA";
+        return CANAL_STATICS.determinarCanalPedido(p);
     }
 
     public static String construirTextoBadgeCanal(Pedido p) {
-        String canal = determinarCanalPedido(p);
-        if ("KIOSCO".equals(canal)) {
-            return "[KIOSCO]";
-        }
-        if ("DELIVERY".equals(canal)) {
-            return "[DELIVERY]";
-        }
-        return "[MESA " + normalizarNumeroMesa(p != null ? p.getNumeroMesa() : "01") + "]";
+        return CANAL_STATICS.construirTextoBadgeCanal(p);
     }
 
     private static String normalizarNumeroMesa(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "01";
-        }
-        String digits = raw.replaceAll("\\D+", "");
-        if (digits.isEmpty()) {
-            return raw.trim();
-        }
-        int num = Integer.parseInt(digits);
-        return String.format("%02d", num);
+        return CANAL_STATICS.normalizarNumeroMesa(raw);
     }
 
     private void renderizarGridMesasPos() {
-        if (tileMesasPos == null) {
-            return;
-        }
-        tileMesasPos.getChildren().clear();
-        int ocupadas = 0;
-        LocalDateTime ahoraLima = LocalDateTime.now(ZONA_LIMA);
-
-        for (int i = 1; i <= TOTAL_MESAS_SALON; i++) {
-            String numMesa = String.format("%02d", i);
-            Pedido pedidoActivo = pedidosPorMesa.get(numMesa);
-            boolean ocupada = pedidoActivo != null;
-            if (ocupada) {
-                ocupadas++;
-            }
-
-            VBox card = new VBox(6.0);
-            card.setPrefSize(158, 118);
-            card.setMinSize(148, 110);
-            card.getStyleClass().add(ocupada ? "pos-mesa-card-ocupada" : "pos-mesa-card-libre");
-            card.setId("posMesaCard_" + numMesa);
-
-            HBox header = new HBox(6.0);
-            header.setAlignment(Pos.CENTER_LEFT);
-            Label lblMesa = new Label("Mesa " + numMesa);
-            lblMesa.getStyleClass().add("text-body-strong");
-            Region sp = new Region();
-            HBox.setHgrow(sp, Priority.ALWAYS);
-            Label badgeEstado = new Label(ocupada ? "OCUPADA" : "LIBRE");
-            badgeEstado.getStyleClass().add(ocupada ? "badge-pill-warning" : "badge-pill-success");
-            header.getChildren().addAll(lblMesa, sp, badgeEstado);
-
-            BigDecimal monto = ocupada && pedidoActivo.getTotal() != null
-                    ? pedidoActivo.getTotal().setScale(2, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            Label lblMonto = new Label("S/ " + monto);
-            lblMonto.getStyleClass().add(ocupada ? "text-mono-accent" : "text-mono");
-
-            long minTranscurridos = 0;
-            if (ocupada && pedidoActivo.getFechaHora() != null) {
-                minTranscurridos = Math.max(0, ChronoUnit.MINUTES.between(pedidoActivo.getFechaHora(), ahoraLima));
-            }
-            Label lblTiempo = new Label(ocupada ? (minTranscurridos + " min") : "Disponible");
-            lblTiempo.getStyleClass().add("text-caption-muted");
-
-            card.getChildren().addAll(header, lblMonto, lblTiempo);
-            card.setOnMouseClicked(ev -> seleccionarMesa(numMesa));
-            tileMesasPos.getChildren().add(card);
-        }
-
-        if (lblResumenMesasPos != null) {
-            int libres = TOTAL_MESAS_SALON - ocupadas;
-            lblResumenMesasPos.setText(ocupadas + " Ocupadas · " + libres + " Libres");
-        }
+        mesasCanalUiRenderer.renderizarGridMesasPos(tileMesasPos, lblResumenMesasPos, pedidosPorMesa,
+                TOTAL_MESAS_SALON, this::seleccionarMesa);
     }
 
     private void renderizarPedidosMulticanal(List<Pedido> externos) {
-        if (flowPedidosMulticanal == null) {
-            return;
-        }
-        flowPedidosMulticanal.getChildren().clear();
-        if (externos == null || externos.isEmpty()) {
-            Label vacio = new Label("Sin pedidos de Kiosco o Delivery pendientes de cobro.");
-            vacio.getStyleClass().add("text-caption-muted");
-            flowPedidosMulticanal.getChildren().add(vacio);
-            return;
-        }
-
-        for (Pedido p : externos) {
-            String badgeTxt = construirTextoBadgeCanal(p);
-            String ref = p.getNumeroMesa() != null && !p.getNumeroMesa().isBlank() ? p.getNumeroMesa() : ("#" + p.getIdPedido());
-            BigDecimal tot = p.getTotal() != null ? p.getTotal().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            Button btn = new Button(badgeTxt + " " + ref + " · S/ " + tot);
-            btn.getStyleClass().add("KIOSCO".equals(determinarCanalPedido(p)) ? "badge-canal-kiosco" : "badge-canal-delivery");
-            btn.setOnAction(ev -> {
-                cargarPedidoEnPOS(p);
-                if (tabPanePosCatalogo != null && tabCatalogo != null) {
-                    tabPanePosCatalogo.getSelectionModel().select(tabCatalogo);
-                }
-            });
-            flowPedidosMulticanal.getChildren().add(btn);
-        }
+        mesasCanalUiRenderer.renderizarPedidosMulticanal(flowPedidosMulticanal, externos, mesasCanalCoordinator, pedido -> {
+            cargarPedidoEnPOS(pedido);
+            if (tabPanePosCatalogo != null && tabCatalogo != null) tabPanePosCatalogo.getSelectionModel().select(tabCatalogo);
+        });
     }
 
     private void renderizarBarraRapidaOrdenes(List<Pedido> activos) {
-        if (boxOrdenesEntrantes == null) {
-            return;
-        }
-        boxOrdenesEntrantes.getChildren().clear();
-        if (activos == null || activos.isEmpty()) {
-            Label info = new Label("Orden manual lista · Mesa " + mesaSeleccionadaActual);
-            info.getStyleClass().add("text-caption-muted");
-            boxOrdenesEntrantes.getChildren().add(info);
-            return;
-        }
-
-        for (Pedido p : activos) {
-            String canal = determinarCanalPedido(p);
-            String badge = construirTextoBadgeCanal(p);
-            BigDecimal tot = p.getTotal() != null ? p.getTotal().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            Button pill = new Button(badge + " S/ " + tot);
-            pill.setPadding(new Insets(3, 8, 3, 8));
-            if ("KIOSCO".equals(canal)) {
-                pill.getStyleClass().add("badge-canal-kiosco");
-            } else if ("DELIVERY".equals(canal)) {
-                pill.getStyleClass().add("badge-canal-delivery");
-            } else {
-                pill.getStyleClass().add("badge-canal-mesa");
-            }
-            pill.setOnAction(ev -> cargarPedidoEnPOS(p));
-            boxOrdenesEntrantes.getChildren().add(pill);
-        }
+        mesasCanalUiRenderer.renderizarBarraRapidaOrdenes(boxOrdenesEntrantes, activos,
+                mesaSeleccionadaActual, mesasCanalCoordinator, this::cargarPedidoEnPOS);
     }
 
     /**
@@ -638,13 +546,13 @@ public class VentaController {
             ocultarBoton(btnAnularVenta);
         } else if (rol.contains("CAJERO")) {
             SesionUsuario sesion = crearSesionActualPOS(usr);
-            if (btnDescuento != null && !autorizacionService.tienePermiso(sesion, Permiso.VENTA_DESCUENTO)) {
+            if (btnDescuento != null && !cobroCoordinator.tienePermiso(sesion, Permiso.VENTA_DESCUENTO)) {
                 btnDescuento.setDisable(true);
             }
             if (btnAnularVenta != null) {
                 // v5.2.0: El CAJERO mantiene habilitado Anular Venta; al pulsar solicita PIN de Supervisor
                 btnAnularVenta.setDisable(false);
-                if (!autorizacionService.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
+                if (!cobroCoordinator.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
                     btnAnularVenta.setTooltip(new Tooltip("Modo Supervisor: requiere PIN de SUPERVISOR/ADMIN para anular"));
                 }
             }
@@ -652,10 +560,7 @@ public class VentaController {
     }
 
     private SesionUsuario crearSesionActualPOS(Usuario usr) {
-        String codigoRol = usr != null && usr.getNombreRol() != null ? usr.getNombreRol() : "CAJERO";
-        long idUsr = usr != null ? usr.getIdUsuario() : 2L;
-        String nombreUsr = usr != null && usr.getUsername() != null ? usr.getUsername() : "usuario";
-        return autorizacionService.crearSesion(idUsr, nombreUsr, codigoRol, "POS-01");
+        return cobroCoordinator.crearSesionActualPOS(usr);
     }
 
     private void ocultarBoton(Button btn) {
@@ -738,62 +643,28 @@ public class VentaController {
     }
 
     private void cargarCategorias() {
-        if (boxCategorias == null) {
-            return;
-        }
-        boxCategorias.getChildren().clear();
-
-        Button btnTodos = new Button("Todos");
-        btnTodos.getStyleClass().addAll("category-chip", "category-chip-active");
-        AnimationUtils.attachTactileFeedback(btnTodos);
-        btnTodos.setOnAction(e -> {
-            categoriaFiltroSeleccionada = 0;
-            actualizarEstiloBotonesCategorias(btnTodos);
-            filtrarCatalogo();
-        });
-        boxCategorias.getChildren().add(btnTodos);
-
+        if (boxCategorias == null) return;
         UiAsyncExecutor.ejecutarAsync(
-            () -> posConsultaService.listarCategoriasProductos(),
-            cats -> {
-                for (Categoria c : cats) {
-                    Button btn = new Button(c.getNombre());
-                    btn.getStyleClass().add("category-chip");
-                    AnimationUtils.attachTactileFeedback(btn);
-                    btn.setOnAction(ev -> {
-                        categoriaFiltroSeleccionada = c.getIdCategoria();
-                        actualizarEstiloBotonesCategorias(btn);
-                        filtrarCatalogo();
-                    });
-                    boxCategorias.getChildren().add(btn);
-                }
-            },
+            () -> catalogoPresenter.listarCategoriasProductos(),
+            categorias -> catalogoPresenter.renderizarChipsCategorias(boxCategorias, categorias, categoria -> {
+                categoriaFiltroSeleccionada = categoria;
+                filtrarCatalogo();
+            }),
             ex -> LOGGER.log(Level.FINE, "Categorías no disponibles en arranque", ex)
         );
     }
 
     private void actualizarEstiloBotonesCategorias(Button activo) {
-        boxCategorias.getChildren().forEach(node -> {
-            if (node instanceof Button b) {
-                b.getStyleClass().remove("category-chip-active");
-                if (b == activo) {
-                    b.getStyleClass().add("category-chip-active");
-                }
-            }
-        });
+        // El estado visual del chip se gestiona dentro de VentaCatalogoPresenter.
     }
 
     public void cargarCatalogoProductosAsync() {
         tileProductos.getChildren().clear();
         UiAsyncExecutor.ejecutarAsync(
-            () -> posConsultaService.listarProductosDisponiblesConOpciones(),
+            () -> catalogoPresenter.cargarProductosConFallbackDemo(),
             productos -> {
                 todosLosProductos.clear();
-                if (productos != null && !productos.isEmpty()) {
-                    todosLosProductos.addAll(productos);
-                } else {
-                    poblarProductosDemostracion();
-                }
+                todosLosProductos.addAll(productos);
                 filtrarCatalogo();
             },
             ex -> {
@@ -813,109 +684,20 @@ public class VentaController {
      * Carga síncrona del catálogo POS para tests de integración y capturas determinísticas.
      */
     public void cargarCatalogoProductosSincrono() {
-        try {
-            List<Producto> productos = posConsultaService.listarProductosDisponiblesConOpciones();
-            todosLosProductos.clear();
-            if (productos != null && !productos.isEmpty()) {
-                todosLosProductos.addAll(productos);
-            } else {
-                poblarProductosDemostracion();
-            }
-            filtrarCatalogo();
-        } catch (Exception ex) {
-            LOGGER.log(Level.FINE, "Aviso cargando catalogo sincrono POS, activando demo", ex);
-            poblarProductosDemostracion();
-            filtrarCatalogo();
-        }
+        todosLosProductos.clear();
+        todosLosProductos.addAll(catalogoPresenter.cargarProductosConFallbackDemo());
+        filtrarCatalogo();
     }
 
     private void poblarProductosDemostracion() {
         todosLosProductos.clear();
-        todosLosProductos.add(new Producto(1, 1, "HAM-01", "Hamburguesa Clásica", "Carne 180g, lechuga, tomate", new BigDecimal("18.00"), new BigDecimal("7.50"), true));
-        todosLosProductos.add(new Producto(2, 1, "HAM-02", "Hamburguesa Doble Queso", "Doble carne, cheddar, bacon", new BigDecimal("24.00"), new BigDecimal("10.00"), true));
-        todosLosProductos.add(new Producto(3, 2, "PIZ-01", "Pizza Artesanal Familiar", "Mozzarella fior di latte, albahaca", new BigDecimal("35.00"), new BigDecimal("14.00"), true));
-        todosLosProductos.add(new Producto(4, 3, "ALI-01", "Alitas BBQ x12", "Alitas crujientes con salsa BBQ ahumada", new BigDecimal("22.00"), new BigDecimal("9.00"), true));
-        todosLosProductos.add(new Producto(5, 3, "PAP-01", "Papas Rústicas Nativas", "Con salsa de queso huancaína", new BigDecimal("12.00"), new BigDecimal("4.00"), true));
-        todosLosProductos.add(new Producto(6, 4, "BEB-01", "Cerveza Artesanal IPA", "Botella 330ml", new BigDecimal("14.00"), new BigDecimal("5.50"), true));
-        todosLosProductos.add(new Producto(7, 4, "BEB-02", "Gaseosa Personal 500ml", "Inca Kola / Coca Cola", new BigDecimal("6.00"), new BigDecimal("2.50"), true));
-        todosLosProductos.add(new Producto(8, 4, "BEB-03", "Limonada Frozen 1L", "Jarra clásica", new BigDecimal("10.00"), new BigDecimal("3.00"), true));
+        todosLosProductos.addAll(catalogoPresenter.crearProductosDemostracion());
     }
 
     public void filtrarCatalogo() {
-        tileProductos.getChildren().clear();
-        String filtroTexto = txtBuscar.getText() != null ? txtBuscar.getText().trim().toLowerCase() : "";
-
-        for (Producto p : todosLosProductos) {
-            if (!p.isDisponible()) {
-                continue;
-            }
-            boolean coincideCategoria = (categoriaFiltroSeleccionada == 0) || (p.getIdCategoria() == categoriaFiltroSeleccionada);
-            boolean coincideTexto = filtroTexto.isEmpty()
-                || p.getNombre().toLowerCase().contains(filtroTexto)
-                || (p.getCodigo() != null && p.getCodigo().toLowerCase().contains(filtroTexto));
-
-            if (coincideCategoria && coincideTexto) {
-                HBox card = new HBox(16.0);
-                card.setId("btnProd_" + p.getIdProducto());
-                card.setAlignment(Pos.CENTER_LEFT);
-                card.setMinWidth(295.0);
-                card.setPrefWidth(310.0);
-                card.getStyleClass().addAll("card", "pos-menu-tile");
-                card.setPadding(new Insets(16.0));
-
-                VBox content = new VBox(4.0);
-                content.setMinWidth(0.0);
-                content.setPrefWidth(150.0);
-                content.setAlignment(Pos.CENTER_LEFT);
-                HBox.setHgrow(content, Priority.ALWAYS);
-
-                ImageView fotoView = crearThumbnailSiExiste(p.getImagenUrl());
-                if (fotoView != null) {
-                    content.getChildren().add(fotoView);
-                }
-
-                Label lblNombre = new Label(p.getNombre());
-                lblNombre.setMinWidth(0.0);
-                lblNombre.setWrapText(true);
-                lblNombre.getStyleClass().add("h3");
-
-                String descTexto;
-                if (p.isEsCombo()) {
-                    descTexto = "COMBO · " + (p.getCodigo() != null ? p.getCodigo() : "Paquete");
-                } else if (p.tieneOpcionesPersonalizacion()) {
-                    descTexto = FormatoPersonalizacionUtil.construirResumenOpciones(p);
-                } else if (p.getDescripcion() != null && !p.getDescripcion().isBlank()) {
-                    descTexto = p.getDescripcion();
-                } else {
-                    descTexto = p.getCodigo() != null ? p.getCodigo() : "Platillo";
-                }
-                Label lblDesc = new Label(descTexto);
-                lblDesc.setMinWidth(0.0);
-                lblDesc.setWrapText(true);
-                lblDesc.getStyleClass().add("text-secondary");
-
-                Label lblPrecio = new Label("S/ " + p.getPrecioVenta());
-                lblPrecio.setMinWidth(Region.USE_PREF_SIZE);
-                lblPrecio.getStyleClass().add("price");
-
-                content.getChildren().addAll(lblNombre, lblDesc, lblPrecio);
-
-                Button btnAdd = new Button("+ Agregar");
-                btnAdd.setMinWidth(Region.USE_PREF_SIZE);
-                btnAdd.getStyleClass().add("btn-primary");
-                btnAdd.setGraphicTextGap(8.0);
-                AnimationUtils.attachTactileFeedback(btnAdd);
-                btnAdd.setOnAction(e -> {
-                    e.consume();
-                    agregarProductoAVenta(p);
-                });
-
-                card.getChildren().addAll(content, btnAdd);
-                AnimationUtils.attachTactileFeedback(card);
-                card.setOnMouseClicked(e -> agregarProductoAVenta(p));
-                tileProductos.getChildren().add(card);
-            }
-        }
+        List<Producto> filtrados = catalogoPresenter.filtrarProductos(
+            todosLosProductos, categoriaFiltroSeleccionada, txtBuscar.getText());
+        catalogoPresenter.renderizarTarjetasCatalogo(tileProductos, filtrados, this::agregarProductoAVenta);
     }
 
     private ImageView crearThumbnailSiExiste(String imagenUrl) {
@@ -941,7 +723,7 @@ public class VentaController {
         if (p == null || !p.isDisponible()) {
             return;
         }
-        Producto productoResuelto = personalizacionService.resolverOpcionesProducto(p);
+        Producto productoResuelto = carritoHandler.resolverOpcionesProducto(personalizacionService, p);
         if (productoResuelto.tieneOpcionesPersonalizacion()) {
             javafx.stage.Window owner = tblDetalle != null && tblDetalle.getScene() != null
                     ? tblDetalle.getScene().getWindow()
@@ -1045,35 +827,11 @@ public class VentaController {
                                                String nota,
                                                BigDecimal precioUnitario,
                                                BigDecimal subtotal) {
-        for (DetalleVenta dv : itemsVenta) {
-            String modsExistentes = FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                    dv.getModificadoresSeleccionados(), dv.getModificadoresTexto());
-            if (FormatoPersonalizacionUtil.mismaPersonalizacion(
-                    dv.getIdProducto(), dv.getIdVariante(), modsExistentes, dv.getNotasPreparacion(),
-                    p.getIdProducto(), idVariante, modsTexto, nota)) {
-                dv.setCantidad(dv.getCantidad() + qty);
-                BigDecimal unit = dv.getPrecioUnitario() != null ? dv.getPrecioUnitario() : precioUnitario;
-                dv.setSubtotal(unit.multiply(BigDecimal.valueOf(dv.getCantidad())).setScale(2, RoundingMode.HALF_UP));
-                if (tblDetalle != null) {
-                    tblDetalle.refresh();
-                }
-                recalcularTotales();
-                return;
-            }
+        boolean nuevoItemAgregado = carritoHandler.agregarItemLocal(itemsVenta, p, idVariante, nombreVariante,
+                mods, modsTexto, qty, nota, precioUnitario, subtotal);
+        if (nuevoItemAgregado) {
+            itemsVenta.get(itemsVenta.size() - 1).setNombreProducto(p.getNombre());
         }
-        DetalleVenta nuevo = new DetalleVenta(0, 0, p.getIdProducto(), qty, precioUnitario, subtotal);
-        nuevo.setNombreProducto(p.getNombre());
-        nuevo.setIdVariante(idVariante);
-        nuevo.setNombreVariante(nombreVariante);
-        nuevo.setModificadoresTexto(modsTexto);
-        nuevo.setModificadoresSeleccionados(mods);
-        nuevo.setNotasPreparacion(nota);
-        if (p.isEsCombo()) {
-            nuevo.setIdCombo(p.getIdCombo());
-            nuevo.setComboComponentesTexto(
-                    FormatoPersonalizacionUtil.formatearDesgloseComboMultilinea(p.getComboComponentes()));
-        }
-        itemsVenta.add(nuevo);
         if (tblDetalle != null) {
             tblDetalle.refresh();
         }
@@ -1100,14 +858,8 @@ public class VentaController {
     @FXML
     public void handleEliminarItem() {
         DetalleVenta sel = tblDetalle.getSelectionModel().getSelectedItem();
-        if (sel != null) {
-            if (sel.getCantidad() > 1) {
-                sel.setCantidad(sel.getCantidad() - 1);
-                sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())));
-                tblDetalle.refresh();
-            } else {
-                itemsVenta.remove(sel);
-            }
+        if (carritoHandler.decrementarOEliminar(itemsVenta, sel)) {
+            tblDetalle.refresh();
             recalcularTotales();
         }
     }
@@ -1139,18 +891,7 @@ public class VentaController {
 
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                Pedido pedidoFinal = pedido;
-                if (idObjetivo <= 0) {
-                    pedidoFinal = pedidoService.registrarPedidoYEnviarComanda(pedido, detallesCocina);
-                }
-                boolean impresionOk = true;
-                try {
-                    new ImpresoraTermicaService().imprimirComandaPorCategorias(pedidoFinal, detallesCocina);
-                } catch (Exception exImp) {
-                    impresionOk = false;
-                    LOGGER.log(Level.WARNING, "Comanda persistida pero falló la impresión térmica", exImp);
-                }
-                return new ResultadoEnvioComanda(pedidoFinal, impresionOk);
+                return cobroCoordinator.enviarComandaACocina(pedidoService, pedido, detallesCocina);
             },
             resultado -> {
                 if (btnEnviarCocina != null) {
@@ -1189,8 +930,6 @@ public class VentaController {
         );
     }
 
-    private record ResultadoEnvioComanda(Pedido pedido, boolean impresionOk) {
-    }
 
     /**
      * Construye los pagos divididos respetando la modalidad seleccionada por el usuario y sumando exactamente
@@ -1199,71 +938,7 @@ public class VentaController {
     public static List<VentaService.PagoSplit> construirPagosPorModalidad(String modalidad,
                                                                           BigDecimal totalNeto,
                                                                           List<DetalleVenta> items) {
-        if (totalNeto == null || totalNeto.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("El total neto a dividir debe ser mayor a cero.");
-        }
-        BigDecimal total = totalNeto.setScale(2, RoundingMode.HALF_UP);
-        if (MODALIDAD_SPLIT_4.equals(modalidad)) {
-            BigDecimal cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
-            BigDecimal acum = cuarta.multiply(new BigDecimal("3"));
-            BigDecimal ultimo = total.subtract(acum);
-            if (ultimo.compareTo(BigDecimal.ZERO) <= 0) {
-                cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.DOWN);
-                ultimo = total.subtract(cuarta.multiply(new BigDecimal("3")));
-            }
-            List<VentaService.PagoSplit> pagos4 = new ArrayList<>();
-            String[] metodos = {"EFECTIVO", "TARJETA", "YAPE_PLIN", "EFECTIVO"};
-            BigDecimal[] montos = {cuarta, cuarta, cuarta, ultimo};
-            for (int i = 0; i < montos.length; i++) {
-                if (montos[i].compareTo(BigDecimal.ZERO) > 0) {
-                    pagos4.add(new VentaService.PagoSplit(metodos[i], montos[i]));
-                }
-            }
-            return pagos4;
-        }
-        if (MODALIDAD_SPLIT_ITEMS.equals(modalidad) && items != null && !items.isEmpty()) {
-            BigDecimal brutoA = BigDecimal.ZERO;
-            BigDecimal brutoB = BigDecimal.ZERO;
-            if (items.size() >= 2) {
-                for (int i = 0; i < items.size(); i++) {
-                    BigDecimal sub = items.get(i) != null && items.get(i).getSubtotal() != null
-                            ? items.get(i).getSubtotal() : BigDecimal.ZERO;
-                    if (i % 2 == 0) {
-                        brutoA = brutoA.add(sub);
-                    } else {
-                        brutoB = brutoB.add(sub);
-                    }
-                }
-            } else {
-                DetalleVenta unico = items.get(0);
-                int qty = unico != null ? unico.getCantidad() : 1;
-                if (qty >= 2 && unico.getPrecioUnitario() != null) {
-                    int qtyA = (qty + 1) / 2;
-                    int qtyB = qty - qtyA;
-                    brutoA = unico.getPrecioUnitario().multiply(BigDecimal.valueOf(qtyA));
-                    brutoB = unico.getPrecioUnitario().multiply(BigDecimal.valueOf(qtyB));
-                }
-            }
-            BigDecimal sumaBruta = brutoA.add(brutoB);
-            if (sumaBruta.compareTo(BigDecimal.ZERO) > 0
-                    && brutoA.compareTo(BigDecimal.ZERO) > 0
-                    && brutoB.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal montoA = total.multiply(brutoA).divide(sumaBruta, 2, RoundingMode.HALF_UP);
-                BigDecimal montoB = total.subtract(montoA);
-                if (montoA.compareTo(BigDecimal.ZERO) > 0 && montoB.compareTo(BigDecimal.ZERO) > 0) {
-                    return List.of(
-                            new VentaService.PagoSplit("EFECTIVO", montoA),
-                            new VentaService.PagoSplit("TARJETA", montoB)
-                    );
-                }
-            }
-        }
-        BigDecimal mitad = total.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP);
-        BigDecimal resto = total.subtract(mitad);
-        return List.of(
-                new VentaService.PagoSplit("EFECTIVO", mitad),
-                new VentaService.PagoSplit("TARJETA", resto)
-        );
+        return COBRO_STATICS.construirPagosPorModalidad(modalidad, totalNeto, items);
     }
 
     /**
@@ -1403,11 +1078,7 @@ public class VentaController {
         Usuario usr = AuthService.getUsuarioSesionActual();
         SesionUsuario sesion = crearSesionActualPOS(usr);
 
-        BigDecimal sumaBruta = BigDecimal.ZERO;
-        for (DetalleVenta dv : itemsVenta) {
-            sumaBruta = sumaBruta.add(dv.getSubtotal());
-        }
-        this.descuentoActivo = ventaService.calcularDescuentoAutorizado(sumaBruta, valor, esPorcentaje, sesion);
+        this.descuentoActivo = carritoHandler.calcularDescuentoAutorizado(itemsVenta, valor, esPorcentaje, sesion);
         this.descuentoManualFijado = true;
         recalcularTotales();
         return this.descuentoActivo;
@@ -1481,32 +1152,27 @@ public class VentaController {
     public void handleAnularVenta(ActionEvent event) {
         Usuario usr = AuthService.getUsuarioSesionActual();
         SesionUsuario sesion = crearSesionActualPOS(usr);
-        if (!autorizacionService.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
-            ModalModoSupervisorHandle modal = construirModalModoSupervisor(0);
+        if (!cobroCoordinator.tienePermiso(sesion, Permiso.VENTA_ANULAR)) {
+            ModalModoSupervisorHandle modal = VentaPosModalHelper.construirModalModoSupervisor(0);
             Optional<ButtonType> res = modal.dialog().showAndWait();
             if (res.isPresent() && res.get().getButtonData() == ButtonBar.ButtonData.OK_DONE) {
                 String idRaw = modal.txtIdVenta().getText() != null ? modal.txtIdVenta().getText().trim() : "";
                 String pinSup = modal.txtPinSupervisor().getText() != null ? modal.txtPinSupervisor().getText().trim() : "";
                 String motivo = modal.txtMotivo().getText() != null ? modal.txtMotivo().getText().trim() : "";
                 boolean yaPreparado = modal.chkPlatoPreparado().isSelected();
-                if (idRaw.isEmpty()) {
-                    mostrarAlerta("Dato requerido", "Debe indicar el ID de la venta a anular.", Alert.AlertType.WARNING);
+                VentaCobroCoordinator.ValidacionAnulacionSupervisor validacion =
+                        cobroCoordinator.validarAnulacionSupervisor(idRaw, motivo);
+                if (!validacion.valido()) {
+                    mostrarAlerta(validacion.tituloError(), validacion.mensajeError(), Alert.AlertType.WARNING);
                     return;
                 }
-                final int idVenta;
-                try {
-                    idVenta = Integer.parseInt(idRaw);
-                } catch (NumberFormatException nfe) {
-                    mostrarAlerta("Dato inválido", "El ID de la venta debe ser numérico.", Alert.AlertType.WARNING);
-                    return;
-                }
-                final String motivoFinal = motivo.isEmpty()
-                        ? "Anulación autorizada en caja (Modo Supervisor)" : motivo;
+                final int idVenta = validacion.idVenta();
+                final String motivoFinal = validacion.motivoFinal();
                 if (btnAnularVenta != null) {
                     btnAnularVenta.setDisable(true);
                 }
                 UiAsyncExecutor.ejecutarAsync(
-                    () -> ventaService.anularVentaConSupervisor(
+                    () -> cobroCoordinator.anularVentaConSupervisor(
                             idVenta, yaPreparado, sesion, pinSup, motivoFinal),
                     supervisor -> {
                         if (btnAnularVenta != null) {
@@ -1554,7 +1220,7 @@ public class VentaController {
             }
             UiAsyncExecutor.ejecutarAsync(
                 () -> {
-                    ventaService.anularVenta(idVenta, false, sesion, "Anulación solicitada desde POS");
+                    cobroCoordinator.anularVentaDirecta(idVenta, sesion, "Anulación solicitada desde POS");
                     return Boolean.TRUE;
                 },
                 ok -> {
@@ -1603,86 +1269,37 @@ public class VentaController {
     }
 
     private BigDecimal obtenerBasePreCanjeActual() {
-        BigDecimal totalBruto = BigDecimal.ZERO;
-        for (DetalleVenta dv : itemsVenta) {
-            totalBruto = totalBruto.add(dv.getSubtotal());
-        }
-        BigDecimal base = totalBruto.subtract(descuentoActivo != null ? descuentoActivo : BigDecimal.ZERO);
-        return base.compareTo(BigDecimal.ZERO) > 0 ? base : BigDecimal.ZERO;
+        return carritoHandler.obtenerBasePreCanje(itemsVenta, descuentoActivo);
     }
 
     private BigDecimal obtenerTotalNetoActual() {
-        BigDecimal base = obtenerBasePreCanjeActual();
-        BigDecimal descPts = descuentoPuntosActivo != null ? descuentoPuntosActivo : BigDecimal.ZERO;
-        if (descPts.compareTo(base) > 0) {
-            descPts = base;
-        }
-        BigDecimal neto = base.subtract(descPts);
-        return neto.compareTo(BigDecimal.ZERO) > 0 ? neto : BigDecimal.ZERO;
+        return carritoHandler.obtenerTotalNeto(itemsVenta, descuentoActivo, descuentoPuntosActivo);
     }
 
     private void recalcularTotales() {
-        BigDecimal totalBruto = BigDecimal.ZERO;
-        for (DetalleVenta dv : itemsVenta) {
-            totalBruto = totalBruto.add(dv.getSubtotal());
-        }
-        if (totalBruto.compareTo(BigDecimal.ZERO) <= 0) {
-            descuentoActivo = BigDecimal.ZERO;
-            descuentoManualFijado = false;
-            descuentoPuntosActivo = BigDecimal.ZERO;
-            puntosARedimirPos = 0;
-            lblSubtotal.setText("S/ 0.00");
-            lblIgv.setText("S/ 0.00");
-            lblTotal.setText("S/ 0.00");
-            if (rowDescuento != null) {
-                rowDescuento.setVisible(false);
-                rowDescuento.setManaged(false);
-            }
-            if (rowDescuentoPuntos != null) {
-                rowDescuentoPuntos.setVisible(false);
-                rowDescuentoPuntos.setManaged(false);
-            }
-            return;
-        }
-
-        // Evaluación automática de Promociones si no hay descuento manual forzado (§11)
-        if (!descuentoManualFijado && !itemsVenta.isEmpty()) {
-            PromocionService.ResultadoEvaluacion resPromo = promocionService.evaluarPromociones(new ArrayList<>(itemsVenta), totalBruto);
-            if (resPromo.tieneDescuento()) {
-                this.descuentoActivo = resPromo.getDescuentoTotal();
-            } else {
-                this.descuentoActivo = BigDecimal.ZERO;
-            }
-        }
         try {
-            // La base gravada y el IGV se calculan ANTES del canje de puntos (SPEC v5.0.0 §2.3)
-            BigDecimal basePreCanje = obtenerBasePreCanjeActual();
-            DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
-            lblSubtotal.setText("S/ " + desglose.getSubtotalGravado());
-            lblIgv.setText("S/ " + desglose.getIgv());
-
-            BigDecimal descPts = descuentoPuntosActivo != null ? descuentoPuntosActivo : BigDecimal.ZERO;
-            if (descPts.compareTo(basePreCanje) > 0) {
-                descPts = basePreCanje;
-                descuentoPuntosActivo = descPts;
+            VentaCarritoHandler.ResumenTotalesVenta totales = carritoHandler.calcularTotales(
+                    itemsVenta, descuentoActivo, descuentoManualFijado, descuentoPuntosActivo);
+            descuentoActivo = totales.descuentoActivo();
+            descuentoPuntosActivo = totales.descuentoPuntosAjustado();
+            if (totales.totalBruto().compareTo(BigDecimal.ZERO) <= 0) {
+                puntosARedimirPos = 0;
             }
-            BigDecimal totalFinal = basePreCanje.subtract(descPts).setScale(2, RoundingMode.HALF_UP);
-            lblTotal.setText("S/ " + totalFinal);
-
+            lblSubtotal.setText("S/ " + totales.subtotalGravado());
+            lblIgv.setText("S/ " + totales.igv());
+            lblTotal.setText("S/ " + totales.totalNeto());
             if (rowDescuento != null && lblDescuento != null) {
-                boolean hayDesc = descuentoActivo != null && descuentoActivo.compareTo(BigDecimal.ZERO) > 0;
-                rowDescuento.setVisible(hayDesc);
-                rowDescuento.setManaged(hayDesc);
-                if (hayDesc) {
+                rowDescuento.setVisible(totales.hayDescuento());
+                rowDescuento.setManaged(totales.hayDescuento());
+                if (totales.hayDescuento()) {
                     lblDescuento.setText("-S/ " + descuentoActivo.setScale(2, RoundingMode.HALF_UP));
                 }
             }
             if (rowDescuentoPuntos != null && lblDescuentoPuntos != null) {
-                boolean hayDescPts = descPts.compareTo(BigDecimal.ZERO) > 0;
-                rowDescuentoPuntos.setVisible(hayDescPts);
-                rowDescuentoPuntos.setManaged(hayDescPts);
-                if (hayDescPts) {
-                    lblDescuentoPuntos.setText("-S/ " + descPts.setScale(2, RoundingMode.HALF_UP));
+                rowDescuentoPuntos.setVisible(totales.hayDescuentoPuntos());
+                rowDescuentoPuntos.setManaged(totales.hayDescuentoPuntos());
+                if (totales.hayDescuentoPuntos()) {
+                    lblDescuentoPuntos.setText("-S/ " + descuentoPuntosActivo.setScale(2, RoundingMode.HALF_UP));
                 }
             }
         } catch (NegocioException e) {
@@ -1739,18 +1356,11 @@ public class VentaController {
             try {
                 BigDecimal basePreCanje = obtenerBasePreCanjeActual();
                 BigDecimal totalNeto = obtenerTotalNetoActual();
-                DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
                 Integer idCliVenta = clienteSeleccionadoPos != null && clienteSeleccionadoPos.getIdCliente() > 0
                         ? clienteSeleccionadoPos.getIdCliente() : null;
-                Venta v = new Venta(0, pedidoActivoId, 1, 1, idCliVenta,
-                    desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto,
-                    metodo, totalNeto, BigDecimal.ZERO);
-                v.setDescuento(descuentoActivo);
-                v.setDescuentoPuntos(descuentoPuntosActivo);
-                v.setPuntosACanjear(puntosARedimirPos);
-                v.setIdempotencyKey(UUID.randomUUID().toString());
-                ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "TCK", "000001", totalNeto);
-                ventaService.procesarCobroVenta(v, new ArrayList<>(itemsVenta), comp);
+                cobroCoordinator.procesarCobroDirecto(pedidoActivoId, idCliVenta, basePreCanje, totalNeto,
+                        metodo, descuentoActivo, descuentoPuntosActivo, puntosARedimirPos,
+                        new ArrayList<>(itemsVenta));
                 itemsVenta.clear();
                 descuentoActivo = BigDecimal.ZERO;
                 descuentoManualFijado = false;
@@ -1952,8 +1562,7 @@ public class VentaController {
         }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                ImpresoraTermicaService imp = new ImpresoraTermicaService();
-                imp.imprimirPreCuenta(p, detalles, null);
+                cobroCoordinator.imprimirPreCuenta(p, detalles);
                 return Boolean.TRUE;
             },
             ok -> {
@@ -2021,7 +1630,7 @@ public class VentaController {
             return;
         }
         UiAsyncExecutor.ejecutarAsync(
-            () -> posConsultaService.buscarClientePorDniOTelefono(criterio).orElse(null),
+            () -> fidelizacionCoordinator.buscarClientePorCriterio(criterio).orElse(null),
             cli -> {
                 if (cli != null) {
                     asociarClientePos(cli, null);
@@ -2055,54 +1664,13 @@ public class VentaController {
     }
 
     private void abrirDialogoRegistroRapidoCliente(String prefill) {
-        Dialog<Cliente> dialog = DialogService.crearDialogo(
-                "Registro Rápido Cliente Minorista (POS)",
-                "Asociar cliente por DNI para acumulación y canje de puntos");
-        ButtonType btnRegistrar = new ButtonType("Registrar y Asociar", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(btnRegistrar, ButtonType.CANCEL);
-
-        TextField txtDni = new TextField(prefill != null && prefill.matches("\\d{8}") ? prefill : "");
-        txtDni.setPromptText("8 dígitos (ej. 70112233)");
-        TextField txtNombre = new TextField();
-        txtNombre.setPromptText("Nombre completo del cliente");
-        TextField txtTel = new TextField(prefill != null && prefill.matches("\\d{9}") ? prefill : "");
-        txtTel.setPromptText("Opcional (9 dígitos)");
-        DatePicker dpNacimiento = new DatePicker();
-        dpNacimiento.setPromptText("Opcional (cumpleaños)");
-
-        VBox form = new VBox(16.0);
-        form.setPadding(new Insets(16, 24, 24, 24));
-        form.setPrefWidth(460.0);
-        form.getChildren().addAll(
-                DialogService.construirFilaDobleModal(
-                        DialogService.construirCampoModal("DNI *:", txtDni),
-                        DialogService.construirCampoModal("Teléfono:", txtTel)),
-                DialogService.construirCampoModal("Nombre Completo *:", txtNombre),
-                DialogService.construirCampoModal("Fecha Nacimiento:", dpNacimiento));
-        dialog.getDialogPane().setContent(form);
-
-        dialog.setResultConverter(btn -> {
-            if (btn != btnRegistrar) {
-                return null;
-            }
-            String dniVal = txtDni.getText().trim();
-            String nomVal = txtNombre.getText().trim();
-            if (!dniVal.matches("\\d{8}") || nomVal.isEmpty()) {
-                return null;
-            }
-            return registrarClienteRapidoInterno(dniVal, nomVal, txtTel.getText().trim(), dpNacimiento.getValue());
-        });
-
-        Optional<Cliente> creado = dialog.showAndWait();
+        Optional<Cliente> creado = VentaPosModalHelper.mostrarDialogoRegistroRapidoCliente(
+                prefill, fidelizacionCoordinator::buscarORegistrarClienteRapidoDirecto);
         if (creado.isPresent() && creado.get() != null) {
             asociarClientePos(creado.get(), null);
         } else if (creado.isPresent()) {
             mostrarAlerta("Datos Inválidos", "Ingrese un DNI válido de 8 dígitos y el nombre completo.", Alert.AlertType.WARNING);
         }
-    }
-
-    private Cliente registrarClienteRapidoInterno(String dni, String nombreCompleto, String telefono, LocalDate fechaNacimiento) {
-        return posConsultaService.buscarORegistrarClienteMinoristaRapido(dni, nombreCompleto, telefono, fechaNacimiento);
     }
 
     /**
@@ -2113,7 +1681,7 @@ public class VentaController {
             return Optional.empty();
         }
         try {
-            Optional<Cliente> cliOpt = posConsultaService.buscarClientePorDniOTelefono(criterio.trim());
+            Optional<Cliente> cliOpt = fidelizacionCoordinator.buscarClientePorCriterio(criterio.trim());
             cliOpt.ifPresent(c -> asociarClientePos(c, confirmarCumpleanos));
             return cliOpt;
         } catch (Exception ex) {
@@ -2127,16 +1695,7 @@ public class VentaController {
      */
     public Cliente registrarYAsociarClienteRapidoPos(String dni, String nombreCompleto, String telefono, LocalDate fechaNacimiento)
             throws NegocioException {
-        if (dni == null || !dni.trim().matches("\\d{8}")) {
-            throw new NegocioException("El DNI del cliente minorista debe tener exactamente 8 dígitos.");
-        }
-        if (nombreCompleto == null || nombreCompleto.isBlank()) {
-            throw new NegocioException("El nombre completo del cliente minorista es obligatorio.");
-        }
-        Cliente cli = registrarClienteRapidoInterno(dni.trim(), nombreCompleto.trim(), telefono, fechaNacimiento);
-        if (cli == null) {
-            throw new NegocioException("No se pudo registrar el cliente minorista en la base de datos.");
-        }
+        Cliente cli = fidelizacionCoordinator.registrarClienteRapido(dni, nombreCompleto, telefono, fechaNacimiento);
         asociarClientePos(cli, respuestaAutomaticaCumpleanosTest != null ? respuestaAutomaticaCumpleanosTest : Boolean.FALSE);
         return cli;
     }
@@ -2180,16 +1739,17 @@ public class VentaController {
             btnCanjearPuntosPos.setText("Canjear Puntos");
         }
 
-        boolean esCumple = fidelizacionService.esCumpleanosEnMesActual(cli);
+        VentaFidelizacionCoordinator.EstadoCumpleanosPos estadoCumple = fidelizacionCoordinator.evaluarCumpleanos(cli);
+        boolean esCumple = estadoCumple.esCumpleanos();
         if (rowAlertaCumplePos != null) {
             rowAlertaCumplePos.setVisible(esCumple);
             rowAlertaCumplePos.setManaged(esCumple);
         }
         if (esCumple) {
-            String msg = "¡Hoy es el cumpleaños de " + cli.getRazonSocial() + "! ¿Deseas aplicar un 10% de descuento?";
+            String msg = estadoCumple.mensajeAlerta();
             this.ultimoMensajeAlertaCumpleanos = msg;
             if (lblAlertaCumplePos != null) {
-                lblAlertaCumplePos.setText("Cumpleaños de " + cli.getRazonSocial() + " (10%)");
+                lblAlertaCumplePos.setText(estadoCumple.textoBadge());
             }
             if (btnAplicarCumplePos != null) {
                 btnAplicarCumplePos.setText("Aplicar 10%");
@@ -2229,7 +1789,7 @@ public class VentaController {
         for (DetalleVenta dv : itemsVenta) {
             totalBruto = totalBruto.add(dv.getSubtotal());
         }
-        BigDecimal desc = fidelizacionService.calcularDescuentoCumpleanosPos(totalBruto);
+        BigDecimal desc = fidelizacionCoordinator.calcularDescuentoCumpleanos(totalBruto);
         this.descuentoActivo = desc;
         this.descuentoManualFijado = true;
         if (lblAlertaCumplePos != null && clienteSeleccionadoPos != null) {
@@ -2254,7 +1814,7 @@ public class VentaController {
             return;
         }
         BigDecimal basePreCanje = obtenerBasePreCanjeActual();
-        FidelizacionService.BeneficioCanje check = fidelizacionService.calcularCanjePorBloques(
+        FidelizacionService.BeneficioCanje check = fidelizacionCoordinator.calcularCanjePorBloques(
                 clienteSeleccionadoPos.getPuntosAcumulados(), 1, basePreCanje);
         if (check.bloquesDisponibles() <= 0) {
             mostrarAlerta("Canje no disponible",
@@ -2266,12 +1826,7 @@ public class VentaController {
             aplicarCanjePuntosPos(1);
             return;
         }
-        List<String> opciones = new ArrayList<>();
-        for (int b = 1; b <= check.bloquesDisponibles(); b++) {
-            int pts = b * check.puntosPorBloque();
-            BigDecimal desc = check.descuentoPorBloqueSoles().multiply(BigDecimal.valueOf(b)).setScale(2, RoundingMode.HALF_UP);
-            opciones.add(b + " bloque(s): " + pts + " pts -> -S/ " + desc);
-        }
+        List<String> opciones = fidelizacionCoordinator.construirOpcionesCanje(check);
         Optional<String> sel = DialogService.crearChoiceDialog(
                 opciones.get(0),
                 opciones,
@@ -2293,7 +1848,7 @@ public class VentaController {
                     ConfiguracionFidelizacion.getDescuentoPorCanjeSoles(), 0, BigDecimal.ZERO);
         }
         BigDecimal basePreCanje = obtenerBasePreCanjeActual();
-        FidelizacionService.BeneficioCanje beneficio = fidelizacionService.calcularCanjePorBloques(
+        FidelizacionService.BeneficioCanje beneficio = fidelizacionCoordinator.calcularCanjePorBloques(
                 clienteSeleccionadoPos.getPuntosAcumulados(), bloques, basePreCanje);
         this.puntosARedimirPos = beneficio.puntosUtilizados();
         this.descuentoPuntosActivo = beneficio.descuentoAplicadoSoles();
@@ -2373,7 +1928,7 @@ public class VentaController {
         if (res.isPresent() && !res.get().isBlank()) {
             String doc = res.get().trim();
             UiAsyncExecutor.ejecutarAsync(
-                () -> posConsultaService.buscarClientePorDniOTelefono(doc).orElse(null),
+                () -> fidelizacionCoordinator.buscarClientePorCriterio(doc).orElse(null),
                 cliObtenido -> {
                     if (cliObtenido != null) {
                         asociarClientePos(cliObtenido, null);
