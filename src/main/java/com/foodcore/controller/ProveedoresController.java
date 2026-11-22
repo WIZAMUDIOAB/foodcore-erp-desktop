@@ -3,14 +3,10 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.ProveedorDAO;
-import com.foodcore.dao.impl.ProveedorDAOImpl;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Proveedor;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.ProveedorGestionService;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.UiAsyncExecutor;
@@ -27,7 +23,6 @@ import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.sql.Connection;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -69,8 +64,7 @@ public class ProveedoresController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ProveedorDAO proveedorDAO = new ProveedorDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
+    private final ProveedorGestionService proveedorGestionService = new ProveedorGestionService();
     private final FinanzasService finanzasService = new FinanzasService();
 
     private final ObservableList<Proveedor> listaProveedores = FXCollections.observableArrayList();
@@ -120,11 +114,7 @@ public class ProveedoresController {
 
     public void cargarProveedoresAsync() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return proveedorDAO.listarTodos(conn);
-                }
-            },
+            () -> proveedorGestionService.listarTodos(),
             todos -> {
                 listaProveedores.setAll(todos);
                 tblProveedores.setItems(listaProveedores);
@@ -214,25 +204,23 @@ public class ProveedoresController {
         lblModalError.setText("");
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (editarFinal) {
-                        sel.setRuc(ruc);
-                        sel.setRazonSocial(razon);
-                        sel.setContacto(contacto);
-                        sel.setTelefono(telefono);
-                        sel.setEmail(email);
-                        sel.setDiasCredito(diasFinal);
-                        proveedorDAO.actualizar(conn, sel);
-                    } else {
-                        Proveedor nuevo = new Proveedor();
-                        nuevo.setRuc(ruc);
-                        nuevo.setRazonSocial(razon);
-                        nuevo.setContacto(contacto);
-                        nuevo.setTelefono(telefono);
-                        nuevo.setEmail(email);
-                        nuevo.setDiasCredito(diasFinal);
-                        proveedorDAO.insertar(conn, nuevo);
-                    }
+                if (editarFinal) {
+                    sel.setRuc(ruc);
+                    sel.setRazonSocial(razon);
+                    sel.setContacto(contacto);
+                    sel.setTelefono(telefono);
+                    sel.setEmail(email);
+                    sel.setDiasCredito(diasFinal);
+                    proveedorGestionService.actualizar(sel);
+                } else {
+                    Proveedor nuevo = new Proveedor();
+                    nuevo.setRuc(ruc);
+                    nuevo.setRazonSocial(razon);
+                    nuevo.setContacto(contacto);
+                    nuevo.setTelefono(telefono);
+                    nuevo.setEmail(email);
+                    nuevo.setDiasCredito(diasFinal);
+                    proveedorGestionService.insertar(nuevo);
                 }
             },
             () -> {
@@ -249,11 +237,7 @@ public class ProveedoresController {
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final boolean nuevoEstado = !proveedorSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    proveedorDAO.cambiarEstado(conn, idProveedor, nuevoEstado);
-                }
-            },
+            () -> proveedorGestionService.cambiarEstado(idProveedor, nuevoEstado),
             this::cargarProveedoresAsync,
             ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado de proveedor", ex)
         );
@@ -278,16 +262,7 @@ public class ProveedoresController {
         final File doc = elegidoOpt.get();
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<Insumo> insumosBajos;
-                try (Connection conn = ConexionBD.getConnection()) {
-                    insumosBajos = insumoDAO.listarTodos(conn).stream()
-                            .filter(i -> i.getStockActualDisponible() != null && i.getStockMinimo() != null
-                                    && i.getStockActualDisponible().compareTo(i.getStockMinimo()) <= 0)
-                            .collect(Collectors.toList());
-                    if (insumosBajos.isEmpty()) {
-                        insumosBajos = insumoDAO.listarTodos(conn).stream().limit(3).collect(Collectors.toList());
-                    }
-                }
+                List<Insumo> insumosBajos = proveedorGestionService.listarInsumosStockBajo(3);
                 if (doc.getParentFile() != null) {
                     Files.createDirectories(doc.getParentFile().toPath());
                 }

@@ -7,11 +7,11 @@ import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.MozoOrdenService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.FormatoPersonalizacionUtil;
@@ -41,7 +41,6 @@ import javafx.stage.Window;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,6 +81,7 @@ public class MozoOrderController {
     private BigDecimal costoEnvio = BigDecimal.ZERO;
     private final ObservableList<DetallePedido> items = FXCollections.observableArrayList();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
+    private final MozoOrdenService mozoOrdenService = new MozoOrdenService();
     private final PedidoService pedidoService = new PedidoService();
 
     public void setNumeroMesa(String mesa) {
@@ -197,14 +197,7 @@ public class MozoOrderController {
     }
 
     private List<Producto> consultarPlatosDisponiblesConRespaldo() {
-        List<Producto> productos = new ArrayList<>();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                productos = personalizacionService.listarProductosDisponiblesConOpciones(conn);
-            }
-        } catch (java.sql.SQLException | RuntimeException ignored) {
-            // Se usará catálogo demostrativo de respaldo
-        }
+        List<Producto> productos = mozoOrdenService.listarProductosDisponiblesConOpciones();
         return productos.isEmpty() ? crearCatalogoDemoRespaldo() : productos;
     }
 

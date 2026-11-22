@@ -212,6 +212,46 @@ public class OnboardingService {
         }
     }
 
+    /**
+     * Variante sin {@link Connection} de {@link #guardarPrimerPlatillo(Connection, int, String, BigDecimal, String)}:
+     * abre la conexión activa, la delega y la cierra al finalizar.
+     */
+    public int guardarPrimerPlatillo(int idProductoExistente, String nombre,
+                                     BigDecimal precio, String categoriaNombre) throws SQLException {
+        try (Connection conn = abrirConexionObligatoria()) {
+            return guardarPrimerPlatillo(conn, idProductoExistente, nombre, precio, categoriaNombre);
+        }
+    }
+
+    /**
+     * Variante sin {@link Connection} de {@link #guardarPrimeraMesa(Connection, String, int)}:
+     * abre la conexión activa, la delega y la cierra al finalizar.
+     */
+    public void guardarPrimeraMesa(String numeroMesa, int capacidad) throws SQLException {
+        try (Connection conn = abrirConexionObligatoria()) {
+            guardarPrimeraMesa(conn, numeroMesa, capacidad);
+        }
+    }
+
+    /**
+     * Variante sin {@link Connection} de {@link #finalizarOnboarding(Connection, String, String, String, String)}:
+     * abre la conexión activa, la delega y la cierra al finalizar.
+     */
+    public void finalizarOnboarding(String nombre, String ruc,
+                                    String direccion, String telefono) throws SQLException {
+        try (Connection conn = abrirConexionObligatoria()) {
+            finalizarOnboarding(conn, nombre, ruc, direccion, telefono);
+        }
+    }
+
+    private static Connection abrirConexionObligatoria() throws SQLException {
+        Connection conn = ConexionBD.getConnection();
+        if (conn == null) {
+            throw new SQLException("Sin conexión activa a base de datos.");
+        }
+        return conn;
+    }
+
     private int resolverOCrearCategoria(Connection conn, String categoriaNombre) throws SQLException {
         String sqlBuscar = "SELECT id_categoria FROM categoria WHERE UPPER(nombre) = UPPER(?) LIMIT 1";
         try (PreparedStatement ps = conn.prepareStatement(sqlBuscar)) {

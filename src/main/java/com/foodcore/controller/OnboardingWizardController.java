@@ -4,7 +4,6 @@ import com.foodcore.App;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ToastService;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -22,7 +21,6 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
@@ -142,13 +140,8 @@ public class OnboardingWizardController {
         String precioStr = texto(txtPrecioPlatillo);
         String categoria = resolverCategoriaSeleccionada();
         BigDecimal precio = OnboardingService.validarPasoPlatillo(nombre, precioStr, categoria);
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) {
-                throw new SQLException("Sin conexión activa a base de datos.");
-            }
-            this.platilloCreadoId = onboardingService.guardarPrimerPlatillo(
-                    conn, platilloCreadoId, nombre, precio, categoria);
-        }
+        this.platilloCreadoId = onboardingService.guardarPrimerPlatillo(
+                platilloCreadoId, nombre, precio, categoria);
         mostrarPaso(3);
         return true;
     }
@@ -160,12 +153,7 @@ public class OnboardingWizardController {
         String numeroMesa = texto(txtNumeroMesa);
         String capacidadStr = texto(txtCapacidadMesa);
         int capacidad = OnboardingService.validarPasoMesa(numeroMesa, capacidadStr);
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) {
-                throw new SQLException("Sin conexión activa a base de datos.");
-            }
-            onboardingService.guardarPrimeraMesa(conn, numeroMesa, capacidad);
-        }
+        onboardingService.guardarPrimeraMesa(numeroMesa, capacidad);
         actualizarResumenPaso4();
         mostrarPaso(4);
         return true;
@@ -190,12 +178,7 @@ public class OnboardingWizardController {
             String ruc = texto(txtRuc);
             String direccion = texto(txtDireccion);
             String telefono = texto(txtTelefono);
-            try (Connection conn = ConexionBD.getConnection()) {
-                if (conn == null) {
-                    throw new SQLException("Sin conexión activa a base de datos.");
-                }
-                onboardingService.finalizarOnboarding(conn, nombre, ruc, direccion, telefono);
-            }
+            onboardingService.finalizarOnboarding(nombre, ruc, direccion, telefono);
             redirigirAlDashboard();
         } catch (IllegalArgumentException ex) {
             mostrarError(ex.getMessage());
