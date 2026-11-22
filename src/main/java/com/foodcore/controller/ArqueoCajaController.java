@@ -9,7 +9,6 @@ import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
@@ -33,9 +32,6 @@ import javafx.scene.layout.VBox;
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -244,19 +240,14 @@ public class ArqueoCajaController {
             montoPorMedio.put(medio, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         }
 
-        String sql = "SELECT metodo_pago, COUNT(*) AS ops, COALESCE(SUM(total), 0) AS monto "
-            + "FROM venta WHERE id_caja = ? AND estado = 'COMPLETADA' GROUP BY metodo_pago";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idCaja);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String m = rs.getString("metodo_pago");
-                    int ops = rs.getInt("ops");
-                    BigDecimal monto = rs.getBigDecimal("monto").setScale(2, RoundingMode.HALF_UP);
-                    conteoPorMedio.put(m, ops);
-                    montoPorMedio.put(m, monto);
-                }
+        try {
+            Map<String, Object[]> resumen = cajaService.obtenerResumenVentasCierreZ(idCaja);
+            for (Map.Entry<String, Object[]> entry : resumen.entrySet()) {
+                Object[] valores = entry.getValue();
+                int ops = ((Number) valores[0]).intValue();
+                BigDecimal monto = ((BigDecimal) valores[1]).setScale(2, RoundingMode.HALF_UP);
+                conteoPorMedio.put(entry.getKey(), ops);
+                montoPorMedio.put(entry.getKey(), monto);
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Sin ventas registradas en Cierre Z", e);

@@ -24,4 +24,10 @@ public interface MermaDAO {
     List<Merma> obtenerTopInsumosPerdida(Connection conn, int anio, int mes, int limite) throws SQLException;
 
     int contarMermasPorInsumoEnMes(Connection conn, long idInsumo, int anio, int mes) throws SQLException;
+
+    /**
+     * Listado reciente de movimientos {@code MERMA*} del Kárdex enriquecido con insumo y unidad de medida
+     * para la vista de registro de mermas (SPEC-FOODCORE-v1.2 §3.3), ordenado del más reciente al más antiguo.
+     */
+    List<Merma> listarMovimientosMermaRecientes(Connection conn, int limite) throws SQLException;
 }

@@ -181,6 +181,12 @@ public class CajaService {
         }
     }
 
+    public Map<String, Object[]> obtenerResumenVentasCierreZ(int idCaja) throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return cajaDAO.obtenerResumenVentasCierreZ(conn, idCaja);
+        }
+    }
+
     public Map<String, BigDecimal> obtenerTotalesCierreZ(int idCaja) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return cajaDAO.obtenerTotalesPorMedioPago(conn, idCaja);
