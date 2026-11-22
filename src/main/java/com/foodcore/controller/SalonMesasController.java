@@ -176,12 +176,12 @@ public class SalonMesasController {
                 if (tieneReserva) {
                     btnMesa.getStyleClass().add("mesa-card-reservada");
                     lblBadge.setText("RESERVADA " + horaRes);
-                    lblBadge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 2 8;");
+                    lblBadge.getStyleClass().add("fc-mesa-badge-warning");
                 } else {
                     btnMesa.getStyleClass().add("mesa-card-libre");
                     lblBadge.setText("LIBRE");
+                    lblBadge.getStyleClass().add("badge-pill-neutral");
                 }
-                lblBadge.getStyleClass().add("badge-pill-neutral");
                 lblTiempoOcupacion.setText("Disponible · 4 pax");
                 lblImporte.setText("S/ 0.00");
                 lblImporte.getStyleClass().setAll("text-mono-sm");

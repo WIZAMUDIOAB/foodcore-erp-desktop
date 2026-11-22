@@ -62,7 +62,10 @@ public class CobroModalController {
             if (!"EFECTIVO".equals(sel)) {
                 txtMontoRecibido.setText(totalVenta.toString());
                 lblVuelto.setText("S/ 0.00");
-                lblVuelto.setStyle("-fx-text-fill: #2a9d8f; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-danger-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-success-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-success-bold");
+                }
             }
         });
 
@@ -158,9 +161,15 @@ public class CobroModalController {
 
             lblVuelto.setText("S/ " + vuelto);
             if (vuelto.compareTo(BigDecimal.ZERO) < 0) {
-                lblVuelto.setStyle("-fx-text-fill: #e63946; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-success-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-danger-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-danger-bold");
+                }
             } else {
-                lblVuelto.setStyle("-fx-text-fill: #2a9d8f; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-danger-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-success-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-success-bold");
+                }
             }
         } catch (NumberFormatException e) {
             lblVuelto.setText("Inválido");
@@ -324,7 +333,7 @@ public class CobroModalController {
         TextArea textArea = new TextArea(sb.toString());
         textArea.setEditable(false);
         textArea.setWrapText(true);
-        textArea.setStyle("-fx-font-family: 'Consolas', monospace; -fx-font-size: 12px;");
+        textArea.getStyleClass().add("fc-ticket-preview-mono");
         textArea.setPrefWidth(420);
         textArea.setPrefHeight(380);
 

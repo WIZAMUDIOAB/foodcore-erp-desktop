@@ -145,8 +145,8 @@ public class SolicitudesController {
 
             {
                 box.setAlignment(Pos.CENTER);
-                btnAprobar.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4 10; -fx-background-radius: 6; -fx-cursor: hand;");
-                btnRechazar.setStyle("-fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4 10; -fx-background-radius: 6; -fx-cursor: hand;");
+                btnAprobar.getStyleClass().add("fc-btn-approve-xs");
+                btnRechazar.getStyleClass().add("fc-btn-reject-xs");
                 AnimationUtils.attachTactileFeedback(btnAprobar);
                 AnimationUtils.attachTactileFeedback(btnRechazar);
             }
