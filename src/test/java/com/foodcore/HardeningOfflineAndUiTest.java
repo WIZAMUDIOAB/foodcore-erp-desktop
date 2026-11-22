@@ -557,10 +557,13 @@ class HardeningOfflineAndUiTest {
         String srcUsuarios = Files.readString(
                 Path.of("src", "main", "java", "com", "foodcore", "controller", "UsuariosController.java"),
                 StandardCharsets.UTF_8);
-        assertFalse(srcUsuarios.contains("Temporal#2026!"),
-                "UsuariosController no debe contener contraseña fallback hardcodeada");
-        assertTrue(srcUsuarios.contains("SET pin = NULL, pin_hash = ?"),
-                "actualizarPinUsuario debe limpiar la columna pin y guardar solo pin_hash");
+        String srcUsuarioService = Files.readString(
+                Path.of("src", "main", "java", "com", "foodcore", "service", "UsuarioGestionService.java"),
+                StandardCharsets.UTF_8);
+        assertFalse(srcUsuarios.contains("Temporal#2026!") || srcUsuarioService.contains("Temporal#2026!"),
+                "UsuariosController y UsuarioGestionService no deben contener contraseña fallback hardcodeada");
+        assertTrue(srcUsuarioService.contains("SET pin = NULL, pin_hash = ?"),
+                "actualizarPinUsuario en UsuarioGestionService debe limpiar la columna pin y guardar solo pin_hash");
 
         // 6. PasswordChangeDialogController: sin comparación directa en texto plano
         String srcPassDialog = Files.readString(
