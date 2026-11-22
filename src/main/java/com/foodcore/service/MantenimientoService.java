@@ -230,4 +230,12 @@ public class MantenimientoService {
     public String obtenerMetricasPool() {
         return ConexionBD.getEstadoPool();
     }
+
+    public void inicializarPool() {
+        ConexionBD.inicializarPool();
+    }
+
+    public String obtenerJdbcUrlInfo() {
+        return ConexionBD.getJdbcUrlInfo();
+    }
 }

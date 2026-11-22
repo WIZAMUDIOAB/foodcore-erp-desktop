@@ -1,15 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.service.KioscoOrdenService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -32,7 +28,7 @@ import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -59,8 +55,7 @@ public class KioscoController {
     @FXML private Label lblTotalKiosco;
     @FXML private Button btnConfirmarKiosco;
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final KioscoOrdenService kioscoOrdenService = new KioscoOrdenService();
 
     private final List<Producto> todosLosProductos = new ArrayList<>();
     private final ObservableList<DetallePedido> carritoItems = FXCollections.observableArrayList();
@@ -145,13 +140,7 @@ public class KioscoController {
         boxCategoriasKiosco.getChildren().add(btnTodos);
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarCategorias(conn);
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    return java.util.Collections.<Categoria>emptyList();
-                }
-            },
+            kioscoOrdenService::listarCategorias,
             cats -> {
                 if (cats != null && !cats.isEmpty()) {
                     for (Categoria c : cats) {
@@ -202,13 +191,7 @@ public class KioscoController {
     public void cargarCatalogo() {
         todosLosProductos.clear();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarProductosDisponibles(conn);
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    return java.util.Collections.<Producto>emptyList();
-                }
-            },
+            kioscoOrdenService::listarProductosDisponibles,
             lista -> {
                 todosLosProductos.clear();
                 if (lista != null && !lista.isEmpty()) {
@@ -377,23 +360,7 @@ public class KioscoController {
             btnConfirmarKiosco.setDisable(true);
         }
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    int id = pedidoDAO.crearPedido(conn, ordenKiosco);
-                    ordenKiosco.setIdPedido(id);
-                    for (DetallePedido d : detallesSnapshot) {
-                        d.setIdPedido(id);
-                        try {
-                            pedidoDAO.insertarDetallePedido(conn, d);
-                        } catch (Exception ex) {
-                            LOGGER.log(Level.FINE, "Detalle guardado: {0}", ex.getMessage());
-                        }
-                    }
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    LOGGER.log(Level.WARNING, "Error al guardar orden de kiosco en BD: {0}", e.getMessage());
-                    ordenKiosco.setIdPedido(9100 + turnoPedido);
-                }
-            },
+            () -> kioscoOrdenService.registrarPedidoKiosco(ordenKiosco, detallesSnapshot),
             () -> {
                 if (btnConfirmarKiosco != null) {
                     btnConfirmarKiosco.setDisable(false);

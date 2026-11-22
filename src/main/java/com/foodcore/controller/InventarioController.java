@@ -1,15 +1,14 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+
 import com.foodcore.model.Insumo;
 import com.foodcore.model.KardexMovimiento;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.ImportacionMasivaService;
-import com.foodcore.tx.TransactionManager;
-import com.foodcore.tx.impl.JdbcTransactionManager;
+import com.foodcore.service.InventarioGestionService;
+
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -36,7 +35,7 @@ import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -74,9 +73,9 @@ public class InventarioController {
     @FXML private TableColumn<Insumo, String> colCostoUnitario;
     @FXML private TableColumn<Insumo, String> colEstado;
 
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
+    private final InventarioGestionService inventarioGestionService = new InventarioGestionService();
     private final ImportacionMasivaService importacionMasivaService = new ImportacionMasivaService();
-    private final TransactionManager tx = new JdbcTransactionManager();
+
     private final ObservableList<Insumo> todosLosInsumos = FXCollections.observableArrayList();
     private final ObservableList<Insumo> insumosFiltrados = FXCollections.observableArrayList();
 
@@ -166,13 +165,12 @@ public class InventarioController {
     public void cargarInventarioDesdeBD() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<Insumo> lista = new ArrayList<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    lista = insumoDAO.listarTodos(conn);
+                try {
+                    return inventarioGestionService.listarTodosInsumos();
                 } catch (Exception e) {
                     LOGGER.log(Level.FINE, "Cargando insumos de respaldo", e);
                 }
-                return lista;
+                return new ArrayList<Insumo>();
             },
             resultado -> {
                 todosLosInsumos.setAll(resultado);
@@ -224,26 +222,8 @@ public class InventarioController {
                                                 BigDecimal stockInicial,
                                                 BigDecimal stockMinimo,
                                                 BigDecimal costoUnitario) throws Exception {
-        String umCanon = UnidadMedidaFormatter.normalizarCodigo(unidadMedida);
-        long idUsuario = AuthService.getUsuarioSesionActual() != null
-            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1L;
-
-        return tx.executeChecked(conn -> {
-            Insumo nuevo = new Insumo(
-                0L,
-                (codigo != null && !codigo.isBlank()) ? codigo.trim() : ("INS-" + (System.currentTimeMillis() % 100000)),
-                nombre.trim(),
-                umCanon,
-                BigDecimal.ZERO,
-                stockMinimo != null ? stockMinimo : BigDecimal.ZERO,
-                costoUnitario != null ? costoUnitario : BigDecimal.ZERO
-            );
-            long id = insumoDAO.crear(conn, nuevo);
-            if (stockInicial != null && stockInicial.compareTo(BigDecimal.ZERO) > 0) {
-                insumoDAO.registrarCompraInsumo(conn, id, stockInicial, costoUnitario, idUsuario, "Inventario Inicial de Insumo");
-            }
-            return insumoDAO.obtenerPorId(conn, id);
-        });
+        return inventarioGestionService.crearNuevoInsumoTransaccional(
+                codigo, nombre, unidadMedida, stockInicial, stockMinimo, costoUnitario);
     }
 
     /**
@@ -253,11 +233,8 @@ public class InventarioController {
                                                          BigDecimal cantidadComprada,
                                                          BigDecimal costoUnitarioCompra,
                                                          String observacion) throws Exception {
-        long idUsuario = AuthService.getUsuarioSesionActual() != null
-            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1L;
-        return tx.executeChecked(conn ->
-            insumoDAO.registrarCompraInsumo(conn, idInsumo, cantidadComprada, costoUnitarioCompra, idUsuario, observacion)
-        );
+        return inventarioGestionService.registrarCompraTransaccional(
+                idInsumo, cantidadComprada, costoUnitarioCompra, observacion);
     }
 
     @FXML
@@ -427,9 +404,7 @@ public class InventarioController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    insumoDAO.eliminar(conn, idInsumo);
-                }
+                inventarioGestionService.eliminarInsumo(idInsumo);
             },
             () -> {
                 if (btnEliminarInsumo != null) {
