@@ -1,15 +1,16 @@
 package com.foodcore.controller;
 
 import com.foodcore.model.ComparativaPeriodos;
-import com.foodcore.model.MargenCategoria;
 import com.foodcore.model.ReporteCohortes;
 import com.foodcore.model.ReporteCohortes.CohorteMensualFila;
 import com.foodcore.model.ReporteCohortes.SegmentoRetencionFila;
-import com.foodcore.model.ResultadoReporteAvanzado;
-import com.foodcore.model.ResultadoReporteAvanzado.RebanadaPie;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
-import com.foodcore.service.ReporteService;
+import com.foodcore.controller.reportes.DefaultReportesAvanzadosPresenter;
+import com.foodcore.controller.reportes.DefaultReporteExportCoordinator;
+import com.foodcore.controller.reportes.ReporteChartUiRenderer;
+import com.foodcore.controller.reportes.ReporteExportCoordinator;
+import com.foodcore.controller.reportes.ReportesAvanzadosPresenter;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.FormatoBiUiHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -17,34 +18,23 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.geometry.Side;
-import javafx.scene.Node;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
-
 import java.io.File;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -111,9 +101,10 @@ public class ReportesAvanzadosController {
     @FXML private TableColumn<CohorteMensualFila, String> colCohorteM3;
     @FXML private TableColumn<CohorteMensualFila, String> colCohorteM4;
 
-    private final ExportacionContableService exportacionService;
-    private final FinanzasBiService finanzasBiService;
-    private final ReporteService reporteService = new ReporteService();
+
+    private final ReportesAvanzadosPresenter presenter;
+    private final ReporteExportCoordinator exportCoordinator;
+    private final ReporteChartUiRenderer chartUiRenderer;
     private final ObservableList<FilaReporteAvanzado> listaFilas = FXCollections.observableArrayList();
     private final ObservableList<SegmentoRetencionFila> listaResumenCohortes = FXCollections.observableArrayList();
     private final ObservableList<CohorteMensualFila> listaMatrizCohortes = FXCollections.observableArrayList();
@@ -125,8 +116,15 @@ public class ReportesAvanzadosController {
     public ReportesAvanzadosController(
             ExportacionContableService exportacionService,
             FinanzasBiService finanzasBiService) {
-        this.exportacionService = exportacionService;
-        this.finanzasBiService = finanzasBiService;
+        this(new DefaultReportesAvanzadosPresenter(finanzasBiService, new com.foodcore.service.ReporteService()),
+                new DefaultReporteExportCoordinator(exportacionService), new ReporteChartUiRenderer());
+    }
+
+    public ReportesAvanzadosController(ReportesAvanzadosPresenter presenter,
+            ReporteExportCoordinator exportCoordinator, ReporteChartUiRenderer chartUiRenderer) {
+        this.presenter = presenter;
+        this.exportCoordinator = exportCoordinator;
+        this.chartUiRenderer = chartUiRenderer;
     }
 
     @FXML
@@ -185,39 +183,7 @@ public class ReportesAvanzadosController {
     }
 
     private void configurarCeldaHeatmap(TableColumn<CohorteMensualFila, String> columna) {
-        columna.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                    setStyle("");
-                    return;
-                }
-                setText(item);
-                setAlignment(Pos.CENTER);
-                if ("-".equals(item)) {
-                    setStyle("-fx-text-fill: #A39D94; -fx-font-weight: normal;");
-                    return;
-                }
-                double val = parsePctSeguro(item);
-                if (val >= 50.0) {
-                    setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: bold;");
-                } else if (val > 0.0) {
-                    setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold;");
-                } else {
-                    setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #5C5650;");
-                }
-            }
-        });
-    }
-
-    private double parsePctSeguro(String textoPct) {
-        try {
-            return Double.parseDouble(textoPct.replace("%", "").trim());
-        } catch (NumberFormatException ex) {
-            return 0.0;
-        }
+        chartUiRenderer.configurarCeldaHeatmap(columna, presenter);
     }
 
     private void configurarCategorias() {
@@ -298,187 +264,15 @@ public class ReportesAvanzadosController {
         LocalDate hoy = LocalDate.now(ZONA_LIMA);
         LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : hoy.withDayOfMonth(1);
         LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : hoy;
-        ResultadoAnalisis res = consultarAnalisis(categoria, ini, fin);
+        ReportesAvanzadosPresenter.ResultadoAnalisisAvanzado res = consultarAnalisis(categoria, ini, fin);
         aplicarResultadoAnalisis(res, categoria, ini, fin);
     }
 
-    private ResultadoAnalisis consultarAnalisis(String categoria, LocalDate ini, LocalDate fin) {
-        ComparativaPeriodos comparativa = consultarComparativaSegura(LocalDate.now(ZONA_LIMA));
-        if (REPORTE_MARGENES_CATEGORIA.equals(categoria)) {
-            return consultarMargenesPorCategoria(ini, fin, comparativa);
-        }
-        if (REPORTE_COHORTES_CLIENTES.equals(categoria)) {
-            return consultarCohortes(fin, comparativa);
-        }
-
-        ResultadoReporteAvanzado res = reporteService.consultarAnalisisAvanzado(categoria, ini, fin);
-        List<FilaReporteAvanzado> filas = new ArrayList<>();
-        for (String[] fila : res.filas()) {
-            filas.add(new FilaReporteAvanzado(fila[0], fila[1], fila[2], fila[3], fila[4]));
-        }
-        List<PieSlice> slices = new ArrayList<>();
-        for (RebanadaPie rebanada : res.slices()) {
-            slices.add(new PieSlice(rebanada.etiqueta(), rebanada.valor()));
-        }
-
-        return new ResultadoAnalisis(
-                res.headers(),
-                filas,
-                slices,
-                res.montoTotal(),
-                res.cantidadTotal(),
-                res.topItem(),
-                res.topValor(),
-                comparativa,
-                null,
-                res.kpiMontoTotalText(),
-                res.kpiSubTotalText(),
-                res.kpiPromedioText(),
-                res.kpiTopValorText());
+    private ReportesAvanzadosPresenter.ResultadoAnalisisAvanzado consultarAnalisis(String categoria, LocalDate ini, LocalDate fin) {
+        return presenter.consultarAnalisis(categoria, ini, fin, LocalDate.now(ZONA_LIMA));
     }
 
-    private ComparativaPeriodos consultarComparativaSegura(LocalDate fechaRef) {
-        try {
-            return finanzasBiService.obtenerComparativaPeriodos(fechaRef);
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "No se pudo consultar comparativa de períodos", ex);
-            return new ComparativaPeriodos(
-                    fechaRef,
-                    BigDecimal.ZERO,
-                    BigDecimal.ZERO,
-                    BigDecimal.ZERO,
-                    BigDecimal.ZERO,
-                    BigDecimal.ZERO,
-                    BigDecimal.ZERO);
-        }
-    }
-
-    private ResultadoAnalisis consultarMargenesPorCategoria(
-            LocalDate ini, LocalDate fin, ComparativaPeriodos comparativa) {
-        String[] headers = new String[]{
-            "Categoría", "Ingresos S/", "Costo Receta S/", "Margen Bruto S/", "Margen %"
-        };
-        List<FilaReporteAvanzado> filas = new ArrayList<>();
-        List<PieSlice> slices = new ArrayList<>();
-        double totalMargen = 0.0;
-        double totalIngresos = 0.0;
-        int totalCategorias = 0;
-        String topItem = "-";
-        double topValor = 0.0;
-        BigDecimal topMargenPct = BigDecimal.ZERO;
-
-        try {
-            List<MargenCategoria> margenes = finanzasBiService.calcularMargenesPorCategoria(ini, fin);
-            for (MargenCategoria mc : margenes) {
-                filas.add(new FilaReporteAvanzado(
-                        mc.nombreCategoria(),
-                        "S/ " + fmt2(mc.ingresosVenta()),
-                        "S/ " + fmt2(mc.costoReceta()),
-                        "S/ " + fmt2(mc.margenBruto()),
-                        fmt1(mc.margenPorcentaje()) + "%"));
-                slices.add(new PieSlice(
-                        mc.nombreCategoria() + " (" + fmt1(mc.margenPorcentaje()) + "%)",
-                        Math.max(0.01, mc.margenBruto().doubleValue())));
-                totalMargen += mc.margenBruto().doubleValue();
-                totalIngresos += mc.ingresosVenta().doubleValue();
-                totalCategorias++;
-            }
-            if (!margenes.isEmpty()) {
-                MargenCategoria primero = margenes.get(0);
-                topItem = primero.nombreCategoria();
-                topValor = primero.margenBruto().doubleValue();
-                topMargenPct = primero.margenPorcentaje();
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error calculando márgenes por categoría", ex);
-        }
-
-        double margenPromedioPct = totalIngresos > 0.0 ? (totalMargen / totalIngresos) * 100.0 : 0.0;
-        String kpiSub = totalCategorias + String.format(" categorías · Ventas S/ %.2f", totalIngresos);
-        String kpiProm = String.format("%.1f%% prom.", margenPromedioPct);
-        String kpiTopSub = totalCategorias > 0
-                ? String.format("Margen %s%% (S/ %.2f)", fmt1(topMargenPct), topValor)
-                : "Sin datos en el rango";
-
-        return new ResultadoAnalisis(
-                headers,
-                filas,
-                slices,
-                totalMargen,
-                totalCategorias,
-                topItem,
-                topValor,
-                comparativa,
-                null,
-                null,
-                kpiSub,
-                kpiProm,
-                kpiTopSub);
-    }
-
-    private ResultadoAnalisis consultarCohortes(LocalDate fechaCorte, ComparativaPeriodos comparativa) {
-        String[] headers = new String[]{
-            "Segmento / Cohorte", "Clientes", "Retención / Mes 2", "Mes 3", "Criterio / Mes 4"
-        };
-        List<FilaReporteAvanzado> filas = new ArrayList<>();
-        ReporteCohortes reporte;
-        try {
-            reporte = finanzasBiService.generarAnalisisCohortes(fechaCorte);
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error generando análisis de cohortes", ex);
-            reporte = new ReporteCohortes(
-                    fechaCorte,
-                    java.time.YearMonth.from(fechaCorte),
-                    0,
-                    0,
-                    0,
-                    0,
-                    false,
-                    List.of(),
-                    List.of());
-        }
-
-        for (SegmentoRetencionFila seg : reporte.resumenRetencion()) {
-            filas.add(new FilaReporteAvanzado(
-                    seg.segmento(),
-                    seg.cantidad() + " clientes",
-                    FormatoBiUiHelper.formatearPorcentajeCohorte(seg.porcentaje()),
-                    "-",
-                    seg.criterio()));
-        }
-        for (CohorteMensualFila coh : reporte.cohortes()) {
-            filas.add(new FilaReporteAvanzado(
-                    "Cohorte " + coh.etiquetaCohorte(),
-                    coh.tamanoCohorte() + " clientes",
-                    FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes2Pct()),
-                    FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes3Pct()),
-                    FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes4Pct())));
-        }
-
-        int activosMes = reporte.clientesNuevosMes() + reporte.clientesRecurrentesMes();
-        double tasaRecurrentePct = activosMes > 0
-                ? (reporte.clientesRecurrentesMes() * 100.0) / activosMes
-                : 0.0;
-        String topItem = reporte.clientesRecurrentesMes() + " recurrentes";
-        String topSub = reporte.clientesPerdidosMas60Dias() + " perdidos (> 60 días)";
-
-        return new ResultadoAnalisis(
-                headers,
-                filas,
-                List.of(),
-                activosMes,
-                reporte.totalClientesIdentificados(),
-                topItem,
-                reporte.clientesRecurrentesMes(),
-                comparativa,
-                reporte,
-                reporte.totalClientesIdentificados() + " clientes",
-                reporte.clientesNuevosMes() + " nuevos · " + reporte.clientesPerdidosMas60Dias() + " perdidos >60d",
-                String.format("%.1f%% ret.", tasaRecurrentePct),
-                topSub);
-    }
-
-    private void aplicarResultadoAnalisis(ResultadoAnalisis res, String categoria, LocalDate ini, LocalDate fin) {
+    private void aplicarResultadoAnalisis(ReportesAvanzadosPresenter.ResultadoAnalisisAvanzado res, String categoria, LocalDate ini, LocalDate fin) {
         actualizarPanelComparativas(res.comparativa());
         actualizarBotonesModo(categoria);
 
@@ -499,7 +293,7 @@ public class ReportesAvanzadosController {
             aplicarModoCohortes(res.cohortesReporte());
         } else {
             ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
-            for (PieSlice s : res.slices()) {
+            for (ReportesAvanzadosPresenter.PieSlice s : res.slices()) {
                 pieData.add(new PieChart.Data(s.label(), s.value()));
             }
             if (pieChartDistribucion != null) {
@@ -531,12 +325,12 @@ public class ReportesAvanzadosController {
         if (comp == null || lblRepHoyVsAyerValor == null) {
             return;
         }
-        lblRepHoyVsAyerValor.setText("S/ " + fmt2(comp.ventasHoy()));
-        lblRepHoyVsAyerSub.setText("Ayer: S/ " + fmt2(comp.ventasAyer()));
+        lblRepHoyVsAyerValor.setText("S/ " + presenter.fmt2(comp.ventasHoy()));
+        lblRepHoyVsAyerSub.setText("Ayer: S/ " + presenter.fmt2(comp.ventasAyer()));
         FormatoBiUiHelper.aplicarIndicadorComparativa(lblRepHoyVsAyerBadge, comp.variacionDiariaPct());
 
-        lblRepMesVsAntValor.setText("S/ " + fmt2(comp.ventasMesActual()));
-        lblRepMesVsAntSub.setText("Mes anterior: S/ " + fmt2(comp.ventasMesAnterior()));
+        lblRepMesVsAntValor.setText("S/ " + presenter.fmt2(comp.ventasMesActual()));
+        lblRepMesVsAntSub.setText("Mes anterior: S/ " + presenter.fmt2(comp.ventasMesAnterior()));
         FormatoBiUiHelper.aplicarIndicadorComparativa(lblRepMesVsAntBadge, comp.variacionMensualPct());
     }
 
@@ -563,9 +357,7 @@ public class ReportesAvanzadosController {
         if (btnModoAnalitica == null || btnModoMargenes == null || btnModoCohortes == null) {
             return;
         }
-        String activo = REPORTE_MARGENES_CATEGORIA.equals(categoria)
-                ? "MARGENES"
-                : (REPORTE_COHORTES_CLIENTES.equals(categoria) ? "COHORTES" : "ANALITICA");
+        String activo = presenter.determinarModoActivo(categoria);
         aplicarEstiloBotonModo(btnModoAnalitica, "ANALITICA".equals(activo));
         aplicarEstiloBotonModo(btnModoMargenes, "MARGENES".equals(activo));
         aplicarEstiloBotonModo(btnModoCohortes, "COHORTES".equals(activo));
@@ -576,98 +368,13 @@ public class ReportesAvanzadosController {
         btn.getStyleClass().add(activo ? "btn-primary" : "btn-secondary");
     }
 
-    private String fmt2(BigDecimal val) {
-        BigDecimal v = val != null ? val.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        return String.format(java.util.Locale.US, "%.2f", v.doubleValue());
-    }
-
-    private String fmt1(BigDecimal val) {
-        BigDecimal v = val != null ? val.setScale(1, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
-        return String.format(java.util.Locale.US, "%.1f", v.doubleValue());
-    }
-
-    private record PieSlice(String label, double value) {
-    }
-
-    private record ResultadoAnalisis(
-            String[] headers,
-            List<FilaReporteAvanzado> filas,
-            List<PieSlice> slices,
-            double montoTotal,
-            int cantidadTotal,
-            String topItem,
-            double topValor,
-            ComparativaPeriodos comparativa,
-            ReporteCohortes cohortesReporte,
-            String kpiMontoTotalText,
-            String kpiSubTotalText,
-            String kpiPromedioText,
-            String kpiTopValorText) {
-
-        private ResultadoAnalisis {
-            headers = headers != null ? headers.clone() : new String[]{"", "", "", "", ""};
-            filas = filas != null ? List.copyOf(filas) : List.of();
-            slices = slices != null ? List.copyOf(slices) : List.of();
-        }
-    }
 
     /**
      * Aplica la paleta SaaS (Naranja, Azul, Verde, Morado...) usando node.setStyle()
      * y transforma el PieChart en un Donut Chart limpio (SPEC v4.0 §1.2).
      */
     public void aplicarEstilosDonut() {
-        if (pieChartDistribucion == null || pieChartDistribucion.getData().isEmpty()) {
-            return;
-        }
-        int i = 0;
-        for (PieChart.Data data : pieChartDistribucion.getData()) {
-            String color = PALETA_SAAS[i % PALETA_SAAS.length];
-            Node node = data.getNode();
-            if (node != null) {
-                node.setStyle("-fx-pie-color: " + color + "; -fx-background-color: " + color
-                        + "; -fx-border-color: #FFFFFF; -fx-border-width: 2px;");
-            }
-            i++;
-        }
-
-        Set<Node> symbols = pieChartDistribucion.lookupAll(".chart-legend-item-symbol");
-        int sIdx = 0;
-        for (Node sym : symbols) {
-            String color = PALETA_SAAS[sIdx % PALETA_SAAS.length];
-            sym.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6px;");
-            sIdx++;
-        }
-
-        if (!(pieChartDistribucion.lookup(".chart-content") instanceof Pane contentPane)) {
-            return;
-        }
-        double w = contentPane.getWidth();
-        double h = contentPane.getHeight();
-        if (w <= 20 || h <= 20) {
-            return;
-        }
-        double cx = w / 2.0;
-        double cy = h / 2.0;
-        double radius = Math.min(w, h) * 0.25;
-
-        Circle hole = null;
-        for (Node child : contentPane.getChildren()) {
-            if (child instanceof Circle c && "donut-hole".equals(c.getId())) {
-                hole = c;
-                break;
-            }
-        }
-        if (hole == null) {
-            hole = new Circle();
-            hole.setId("donut-hole");
-            hole.setFill(Color.WHITE);
-            hole.setMouseTransparent(true);
-            contentPane.getChildren().add(hole);
-        }
-        hole.setCenterX(cx);
-        hole.setCenterY(cy);
-        hole.setRadius(radius);
-        hole.toFront();
+        chartUiRenderer.aplicarEstilosDonut(pieChartDistribucion, PALETA_SAAS);
     }
 
     private void configurarHeaders(String h1, String h2, String h3, String h4, String h5) {
@@ -682,68 +389,27 @@ public class ReportesAvanzadosController {
     @FXML
     public void handleExportarPdf() {
         String categoria = cbCategoriaReporte.getValue();
-        exportarTablaConSelector(
-            btnExportarPdf,
-            "Guardar Reporte en PDF",
-            "REPORTE_" + sanitizarNombre(categoria) + ".pdf",
-            ExportFileChooserHelper.FormatoExportacion.PDF,
-            "Exportando PDF...",
-            (headers, filas, doc) -> exportacionService.exportarReporteGenericoPdf(
-                    categoria != null ? categoria : "REPORTE", headers, filas, doc),
-            "✓ PDF exportado: ",
-            "Error al exportar PDF: "
-        );
+        exportarTablaConSelector(btnExportarPdf, ExportFileChooserHelper.FormatoExportacion.PDF, categoria);
     }
 
     @FXML
     public void handleExportarExcel() {
         String categoria = cbCategoriaReporte.getValue();
-        exportarTablaConSelector(
-            btnExportarExcel,
-            "Guardar Reporte en Excel",
-            "REPORTE_" + sanitizarNombre(categoria) + ".xlsx",
-            ExportFileChooserHelper.FormatoExportacion.EXCEL,
-            "Exportando Excel...",
-            (headers, filas, doc) -> exportacionService.exportarReporteGenericoExcel("ANALISIS", headers, filas, doc),
-            "✓ Excel exportado: ",
-            "Error al exportar Excel: "
-        );
+        exportarTablaConSelector(btnExportarExcel, ExportFileChooserHelper.FormatoExportacion.EXCEL, categoria);
     }
 
     @FXML
     public void handleExportarCsv() {
         String categoria = cbCategoriaReporte.getValue();
-        exportarTablaConSelector(
-            btnExportarCsv,
-            "Guardar Reporte en CSV",
-            "REPORTE_" + sanitizarNombre(categoria) + ".csv",
-            ExportFileChooserHelper.FormatoExportacion.CSV,
-            "Exportando CSV...",
-            (headers, filas, doc) -> exportacionService.exportarReporteGenericoCsv(headers, filas, doc),
-            "✓ CSV exportado: ",
-            "Error al exportar CSV: "
-        );
+        exportarTablaConSelector(btnExportarCsv, ExportFileChooserHelper.FormatoExportacion.CSV, categoria);
     }
 
-    @FunctionalInterface
-    private interface ExportTablaAction {
-        void export(List<String> headers, List<List<String>> filas, File destino) throws Exception;
-    }
-
-    private void exportarTablaConSelector(
-            Button origenBtn,
-            String tituloDialogo,
-            String nombreSugerido,
-            ExportFileChooserHelper.FormatoExportacion formato,
-            String estadoProcesando,
-            ExportTablaAction action,
-            String prefijoExito,
-            String prefijoError) {
+    private void exportarTablaConSelector(Button origenBtn,
+            ExportFileChooserHelper.FormatoExportacion formato, String categoria) {
+        ReporteExportCoordinator.SolicitudExportacion solicitud = exportCoordinator.prepararSolicitud(formato, categoria);
         Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
                 origenBtn != null ? origenBtn : lblEstadoReporte,
-                tituloDialogo,
-                nombreSugerido,
-                formato);
+                solicitud.tituloDialogo(), solicitud.nombreSugerido(), solicitud.formato());
         if (elegidoOpt.isEmpty()) {
             if (lblEstadoReporte != null) {
                 lblEstadoReporte.setText("Exportación cancelada.");
@@ -753,41 +419,29 @@ public class ReportesAvanzadosController {
 
         File doc = elegidoOpt.get();
         List<String> headers = List.of(col1.getText(), col2.getText(), col3.getText(), col4.getText(), col5.getText());
-        List<List<String>> filas = new ArrayList<>();
-        for (FilaReporteAvanzado f : listaFilas) {
-            filas.add(List.of(f.c1, f.c2, f.c3, f.c4, f.c5));
-        }
+        List<List<String>> filas = exportCoordinator.convertirFilas(List.copyOf(listaFilas));
 
         if (lblEstadoReporte != null) {
-            lblEstadoReporte.setText(estadoProcesando);
+            lblEstadoReporte.setText(solicitud.estadoProcesando());
         }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                if (doc.getParentFile() != null) {
-                    Files.createDirectories(doc.getParentFile().toPath());
-                }
-                action.export(headers, filas, doc);
+                exportCoordinator.ejecutarExportacion(formato, categoria, headers, filas, doc);
                 return doc.getName();
             },
             nombre -> {
                 if (lblEstadoReporte != null) {
-                    lblEstadoReporte.setText(prefijoExito + nombre);
+                    lblEstadoReporte.setText(solicitud.prefijoExito() + nombre);
                 }
             },
             ex -> {
                 if (lblEstadoReporte != null) {
-                    lblEstadoReporte.setText(prefijoError + (ex != null ? ex.getMessage() : "desconocido"));
+                    lblEstadoReporte.setText(solicitud.prefijoError() + (ex != null ? ex.getMessage() : "desconocido"));
                 }
             }
         );
     }
 
-    private String sanitizarNombre(String nom) {
-        if (nom == null) {
-            return "REPORTE";
-        }
-        return nom.replaceAll("[^a-zA-Z0-9]", "_").toUpperCase();
-    }
 
     public PieChart getPieChartDistribucion() {
         return pieChartDistribucion;
