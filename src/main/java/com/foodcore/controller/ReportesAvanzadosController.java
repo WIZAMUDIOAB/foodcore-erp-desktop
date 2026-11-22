@@ -1,14 +1,15 @@
 package com.foodcore.controller;
 
-import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComparativaPeriodos;
 import com.foodcore.model.MargenCategoria;
 import com.foodcore.model.ReporteCohortes;
 import com.foodcore.model.ReporteCohortes.CohorteMensualFila;
 import com.foodcore.model.ReporteCohortes.SegmentoRetencionFila;
+import com.foodcore.model.ResultadoReporteAvanzado;
+import com.foodcore.model.ResultadoReporteAvanzado.RebanadaPie;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.ReporteService;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.FormatoBiUiHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -37,11 +38,6 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -117,6 +113,7 @@ public class ReportesAvanzadosController {
 
     private final ExportacionContableService exportacionService;
     private final FinanzasBiService finanzasBiService;
+    private final ReporteService reporteService = new ReporteService();
     private final ObservableList<FilaReporteAvanzado> listaFilas = FXCollections.observableArrayList();
     private final ObservableList<SegmentoRetencionFila> listaResumenCohortes = FXCollections.observableArrayList();
     private final ObservableList<CohorteMensualFila> listaMatrizCohortes = FXCollections.observableArrayList();
@@ -314,238 +311,36 @@ public class ReportesAvanzadosController {
             return consultarCohortes(fin, comparativa);
         }
 
-        String[] headers;
+        ResultadoReporteAvanzado res = reporteService.consultarAnalisisAvanzado(categoria, ini, fin);
         List<FilaReporteAvanzado> filas = new ArrayList<>();
+        for (String[] fila : res.filas()) {
+            filas.add(new FilaReporteAvanzado(fila[0], fila[1], fila[2], fila[3], fila[4]));
+        }
         List<PieSlice> slices = new ArrayList<>();
-        double montoTotal = 0.0;
-        int cantidadTotal = 0;
-        String topItem = "-";
-        double topValor = 0.0;
-
-        if ("Ventas por Medio de Pago".equals(categoria)) {
-            headers = new String[]{"Medio de Pago", "Comprobantes", "Subtotal S/", "Total Ventas S/", "Participación %"};
-        } else if ("Ventas por Mozo / Operador".equals(categoria)) {
-            headers = new String[]{"Usuario / Mozo", "Comprobantes", "Subtotal S/", "Total Facturado S/", "Participación %"};
-        } else if ("Ventas por Producto".equals(categoria)) {
-            headers = new String[]{"Producto Vendido", "Unidades", "Precio Prom.", "Total Vendido S/", "Participación %"};
-        } else if ("Compras por Proveedor".equals(categoria)) {
-            headers = new String[]{"Proveedor / Razón Social", "Facturas", "Base Imponible", "Total Compras S/", "Participación %"};
-        } else {
-            headers = new String[]{"Platillo Carta", "Precio Venta", "Costo Receta", "Margen Bruto S/", "Margen %"};
-        }
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            if ("Ventas por Medio de Pago".equals(categoria)) {
-                String sql = "SELECT metodo_pago, COUNT(*) AS transacciones, SUM(subtotal) AS sub, SUM(total) AS tot "
-                        + "FROM venta WHERE DATE(fecha_hora) BETWEEN ? AND ? GROUP BY metodo_pago ORDER BY tot DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setDate(1, Date.valueOf(ini));
-                    ps.setDate(2, Date.valueOf(fin));
-                    try (ResultSet rs = ps.executeQuery()) {
-                        List<FilaTemp> temps = new ArrayList<>();
-                        while (rs.next()) {
-                            FilaTemp t = new FilaTemp();
-                            t.nombre = rs.getString("metodo_pago");
-                            t.qty = rs.getInt("transacciones");
-                            t.sub = rs.getDouble("sub");
-                            t.tot = rs.getDouble("tot");
-                            temps.add(t);
-                            montoTotal += t.tot;
-                            cantidadTotal += t.qty;
-                        }
-                        for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            filas.add(new FilaReporteAvanzado(
-                                    t.nombre,
-                                    t.qty + " ops",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)));
-                            slices.add(new PieSlice(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
-                                topValor = t.tot;
-                                topItem = t.nombre;
-                            }
-                        }
-                    }
-                }
-            } else if ("Ventas por Mozo / Operador".equals(categoria)) {
-                String sql = "SELECT u.username, COUNT(v.id_venta) AS ops, SUM(v.subtotal) AS sub, SUM(v.total) AS tot "
-                        + "FROM venta v JOIN usuario u ON v.id_usuario = u.id_usuario "
-                        + "WHERE DATE(v.fecha_hora) BETWEEN ? AND ? GROUP BY u.id_usuario, u.username ORDER BY tot DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setDate(1, Date.valueOf(ini));
-                    ps.setDate(2, Date.valueOf(fin));
-                    try (ResultSet rs = ps.executeQuery()) {
-                        List<FilaTemp> temps = new ArrayList<>();
-                        while (rs.next()) {
-                            FilaTemp t = new FilaTemp();
-                            t.nombre = rs.getString("username");
-                            t.qty = rs.getInt("ops");
-                            t.sub = rs.getDouble("sub");
-                            t.tot = rs.getDouble("tot");
-                            temps.add(t);
-                            montoTotal += t.tot;
-                            cantidadTotal += t.qty;
-                        }
-                        for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            filas.add(new FilaReporteAvanzado(
-                                    t.nombre,
-                                    t.qty + " pedidos",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)));
-                            slices.add(new PieSlice(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
-                                topValor = t.tot;
-                                topItem = t.nombre;
-                            }
-                        }
-                    }
-                }
-            } else if ("Ventas por Producto".equals(categoria)) {
-                String sql = "SELECT p.nombre, SUM(dv.cantidad) AS cant, AVG(dv.precio_unitario) AS precio, SUM(dv.subtotal) AS tot "
-                        + "FROM detalle_venta dv JOIN producto p ON dv.id_producto = p.id_producto "
-                        + "JOIN venta v ON dv.id_venta = v.id_venta WHERE DATE(v.fecha_hora) BETWEEN ? AND ? "
-                        + "GROUP BY p.id_producto, p.nombre ORDER BY tot DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setDate(1, Date.valueOf(ini));
-                    ps.setDate(2, Date.valueOf(fin));
-                    try (ResultSet rs = ps.executeQuery()) {
-                        List<FilaTemp> temps = new ArrayList<>();
-                        while (rs.next()) {
-                            FilaTemp t = new FilaTemp();
-                            t.nombre = rs.getString("nombre");
-                            t.qty = rs.getInt("cant");
-                            t.sub = rs.getDouble("precio");
-                            t.tot = rs.getDouble("tot");
-                            temps.add(t);
-                            montoTotal += t.tot;
-                            cantidadTotal += t.qty;
-                        }
-                        for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            filas.add(new FilaReporteAvanzado(
-                                    t.nombre,
-                                    t.qty + " und",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)));
-                            slices.add(new PieSlice(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
-                                topValor = t.tot;
-                                topItem = t.nombre;
-                            }
-                        }
-                    }
-                }
-            } else if ("Compras por Proveedor".equals(categoria)) {
-                String sql = "SELECT p.razon_social, COUNT(c.id_compra) AS docs, SUM(c.base_imponible) AS base, SUM(c.total) AS tot "
-                        + "FROM compra c JOIN proveedor p ON c.id_proveedor = p.id_proveedor "
-                        + "WHERE c.fecha_emision BETWEEN ? AND ? GROUP BY p.id_proveedor, p.razon_social ORDER BY tot DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setDate(1, Date.valueOf(ini));
-                    ps.setDate(2, Date.valueOf(fin));
-                    try (ResultSet rs = ps.executeQuery()) {
-                        List<FilaTemp> temps = new ArrayList<>();
-                        while (rs.next()) {
-                            FilaTemp t = new FilaTemp();
-                            t.nombre = rs.getString("razon_social");
-                            t.qty = rs.getInt("docs");
-                            t.sub = rs.getDouble("base");
-                            t.tot = rs.getDouble("tot");
-                            temps.add(t);
-                            montoTotal += t.tot;
-                            cantidadTotal += t.qty;
-                        }
-                        for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
-                            filas.add(new FilaReporteAvanzado(
-                                    t.nombre,
-                                    t.qty + " facturas",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)));
-                            slices.add(new PieSlice(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
-                                topValor = t.tot;
-                                topItem = t.nombre;
-                            }
-                        }
-                    }
-                }
-            } else { // Rentabilidad Real de Carta
-                String sql = "SELECT p.nombre, p.precio_venta, "
-                        + "COALESCE((SELECT SUM(r.cantidad_necesaria * i.costo_unitario) FROM receta r JOIN insumo i ON r.id_insumo = i.id_insumo WHERE r.id_producto = p.id_producto), 0.0) AS costo_receta "
-                        + "FROM producto p WHERE p.disponible = 1 ORDER BY p.precio_venta DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String nom = rs.getString("nombre");
-                        double pv = rs.getDouble("precio_venta");
-                        double cr = rs.getDouble("costo_receta");
-                        double mgSoles = Math.max(0.01, pv - cr);
-                        double mgPct = pv > 0 ? (mgSoles / pv) * 100.0 : 0.0;
-                        filas.add(new FilaReporteAvanzado(
-                                nom,
-                                String.format("S/ %.2f", pv),
-                                String.format("S/ %.2f", cr),
-                                String.format("S/ %.2f", mgSoles),
-                                String.format("%.1f%%", mgPct)));
-                        slices.add(new PieSlice(nom, mgSoles));
-                        montoTotal += mgSoles;
-                        cantidadTotal++;
-                    }
-                    topItem = "Margen Promedio";
-                    topValor = cantidadTotal > 0 ? montoTotal / cantidadTotal : 0.0;
-                }
-            }
-        } catch (java.sql.SQLException | RuntimeException ex) {
-            LOGGER.log(Level.WARNING, "Error en reporte avanzado", ex);
-        }
-
-        if (slices.isEmpty()) {
-            filas.add(new FilaReporteAvanzado("EFECTIVO", "12 ops", "S/ 457.63", "S/ 540.00", "45.0%"));
-            filas.add(new FilaReporteAvanzado("TARJETA", "8 ops", "S/ 322.03", "S/ 380.00", "31.7%"));
-            filas.add(new FilaReporteAvanzado("YAPE / PLIN", "6 ops", "S/ 237.29", "S/ 280.00", "23.3%"));
-            slices.add(new PieSlice("EFECTIVO (45.0%)", 540.0));
-            slices.add(new PieSlice("TARJETA (31.7%)", 380.0));
-            slices.add(new PieSlice("YAPE / PLIN (23.3%)", 280.0));
-            montoTotal = 1200.00;
-            cantidadTotal = 26;
-            topItem = "EFECTIVO";
-            topValor = 540.00;
+        for (RebanadaPie rebanada : res.slices()) {
+            slices.add(new PieSlice(rebanada.etiqueta(), rebanada.valor()));
         }
 
         return new ResultadoAnalisis(
-                headers,
+                res.headers(),
                 filas,
                 slices,
-                montoTotal,
-                cantidadTotal,
-                topItem,
-                topValor,
+                res.montoTotal(),
+                res.cantidadTotal(),
+                res.topItem(),
+                res.topValor(),
                 comparativa,
                 null,
-                null,
-                null,
-                null,
-                null);
+                res.kpiMontoTotalText(),
+                res.kpiSubTotalText(),
+                res.kpiPromedioText(),
+                res.kpiTopValorText());
     }
 
     private ComparativaPeriodos consultarComparativaSegura(LocalDate fechaRef) {
         try {
             return finanzasBiService.obtenerComparativaPeriodos(fechaRef);
-        } catch (SQLException | RuntimeException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "No se pudo consultar comparativa de períodos", ex);
             return new ComparativaPeriodos(
                     fechaRef,
@@ -594,7 +389,7 @@ public class ReportesAvanzadosController {
                 topValor = primero.margenBruto().doubleValue();
                 topMargenPct = primero.margenPorcentaje();
             }
-        } catch (NegocioException | SQLException | RuntimeException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error calculando márgenes por categoría", ex);
         }
 
@@ -629,7 +424,7 @@ public class ReportesAvanzadosController {
         ReporteCohortes reporte;
         try {
             reporte = finanzasBiService.generarAnalisisCohortes(fechaCorte);
-        } catch (SQLException | RuntimeException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error generando análisis de cohortes", ex);
             reporte = new ReporteCohortes(
                     fechaCorte,
@@ -1024,12 +819,5 @@ public class ReportesAvanzadosController {
             this.c4 = c4;
             this.c5 = c5;
         }
-    }
-
-    private static class FilaTemp {
-        String nombre;
-        int qty;
-        double sub;
-        double tot;
     }
 }
