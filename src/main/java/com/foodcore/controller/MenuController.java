@@ -1,9 +1,5 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.CategoriaDAO;
-import com.foodcore.dao.CategoriaDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Combo;
@@ -13,11 +9,11 @@ import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.service.ComboService;
 import com.foodcore.service.ImportacionMasivaService;
+import com.foodcore.service.MenuGestionService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.impl.ComboServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
@@ -52,7 +48,6 @@ import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -144,8 +139,7 @@ public class MenuController {
     @FXML private Button btnEliminarModificadorGlobal;
     @FXML private ListView<ProductoModificador> lstModificadoresGlobales;
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final CategoriaDAO categoriaDAO = new CategoriaDAOImpl();
+    private final MenuGestionService menuGestionService = new MenuGestionService();
     private final ImportacionMasivaService importacionMasivaService = new ImportacionMasivaService();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
     private final ComboService comboService = new ComboServiceImpl();
@@ -369,9 +363,9 @@ public class MenuController {
                 List<Categoria> cats = new ArrayList<>();
                 List<Producto> prods = new ArrayList<>();
                 List<ProductoModificador> modsGlobales = new ArrayList<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    cats = productoDAO.listarCategorias(conn);
-                    prods = personalizacionService.listarTodosConOpciones(conn);
+                try {
+                    cats = menuGestionService.listarCategoriasProductos();
+                    prods = personalizacionService.listarTodosConOpciones();
                     modsGlobales = personalizacionService.listarModificadoresGlobales();
                 } catch (Exception e) {
                     LOGGER.log(Level.FINE, "Error cargando menú desde BD", e);
@@ -612,22 +606,20 @@ public class MenuController {
                                         boolean disponible,
                                         boolean esMenuDelDia,
                                         String imagenUrl) throws SQLException {
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
-                productoEnEdicion.setIdCategoria(idCategoria);
-                productoEnEdicion.setCodigo(codigo);
-                productoEnEdicion.setNombre(nombre);
-                productoEnEdicion.setPrecioVenta(precioVenta);
-                productoEnEdicion.setDisponible(disponible);
-                productoEnEdicion.setEsMenuDelDia(esMenuDelDia);
-                productoEnEdicion.setImagenUrl(imagenUrl);
-                productoDAO.actualizar(conn, productoEnEdicion);
-                return productoEnEdicion;
-            } else {
-                Producto nuevo = new Producto(0, idCategoria, codigo, nombre, "", precioVenta, BigDecimal.ZERO, disponible, imagenUrl, esMenuDelDia, esMenuDelDia ? java.time.LocalDate.now() : null);
-                productoDAO.crear(conn, nuevo);
-                return nuevo;
-            }
+        if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
+            productoEnEdicion.setIdCategoria(idCategoria);
+            productoEnEdicion.setCodigo(codigo);
+            productoEnEdicion.setNombre(nombre);
+            productoEnEdicion.setPrecioVenta(precioVenta);
+            productoEnEdicion.setDisponible(disponible);
+            productoEnEdicion.setEsMenuDelDia(esMenuDelDia);
+            productoEnEdicion.setImagenUrl(imagenUrl);
+            menuGestionService.actualizarProducto(productoEnEdicion);
+            return productoEnEdicion;
+        } else {
+            Producto nuevo = new Producto(0, idCategoria, codigo, nombre, "", precioVenta, BigDecimal.ZERO, disponible, imagenUrl, esMenuDelDia, esMenuDelDia ? java.time.LocalDate.now() : null);
+            menuGestionService.crearProducto(nuevo);
+            return nuevo;
         }
     }
 
@@ -764,23 +756,10 @@ public class MenuController {
                 if (catInicial != null && catInicial.getIdCategoria() > 0) {
                     idCat = catInicial.getIdCategoria();
                 } else {
-                    Categoria enListaBd = null;
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        List<Categoria> enBD = categoriaDAO.listarTodas(conn);
-                        for (Categoria c : enBD) {
-                            if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(categoriaNombre)) {
-                                enListaBd = c;
-                                break;
-                            }
-                        }
-                        if (enListaBd != null && enListaBd.getIdCategoria() > 0) {
-                            idCat = enListaBd.getIdCategoria();
-                        } else {
-                            Categoria nuevaCat = new Categoria(0, categoriaNombre, "Categoría creada dinámicamente", true);
-                            idCat = categoriaDAO.crear(conn, nuevaCat);
-                            nuevaCatCreada = nuevaCat;
-                        }
-                    }
+                    MenuGestionService.CategoriaResultado resultado =
+                            menuGestionService.resolverOCrearCategoria(categoriaNombre);
+                    idCat = resultado.idCategoria();
+                    nuevaCatCreada = resultado.nuevaCategoriaCreada();
                 }
                 guardarPlatilloEnBDConOpciones(
                         idCat, cod, nom, precio, disp, menuDia, imagenUrl,

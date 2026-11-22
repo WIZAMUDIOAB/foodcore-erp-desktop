@@ -1,16 +1,10 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.RecetaDAO;
-import com.foodcore.dao.RecetaDAOImpl;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
+import com.foodcore.service.RecetaGestionService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.application.Platform;
@@ -30,8 +24,6 @@ import javafx.scene.layout.StackPane;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,9 +58,7 @@ public class RecetasController {
     @FXML private TableColumn<Receta, String> colRecCantidad;
     @FXML private TableColumn<Receta, String> colRecUnidad;
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
-    private final RecetaDAO recetaDAO = new RecetaDAOImpl();
+    private final RecetaGestionService recetaGestionService = new RecetaGestionService();
 
     private final ObservableList<Producto> listaPlatillos = FXCollections.observableArrayList();
     private final ObservableList<Insumo> listaInsumos = FXCollections.observableArrayList();
@@ -121,21 +111,15 @@ public class RecetasController {
         tblComponentesReceta.setItems(listaComponentes);
     }
 
-    private record DatosRecetasCarga(List<Producto> prods, List<Insumo> insumos) {
-    }
-
     public void cargarDatosIniciales() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<Producto> prods = new ArrayList<>();
-                List<Insumo> ins = new ArrayList<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    prods = productoDAO.listarTodos(conn);
-                    ins = insumoDAO.listarTodos(conn);
+                try {
+                    return recetaGestionService.listarCatalogosReceta();
                 } catch (Exception e) {
                     LOGGER.log(Level.FINE, "Error cargando datos de recetas", e);
+                    return new RecetaGestionService.CatalogoRecetaData(List.of(), List.of());
                 }
-                return new DatosRecetasCarga(prods, ins);
             },
             datos -> {
                 costosPorInsumo.clear();
@@ -146,7 +130,7 @@ public class RecetasController {
                 if (!listaInsumos.isEmpty()) {
                     cmbInsumoReceta.getSelectionModel().selectFirst();
                 }
-                listaPlatillos.setAll(datos.prods());
+                listaPlatillos.setAll(datos.productos());
                 if (!listaPlatillos.isEmpty()) {
                     tblPlatillos.getSelectionModel().selectFirst();
                 }
@@ -172,11 +156,7 @@ public class RecetasController {
         }
         int idProducto = p.getIdProducto();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return recetaDAO.listarPorProducto(conn, idProducto);
-                }
-            },
+            () -> recetaGestionService.listarPorProducto(idProducto),
             recs -> {
                 listaComponentes.setAll(recs);
                 actualizarEscandallo(p, recs);
@@ -214,9 +194,7 @@ public class RecetasController {
      * Asocia transaccionalmente un insumo a la receta de un platillo (§2.3).
      */
     public void asociarInsumoARecetaEnBD(int idProducto, long idInsumo, BigDecimal cantidad) throws Exception {
-        try (Connection conn = ConexionBD.getConnection()) {
-            recetaDAO.asociarInsumo(conn, idProducto, idInsumo, cantidad);
-        }
+        recetaGestionService.asociarInsumo(idProducto, idInsumo, cantidad);
     }
 
     @FXML
@@ -271,11 +249,7 @@ public class RecetasController {
             btnQuitarInsumo.setDisable(true);
         }
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    recetaDAO.eliminarComponente(conn, idReceta);
-                }
-            },
+            () -> recetaGestionService.eliminarComponente(idReceta),
             () -> {
                 if (btnQuitarInsumo != null) {
                     btnQuitarInsumo.setDisable(false);
