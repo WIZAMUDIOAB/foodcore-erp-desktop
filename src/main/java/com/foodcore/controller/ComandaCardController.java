@@ -302,8 +302,7 @@ public class ComandaCardController {
         boolean esCombo = componentesCombo != null && !componentesCombo.isEmpty();
         if (esCombo) {
             Label badgeCombo = new Label("COMBO");
-            badgeCombo.setStyle("-fx-background-color: #4F46E5; -fx-text-fill: #FFFFFF; -fx-font-size: 10px; "
-                    + "-fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
+            badgeCombo.getStyleClass().add("fc-kds-combo-badge");
             itemBox.getChildren().add(badgeCombo);
         }
 
@@ -316,17 +315,15 @@ public class ComandaCardController {
         if (esCombo) {
             VBox boxDesglose = new VBox(3);
             boxDesglose.setMaxWidth(275);
-            boxDesglose.setStyle("-fx-background-color: rgba(255, 255, 255, 0.08); "
-                    + "-fx-border-color: rgba(234, 88, 12, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
-                    + "-fx-padding: 6 9;");
+            boxDesglose.getStyleClass().add("fc-kds-combo-box");
             Label lblCabeceraDesglose = new Label("Desglose de empaquetado:");
-            lblCabeceraDesglose.setStyle("-fx-text-fill: #EA580C; -fx-font-size: 11px; -fx-font-weight: 700;");
+            lblCabeceraDesglose.getStyleClass().add("fc-kds-combo-header");
             boxDesglose.getChildren().add(lblCabeceraDesglose);
             for (String comp : componentesCombo) {
                 Label lblComp = new Label("•  " + comp);
                 lblComp.setWrapText(true);
                 lblComp.setMaxWidth(252);
-                lblComp.setStyle("-fx-text-fill: #FAF9F6; -fx-font-size: 12.5px; -fx-font-weight: 600;");
+                lblComp.getStyleClass().add("fc-kds-combo-item");
                 boxDesglose.getChildren().add(lblComp);
             }
             itemBox.getChildren().add(boxDesglose);

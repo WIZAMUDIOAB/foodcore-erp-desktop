@@ -162,7 +162,7 @@ public class AnalisisMermasController {
                 UnidadMedidaFormatter.formatear(c.getValue().getCantidad(), c.getValue().getUnidadMedida(), true)));
         colTopPerdida.setCellValueFactory(c -> new SimpleStringProperty(
                 String.format("S/ %.2f", c.getValue().getCostoTotal())));
-        colTopPerdida.setStyle("-fx-text-fill: -fc-danger; -fx-font-weight: bold; -fx-alignment: CENTER-RIGHT;");
+        colTopPerdida.getStyleClass().add("fc-col-danger-right-bold");
         tblTopInsumos.setItems(listaTopInsumos);
 
         colDetFecha.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaTexto()));
@@ -195,7 +195,7 @@ public class AnalisisMermasController {
 
         colDetCosto.setCellValueFactory(c -> new SimpleStringProperty(
                 String.format("S/ %.2f", c.getValue().getCostoTotal())));
-        colDetCosto.setStyle("-fx-text-fill: -fc-danger; -fx-alignment: CENTER-RIGHT;");
+        colDetCosto.getStyleClass().add("fc-col-danger-right");
 
         colDetObservacion.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getObservacion() != null ? c.getValue().getObservacion() : "-"));

@@ -89,14 +89,8 @@ public class KioscoController {
                 box.setAlignment(Pos.CENTER);
                 btnMenos.getStyleClass().add("btn-kiosco-ajuste");
                 btnMas.getStyleClass().add("btn-kiosco-ajuste");
-                String btnCartStyle = "-fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px; "
-                        + "-fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px; "
-                        + "-fx-padding: 0; -fx-font-size: 16px; -fx-font-weight: 700; "
-                        + "-fx-background-color: #FFFFFF; -fx-text-fill: #374151; "
-                        + "-fx-border-color: #D1D5DB; -fx-border-radius: 6px; -fx-background-radius: 6px; "
-                        + "-fx-cursor: hand; -fx-alignment: center;";
-                btnMenos.setStyle(btnCartStyle);
-                btnMas.setStyle(btnCartStyle);
+                btnMenos.getStyleClass().add("fc-kiosk-qty-btn");
+                btnMas.getStyleClass().add("fc-kiosk-qty-btn");
                 btnMenos.setMinWidth(32);
                 btnMenos.setPrefWidth(32);
                 btnMas.setMinWidth(32);

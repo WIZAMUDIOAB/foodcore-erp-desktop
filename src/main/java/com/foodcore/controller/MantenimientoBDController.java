@@ -352,13 +352,12 @@ public class MantenimientoBDController {
     private void actualizarDiagnostico() {
         boolean viva = service.verificarSaludBD();
         lblEstadoBD.setText(viva ? "MySQL: Conectado" : "MySQL: Desconectado");
-        lblEstadoBD.setStyle(viva
-            ? "-fx-background-color: #e6f4ea; -fx-text-fill: #2a9d8f; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold;"
-            : "-fx-background-color: #fee2e2; -fx-text-fill: #e63946; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold;"
-        );
+        lblEstadoBD.getStyleClass().removeAll("fc-bd-pill-ok", "fc-bd-pill-error");
+        lblEstadoBD.getStyleClass().add(viva ? "fc-bd-pill-ok" : "fc-bd-pill-error");
 
         lblDiagnosticoEstado.setText(viva ? "Activo, Saludable y Respondiendo" : "Sin Conexión con MySQL Server");
-        lblDiagnosticoEstado.setStyle(viva ? "-fx-text-fill: #2a9d8f; -fx-font-weight: bold;" : "-fx-text-fill: #e63946; -fx-font-weight: bold;");
+        lblDiagnosticoEstado.getStyleClass().removeAll("fc-text-success-bold", "fc-text-danger-bold");
+        lblDiagnosticoEstado.getStyleClass().add(viva ? "fc-text-success-bold" : "fc-text-danger-bold");
         lblDiagnosticoUrl.setText(service.obtenerJdbcUrlInfo());
         lblDiagnosticoMetricas.setText(service.obtenerMetricasPool());
     }
