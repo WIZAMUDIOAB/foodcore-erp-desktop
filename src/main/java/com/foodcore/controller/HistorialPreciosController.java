@@ -3,18 +3,13 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.HistorialPrecioDAO;
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.impl.HistorialPrecioDAOImpl;
+
 import com.foodcore.model.HistorialPrecio;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.HistorialPreciosService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -28,10 +23,10 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
+
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
+
 import java.util.stream.Collectors;
 
 public class HistorialPreciosController {
@@ -62,9 +57,7 @@ public class HistorialPreciosController {
     @FXML private TextField txtModalMotivo;
     @FXML private Label lblModalAjusteError;
 
-    private final HistorialPrecioDAO historialDAO = new HistorialPrecioDAOImpl();
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
+    private final HistorialPreciosService historialPreciosService = new HistorialPreciosService();
     private final FinanzasService finanzasService = new FinanzasService();
 
     private final ObservableList<HistorialPrecio> listaHistorial = FXCollections.observableArrayList();
@@ -118,15 +111,13 @@ public class HistorialPreciosController {
         final String filtroTipo = cbFiltroTipo.getValue();
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    List<HistorialPrecio> todos = historialDAO.listarTodos(conn);
-                    if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
-                        return todos.stream()
-                            .filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad()))
-                            .collect(Collectors.toList());
-                    }
-                    return todos;
+                List<HistorialPrecio> todos = historialPreciosService.listarHistorial();
+                if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
+                    return todos.stream()
+                        .filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad()))
+                        .collect(Collectors.toList());
                 }
+                return todos;
             },
             todos -> {
                 listaHistorial.setAll(todos);
@@ -193,14 +184,14 @@ public class HistorialPreciosController {
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
                 int idEntidad = 1;
-                try (Connection conn = ConexionBD.getConnection()) {
+                try {
                     if ("PRODUCTO".equalsIgnoreCase(tipoFinal)) {
-                        List<Producto> prods = productoDAO.listarTodos(conn);
+                        List<Producto> prods = historialPreciosService.listarCatalogosPrecios().productos();
                         if (!prods.isEmpty()) {
                             idEntidad = prods.get(0).getIdProducto();
                         }
                     } else {
-                        List<Insumo> ins = insumoDAO.listarTodos(conn);
+                        List<Insumo> ins = historialPreciosService.listarCatalogosPrecios().insumos();
                         if (!ins.isEmpty()) {
                             idEntidad = (int) ins.get(0).getIdInsumo();
                         }

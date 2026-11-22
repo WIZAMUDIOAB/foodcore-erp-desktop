@@ -6,7 +6,7 @@ import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
 import com.foodcore.service.MantenimientoService;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
@@ -344,7 +344,7 @@ public class MantenimientoBDController {
 
     @FXML
     public void handleRecargarPool(ActionEvent event) {
-        ConexionBD.inicializarPool();
+        service.inicializarPool();
         actualizarDiagnostico();
         mostrarAlerta("Pool Reiniciado", "El pool HikariCP ha sido reiniciado con database.properties.", Alert.AlertType.INFORMATION);
     }
@@ -359,7 +359,7 @@ public class MantenimientoBDController {
 
         lblDiagnosticoEstado.setText(viva ? "Activo, Saludable y Respondiendo" : "Sin Conexión con MySQL Server");
         lblDiagnosticoEstado.setStyle(viva ? "-fx-text-fill: #2a9d8f; -fx-font-weight: bold;" : "-fx-text-fill: #e63946; -fx-font-weight: bold;");
-        lblDiagnosticoUrl.setText(ConexionBD.getJdbcUrlInfo());
+        lblDiagnosticoUrl.setText(service.obtenerJdbcUrlInfo());
         lblDiagnosticoMetricas.setText(service.obtenerMetricasPool());
     }
 
