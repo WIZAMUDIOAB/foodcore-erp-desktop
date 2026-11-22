@@ -366,6 +366,8 @@ public class RedisenoPremiumVisualE2ETest {
         }
 
         // Checklist §5.4: Gráficos Donut usan solo 4 colores aprobados (#EA580C, #D97706, #DC2626, #A39D94)
+        // vía paleta directa o tokens semánticos .fc-donut-palette-0..3 en foodcore.css
+        String css = Files.readString(Path.of("src", "main", "resources", "css", "foodcore.css"), StandardCharsets.UTF_8);
         for (String ctrlName : List.of(
                 "AnalisisMermasController.java",
                 "ReportesAvanzadosController.java",
@@ -373,8 +375,18 @@ public class RedisenoPremiumVisualE2ETest {
             String src = Files.readString(
                     Path.of("src", "main", "java", "com", "foodcore", "controller", ctrlName),
                     StandardCharsets.UTF_8);
-            assertTrue(src.contains("#EA580C") && src.contains("#D97706")
-                    && src.contains("#DC2626") && src.contains("#A39D94"),
+            boolean paletaInline = src.contains("#EA580C") && src.contains("#D97706")
+                    && src.contains("#DC2626") && src.contains("#A39D94");
+            boolean paletaCssTokens = src.contains("fc-donut-palette-0")
+                    && src.contains("fc-donut-palette-1")
+                    && src.contains("fc-donut-palette-2")
+                    && src.contains("fc-donut-palette-3")
+                    && css.contains(".fc-donut-palette-0")
+                    && css.contains("-brand-primary")
+                    && css.contains("-status-warning")
+                    && css.contains("-status-danger")
+                    && css.contains("-text-muted");
+            assertTrue(paletaInline || paletaCssTokens,
                     ctrlName + " debe definir la paleta Donut de 4 colores aprobados");
             assertFalse(src.contains("#8B5CF6") || src.contains("#3B82F6")
                     || src.contains("#10B981") || src.contains("#06B6D4"),
@@ -382,7 +394,6 @@ public class RedisenoPremiumVisualE2ETest {
         }
 
         // Checklist §5.3, §5.5, §5.6, §5.7 en runtime JavaFX
-        String css = Files.readString(Path.of("src", "main", "resources", "css", "foodcore.css"), StandardCharsets.UTF_8);
         assertTrue(css.contains("-fx-graphic-text-gap: 8px"), "CSS debe definir -fx-graphic-text-gap: 8px");
         assertTrue(css.contains(".card") && css.contains(".edge-to-edge") && css.contains(".modal-footer"),
                 "CSS debe definir clases estructurales §2.1");
