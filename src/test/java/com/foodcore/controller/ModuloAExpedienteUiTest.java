@@ -9,7 +9,6 @@ import com.foodcore.service.ExpedienteEmpleadoService;
 import com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -29,7 +28,6 @@ import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -150,9 +148,7 @@ class ModuloAExpedienteUiTest {
                 DashboardController ctrl = loader.getController();
                 rootRef.set(root);
 
-                try (Connection conn = ConexionBD.getConnection()) {
-                    alertasRef.set(ctrl.obtenerAlertasVencimiento30Dias(conn));
-                }
+                alertasRef.set(ctrl.obtenerAlertasVencimiento30Dias());
 
                 new Scene(root, 1280, 820);
                 root.applyCss();

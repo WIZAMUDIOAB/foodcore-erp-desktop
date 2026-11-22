@@ -1,12 +1,11 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
-import com.foodcore.dao.impl.FinanzasBiDAOImpl;
 import com.foodcore.model.ComparativaPeriodos;
+import com.foodcore.model.ResumenDashboard;
 import com.foodcore.model.ResumenSeguridadHoy;
+import com.foodcore.service.ReporteService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.FormatoBiUiHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.application.Platform;
@@ -51,21 +50,12 @@ import javafx.stage.StageStyle;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -135,8 +125,7 @@ public class DashboardController {
     private final ObservableList<FilaRentabilidad> itemsRentabilidad = FXCollections.observableArrayList();
     private final ObservableList<FilaVentasMozo> itemsVentasMozo = FXCollections.observableArrayList();
     private final List<AlertaVencimiento> alertasVencimientoActuales = new ArrayList<>();
-    private final FinanzasBiDAOImpl finanzasBiDao = new FinanzasBiDAOImpl();
-    private final AuditoriaDAOImpl auditoriaDao = new AuditoriaDAOImpl();
+    private final ReporteService reporteService = new ReporteService();
     private ComparativaPeriodos ultimaComparativa;
     private ResumenSeguridadHoy ultimoResumenSeguridad = ResumenSeguridadHoy.normal();
 
@@ -360,129 +349,24 @@ public class DashboardController {
     }
 
     public void cargarMetricasDashboardSincrono() {
-        LocalDate hoy = LocalDate.now(ZONA_LIMA);
-        ComparativaPeriodos comparativa = new ComparativaPeriodos(
-                hoy,
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
-        );
-        BigDecimal ventasDia = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        int numTx = 0;
-        BigDecimal ticketProm = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        String platoTop = "Sin ventas registradas";
-        int platoTopCant = 0;
-        Map<String, BigDecimal> ventasPorHora = new TreeMap<>();
-        List<FilaVentasMozo> filasMozo = new ArrayList<>();
-        List<FilaRentabilidad> filasRent = new ArrayList<>();
-        List<AlertaVencimiento> alertasPersonal = new ArrayList<>();
-        ResumenSeguridadHoy seguridadHoy = ResumenSeguridadHoy.normal();
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                comparativa = finanzasBiDao.obtenerComparativaPeriodos(conn, hoy);
-                try {
-                    seguridadHoy = auditoriaDao.obtenerResumenSeguridadHoy(conn);
-                } catch (Exception exSec) {
-                    LOGGER.log(Level.FINE, "Aviso consultando alertas de seguridad en auditoria", exSec);
-                }
-
-                String sqlKpi = "SELECT COALESCE(SUM(total), 0.00) AS suma, COUNT(*) AS tx, COALESCE(AVG(total), 0.00) AS prom "
-                    + "FROM venta WHERE estado = 'COMPLETADA'";
-                try (PreparedStatement ps = conn.prepareStatement(sqlKpi);
-                     ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        numTx = rs.getInt("tx");
-                        BigDecimal avg = rs.getBigDecimal("prom");
-                        if (avg != null && avg.compareTo(BigDecimal.ZERO) > 0) {
-                            ticketProm = avg.setScale(2, RoundingMode.HALF_UP);
-                        }
-                    }
-                }
-                ventasDia = comparativa.ventasHoy();
-
-                String sqlTop = "SELECT p.nombre, COALESCE(SUM(dv.cantidad), 0) AS unidades "
-                    + "FROM detalle_venta dv JOIN producto p ON dv.id_producto = p.id_producto "
-                    + "JOIN venta v ON dv.id_venta = v.id_venta WHERE v.estado = 'COMPLETADA' "
-                    + "GROUP BY p.id_producto, p.nombre ORDER BY unidades DESC LIMIT 1";
-                try (PreparedStatement ps = conn.prepareStatement(sqlTop);
-                     ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        platoTop = rs.getString("nombre");
-                        platoTopCant = rs.getInt("unidades");
-                    }
-                }
-
-                String sqlHora = "SELECT DATE_FORMAT(fecha_hora, '%H:00') AS hora, COALESCE(SUM(total), 0.00) AS monto "
-                    + "FROM venta WHERE estado = 'COMPLETADA' GROUP BY DATE_FORMAT(fecha_hora, '%H:00') ORDER BY hora ASC";
-                try (PreparedStatement ps = conn.prepareStatement(sqlHora);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        ventasPorHora.put(rs.getString("hora"), rs.getBigDecimal("monto"));
-                    }
-                }
-
-                String sqlMozo = "SELECT COALESCE(u.username, 'admin') AS usr, COALESCE(u.codigo_rol, 'CAJERO') AS rol, "
-                    + "COUNT(v.id_venta) AS pedidos, COALESCE(SUM(v.total), 0.00) AS total_ventas, "
-                    + "COALESCE(AVG(v.total), 0.00) AS prom "
-                    + "FROM venta v LEFT JOIN usuario u ON v.id_usuario = u.id_usuario "
-                    + "WHERE v.estado = 'COMPLETADA' GROUP BY v.id_usuario, u.username, u.codigo_rol ORDER BY total_ventas DESC";
-                try (PreparedStatement ps = conn.prepareStatement(sqlMozo);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String u = rs.getString("usr") + " (" + rs.getString("rol") + ")";
-                        BigDecimal tot = rs.getBigDecimal("total_ventas").setScale(2, RoundingMode.HALF_UP);
-                        int peds = rs.getInt("pedidos");
-                        BigDecimal pr = rs.getBigDecimal("prom").setScale(2, RoundingMode.HALF_UP);
-                        filasMozo.add(new FilaVentasMozo(u, "S/ " + tot, String.valueOf(peds), "S/ " + pr));
-                    }
-                }
-
-                String sqlRent = "SELECT p.nombre, p.precio_venta, p.costo_estimado, "
-                    + "COALESCE(SUM(r.cantidad_necesaria * i.costo_unitario), 0.00) AS costo_receta "
-                    + "FROM producto p "
-                    + "LEFT JOIN receta r ON p.id_producto = r.id_producto "
-                    + "LEFT JOIN insumo i ON r.id_insumo = i.id_insumo "
-                    + "GROUP BY p.id_producto, p.nombre, p.precio_venta, p.costo_estimado "
-                    + "ORDER BY p.id_producto ASC";
-                try (PreparedStatement ps = conn.prepareStatement(sqlRent);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String nom = rs.getString("nombre");
-                        BigDecimal precio = rs.getBigDecimal("precio_venta").setScale(2, RoundingMode.HALF_UP);
-                        BigDecimal costoRec = rs.getBigDecimal("costo_receta");
-                        if (costoRec == null || costoRec.compareTo(BigDecimal.ZERO) <= 0) {
-                            BigDecimal est = rs.getBigDecimal("costo_estimado");
-                            costoRec = (est != null && est.compareTo(BigDecimal.ZERO) > 0 && est.compareTo(precio) < 0)
-                                ? est : precio.multiply(new BigDecimal("0.38"));
-                        }
-                        costoRec = costoRec.setScale(2, RoundingMode.HALF_UP);
-                        BigDecimal margen = precio.compareTo(BigDecimal.ZERO) > 0
-                            ? precio.subtract(costoRec).multiply(new BigDecimal("100")).divide(precio, 1, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
-                        filasRent.add(new FilaRentabilidad(
-                            nom,
-                            "S/ " + costoRec,
-                            "S/ " + precio,
-                            margen + "%",
-                            margen
-                        ));
-                    }
-                }
-
-                alertasPersonal = obtenerAlertasVencimiento30Dias(conn);
-            }
-        } catch (java.sql.SQLException | RuntimeException e) {
-            LOGGER.log(Level.FINE, "Cargando métricas demostrativas del Dashboard", e);
-        }
+        ResumenDashboard res = reporteService.consultarResumenDashboard(LocalDate.now(ZONA_LIMA));
+        ComparativaPeriodos comparativa = res.comparativa() != null
+                ? res.comparativa() : comparativaSinDatos(LocalDate.now(ZONA_LIMA));
+        BigDecimal ventasDia = res.ventasDia() != null ? res.ventasDia() : BigDecimal.ZERO;
+        BigDecimal ticketProm = res.ticketPromedio() != null ? res.ticketPromedio() : BigDecimal.ZERO;
+        String platoTop = res.platoTop();
+        int platoTopCant = res.platoTopUnidades();
+        Map<String, BigDecimal> ventasPorHora = res.ventasPorHora();
+        List<FilaVentasMozo> filasMozo = mapearFilasMozo(res.filasMozo());
+        List<FilaRentabilidad> filasRent = mapearFilasRentabilidad(res.filasRentabilidad());
+        List<AlertaVencimiento> alertasPersonal = mapearAlertasVencimiento(res.alertasVencimiento());
+        ResumenSeguridadHoy seguridadHoy = res.seguridadHoy() != null
+                ? res.seguridadHoy() : ResumenSeguridadHoy.normal();
 
         final ResumenSeguridadHoy seguridadFinal = seguridadHoy;
         final ComparativaPeriodos compFinal = comparativa;
         final BigDecimal vDiaFinal = ventasDia;
-        final int txFinal = numTx;
+        final int txFinal = res.numTransacciones();
         final BigDecimal tPromFinal = ticketProm;
         final String pTopFinal = platoTop;
         final int pCantFinal = platoTopCant;
@@ -553,94 +437,74 @@ public class DashboardController {
 
     /**
      * Consulta colaboradores activos cuyo contrato o carné de sanidad venza en los próximos 30 días (v4.4.0 §4).
+     * Delega en {@link ReporteService}, que abre su propia conexión del pool HikariCP.
+     *
+     * @return Alertas de vencimiento ordenadas por cercanía.
      */
-    public List<AlertaVencimiento> obtenerAlertasVencimiento30Dias(Connection conn) {
-        Map<String, AlertaVencimiento> alertasPorClave = new LinkedHashMap<>();
-        if (conn == null) {
-            return List.of();
-        }
-        LocalDate hoy = LocalDate.now(ZONA_LIMA);
+    public List<AlertaVencimiento> obtenerAlertasVencimiento30Dias() {
+        return mapearAlertasVencimiento(reporteService.consultarAlertasVencimiento30Dias());
+    }
 
-        String sqlUsuario = "SELECT COALESCE(NULLIF(nombre_completo, ''), username) AS nombre, "
-                + "COALESCE(codigo_rol, 'PERSONAL') AS rol, fecha_vencimiento_contrato, fecha_vencimiento_carnet_sanidad "
-                + "FROM usuario WHERE activo = 1";
-        try (PreparedStatement ps = conn.prepareStatement(sqlUsuario);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                String nombre = rs.getString("nombre");
-                String cargo = rs.getString("rol");
-                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
-                        "Contrato Laboral", rs.getDate("fecha_vencimiento_contrato"), hoy);
-                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
-                        "Carné de Sanidad", rs.getDate("fecha_vencimiento_carnet_sanidad"), hoy);
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en usuario", e);
+    private List<AlertaVencimiento> mapearAlertasVencimiento(List<com.foodcore.model.AlertaVencimiento> alertas) {
+        List<AlertaVencimiento> resultado = new ArrayList<>();
+        if (alertas == null) {
+            return resultado;
         }
-
-        String sqlEmp = "SELECT CONCAT(nombres, ' ', apellidos) AS nombre, cargo, "
-                + "fecha_vencimiento_contrato, fecha_vencimiento_carnet_sanidad "
-                + "FROM empleado WHERE estado = 1";
-        try (PreparedStatement ps = conn.prepareStatement(sqlEmp);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                String nombre = rs.getString("nombre");
-                String cargo = rs.getString("cargo");
-                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
-                        "Contrato Laboral", rs.getDate("fecha_vencimiento_contrato"), hoy);
-                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
-                        "Carné de Sanidad", rs.getDate("fecha_vencimiento_carnet_sanidad"), hoy);
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en empleado", e);
+        for (com.foodcore.model.AlertaVencimiento a : alertas) {
+            resultado.add(new AlertaVencimiento(
+                    a.colaborador(),
+                    a.cargo(),
+                    a.documento(),
+                    a.fechaVencimiento(),
+                    a.diasRestantes()
+            ));
         }
-
-        String sqlDocs = "SELECT COALESCE(NULLIF(TRIM(u.nombre_completo), ''), "
-                + "NULLIF(TRIM(CONCAT(COALESCE(e.nombres, ''), ' ', COALESCE(e.apellidos, ''))), ''), "
-                + "u.username) AS nombre, "
-                + "COALESCE(NULLIF(TRIM(u.cargo), ''), r.nombre, u.codigo_rol, 'PERSONAL') AS cargo, "
-                + "d.tipo_documento, d.nombre_archivo, d.fecha_vencimiento "
-                + "FROM documento_empleado d "
-                + "JOIN usuario u ON d.id_usuario = u.id_usuario "
-                + "LEFT JOIN rol r ON u.id_rol = r.id_rol "
-                + "LEFT JOIN empleado e ON u.id_empleado = e.id_empleado "
-                + "WHERE u.activo = 1 AND d.fecha_vencimiento IS NOT NULL";
-        try (PreparedStatement ps = conn.prepareStatement(sqlDocs);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                String nombre = rs.getString("nombre");
-                String cargo = rs.getString("cargo");
-                String tipoDoc = rs.getString("tipo_documento");
-                String nombreArchivo = rs.getString("nombre_archivo");
-                String etiquetaDoc = (tipoDoc != null ? tipoDoc.replace('_', ' ') : "Documento")
-                        + (nombreArchivo != null && !nombreArchivo.isBlank() ? " (" + nombreArchivo + ")" : "");
-                registrarSiVenceEn30Dias(alertasPorClave, nombre, cargo,
-                        etiquetaDoc, rs.getDate("fecha_vencimiento"), hoy);
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Aviso consultando vencimientos en documento_empleado", e);
-        }
-
-        List<AlertaVencimiento> resultado = new ArrayList<>(alertasPorClave.values());
-        resultado.sort(Comparator.comparingLong(AlertaVencimiento::diasRestantes));
         return resultado;
     }
 
-    private void registrarSiVenceEn30Dias(Map<String, AlertaVencimiento> mapa,
-                                          String nombre,
-                                          String cargo,
-                                          String documento,
-                                          Date fechaSql,
-                                          LocalDate hoy) {
-        if (fechaSql == null || nombre == null) {
-            return;
+    private List<FilaVentasMozo> mapearFilasMozo(List<com.foodcore.model.FilaVentasMozo> filas) {
+        List<FilaVentasMozo> resultado = new ArrayList<>();
+        if (filas == null) {
+            return resultado;
         }
-        LocalDate fecha = fechaSql.toLocalDate();
-        long diasRestantes = ChronoUnit.DAYS.between(hoy, fecha);
-        if (diasRestantes >= 0 && diasRestantes <= 30) {
-            String key = nombre.trim().toUpperCase(Locale.ROOT) + "|" + documento;
-            mapa.putIfAbsent(key, new AlertaVencimiento(nombre.trim(), cargo, documento, fecha, diasRestantes));
+        for (com.foodcore.model.FilaVentasMozo f : filas) {
+            resultado.add(new FilaVentasMozo(
+                    f.usuario(),
+                    f.ventasTotales(),
+                    f.nroPedidos(),
+                    f.ticketPromedio()
+            ));
         }
+        return resultado;
+    }
+
+    private List<FilaRentabilidad> mapearFilasRentabilidad(List<com.foodcore.model.FilaRentabilidad> filas) {
+        List<FilaRentabilidad> resultado = new ArrayList<>();
+        if (filas == null) {
+            return resultado;
+        }
+        for (com.foodcore.model.FilaRentabilidad f : filas) {
+            resultado.add(new FilaRentabilidad(
+                    f.platillo(),
+                    f.costoReceta(),
+                    f.precioVenta(),
+                    f.margenPorcentaje(),
+                    f.margenNum()
+            ));
+        }
+        return resultado;
+    }
+
+    private ComparativaPeriodos comparativaSinDatos(LocalDate fecha) {
+        return new ComparativaPeriodos(
+                fecha,
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
+        );
     }
 
     private void renderizarAlertasVencimiento(List<AlertaVencimiento> alertas) {
