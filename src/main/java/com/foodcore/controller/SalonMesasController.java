@@ -1,8 +1,6 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
@@ -14,7 +12,6 @@ import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
-import com.foodcore.util.ConexionBD;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
@@ -34,7 +31,6 @@ import javafx.stage.Stage;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -58,7 +54,6 @@ public class SalonMesasController {
 
     @FXML private FlowPane flowMesas;
 
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private final SalonService salonService = new SalonService();
     private final ReservasService reservasService = new ReservasService();
     private final ImpresoraTermicaService impresoraService = new ImpresoraTermicaService();
@@ -74,13 +69,11 @@ public class SalonMesasController {
             return;
         }
         pedidosActivosPorMesa.clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
-                for (Pedido p : activos) {
-                    if (p.getNumeroMesa() != null) {
-                        pedidosActivosPorMesa.put(p.getNumeroMesa(), p);
-                    }
+        try {
+            List<Pedido> activos = salonService.listarPedidosActivosConConexion();
+            for (Pedido p : activos) {
+                if (p.getNumeroMesa() != null) {
+                    pedidosActivosPorMesa.put(p.getNumeroMesa(), p);
                 }
             }
         } catch (Exception e) {
@@ -98,14 +91,10 @@ public class SalonMesasController {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
                 Map<String, Pedido> nuevosPedidos = new HashMap<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (conn != null) {
-                        List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
-                        for (Pedido p : activos) {
-                            if (p.getNumeroMesa() != null) {
-                                nuevosPedidos.put(p.getNumeroMesa(), p);
-                            }
-                        }
+                List<Pedido> activos = salonService.listarPedidosActivosConConexion();
+                for (Pedido p : activos) {
+                    if (p.getNumeroMesa() != null) {
+                        nuevosPedidos.put(p.getNumeroMesa(), p);
                     }
                 }
                 return nuevosPedidos;
@@ -364,11 +353,7 @@ public class SalonMesasController {
 
     public void emitirPreCuentaMesa(String mesa, Pedido pedido) {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-                }
-            },
+            () -> salonService.listarDetallesPedido(pedido.getIdPedido()),
             detalles -> {
                 if (detalles.isEmpty()) {
                     ToastService.mostrarAdvertencia("La comanda no tiene platos registrados.");
@@ -436,11 +421,7 @@ public class SalonMesasController {
 
     private void abrirLiquidacionFiscalMesa(String mesa, Pedido pedido) {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-                }
-            },
+            () -> salonService.listarDetallesPedido(pedido.getIdPedido()),
             detallesPed -> {
                 if (detallesPed.isEmpty()) {
                     ToastService.mostrarAdvertencia("El pedido no contiene ítems para facturar.");
