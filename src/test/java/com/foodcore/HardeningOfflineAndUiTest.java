@@ -23,6 +23,7 @@ import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.support.JavaFxTestSupport;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXMLLoader;

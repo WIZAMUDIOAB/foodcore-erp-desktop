@@ -14,7 +14,7 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
-    <!-- Justificación: Controladores REST, servicios de negocio y despachador Outbox reciben DAOs/repositorios sin estado mediante inyección de dependencias en constructor; POJOs de dominio (Pedido, Venta, EventoKdsDTO) mantienen referencias directas de sus listas de detalle usadas por DAOs JDBC y mappers JSON. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <!-- Justificación: Controladores REST, servicios de negocio y despachador Outbox reciben DAOs/repositorios sin estado mediante inyección de dependencias en constructor; POJOs/DTOs de dominio (Pedido, Venta, EventoKdsDTO, OfflineOrderPayloadDTO) mantienen referencias directas de sus estructuras usadas por DAOs JDBC y mappers Jackson. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-22 -->
     <Match>
         <Or>
             <Class name="com.foodcore.api.KdsController"/>
@@ -24,6 +24,7 @@
             <Class name="com.foodcore.model.Pedido"/>
             <Class name="com.foodcore.model.Venta"/>
             <Class name="com.foodcore.model.dto.EventoKdsDTO"/>
+            <Class name="com.foodcore.model.dto.OfflineOrderPayloadDTO"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
@@ -35,7 +36,7 @@
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
 
-    <!-- Justificación: Singletons de infraestructura (SyncWorker, ServidorSockets) y el pool compartido Hikari DataSource deben retornar la instancia gestionada única por proceso. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
+    <!-- Justificación: Singletons de infraestructura (SyncWorker, ServidorSockets, JsonMapperProvider) y el pool compartido Hikari DataSource deben retornar la instancia gestionada única por proceso. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-22 -->
     <Match>
         <Or>
             <And>
@@ -45,6 +46,10 @@
             <And>
                 <Class name="com.foodcore.util.ServidorSockets"/>
                 <Method name="getInstance"/>
+            </And>
+            <And>
+                <Class name="com.foodcore.util.JsonMapperProvider"/>
+                <Method name="getMapper"/>
             </And>
             <And>
                 <Class name="com.foodcore.util.ConexionBD"/>

@@ -25,6 +25,8 @@ import com.foodcore.model.Venta;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
+import com.foodcore.util.ConexionBD;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import io.javalin.http.Context;
 
@@ -41,6 +43,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1226,22 +1230,20 @@ public class PedidoController {
 
     private void emitirEventoDirectoKds(Pedido pedido, List<DetallePedido> detalles) {
         try {
-            JsonObject msg = new JsonObject();
-            msg.addProperty("accion", "NUEVA_COMANDA");
-            msg.addProperty("origen", "PWA_TABLET");
-            msg.addProperty("idPedido", pedido.getIdPedido());
-            msg.addProperty("numeroComanda", "COM-" + String.format("%04d", pedido.getIdPedido()));
-            msg.addProperty("mesa", pedido.getNumeroMesa());
+            ObjectNode msg = JsonMapperProvider.getMapper().createObjectNode();
+            msg.put("accion", "NUEVA_COMANDA");
+            msg.put("origen", "PWA_TABLET");
+            msg.put("idPedido", pedido.getIdPedido());
+            msg.put("numeroComanda", "COM-" + String.format("%04d", pedido.getIdPedido()));
+            msg.put("mesa", pedido.getNumeroMesa());
 
-            JsonArray items = new JsonArray();
+            ArrayNode items = msg.putArray("items");
             for (DetallePedido d : detalles) {
-                JsonObject item = new JsonObject();
-                item.addProperty("producto", d.getNombreProducto());
-                item.addProperty("cantidad", d.getCantidad());
-                item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
-                items.add(item);
+                ObjectNode item = items.addObject();
+                item.put("producto", d.getNombreProducto());
+                item.put("cantidad", d.getCantidad());
+                item.put("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
             }
-            msg.add("items", items);
             ServidorSockets.getInstance().emitirMensaje(msg);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Sin clientes KDS conectados al emitir desde PedidoController", e);

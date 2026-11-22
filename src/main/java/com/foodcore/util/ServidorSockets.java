@@ -1,5 +1,6 @@
 package com.foodcore.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -367,7 +368,7 @@ public class ServidorSockets {
             }
 
             return crearError("FRAME_NO_AUTORIZADO", "Tipo de trama desconocido o no autenticado");
-        } catch (SQLException | RuntimeException parseEx) {
+        } catch (JsonProcessingException | SQLException | RuntimeException parseEx) {
             return crearError("INVALID_JSON", "Mensaje JSON malformado");
         }
     }
@@ -405,7 +406,7 @@ public class ServidorSockets {
                 if (el != null && el.isObject()) {
                     listener.accept((ObjectNode) el);
                 }
-            } catch (RuntimeException ex) {
+            } catch (JsonProcessingException | RuntimeException ex) {
                 LOGGER.log(Level.FINE, "Mensaje interno KDS no pudo parsearse como ObjectNode", ex);
             }
         }

@@ -1,5 +1,6 @@
 package com.foodcore.offline;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.dto.OfflineOrderPayloadDTO;
@@ -259,8 +260,13 @@ public class SyncWorker {
                 }
 
                 OfflineOrderPayloadDTO payload = new OfflineOrderPayloadDTO(pedido, detalles);
-
-                String payloadCifrado = OfflineCryptoService.encrypt(cryptoKey, JsonMapperProvider.getMapper().writeValueAsString(payload));
+                String payloadJson;
+                try {
+                    payloadJson = JsonMapperProvider.getMapper().writeValueAsString(payload);
+                } catch (JsonProcessingException jpe) {
+                    throw new SQLException("Error serializando payload offline outbox.", jpe);
+                }
+                String payloadCifrado = OfflineCryptoService.encrypt(cryptoKey, payloadJson);
                 String sqlOutbox = "INSERT INTO outbox_sync (id_pedido_local, idempotency_key, payload_json, estado) VALUES (?, ?, ?, 'PENDIENTE')";
                 try (PreparedStatement ps = conn.prepareStatement(sqlOutbox)) {
                     ps.setInt(1, idPedidoLocal);

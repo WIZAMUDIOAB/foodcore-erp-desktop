@@ -12,6 +12,7 @@ import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import io.javalin.http.Context;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,7 +27,7 @@ import java.util.logging.Logger;
  * Controlador Javalin para el KDS (Kitchen Display System) de Cocina y Bar (v5.8.0 Hardening):
  * consulta batch sin N+1, validación de máquina de estados contra lista blanca
  * y datos demo estrictamente acotados a {@code -Dfoodcore.demoFallback=true}.
- * Toda la persistencia se delega en {@link PedidoService} (sin JDBC ni Gson en el controlador).
+ * Toda la persistencia se delega en {@link PedidoService} y JSON vía Jackson (sin JDBC directo en el controlador).
  */
 public class KdsController {
 
@@ -104,7 +105,7 @@ public class KdsController {
                     }
                 }
             }
-        } catch (RuntimeException e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso consultando comandas KDS en BD", e);
         }
 
@@ -145,7 +146,7 @@ public class KdsController {
                 itemNode.put("enviado_en", dp.getEnviadoEn() != null ? dp.getEnviadoEn().toString() : Instant.now().toString());
                 itemNode.put("numero_mesa", dp.getNumeroMesa() != null ? dp.getNumeroMesa() : "01");
             }
-        } catch (RuntimeException e) {
+        } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso listando ítems de cocina en BD", e);
         }
 
