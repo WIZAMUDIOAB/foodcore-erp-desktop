@@ -44,6 +44,11 @@ public record ResultadoReporteAvanzado(
         slices = slices != null ? List.copyOf(slices) : List.of();
     }
 
+    @Override
+    public String[] headers() {
+        return headers.clone();
+    }
+
     /**
      * Retorna una copia con la comparativa y el reporte de cohortes provistos.
      *
