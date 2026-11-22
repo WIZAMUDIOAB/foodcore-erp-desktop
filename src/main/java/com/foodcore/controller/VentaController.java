@@ -1,12 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.ClienteDAO;
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.impl.ClienteDAOImpl;
+
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Cliente;
@@ -29,9 +24,10 @@ import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.VentaPosConsultaService;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.ConfiguracionFidelizacion;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.FormatoPersonalizacionUtil;
@@ -92,7 +88,6 @@ import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -181,15 +176,14 @@ public class VentaController {
     private final List<Pedido> pedidosActivosMulticanal = new ArrayList<>();
     private final Map<String, Pedido> pedidosPorMesa = new LinkedHashMap<>();
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private PedidoService pedidoService = new PedidoService();
     private final VentaService ventaService = new VentaService();
     private final PromocionService promocionService = new PromocionService();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
+    private final VentaPosConsultaService posConsultaService = new VentaPosConsultaService();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
     private final AutorizacionService autorizacionService = new AutorizacionService();
-    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
+
 
     private boolean descuentoManualFijado = false;
     private final AtomicBoolean cobroEnProgreso = new AtomicBoolean(false);
@@ -331,20 +325,12 @@ public class VentaController {
     }
 
     private List<Pedido> consultarPedidosActivosDesdeBD() {
-        List<Pedido> activos = new ArrayList<>();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                activos = pedidoDAO.listarPedidosActivos(conn);
-                for (Pedido p : activos) {
-                    if (p.getDetalles() == null || p.getDetalles().isEmpty()) {
-                        p.setDetalles(pedidoDAO.listarDetallesPorPedido(conn, p.getIdPedido()));
-                    }
-                }
-            }
+        try {
+            return posConsultaService.listarPedidosActivosConDetalles();
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Aviso consultando pedidos multicanal en POS", e);
+            return new ArrayList<>();
         }
-        return activos;
     }
 
     public void aplicarPedidosActivosEnUI(List<Pedido> activos) {
@@ -577,11 +563,7 @@ public class VentaController {
         if ((detallesIniciales == null || detallesIniciales.isEmpty()) && pedido.getIdPedido() > 0) {
             final int idObjetivo = pedido.getIdPedido();
             UiAsyncExecutor.ejecutarAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        return conn != null ? pedidoDAO.listarDetallesPorPedido(conn, idObjetivo) : List.<DetallePedido>of();
-                    }
-                },
+                () -> posConsultaService.listarDetallesPorPedido(idObjetivo),
                 detallesCargados -> {
                     if (Integer.valueOf(idObjetivo).equals(this.pedidoActivoId)) {
                         aplicarDetallesPedidoEnPOS(detallesCargados);
@@ -772,11 +754,7 @@ public class VentaController {
         boxCategorias.getChildren().add(btnTodos);
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarCategorias(conn);
-                }
-            },
+            () -> posConsultaService.listarCategoriasProductos(),
             cats -> {
                 for (Categoria c : cats) {
                     Button btn = new Button(c.getNombre());
@@ -808,13 +786,7 @@ public class VentaController {
     public void cargarCatalogoProductosAsync() {
         tileProductos.getChildren().clear();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return conn != null
-                            ? personalizacionService.listarProductosDisponiblesConOpciones(conn)
-                            : java.util.Collections.<Producto>emptyList();
-                }
-            },
+            () -> posConsultaService.listarProductosDisponiblesConOpciones(),
             productos -> {
                 todosLosProductos.clear();
                 if (productos != null && !productos.isEmpty()) {
@@ -841,10 +813,8 @@ public class VentaController {
      * Carga síncrona del catálogo POS para tests de integración y capturas determinísticas.
      */
     public void cargarCatalogoProductosSincrono() {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Producto> productos = conn != null
-                    ? personalizacionService.listarProductosDisponiblesConOpciones(conn)
-                    : java.util.Collections.emptyList();
+        try {
+            List<Producto> productos = posConsultaService.listarProductosDisponiblesConOpciones();
             todosLosProductos.clear();
             if (productos != null && !productos.isEmpty()) {
                 todosLosProductos.addAll(productos);
@@ -2051,11 +2021,7 @@ public class VentaController {
             return;
         }
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return clienteDAO.buscarPorDniOTelefono(conn, criterio).orElse(null);
-                }
-            },
+            () -> posConsultaService.buscarClientePorDniOTelefono(criterio).orElse(null),
             cli -> {
                 if (cli != null) {
                     asociarClientePos(cli, null);
@@ -2136,27 +2102,7 @@ public class VentaController {
     }
 
     private Cliente registrarClienteRapidoInterno(String dni, String nombreCompleto, String telefono, LocalDate fechaNacimiento) {
-        try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Cliente> existente = clienteDAO.buscarPorDocumento(conn, dni);
-            if (existente.isPresent()) {
-                return existente.get();
-            }
-            Cliente nuevo = new Cliente();
-            nuevo.setTipoCliente("MINORISTA");
-            nuevo.setTipoDocumento("DNI");
-            nuevo.setNumeroDocumento(dni);
-            nuevo.setRazonSocial(nombreCompleto);
-            nuevo.setContacto(nombreCompleto);
-            nuevo.setTelefono(telefono != null && !telefono.isBlank() ? telefono.trim() : null);
-            nuevo.setFechaNacimiento(fechaNacimiento);
-            nuevo.setLimiteCredito(0.0);
-            nuevo.setDiasCredito(0);
-            clienteDAO.insertar(conn, nuevo);
-            return nuevo;
-        } catch (SQLException ex) {
-            LOGGER.log(Level.WARNING, "Error registrando cliente rápido POS", ex);
-            return null;
-        }
+        return posConsultaService.buscarORegistrarClienteMinoristaRapido(dni, nombreCompleto, telefono, fechaNacimiento);
     }
 
     /**
@@ -2166,11 +2112,11 @@ public class VentaController {
         if (criterio == null || criterio.isBlank()) {
             return Optional.empty();
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Cliente> cliOpt = clienteDAO.buscarPorDniOTelefono(conn, criterio.trim());
+        try {
+            Optional<Cliente> cliOpt = posConsultaService.buscarClientePorDniOTelefono(criterio.trim());
             cliOpt.ifPresent(c -> asociarClientePos(c, confirmarCumpleanos));
             return cliOpt;
-        } catch (SQLException ex) {
+        } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error buscando cliente por criterio POS", ex);
             return Optional.empty();
         }
@@ -2427,11 +2373,7 @@ public class VentaController {
         if (res.isPresent() && !res.get().isBlank()) {
             String doc = res.get().trim();
             UiAsyncExecutor.ejecutarAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        return clienteDAO.buscarPorDniOTelefono(conn, doc).orElse(null);
-                    }
-                },
+                () -> posConsultaService.buscarClientePorDniOTelefono(doc).orElse(null),
                 cliObtenido -> {
                     if (cliObtenido != null) {
                         asociarClientePos(cliObtenido, null);
