@@ -10,6 +10,7 @@ import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
+import com.foodcore.exception.CodigoError;
 import com.foodcore.service.UsuarioGestionService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
@@ -89,7 +90,7 @@ public class UsuariosController {
     @FXML private Button btnDesactivar2FA;
     @FXML private Button btnConfirmar2FA;
 
-    private final EncriptadorPassword encriptador = new EncriptadorPassword();
+
     private final TotpService totpService = new TotpService();
     private final UsuarioGestionService usuarioGestionService = new UsuarioGestionService();
     private final TokenBlacklistService tokenBlacklistService = TokenBlacklistService.getInstance();
@@ -157,9 +158,9 @@ public class UsuariosController {
     public void cargarUsuarios() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<UsuarioResumen> resumenes = usuarioGestionService.listarUsuarios();
+                List<UsuarioGestionService.UsuarioResumen> resumenes = usuarioGestionService.listarUsuarios();
                 List<FilaUsuario> filas = new ArrayList<>();
-                for (UsuarioResumen r : resumenes) {
+                for (UsuarioGestionService.UsuarioResumen r : resumenes) {
                     filas.add(new FilaUsuario(
                         r.idUsuario(),
                         r.username(),
@@ -244,28 +245,8 @@ public class UsuariosController {
         }
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                String hash = encriptador.hashear(pass);
-                String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
-                    + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, pin_hash, sueldo_base, horario_laboral) "
-                    + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, NULL, ?, ?) "
-                    + "ON DUPLICATE KEY UPDATE nombre_completo = VALUES(nombre_completo), codigo_rol = VALUES(codigo_rol), activo = VALUES(activo), "
-                    + "dni = VALUES(dni), sueldo_base = VALUES(sueldo_base), horario_laboral = VALUES(horario_laboral)";
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setInt(1, idRol);
-                    ps.setString(2, user);
-                    ps.setString(3, user);
-                    ps.setString(4, nom);
-                    ps.setString(5, hash);
-                    ps.setString(6, hash);
-                    ps.setString(7, rol);
-                    ps.setBoolean(8, activoSel);
-                    ps.setString(9, dni);
-                    ps.setBigDecimal(10, java.math.BigDecimal.valueOf(sueldoFinal));
-                    ps.setString(11, horario);
-                    ps.executeUpdate();
-                }
+                usuarioGestionService.crearOActualizarUsuario(idRol, user, nom, rol, pass,
+                        activoSel, dni, sueldoFinal, horario);
             },
             () -> {
                 if (btnCrearUsuario != null) {
@@ -372,19 +353,7 @@ public class UsuariosController {
 
     public void actualizarPinUsuario(int idUsuario, String pin) throws Exception {
         exigirPermisoGestionUsuarios();
-        if (pin == null || !pin.trim().matches("^\\d{4,6}$")) {
-            throw new NegocioException(
-                    CodigoError.VALIDACION_ENTRADA,
-                    "El PIN debe contener entre 4 y 6 dígitos numéricos.");
-        }
-        String hash = EncriptadorPassword.generarHash(pin.trim());
-        String sql = "UPDATE usuario SET pin = NULL, pin_hash = ? WHERE id_usuario = ?";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, hash);
-            ps.setInt(2, idUsuario);
-            ps.executeUpdate();
-        }
+        usuarioGestionService.actualizarPinUsuario(idUsuario, pin);
     }
 
     /**
@@ -467,15 +436,10 @@ public class UsuariosController {
         final String secretoFinal = secretoTemporal2fa;
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, secretoFinal, true);
-                    int actor = AuthService.getUsuarioSesionActual() != null
-                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                    auditoriaDAO.registrarEventoSeguro(
-                            conn, actor, "ACTIVAR_2FA", "USUARIO", null,
-                            "2FA TOTP activado para usuario " + usernameObj);
-                }
+                int actor = AuthService.getUsuarioSesionActual() != null
+                        ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                usuarioGestionService.actualizarConfiguracion2FA(idObjetivo, usernameObj,
+                        secretoFinal, true, actor);
             },
             () -> {
                 if (btnConfirmar2FA != null) {
@@ -510,15 +474,10 @@ public class UsuariosController {
         final String usernameObj = usuario2faEnEdicion.username();
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                exigirPermisoGestionUsuarios();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    usuarioDAO.actualizarConfiguracion2FA(conn, idObjetivo, null, false);
-                    int actor = AuthService.getUsuarioSesionActual() != null
-                            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
-                    auditoriaDAO.registrarEventoSeguro(
-                            conn, actor, "DESACTIVAR_2FA", "USUARIO", null,
-                            "2FA TOTP desactivado para usuario " + usernameObj);
-                }
+                int actor = AuthService.getUsuarioSesionActual() != null
+                        ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+                usuarioGestionService.actualizarConfiguracion2FA(idObjetivo, usernameObj,
+                        null, false, actor);
             },
             () -> {
                 handleCerrarModal2FA(null);

@@ -72,7 +72,7 @@ public class UsuarioGestionService {
         return sesion != null && sesion.tienePermiso(Permiso.USUARIO_GESTIONAR);
     }
 
-    private void exigirPermisoGestionUsuarios() throws NegocioException {
+    public void exigirPermisoGestionUsuarios() throws NegocioException {
         if (!tienePermisoGestionUsuarios()) {
             throw new NegocioException(
                     CodigoError.ACCESO_DENEGADO,
