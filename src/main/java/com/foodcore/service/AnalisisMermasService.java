@@ -122,6 +122,18 @@ public class AnalisisMermasService {
         }
     }
 
+    /**
+     * Lista todos los insumos activos disponibles para el registro de mermas.
+     *
+     * @return insumos activos ordenados por nombre.
+     * @throws SQLException si falla la consulta en base de datos.
+     */
+    public List<Insumo> listarTodosInsumos() throws SQLException {
+        try (Connection conn = ConexionBD.getConnection()) {
+            return insumoDAO.listarTodos(conn);
+        }
+    }
+
     public Map<String, BigDecimal> obtenerMermasPorMotivo(int anio, int mes) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
             return mermaDAO.obtenerMermasPorMotivo(conn, anio, mes);

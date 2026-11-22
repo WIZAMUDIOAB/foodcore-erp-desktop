@@ -1,13 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.AuditoriaDAO;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.model.RegistroAuditoria;
 import com.foodcore.model.Usuario;
+import com.foodcore.service.AuditoriaConsultaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
@@ -33,7 +31,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
-import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -52,7 +50,6 @@ import java.util.logging.Logger;
 public class AuditoriaController {
 
     public static final int TAMANO_PAGINA = 50;
-    private static final int LIMITE_EXPORTACION = 10_000;
     private static final String TODOS_USUARIOS = "Todos los Usuarios";
     private static final String TODAS_ACCIONES = "Todas las Acciones";
     private static final List<String> ACCIONES_BASE = List.of(
@@ -95,7 +92,7 @@ public class AuditoriaController {
     @FXML private Button btnPaginaAnterior;
     @FXML private Button btnPaginaSiguiente;
 
-    private final AuditoriaDAO auditoriaDAO = new AuditoriaDAOImpl();
+    private final AuditoriaConsultaService auditoriaService = new AuditoriaConsultaService();
     private final ExportacionContableService exportacionService = new ExportacionContableService();
     private final List<RegistroAuditoria> todosEventos = new ArrayList<>();
     private final ObservableList<RegistroAuditoria> listaAuditoria = FXCollections.observableArrayList();
@@ -103,13 +100,6 @@ public class AuditoriaController {
     private boolean accesoPermitido = true;
     private int paginaActual = 1;
     private int totalRegistros = 0;
-
-    private record CargaAuditoriaResult(
-            List<RegistroAuditoria> paginaItems,
-            int total,
-            List<String> usuarios,
-            List<String> acciones) {
-    }
 
     @FXML
     public void initialize() {
@@ -241,31 +231,18 @@ public class AuditoriaController {
         }
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (conn == null) {
-                        return new CargaAuditoriaResult(List.of(), 0, List.of(), List.of());
-                    }
-                    int total = auditoriaDAO.contarEventosFiltrados(conn, usuario, accion, desde, hasta);
-                    int maxPagina = Math.max(1, (int) Math.ceil((double) total / TAMANO_PAGINA));
-                    int offsetEfectivo = offset >= total ? Math.max(0, (maxPagina - 1) * TAMANO_PAGINA) : offset;
-                    List<RegistroAuditoria> items = auditoriaDAO.listarEventosFiltrados(
-                            conn, usuario, accion, desde, hasta, offsetEfectivo, TAMANO_PAGINA);
-                    List<String> usuarios = auditoriaDAO.listarUsuariosDistinct(conn);
-                    List<String> acciones = auditoriaDAO.listarAccionesDistinct(conn);
-                    return new CargaAuditoriaResult(items, total, usuarios, acciones);
-                }
-            },
+            () -> auditoriaService.consultarPaginaAuditoria(
+                    usuario, accion, desde, hasta, TAMANO_PAGINA, offset),
             res -> {
                 todosEventos.clear();
-                todosEventos.addAll(res.paginaItems());
+                todosEventos.addAll(res.items());
                 totalRegistros = res.total();
                 int totalPaginas = getTotalPaginas();
                 if (paginaActual > totalPaginas) {
                     paginaActual = totalPaginas;
                 }
                 actualizarCombosDesdeBd(res.usuarios(), res.acciones());
-                listaAuditoria.setAll(res.paginaItems());
+                listaAuditoria.setAll(res.items());
                 actualizarControlesPaginacion();
             },
             e -> LOGGER.log(Level.FINE, "Error cargando bitácora de auditoría", e)
@@ -390,15 +367,13 @@ public class AuditoriaController {
         String accion = cmbFiltroAccion != null ? cmbFiltroAccion.getValue() : null;
         LocalDate desde = dpDesde != null ? dpDesde.getValue() : null;
         LocalDate hasta = dpHasta != null ? dpHasta.getValue() : null;
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<RegistroAuditoria> desdeBd = auditoriaDAO.listarEventosFiltrados(
-                        conn, usuario, accion, desde, hasta, 0, LIMITE_EXPORTACION);
-                if (!desdeBd.isEmpty()) {
-                    return desdeBd;
-                }
+        try {
+            List<RegistroAuditoria> desdeBd = auditoriaService.listarParaExportacion(
+                    usuario, accion, desde, hasta);
+            if (!desdeBd.isEmpty()) {
+                return desdeBd;
             }
-        } catch (Exception ex) {
+        } catch (SQLException ex) {
             LOGGER.log(Level.FINE, "Fallback a eventos en memoria para exportación", ex);
         }
         return List.copyOf(listaAuditoria);

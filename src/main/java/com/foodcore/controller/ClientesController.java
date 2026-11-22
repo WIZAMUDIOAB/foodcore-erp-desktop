@@ -1,12 +1,10 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.ClienteDAO;
-import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.CompraClienteResumen;
+import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ConfiguracionFidelizacion;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
@@ -33,7 +31,6 @@ import javafx.scene.layout.VBox;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
-import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -119,7 +116,7 @@ public class ClientesController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
+    private final ClienteGestionService clienteGestionService = new ClienteGestionService();
     private final FinanzasService finanzasService = new FinanzasService();
     private final FidelizacionService fidelizacionService = new FidelizacionService();
 
@@ -343,11 +340,7 @@ public class ClientesController {
 
     public void cargarClientesAsync() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return clienteDAO.listarTodos(conn);
-                }
-            },
+            clienteGestionService::listarTodos,
             todos -> {
                 listaTodosClientes.setAll(todos);
                 aplicarListasDesdeMaestro(todos);
@@ -360,8 +353,8 @@ public class ClientesController {
      * Carga síncrona determinística de clientes para pruebas de integración y capturas (v5.0.0).
      */
     public void cargarDatosSincrono() {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Cliente> todos = clienteDAO.listarTodos(conn);
+        try {
+            List<Cliente> todos = clienteGestionService.listarTodos();
             listaTodosClientes.setAll(todos);
             aplicarListasDesdeMaestro(todos);
         } catch (Exception ex) {
@@ -646,33 +639,31 @@ public class ClientesController {
 
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (edicion) {
-                        objEdicion.setTipoCliente(segmento);
-                        objEdicion.setTipoDocumento(tipoDoc);
-                        objEdicion.setNumeroDocumento(num);
-                        objEdicion.setRazonSocial(razon);
-                        objEdicion.setContacto(contacto.isEmpty() ? razon : contacto);
-                        objEdicion.setTelefono(telefono);
-                        objEdicion.setEmail(email);
-                        objEdicion.setFechaNacimiento(fechaNacimiento);
-                        objEdicion.setLimiteCredito(limFinal);
-                        objEdicion.setDiasCredito(diasFinal);
-                        clienteDAO.actualizar(conn, objEdicion);
-                    } else {
-                        Cliente nuevo = new Cliente();
-                        nuevo.setTipoCliente(segmento);
-                        nuevo.setTipoDocumento(tipoDoc);
-                        nuevo.setNumeroDocumento(num);
-                        nuevo.setRazonSocial(razon);
-                        nuevo.setContacto(contacto.isEmpty() ? razon : contacto);
-                        nuevo.setTelefono(telefono);
-                        nuevo.setEmail(email);
-                        nuevo.setFechaNacimiento(fechaNacimiento);
-                        nuevo.setLimiteCredito(limFinal);
-                        nuevo.setDiasCredito(diasFinal);
-                        clienteDAO.insertar(conn, nuevo);
-                    }
+                if (edicion) {
+                    objEdicion.setTipoCliente(segmento);
+                    objEdicion.setTipoDocumento(tipoDoc);
+                    objEdicion.setNumeroDocumento(num);
+                    objEdicion.setRazonSocial(razon);
+                    objEdicion.setContacto(contacto.isEmpty() ? razon : contacto);
+                    objEdicion.setTelefono(telefono);
+                    objEdicion.setEmail(email);
+                    objEdicion.setFechaNacimiento(fechaNacimiento);
+                    objEdicion.setLimiteCredito(limFinal);
+                    objEdicion.setDiasCredito(diasFinal);
+                    clienteGestionService.actualizarCliente(objEdicion);
+                } else {
+                    Cliente nuevo = new Cliente();
+                    nuevo.setTipoCliente(segmento);
+                    nuevo.setTipoDocumento(tipoDoc);
+                    nuevo.setNumeroDocumento(num);
+                    nuevo.setRazonSocial(razon);
+                    nuevo.setContacto(contacto.isEmpty() ? razon : contacto);
+                    nuevo.setTelefono(telefono);
+                    nuevo.setEmail(email);
+                    nuevo.setFechaNacimiento(fechaNacimiento);
+                    nuevo.setLimiteCredito(limFinal);
+                    nuevo.setDiasCredito(diasFinal);
+                    clienteGestionService.insertarCliente(nuevo);
                 }
             },
             () -> {
@@ -705,11 +696,7 @@ public class ClientesController {
         final int idCli = clienteSeleccionado.getIdCliente();
         final boolean nuevoEstado = !clienteSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    clienteDAO.cambiarEstado(conn, idCli, nuevoEstado);
-                }
-            },
+            () -> clienteGestionService.cambiarEstado(idCli, nuevoEstado),
             this::cargarClientesAsync,
             ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado", ex)
         );
