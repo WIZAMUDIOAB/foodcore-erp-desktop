@@ -10,15 +10,17 @@ import com.foodcore.model.Comanda;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Usuario;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
+import com.foodcore.util.ConexionBD;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -44,6 +46,10 @@ public class PedidoService {
 
     public PedidoService() {
         this(new JdbcTransactionManager(), new PedidoDAOImpl(), new AutorizacionService());
+    }
+
+    public PedidoService(PedidoDAO pedidoDAO) {
+        this(new JdbcTransactionManager(), pedidoDAO != null ? pedidoDAO : new PedidoDAOImpl(), new AutorizacionService());
     }
 
     public PedidoService(TransactionManager tx, PedidoDAO pedidoDAO, AutorizacionService autorizacionService) {
@@ -343,41 +349,157 @@ public class PedidoService {
 
     private void enviarNotificacionSocketCocina(Pedido pedido, List<DetallePedido> detalles, String numeroComanda) {
         try {
-            JsonObject json = new JsonObject();
-            json.addProperty("accion", "NUEVA_COMANDA");
-            json.addProperty("idPedido", pedido.getIdPedido());
-            json.addProperty("numeroComanda", numeroComanda);
-            json.addProperty("mesa", pedido.getNumeroMesa());
+            ObjectNode json = JsonMapperProvider.getMapper().createObjectNode();
+            json.put("accion", "NUEVA_COMANDA");
+            json.put("idPedido", pedido.getIdPedido());
+            json.put("numeroComanda", numeroComanda);
+            json.put("mesa", pedido.getNumeroMesa());
 
-            JsonArray items = new JsonArray();
+            ArrayNode items = json.putArray("items");
             for (DetallePedido d : detalles) {
-                JsonObject item = new JsonObject();
-                item.addProperty("idDetallePedido", d.getIdDetallePedido());
-                item.addProperty("producto", d.getNombreProducto());
+                ObjectNode item = items.addObject();
+                item.put("idDetallePedido", d.getIdDetallePedido());
+                item.put("producto", d.getNombreProducto());
                 if (d.getNombreVariante() != null && !d.getNombreVariante().isBlank()) {
-                    item.addProperty("variante", d.getNombreVariante());
+                    item.put("variante", d.getNombreVariante());
                 }
                 String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
                         d.getModificadoresSeleccionados(), d.getModificadoresTexto());
                 if (!mods.isEmpty()) {
-                    item.addProperty("modificadores", mods);
+                    item.put("modificadores", mods);
                 }
                 if (d.getIdCombo() != null && d.getIdCombo() > 0) {
-                    item.addProperty("idCombo", d.getIdCombo());
+                    item.put("idCombo", d.getIdCombo());
                 }
                 if (d.getComboComponentesTexto() != null && !d.getComboComponentesTexto().isBlank()) {
-                    item.addProperty("componentes", d.getComboComponentesTexto());
+                    item.put("componentes", d.getComboComponentesTexto());
                 }
-                item.addProperty("cantidad", d.getCantidad());
-                item.addProperty("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
-                items.add(item);
+                item.put("cantidad", d.getCantidad());
+                item.put("notas", d.getNotasPreparacion() != null ? d.getNotasPreparacion() : "");
             }
-            json.add("items", items);
 
             // Despacho interno in-process sin abrir sockets TCP raw ni hilos no gestionados
             ServidorSockets.getInstance().emitirMensaje(json);
         } catch (RuntimeException e) {
             LOGGER.fine("Servidor KDS no activo al emitir notificación interna: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Lista los ítems activos de cocina directamente desde BD gestionando su propia conexión HikariCP.
+     */
+    public List<DetallePedido> listarItemsPendientesCocina() throws SQLException {
+        try {
+            return tx.executeChecked(conn -> pedidoDAO.listarItemsPendientesCocina(conn));
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Lista los pedidos activos de cocina directamente desde BD gestionando su propia conexión HikariCP.
+     */
+    public List<Pedido> listarPedidosPendientesCocina() throws SQLException {
+        try {
+            return tx.executeChecked(conn -> pedidoDAO.listarPedidosPendientesCocina(conn));
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Lista los ítems de cocina pendientes de un pedido dado directamente desde BD.
+     */
+    public List<DetallePedido> listarItemsPendientesCocinaPorPedido(int idPedido) throws SQLException {
+        if (idPedido <= 0) {
+            return List.of();
+        }
+        try {
+            return tx.executeChecked(conn -> pedidoDAO.listarItemsPendientesCocinaPorPedido(conn, idPedido));
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Actualiza el estado de cocina de un ítem y, de forma coherente, el estado del pedido asociado.
+     */
+    public void actualizarEstadoKds(int idDetallePedido, int idPedido, String estado) throws SQLException {
+        marcarItemEstadoYActualizarPedidoKds(idDetallePedido, idPedido, estado);
+    }
+
+    /**
+     * Marca un ítem de cocina con el estado indicado y actualiza el pedido asociado siempre a {@code EN_PREPARACION},
+     * propagando otros estados al pedido solo cuando no quedan ítems pendientes (v5.8.0).
+     */
+    public void marcarItemEnPreparacionKds(int idDetallePedido, int idPedido) throws SQLException {
+        try {
+            tx.executeVoidChecked(conn -> {
+                if (idDetallePedido > 0) {
+                    pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
+                }
+                if (idPedido > 0) {
+                    pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
+                }
+            });
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Marca un ítem de cocina con el estado indicado y, solo cuando el pedido asociado ya no tiene
+     * ítems pendientes de cocina, propaga el mismo estado al pedido (v5.8.0).
+     * Encapsula {@link ConexionBD#getConnection()} para que los controladores no gestionen conexiones JDBC.
+     */
+    public void marcarItemEstadoYActualizarPedidoKds(int idDetallePedido, int idPedido, String nuevoEstadoDetalle)
+            throws SQLException {
+        try {
+            tx.executeVoidChecked(conn -> {
+                if (idDetallePedido > 0) {
+                    pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, nuevoEstadoDetalle);
+                }
+                if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
+                    pedidoDAO.actualizarEstadoPedido(conn, idPedido, nuevoEstadoDetalle);
+                }
+            });
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Consulta el estado de cocina actual de un ítem directamente desde BD.
+     *
+     * @return el estado normalizado, o {@code null} si el ítem no existe
+     */
+    public String obtenerEstadoCocinaDetalle(int idDetallePedido) throws SQLException {
+        try {
+            return tx.executeChecked(conn -> pedidoDAO.obtenerEstadoCocinaDetalle(conn, idDetallePedido));
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Marca como ENTREGADO únicamente los ítems indicados y el pedido asociado sin afectar otros pedidos en cocina.
+     */
+    public void marcarPedidoEntregadoKds(List<Integer> idsDetalle, int idPedido) throws SQLException {
+        try {
+            tx.executeVoidChecked(conn -> {
+                if (idsDetalle != null) {
+                    for (int idDet : idsDetalle) {
+                        if (idDet > 0) {
+                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDet, "ENTREGADO");
+                        }
+                    }
+                }
+                if (idPedido > 0) {
+                    pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
+                }
+            });
+        } catch (NegocioException e) {
+            throw new SQLException(e.getMessage(), e);
         }
     }
 

@@ -1,16 +1,12 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -25,7 +21,6 @@ import javafx.util.Duration;
 
 import java.awt.Toolkit;
 import java.io.IOException;
-import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -62,7 +57,6 @@ public class KitchenDisplayController {
     @FXML private Label lblSocketStatus;
     @FXML private Label lblContadorActivas;
 
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private final PedidoService pedidoService = new PedidoService();
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
     private final Set<Integer> itemsDespachadosLocal = Collections.synchronizedSet(new HashSet<>());
@@ -97,11 +91,7 @@ public class KitchenDisplayController {
 
     private void cargarComandasDesdeBD() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarItemsPendientesCocina(conn);
-                }
-            },
+            () -> pedidoService.listarItemsPendientesCocina(),
             itemsPendientes -> renderizarItemsKds(itemsPendientes, LocalDateTime.now(ZONA_LIMA)),
             e -> {
                 LOGGER.log(Level.SEVERE, "Error al cargar ítems de cocina desde BD", e);
@@ -173,11 +163,7 @@ public class KitchenDisplayController {
 
     private void sincronizarNuevasComandas() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarItemsPendientesCocina(conn);
-                }
-            },
+            () -> pedidoService.listarItemsPendientesCocina(),
             itemsBD -> {
                 LocalDateTime ahoraLima = LocalDateTime.now(ZONA_LIMA);
                 Set<Integer> idsPendientesEnBD = new HashSet<>();
@@ -233,22 +219,20 @@ public class KitchenDisplayController {
         );
     }
 
-    private void procesarMensajeSocket(JsonObject json) {
-        String accion = json.has("accion") ? json.get("accion").getAsString()
-            : (json.has("type") ? json.get("type").getAsString() : "");
+    private void procesarMensajeSocket(ObjectNode json) {
+        String accion = json.hasNonNull("accion") ? json.get("accion").asText("") : json.path("type").asText("");
         if ("NUEVA_COMANDA".equals(accion) || "COMANDA_NUEVA".equals(accion) || "ITEMS_ADICIONALES".equals(accion)) {
-            int idPed = json.has("idPedido") ? json.get("idPedido").getAsInt() : 0;
-            String mesa = json.has("mesa") ? json.get("mesa").getAsString() : "01";
-            String comandaBase = json.has("numeroComanda") ? json.get("numeroComanda").getAsString() : "COM-AUTO";
+            int idPed = json.path("idPedido").asInt(0);
+            String mesa = json.hasNonNull("mesa") ? json.get("mesa").asText("01") : "01";
+            String comandaBase = json.hasNonNull("numeroComanda") ? json.get("numeroComanda").asText("COM-AUTO") : "COM-AUTO";
 
             emitirBeepSonoro();
 
-            if (json.has("items")) {
-                JsonArray items = json.getAsJsonArray("items");
+            JsonNode itemsNode = json.get("items");
+            if (itemsNode != null && itemsNode.isArray()) {
                 int idx = 1;
-                for (JsonElement el : items) {
-                    JsonObject obj = el.getAsJsonObject();
-                    int idDet = obj.has("idDetallePedido") ? obj.get("idDetallePedido").getAsInt() : -(idPed * 100 + idx);
+                for (JsonNode obj : itemsNode) {
+                    int idDet = obj.hasNonNull("idDetallePedido") ? obj.get("idDetallePedido").asInt(0) : -(idPed * 100 + idx);
                     if (idDet > 0 && (tarjetasActivas.containsKey(idDet) || itemsDespachadosLocal.contains(idDet))) {
                         idx++;
                         continue;
@@ -257,21 +241,21 @@ public class KitchenDisplayController {
                     dp.setIdPedido(idPed);
                     dp.setIdDetallePedido(Math.max(0, idDet));
                     dp.setNumeroMesa(mesa);
-                    dp.setNombreProducto(obj.get("producto").getAsString());
-                    if (obj.has("variante") && !obj.get("variante").isJsonNull()) {
-                        dp.setNombreVariante(obj.get("variante").getAsString());
+                    dp.setNombreProducto(obj.path("producto").asText(""));
+                    if (obj.hasNonNull("variante")) {
+                        dp.setNombreVariante(obj.get("variante").asText(""));
                     }
-                    if (obj.has("modificadores") && !obj.get("modificadores").isJsonNull()) {
-                        dp.setModificadoresTexto(obj.get("modificadores").getAsString());
+                    if (obj.hasNonNull("modificadores")) {
+                        dp.setModificadoresTexto(obj.get("modificadores").asText(""));
                     }
-                    if (obj.has("idCombo") && !obj.get("idCombo").isJsonNull()) {
-                        dp.setIdCombo(obj.get("idCombo").getAsInt());
+                    if (obj.hasNonNull("idCombo")) {
+                        dp.setIdCombo(obj.get("idCombo").asInt(0));
                     }
-                    if (obj.has("componentes") && !obj.get("componentes").isJsonNull()) {
-                        dp.setComboComponentesTexto(obj.get("componentes").getAsString());
+                    if (obj.hasNonNull("componentes")) {
+                        dp.setComboComponentesTexto(obj.get("componentes").asText(""));
                     }
-                    dp.setCantidad(obj.get("cantidad").getAsInt());
-                    dp.setNotasPreparacion(obj.has("notas") ? obj.get("notas").getAsString() : "");
+                    dp.setCantidad(obj.path("cantidad").asInt(1));
+                    dp.setNotasPreparacion(obj.path("notas").asText(""));
                     dp.setEnviadoEn(LocalDateTime.now(ZONA_LIMA));
 
                     int segundos = dp.calcularSegundosDesdeEnvio(LocalDateTime.now(ZONA_LIMA));
@@ -344,16 +328,7 @@ public class KitchenDisplayController {
                     .filter(id -> id > 0)
                     .toList();
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (conn != null) {
-                            for (int idDet : idsDetalle) {
-                                pedidoDAO.actualizarEstadoDetalleCocina(conn, idDet, "ENTREGADO");
-                            }
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                        }
-                    }
-                },
+                () -> pedidoService.marcarPedidoEntregadoKds(idsDetalle, idPedido),
                 null,
                 ex -> LOGGER.log(Level.FINE, "Aviso marcando pedido entregado en BD", ex)
             );

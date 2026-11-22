@@ -7,14 +7,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.PedidoService;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
-import com.google.gson.JsonObject;
 import io.javalin.http.Context;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -27,9 +24,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Controlador Javalin para el KDS (Kitchen Display System) de Cocina y Bar (v5.7.1 Hardening):
+ * Controlador Javalin para el KDS (Kitchen Display System) de Cocina y Bar (v5.8.0 Hardening):
  * consulta batch sin N+1, validación de máquina de estados contra lista blanca
  * y datos demo estrictamente acotados a {@code -Dfoodcore.demoFallback=true}.
+ * Toda la persistencia se delega en {@link PedidoService} y JSON vía Jackson (sin JDBC directo en el controlador).
  */
 public class KdsController {
 
@@ -45,11 +43,15 @@ public class KdsController {
     );
 
     private final ApiState state;
-    private final PedidoDAO pedidoDAO;
+    private final PedidoService pedidoService;
 
     public KdsController(ApiState state, PedidoDAO pedidoDAO) {
+        this(state, new PedidoService(pedidoDAO));
+    }
+
+    public KdsController(ApiState state, PedidoService pedidoService) {
         this.state = state;
-        this.pedidoDAO = pedidoDAO;
+        this.pedidoService = pedidoService;
     }
 
     /**
@@ -57,51 +59,49 @@ public class KdsController {
      */
     public void handleKdsComandas(Context ctx) {
         ArrayNode root = state.mapper.createArrayNode();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<Pedido> pedidos = pedidoDAO.listarPedidosPendientesCocina(conn);
-                if (!pedidos.isEmpty()) {
-                    List<DetallePedido> todosLosItems = pedidoDAO.listarItemsPendientesCocina(conn);
-                    Map<Integer, List<DetallePedido>> itemsPorPedido = new HashMap<>();
-                    for (DetallePedido dp : todosLosItems) {
-                        itemsPorPedido.computeIfAbsent(dp.getIdPedido(), k -> new ArrayList<>()).add(dp);
+        try {
+            List<Pedido> pedidos = pedidoService.listarPedidosPendientesCocina();
+            if (!pedidos.isEmpty()) {
+                List<DetallePedido> todosLosItems = pedidoService.listarItemsPendientesCocina();
+                Map<Integer, List<DetallePedido>> itemsPorPedido = new HashMap<>();
+                for (DetallePedido dp : todosLosItems) {
+                    itemsPorPedido.computeIfAbsent(dp.getIdPedido(), k -> new ArrayList<>()).add(dp);
+                }
+                for (Pedido p : pedidos) {
+                    List<DetallePedido> detalles = itemsPorPedido.getOrDefault(p.getIdPedido(), List.of());
+                    if (detalles.isEmpty()) {
+                        continue;
                     }
-                    for (Pedido p : pedidos) {
-                        List<DetallePedido> detalles = itemsPorPedido.getOrDefault(p.getIdPedido(), List.of());
-                        if (detalles.isEmpty()) {
-                            continue;
-                        }
-                        ObjectNode pNode = root.addObject();
-                        pNode.put("id_pedido", p.getIdPedido());
-                        pNode.put("uuid", p.getIdempotencyKey());
-                        pNode.put("numero_mesa", p.getNumeroMesa());
-                        pNode.put("id_usuario", p.getIdUsuario());
-                        pNode.put("id_usuario_creador", p.getIdUsuarioCreador() != null ? p.getIdUsuarioCreador() : p.getIdUsuario());
-                        pNode.put("estado", p.getEstado());
-                        pNode.put("total", p.getTotal() != null ? p.getTotal().doubleValue() : 0.0);
-                        pNode.put("creado_en", p.getFechaHora() != null ? p.getFechaHora().toString() : Instant.now().toString());
+                    ObjectNode pNode = root.addObject();
+                    pNode.put("id_pedido", p.getIdPedido());
+                    pNode.put("uuid", p.getIdempotencyKey());
+                    pNode.put("numero_mesa", p.getNumeroMesa());
+                    pNode.put("id_usuario", p.getIdUsuario());
+                    pNode.put("id_usuario_creador", p.getIdUsuarioCreador() != null ? p.getIdUsuarioCreador() : p.getIdUsuario());
+                    pNode.put("estado", p.getEstado());
+                    pNode.put("total", p.getTotal() != null ? p.getTotal().doubleValue() : 0.0);
+                    pNode.put("creado_en", p.getFechaHora() != null ? p.getFechaHora().toString() : Instant.now().toString());
 
-                        ArrayNode itemsArr = pNode.putArray("items");
-                        for (DetallePedido dp : detalles) {
-                            ObjectNode itemNode = itemsArr.addObject();
-                            itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
-                            itemNode.put("id_producto", dp.getIdProducto());
-                            String nombreCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp);
-                            itemNode.put("nombre", nombreCocina);
-                            if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
-                                itemNode.put("variante", dp.getNombreVariante());
-                            }
-                            String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                                    dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
-                            if (!mods.isEmpty()) {
-                                itemNode.put("modificadores", mods);
-                            }
-                            itemNode.put("cantidad", dp.getCantidad());
-                            itemNode.put("precio_unitario", dp.getPrecioUnitario() != null ? dp.getPrecioUnitario().doubleValue() : 0.0);
-                            itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
-                            itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");
-                            itemNode.put("enviado_en", dp.getEnviadoEn() != null ? dp.getEnviadoEn().toString() : Instant.now().toString());
+                    ArrayNode itemsArr = pNode.putArray("items");
+                    for (DetallePedido dp : detalles) {
+                        ObjectNode itemNode = itemsArr.addObject();
+                        itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
+                        itemNode.put("id_producto", dp.getIdProducto());
+                        String nombreCocina = com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp);
+                        itemNode.put("nombre", nombreCocina);
+                        if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
+                            itemNode.put("variante", dp.getNombreVariante());
                         }
+                        String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                                dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
+                        if (!mods.isEmpty()) {
+                            itemNode.put("modificadores", mods);
+                        }
+                        itemNode.put("cantidad", dp.getCantidad());
+                        itemNode.put("precio_unitario", dp.getPrecioUnitario() != null ? dp.getPrecioUnitario().doubleValue() : 0.0);
+                        itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
+                        itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");
+                        itemNode.put("enviado_en", dp.getEnviadoEn() != null ? dp.getEnviadoEn().toString() : Instant.now().toString());
                     }
                 }
             }
@@ -118,35 +118,33 @@ public class KdsController {
 
     public void handleKdsItems(Context ctx) {
         ArrayNode root = state.mapper.createArrayNode();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<DetallePedido> items = pedidoDAO.listarItemsPendientesCocina(conn);
-                for (DetallePedido dp : items) {
-                    ObjectNode itemNode = root.addObject();
-                    itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
-                    itemNode.put("id_pedido", dp.getIdPedido());
-                    itemNode.put("id_producto", dp.getIdProducto());
-                    itemNode.put("nombre", com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp));
-                    if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
-                        itemNode.put("variante", dp.getNombreVariante());
-                    }
-                    String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
-                            dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
-                    if (!mods.isEmpty()) {
-                        itemNode.put("modificadores", mods);
-                    }
-                    if (dp.getIdCombo() != null && dp.getIdCombo() > 0) {
-                        itemNode.put("id_combo", dp.getIdCombo());
-                    }
-                    if (dp.getComboComponentesTexto() != null && !dp.getComboComponentesTexto().isBlank()) {
-                        itemNode.put("componentes", dp.getComboComponentesTexto());
-                    }
-                    itemNode.put("cantidad", dp.getCantidad());
-                    itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
-                    itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");
-                    itemNode.put("enviado_en", dp.getEnviadoEn() != null ? dp.getEnviadoEn().toString() : Instant.now().toString());
-                    itemNode.put("numero_mesa", dp.getNumeroMesa() != null ? dp.getNumeroMesa() : "01");
+        try {
+            List<DetallePedido> items = pedidoService.listarItemsPendientesCocina();
+            for (DetallePedido dp : items) {
+                ObjectNode itemNode = root.addObject();
+                itemNode.put("id_detalle_pedido", dp.getIdDetallePedido());
+                itemNode.put("id_pedido", dp.getIdPedido());
+                itemNode.put("id_producto", dp.getIdProducto());
+                itemNode.put("nombre", com.foodcore.util.FormatoPersonalizacionUtil.formatearDescripcionItem(dp));
+                if (dp.getNombreVariante() != null && !dp.getNombreVariante().isBlank()) {
+                    itemNode.put("variante", dp.getNombreVariante());
                 }
+                String mods = com.foodcore.util.FormatoPersonalizacionUtil.normalizarModificadoresDetalle(
+                        dp.getModificadoresSeleccionados(), dp.getModificadoresTexto());
+                if (!mods.isEmpty()) {
+                    itemNode.put("modificadores", mods);
+                }
+                if (dp.getIdCombo() != null && dp.getIdCombo() > 0) {
+                    itemNode.put("id_combo", dp.getIdCombo());
+                }
+                if (dp.getComboComponentesTexto() != null && !dp.getComboComponentesTexto().isBlank()) {
+                    itemNode.put("componentes", dp.getComboComponentesTexto());
+                }
+                itemNode.put("cantidad", dp.getCantidad());
+                itemNode.put("notas", dp.getNotasPreparacion() != null ? dp.getNotasPreparacion() : "");
+                itemNode.put("estado_cocina", dp.getEstadoCocina() != null ? dp.getEstadoCocina() : "PENDIENTE");
+                itemNode.put("enviado_en", dp.getEnviadoEn() != null ? dp.getEnviadoEn().toString() : Instant.now().toString());
+                itemNode.put("numero_mesa", dp.getNumeroMesa() != null ? dp.getNumeroMesa() : "01");
             }
         } catch (SQLException | RuntimeException e) {
             LOGGER.log(Level.FINE, "Aviso listando ítems de cocina en BD", e);
@@ -177,12 +175,8 @@ public class KdsController {
                 return;
             }
 
-            try (Connection conn = ConexionBD.getConnection()) {
-                if (conn == null) {
-                    state.responderError(ctx, 503, "Base de datos no disponible.");
-                    return;
-                }
-                String estadoActual = obtenerEstadoActualDetalle(conn, idDetalle);
+            try {
+                String estadoActual = pedidoService.obtenerEstadoCocinaDetalle(idDetalle);
                 if (estadoActual == null) {
                     state.responderError(ctx, 404, "Ítem de comanda no encontrado: #" + idDetalle);
                     return;
@@ -193,20 +187,20 @@ public class KdsController {
                             "Transición KDS no permitida: " + estadoActual + " -> " + nuevoEstado);
                     return;
                 }
-                pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetalle, nuevoEstado);
-            } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Error SQL actualizando estado de ítem KDS #" + idDetalle, e);
+                pedidoService.marcarItemEstadoYActualizarPedidoKds(idDetalle, 0, nuevoEstado);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Error actualizando estado de ítem KDS #" + idDetalle, e);
                 state.responderError(ctx, 503, "No se pudo actualizar el estado del ítem en base de datos.");
                 return;
             }
 
             try {
-                JsonObject msg = new JsonObject();
-                msg.addProperty("type", "KDS_STATUS_CHANGE");
-                msg.addProperty("idDetalle", idDetalle);
-                msg.addProperty("nuevoEstado", nuevoEstado);
+                ObjectNode msg = JsonMapperProvider.getMapper().createObjectNode();
+                msg.put("type", "KDS_STATUS_CHANGE");
+                msg.put("idDetalle", idDetalle);
+                msg.put("nuevoEstado", nuevoEstado);
                 ServidorSockets.getInstance().emitirMensaje(msg);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 LOGGER.log(Level.FINE, "Aviso notificando cambio de comanda vía socket", e);
             }
 
@@ -225,20 +219,6 @@ public class KdsController {
         }
     }
 
-    private String obtenerEstadoActualDetalle(Connection conn, int idDetalle) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT estado_cocina FROM detalle_pedido WHERE id_detalle_pedido = ?")) {
-            ps.setInt(1, idDetalle);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    String val = rs.getString("estado_cocina");
-                    return val != null ? val.trim().toUpperCase(Locale.ROOT) : "PENDIENTE";
-                }
-            }
-        }
-        return null;
-    }
-
     /**
      * Marca únicamente el pedido indicado como ENTREGADO sin afectar ni limpiar otros pedidos en cocina (v4.4.0 §1).
      */
@@ -246,15 +226,14 @@ public class KdsController {
         if (idPedido <= 0) {
             return false;
         }
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<DetallePedido> detalles = pedidoDAO.listarDetallesPorPedido(conn, idPedido);
-                for (DetallePedido dp : detalles) {
-                    pedidoDAO.actualizarEstadoDetalleCocina(conn, dp.getIdDetallePedido(), "ENTREGADO");
-                }
-                pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                return true;
+        try {
+            List<DetallePedido> detalles = pedidoService.listarItemsPendientesCocinaPorPedido(idPedido);
+            List<Integer> idsDetalle = new ArrayList<>();
+            for (DetallePedido dp : detalles) {
+                idsDetalle.add(dp.getIdDetallePedido());
             }
+            pedidoService.marcarPedidoEntregadoKds(idsDetalle, idPedido);
+            return true;
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error al marcar pedido #" + idPedido + " como ENTREGADO en KDS", e);
         }

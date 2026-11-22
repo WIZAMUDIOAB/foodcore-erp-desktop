@@ -5,7 +5,6 @@ module com.foodcore {
     requires java.desktop;
     requires java.logging;
     requires com.zaxxer.hikari;
-    requires com.google.gson;
     requires org.flywaydb.core;
 
     opens com.foodcore to javafx.fxml;

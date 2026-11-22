@@ -1,13 +1,12 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.DetallePedido;
+import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
-import com.google.gson.JsonObject;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.event.ActionEvent;
@@ -22,7 +21,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
-import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -62,7 +60,7 @@ public class ComandaCardController {
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
     private BiConsumer<Integer, Integer> onDragReordenarListener;
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final PedidoService pedidoService = new PedidoService();
 
     public static String determinarColorPorSegundos(long segundos) {
         long min = Math.max(0L, segundos) / 60L;
@@ -389,16 +387,7 @@ public class ComandaCardController {
 
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
-                        }
-                        if (idPedido > 0) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
-                        }
-                    }
-                },
+                () -> pedidoService.marcarItemEnPreparacionKds(idDetallePedido, idPedido),
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex)
             );
@@ -416,20 +405,12 @@ public class ComandaCardController {
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
-                        }
-                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
-                        }
-
-                        JsonObject json = new JsonObject();
-                        json.addProperty("accion", "PLATO_DESPACHADO");
-                        json.addProperty("idPedido", idPedido);
-                        json.addProperty("idDetallePedido", idDetallePedido);
-                        ServidorSockets.getInstance().emitirMensaje(json);
-                    }
+                    pedidoService.marcarItemEstadoYActualizarPedidoKds(idDetallePedido, idPedido, "LISTO");
+                    ObjectNode json = JsonMapperProvider.getMapper().createObjectNode();
+                    json.put("accion", "PLATO_DESPACHADO");
+                    json.put("idPedido", idPedido);
+                    json.put("idDetallePedido", idDetallePedido);
+                    ServidorSockets.getInstance().emitirMensaje(json);
                 },
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex)
@@ -451,16 +432,7 @@ public class ComandaCardController {
 
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
-                        }
-                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                        }
-                    }
-                },
+                () -> pedidoService.marcarItemEstadoYActualizarPedidoKds(idDetallePedido, idPedido, "ENTREGADO"),
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex)
             );

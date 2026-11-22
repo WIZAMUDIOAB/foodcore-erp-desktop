@@ -48,6 +48,16 @@ public class PedidoDAOImpl extends com.foodcore.dao.PedidoDAOImpl {
     }
 
     @Override
+    public List<DetallePedido> listarItemsPendientesCocinaPorPedido(Connection conn, int idPedido) throws SQLException {
+        return super.listarItemsPendientesCocinaPorPedido(conn, idPedido);
+    }
+
+    @Override
+    public String obtenerEstadoCocinaDetalle(Connection conn, int idDetallePedido) throws SQLException {
+        return super.obtenerEstadoCocinaDetalle(conn, idDetallePedido);
+    }
+
+    @Override
     public void actualizarEstadoMesaConVersion(Connection conn, long idMesa, String nuevoEstado, int versionEsperada) throws SQLException {
         super.actualizarEstadoMesaConVersion(conn, idMesa, nuevoEstado, versionEsperada);
     }
