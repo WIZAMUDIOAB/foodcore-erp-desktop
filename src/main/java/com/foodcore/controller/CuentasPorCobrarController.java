@@ -3,16 +3,11 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.CajaDAO;
-import com.foodcore.dao.CajaDAOImpl;
-import com.foodcore.dao.CuentaPorCobrarDAO;
-import com.foodcore.dao.impl.CuentaPorCobrarDAOImpl;
-import com.foodcore.model.Caja;
 import com.foodcore.model.CuentaPorCobrar;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.CuentasPorCobrarService;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.ReporteExportUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -28,11 +23,9 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class CuentasPorCobrarController {
 
@@ -66,8 +59,7 @@ public class CuentasPorCobrarController {
     @FXML private TextField txtModalNota;
     @FXML private Label lblModalCobroError;
 
-    private final CuentaPorCobrarDAO cuentaPorCobrarDAO = new CuentaPorCobrarDAOImpl();
-    private final CajaDAO cajaDAO = new CajaDAOImpl();
+    private final CuentasPorCobrarService cuentasPorCobrarService = new CuentasPorCobrarService();
     private final FinanzasService finanzasService = new FinanzasService();
     private final ExportacionContableService exportacionService = new ExportacionContableService();
 
@@ -109,13 +101,7 @@ public class CuentasPorCobrarController {
     public void cargarCuentasAsync() {
         final String filtro = cbFiltroEstado.getValue();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return (filtro == null || "TODAS".equals(filtro))
-                        ? cuentaPorCobrarDAO.listarTodas(conn)
-                        : cuentaPorCobrarDAO.listarPorEstado(conn, filtro);
-                }
-            },
+            () -> cuentasPorCobrarService.listarPorFiltro(filtro),
             cuentas -> {
                 listaCxc.setAll(cuentas);
                 double saldoTotal = 0.0;
@@ -193,15 +179,7 @@ public class CuentasPorCobrarController {
 
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                Integer idCaja = null;
-                try (Connection conn = ConexionBD.getConnection()) {
-                    Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
-                    if (cajaOpt.isPresent()) {
-                        idCaja = cajaOpt.get().getIdCaja();
-                    }
-                } catch (java.sql.SQLException | RuntimeException ignored) {
-                    // Caja opcional para este flujo
-                }
+                Integer idCaja = cuentasPorCobrarService.obtenerIdCajaAbiertaOptional();
                 finanzasService.registrarCobroCliente(idCuenta, montoFinal, metodoFinal, idCaja, idUsrFinal, notaFinal);
             },
             () -> {

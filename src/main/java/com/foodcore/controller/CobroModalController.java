@@ -3,8 +3,6 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.ClienteDAO;
-import com.foodcore.dao.impl.ClienteDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.ComprobantePago;
@@ -12,8 +10,8 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.VentaService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -52,7 +50,7 @@ public class CobroModalController {
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
     private final VentaService ventaService = new VentaService();
-    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
+    private final ClienteGestionService clienteGestionService = new ClienteGestionService();
 
     @FXML
     public void initialize() {
@@ -241,10 +239,10 @@ public class CobroModalController {
                                 venta, itemsCopia, comprobante, docCliente, nombreCliente);
                     } else {
                         if (venta.getIdCliente() == null && !docCliente.isBlank() && !"00000000".equals(docCliente)) {
-                            try (java.sql.Connection connCli = ConexionBD.getConnection()) {
-                                java.util.Optional<Cliente> optCli = clienteDAO.buscarPorDniOTelefono(connCli, docCliente);
-                                optCli.ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
-                            } catch (java.sql.SQLException ex) {
+                            try {
+                                clienteGestionService.buscarPorDniOTelefono(docCliente)
+                                        .ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
+                            } catch (Exception ex) {
                                 LOGGER.log(Level.FINE, "No se pudo resolver cliente por documento", ex);
                             }
                         }
