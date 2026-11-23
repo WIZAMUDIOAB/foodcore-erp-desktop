@@ -21,6 +21,7 @@ import com.foodcore.service.DeliveryWebhookService;
 import com.foodcore.service.TunnelService;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
 import org.junit.jupiter.api.AfterEach;
@@ -369,6 +370,7 @@ class HardeningAuthApiSecurityTest {
     @Test
     @DisplayName("Aislamiento Cloudflare Tunnel: bloquea rutas no públicas por header CF-* y aísla conector loopback 127.0.0.1")
     void testAislamientoCloudflareYConectorMenuPublico() throws Exception {
+        asegurarBdPruebasLimpiaParaAislamiento();
         int mainPort = puertoLibre();
         int publicMenuPort = puertoLibre();
         JwtService jwt = new JwtService(TEST_SECRET);
@@ -778,5 +780,27 @@ class HardeningAuthApiSecurityTest {
                 Connection.class.getClassLoader(),
                 new Class<?>[]{Connection.class},
                 (proxy, method, args) -> "prepareStatement".equals(method.getName()) ? ps : null);
+    }
+
+    private static void asegurarBdPruebasLimpiaParaAislamiento() {
+        String activeJdbcUrl = MySqlIntegrationTestSupport.getActiveJdbcUrl();
+        if (activeJdbcUrl != null && !activeJdbcUrl.isBlank()) {
+            MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
+            return;
+        }
+        if (tieneVariableConfigurada("FOODCORE_DB_PASS") && tieneVariableConfigurada("FOODCORE_MIGRATOR_PASS")) {
+            MySqlIntegrationTestSupport.inicializarEntornoMySql();
+        } else {
+            ConexionBD.closePool();
+        }
+    }
+
+    private static boolean tieneVariableConfigurada(String nombre) {
+        String prop = System.getProperty(nombre);
+        if (prop != null && !prop.isBlank()) {
+            return true;
+        }
+        String env = System.getenv(nombre);
+        return env != null && !env.isBlank();
     }
 }
