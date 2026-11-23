@@ -71,4 +71,12 @@ class ServiceSolidArchitectureTest {
         assertFalse(read(root).contains("new StringBuilder"));
         assertFalse(read(sync).contains("new StringBuilder"));
     }
+
+    @Test
+    void pomDeclaresJacocoGatesForSolidServicePackages() throws IOException {
+        String pom = Files.readString(Path.of("pom.xml"));
+        assertTrue(pom.contains("com/foodcore/service/venta"));
+        assertTrue(pom.contains("com/foodcore/service/finanzas"));
+        assertTrue(pom.contains("com/foodcore/service/caja"));
+    }
 }
