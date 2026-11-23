@@ -112,6 +112,18 @@
     -color-accent-rose: -status-danger;
     -color-accent-rose-soft: -status-danger-bg;
 
+    /* Tokens para remanentes setStyle migrados (Ola 2) */
+    -fc-teal-success: #2a9d8f;
+    -fc-crimson-danger: #e63946;
+    -fc-bd-ok-bg: #e6f4ea;
+    -fc-bd-error-bg: #fee2e2;
+    -fc-kds-combo-badge-bg: #4F46E5;
+    -fc-kds-combo-header-text: #EA580C;
+    -fc-kds-combo-item-text: #FAF9F6;
+    -fc-kiosk-qty-bg: #FFFFFF;
+    -fc-kiosk-qty-text: #374151;
+    -fc-kiosk-qty-border: #D1D5DB;
+
     -fx-base: -bg-surface;
     -fx-background-color: -bg-canvas;
     -fx-text-fill: -text-primary;
@@ -2727,25 +2739,25 @@
 }
 
 /* --- Remanentes setStyle migrados (Ola 2) ------------------------------- */
-.fc-text-success-bold { -fx-text-fill: #2a9d8f; -fx-font-weight: bold; }
-.fc-text-danger-bold { -fx-text-fill: #e63946; -fx-font-weight: bold; }
+.fc-text-success-bold { -fx-text-fill: -fc-teal-success; -fx-font-weight: bold; }
+.fc-text-danger-bold { -fx-text-fill: -fc-crimson-danger; -fx-font-weight: bold; }
 .fc-ticket-preview-mono { -fx-font-family: "Consolas", monospace; -fx-font-size: 12px; }
-.fc-bd-pill-ok { -fx-background-color: #e6f4ea; -fx-text-fill: #2a9d8f; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold; }
-.fc-bd-pill-error { -fx-background-color: #fee2e2; -fx-text-fill: #e63946; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold; }
-.fc-kds-combo-badge { -fx-background-color: #4F46E5; -fx-text-fill: #FFFFFF; -fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2px 7px; -fx-background-radius: 6px; }
+.fc-bd-pill-ok { -fx-background-color: -fc-bd-ok-bg; -fx-text-fill: -fc-teal-success; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold; }
+.fc-bd-pill-error { -fx-background-color: -fc-bd-error-bg; -fx-text-fill: -fc-crimson-danger; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold; }
+.fc-kds-combo-badge { -fx-background-color: -fc-kds-combo-badge-bg; -fx-text-fill: -text-inverse; -fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 2px 7px; -fx-background-radius: 6px; }
 .fc-kds-combo-box { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-border-color: rgba(234, 88, 12, 0.35); -fx-border-radius: 6px; -fx-background-radius: 6px; -fx-padding: 6px 9px; }
-.fc-kds-combo-header { -fx-text-fill: #EA580C; -fx-font-size: 11px; -fx-font-weight: 700; }
-.fc-kds-combo-item { -fx-text-fill: #FAF9F6; -fx-font-size: 12.5px; -fx-font-weight: 600; }
+.fc-kds-combo-header { -fx-text-fill: -fc-kds-combo-header-text; -fx-font-size: 11px; -fx-font-weight: 700; }
+.fc-kds-combo-item { -fx-text-fill: -fc-kds-combo-item-text; -fx-font-size: 12.5px; -fx-font-weight: 600; }
 .fc-kiosk-qty-btn {
     -fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px;
     -fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px;
     -fx-padding: 0; -fx-font-size: 16px; -fx-font-weight: 700;
-    -fx-background-color: #FFFFFF; -fx-text-fill: #374151;
-    -fx-border-color: #D1D5DB; -fx-border-radius: 6px; -fx-background-radius: 6px;
+    -fx-background-color: -fc-kiosk-qty-bg; -fx-text-fill: -fc-kiosk-qty-text;
+    -fx-border-color: -fc-kiosk-qty-border; -fx-border-radius: 6px; -fx-background-radius: 6px;
     -fx-cursor: hand; -fx-alignment: center;
 }
-.fc-mesa-badge-warning { -fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-background-radius: 8px; -fx-padding: 2px 8px; }
-.fc-btn-approve-xs { -fx-background-color: #059669; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4px 10px; -fx-background-radius: 6px; -fx-cursor: hand; }
-.fc-btn-reject-xs { -fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4px 10px; -fx-background-radius: 6px; -fx-cursor: hand; }
+.fc-mesa-badge-warning { -fx-background-color: -status-warning-bg; -fx-text-fill: -status-warning; -fx-font-weight: bold; -fx-background-radius: 8px; -fx-padding: 2px 8px; }
+.fc-btn-approve-xs { -fx-background-color: -status-success; -fx-text-fill: -text-inverse; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4px 10px; -fx-background-radius: 6px; -fx-cursor: hand; }
+.fc-btn-reject-xs { -fx-background-color: -status-danger; -fx-text-fill: -text-inverse; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4px 10px; -fx-background-radius: 6px; -fx-cursor: hand; }
 .fc-col-danger-right-bold { -fx-text-fill: -fc-danger; -fx-font-weight: bold; -fx-alignment: CENTER-RIGHT; }
 .fc-col-danger-right { -fx-text-fill: -fc-danger; -fx-alignment: CENTER-RIGHT; }
