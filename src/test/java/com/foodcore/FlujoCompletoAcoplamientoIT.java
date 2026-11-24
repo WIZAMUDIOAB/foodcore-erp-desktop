@@ -2,7 +2,7 @@ package com.foodcore;
 
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.InsumoDAOImpl;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.impl.VentaDAOImpl;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DetallePedido;
@@ -17,6 +17,7 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
@@ -82,7 +83,7 @@ class FlujoCompletoAcoplamientoIT {
         pedidoDAO = new PedidoDAOImpl();
         insumoDAO = new InsumoDAOImpl();
         CajaDAOImpl cajaDAO = new CajaDAOImpl();
-        pedidoService = new PedidoService(tx, pedidoDAO, new AutorizacionService());
+        pedidoService = new PedidoServiceImpl(tx, pedidoDAO, new AutorizacionService());
         ventaService = new VentaServiceImpl(tx, new VentaDAOImpl(), cajaDAO, insumoDAO, pedidoDAO);
         cajaService = new CajaServiceImpl(tx, cajaDAO);
         finanzasBiService = new FinanzasBiService();

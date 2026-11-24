@@ -59,12 +59,6 @@
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
 
-    <!-- Justificación: Adaptadores de transición en com.foodcore.dao.impl heredan de sus clases base históricas homónimas en com.foodcore.dao para preservar compatibilidad binaria sin duplicar lógica. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
-    <Match>
-        <Class name="~com\.foodcore\.dao\.impl\.(CajaDAOImpl|InsumoDAOImpl|PedidoDAOImpl|UsuarioDAOImpl)"/>
-        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
-    </Match>
-
     <!-- Justificación FindSecBugs (Riesgo aceptado R1 / R-KDS-TLS-01 en docs/RISK_ACCEPTANCE.md): El canal TCP 9090 de KDS opera sin TLS en subred LAN cableada aislada con autenticación HELLO/AUTH_TERMINAL y firma HMAC-SHA256. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
     <Match>
         <Class name="com.foodcore.util.ServidorSockets"/>
@@ -95,7 +89,7 @@
 
     <!-- Justificación FindSecBugs (Falso positivo): SqlQueryBuilder.buildInPlaceholders genera exclusivamente marcadores '?' separados por coma; los valores se vinculan vía PreparedStatement.setLong. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
     <Match>
-        <Class name="com.foodcore.dao.InsumoDAOImpl"/>
+        <Class name="com.foodcore.dao.impl.InsumoDAOImpl"/>
         <Method name="lockearPorIds"/>
         <Bug pattern="SQL_INJECTION_JDBC"/>
     </Match>
@@ -119,7 +113,7 @@
 
     <!-- Justificación FindSecBugs (Falso positivo): La ruta por defecto del acta se construye únicamente con entero idCaja y timestamp LocalDateTime formateado (sin entrada textual de usuario). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
     <Match>
-        <Class name="com.foodcore.service.CajaService"/>
+        <Class name="com.foodcore.service.impl.CajaServiceImpl"/>
         <Method name="cerrarTurnoConActaPdf"/>
         <Bug pattern="PATH_TRAVERSAL_IN"/>
     </Match>

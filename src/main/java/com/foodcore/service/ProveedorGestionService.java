@@ -1,7 +1,7 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.ProveedorDAO;
 import com.foodcore.dao.impl.ProveedorDAOImpl;
 import com.foodcore.model.Insumo;

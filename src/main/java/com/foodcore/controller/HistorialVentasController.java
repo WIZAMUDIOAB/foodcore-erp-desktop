@@ -8,6 +8,7 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -75,7 +76,7 @@ public class HistorialVentasController {
     @FXML private Label lblTotalReembolso;
     @FXML private Button btnDevolucionParcial;
 
-    private final VentaService ventaService = new VentaService();
+    private final VentaService ventaService = new VentaServiceImpl();
     private final AutorizacionService autorizacionService = new AutorizacionService();
     private final ObservableList<Venta> ventas = FXCollections.observableArrayList();
     private final ObservableList<DetalleVenta> detalles = FXCollections.observableArrayList();

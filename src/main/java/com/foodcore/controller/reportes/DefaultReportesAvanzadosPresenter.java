@@ -1,6 +1,5 @@
 package com.foodcore.controller.reportes;
 
-import com.foodcore.controller.ReportesAvanzadosController;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ComparativaPeriodos;
 import com.foodcore.model.MargenCategoria;
@@ -87,9 +86,9 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
             return consultarCohortes(fin, comparativa);
         }
         ResultadoReporteAvanzado res = analiticaFn.consultar(categoria, ini, fin);
-        List<ReportesAvanzadosController.FilaReporteAvanzado> filas = new ArrayList<>();
+        List<FilaReporteAvanzado> filas = new ArrayList<>();
         for (String[] fila : res.filas()) {
-            filas.add(new ReportesAvanzadosController.FilaReporteAvanzado(fila[0], fila[1], fila[2], fila[3], fila[4]));
+            filas.add(new FilaReporteAvanzado(fila[0], fila[1], fila[2], fila[3], fila[4]));
         }
         List<PieSlice> slices = new ArrayList<>();
         for (RebanadaPie rebanada : res.slices()) {
@@ -113,7 +112,7 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
     private ResultadoAnalisisAvanzado consultarMargenesPorCategoria(LocalDate ini, LocalDate fin,
             ComparativaPeriodos comparativa) {
         String[] headers = {"Categoría", "Ingresos S/", "Costo Receta S/", "Margen Bruto S/", "Margen %"};
-        List<ReportesAvanzadosController.FilaReporteAvanzado> filas = new ArrayList<>();
+        List<FilaReporteAvanzado> filas = new ArrayList<>();
         List<PieSlice> slices = new ArrayList<>();
         BigDecimal cero = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal minSlice = new BigDecimal("0.01");
@@ -130,7 +129,7 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
                 BigDecimal ingresos = mc.ingresosVenta() != null ? mc.ingresosVenta().setScale(2, RoundingMode.HALF_UP) : cero;
                 BigDecimal costo = mc.costoReceta() != null ? mc.costoReceta().setScale(2, RoundingMode.HALF_UP) : cero;
                 BigDecimal margen = mc.margenBruto() != null ? mc.margenBruto().setScale(2, RoundingMode.HALF_UP) : cero;
-                filas.add(new ReportesAvanzadosController.FilaReporteAvanzado(mc.nombreCategoria(),
+                filas.add(new FilaReporteAvanzado(mc.nombreCategoria(),
                         "S/ " + fmt2(ingresos), "S/ " + fmt2(costo),
                         "S/ " + fmt2(margen), fmt1(mc.margenPorcentaje()) + "%"));
                 slices.add(new PieSlice(mc.nombreCategoria() + " (" + fmt1(mc.margenPorcentaje()) + "%)",
@@ -162,7 +161,7 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
 
     private ResultadoAnalisisAvanzado consultarCohortes(LocalDate fechaCorte, ComparativaPeriodos comparativa) {
         String[] headers = {"Segmento / Cohorte", "Clientes", "Retención / Mes 2", "Mes 3", "Criterio / Mes 4"};
-        List<ReportesAvanzadosController.FilaReporteAvanzado> filas = new ArrayList<>();
+        List<FilaReporteAvanzado> filas = new ArrayList<>();
         ReporteCohortes reporte;
         try {
             reporte = cohortesFn.apply(fechaCorte);
@@ -171,11 +170,11 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
             reporte = new ReporteCohortes(fechaCorte, YearMonth.from(fechaCorte), 0, 0, 0, 0, false, List.of(), List.of());
         }
         for (ReporteCohortes.SegmentoRetencionFila seg : reporte.resumenRetencion()) {
-            filas.add(new ReportesAvanzadosController.FilaReporteAvanzado(seg.segmento(), seg.cantidad() + " clientes",
+            filas.add(new FilaReporteAvanzado(seg.segmento(), seg.cantidad() + " clientes",
                     FormatoBiUiHelper.formatearPorcentajeCohorte(seg.porcentaje()), "-", seg.criterio()));
         }
         for (ReporteCohortes.CohorteMensualFila coh : reporte.cohortes()) {
-            filas.add(new ReportesAvanzadosController.FilaReporteAvanzado("Cohorte " + coh.etiquetaCohorte(),
+            filas.add(new FilaReporteAvanzado("Cohorte " + coh.etiquetaCohorte(),
                     coh.tamanoCohorte() + " clientes", FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes2Pct()),
                     FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes3Pct()),
                     FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes4Pct())));

@@ -9,8 +9,8 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.ActaEntregaTurnoService;
-import com.foodcore.service.CajaService;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -97,20 +97,20 @@ public final class DefaultArqueoCierreZUseCase implements ArqueoCierreZUseCase {
     }
 
     @Override
-    public CajaService.ResultadoCierreConActa cerrarTurnoCaja(int idCaja, int idUsuarioCierre,
+    public ResultadoCierreConActa cerrarTurnoCaja(int idCaja, int idUsuarioCierre,
                                                               BigDecimal efectivoFisicoContado)
             throws NegocioException, SQLException {
         return ejecutarCierreTurnoTx(idCaja, idUsuarioCierre, efectivoFisicoContado);
     }
 
     @Override
-    public CajaService.ResultadoCierreConActa cerrarTurnoConActaPdf(int idCaja, int idUsuarioCierre,
+    public ResultadoCierreConActa cerrarTurnoConActaPdf(int idCaja, int idUsuarioCierre,
                                                                     BigDecimal efectivoFisicoContado,
                                                                     String responsableSalida,
                                                                     String responsableEntrada,
                                                                     File archivoDestinoResuelto)
             throws NegocioException, SQLException {
-        CajaService.ResultadoCierreConActa parcial = ejecutarCierreTurnoTx(
+        ResultadoCierreConActa parcial = ejecutarCierreTurnoTx(
                 idCaja, idUsuarioCierre, efectivoFisicoContado);
         try {
             File destino = Objects.requireNonNull(archivoDestinoResuelto,
@@ -118,7 +118,7 @@ public final class DefaultArqueoCierreZUseCase implements ArqueoCierreZUseCase {
             File pdfGenerado = actaEntregaTurnoService.generarActaEntregaTurnoPdf(
                     parcial.cajaCerrada(), parcial.efectivoContado(), parcial.diferencia(),
                     parcial.insumosCriticos(), responsableSalida, responsableEntrada, destino);
-            return new CajaService.ResultadoCierreConActa(parcial.cajaCerrada(), parcial.montoEsperado(),
+            return new ResultadoCierreConActa(parcial.cajaCerrada(), parcial.montoEsperado(),
                     parcial.efectivoContado(), parcial.diferencia(), parcial.insumosCriticos(), pdfGenerado);
         } catch (Exception ex) {
             throw new NegocioException("La caja fue cerrada pero falló la generación del Acta PDF: "
@@ -126,7 +126,7 @@ public final class DefaultArqueoCierreZUseCase implements ArqueoCierreZUseCase {
         }
     }
 
-    private CajaService.ResultadoCierreConActa ejecutarCierreTurnoTx(int idCaja, int idUsuarioCierre,
+    private ResultadoCierreConActa ejecutarCierreTurnoTx(int idCaja, int idUsuarioCierre,
                                                                       BigDecimal efectivoFisicoContado)
             throws NegocioException, SQLException {
         if (efectivoFisicoContado == null || efectivoFisicoContado.compareTo(BigDecimal.ZERO) < 0) {
@@ -166,7 +166,7 @@ public final class DefaultArqueoCierreZUseCase implements ArqueoCierreZUseCase {
             List<InsumoCriticoTurno> criticos = obtenerInsumosCriticosTurno(conn);
             LOGGER.info("Caja #" + idCaja + " cerrada exitosamente. " + glosa
                     + " | Insumos críticos: " + criticos.size());
-            return new CajaService.ResultadoCierreConActa(
+            return new ResultadoCierreConActa(
                     caja, montoEsperado, fisicoNorm, diferencia, criticos, null);
         });
     }

@@ -15,8 +15,12 @@ import com.foodcore.model.KardexMovimiento;
 import com.foodcore.model.Receta;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
+import com.foodcore.model.dto.SubcuentaItems;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.VentaServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.InvocationHandler;
@@ -217,19 +221,19 @@ class VentaKardexHandlerUnitTest {
             }
             @Override
             public void validarYPrepararMontosVenta(Venta v, List<DetalleVenta> detalles,
-                                                     List<VentaService.PagoSplit> pagos) { }
+                                                     List<PagoSplit> pagos) { }
             @Override
             public String normalizarMedioPagoMovimientoCaja(String medioPago) { return "CREDITO"; }
         };
         RegistrarVentaUseCase registrar = new RegistrarVentaUseCase() {
             @Override
             public Venta registrarVentaConPagos(Venta v, List<DetalleVenta> detalles, ComprobantePago c,
-                                                 List<VentaService.PagoSplit> pagos) {
+                                                 List<PagoSplit> pagos) {
                 operacion.set("registrar"); return v;
             }
             @Override
             public Venta registrarVentaDividida(Venta v, List<DetalleVenta> detalles, ComprobantePago c,
-                                                  List<VentaService.PagoSplit> pagos) {
+                                                  List<PagoSplit> pagos) {
                 operacion.set("dividida"); return v;
             }
             @Override
@@ -238,12 +242,12 @@ class VentaKardexHandlerUnitTest {
                 operacion.set("credito"); return v;
             }
             @Override
-            public List<Venta> dividirCuentaPorItems(List<VentaService.SubcuentaItems> subcuentas, int idUsuario) {
+            public List<Venta> dividirCuentaPorItems(List<SubcuentaItems> subcuentas, int idUsuario) {
                 operacion.set("dividirItems"); return List.of(venta);
             }
             @Override
             public Venta registrarVentaEnConexion(Connection conn, Venta v, List<DetalleVenta> detalles,
-                    ComprobantePago c, List<VentaService.PagoSplit> pagos) { return v; }
+                    ComprobantePago c, List<PagoSplit> pagos) { return v; }
         };
         AnularDevolverVentaUseCase anular = new AnularDevolverVentaUseCase() {
             @Override
@@ -256,12 +260,12 @@ class VentaKardexHandlerUnitTest {
                 operacion.set("supervisor"); return null;
             }
             @Override
-            public VentaService.ResultadoDevolucionParcial devolverItemsParcial(int id, List<Integer> ids,
+            public ResultadoDevolucionParcial devolverItemsParcial(int id, List<Integer> ids,
                     SesionUsuario usuario, String motivo) {
                 operacion.set("devolucion"); return null;
             }
         };
-        VentaService service = new VentaService(ventaDAO, validator, registrar, anular);
+        VentaService service = new VentaServiceImpl(ventaDAO, validator, registrar, anular);
 
         assertSame(venta, service.procesarCobroVenta(venta, List.of(detalle), comprobante));
         assertEquals("registrar", operacion.get());

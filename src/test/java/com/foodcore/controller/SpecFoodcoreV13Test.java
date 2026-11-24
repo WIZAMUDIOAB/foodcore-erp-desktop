@@ -3,7 +3,7 @@ package com.foodcore.controller;
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.RolDAO;
 import com.foodcore.dao.impl.RolDAOImpl;
 import com.foodcore.dao.AuditoriaDAO;

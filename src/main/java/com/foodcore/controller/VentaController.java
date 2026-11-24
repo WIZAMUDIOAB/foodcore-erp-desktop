@@ -28,6 +28,7 @@ import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
@@ -36,7 +37,9 @@ import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaPosConsultaService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -81,7 +84,7 @@ public class VentaController implements VentaPosOrdenHostPort,
     public static final String MODALIDAD_SPLIT_ITEMS = VentaCobroCoordinator.MODALIDAD_SPLIT_ITEMS;
     private static final VentaMesasCanalCoordinator CANAL_STATICS = new DefaultVentaMesasCanalCoordinator(null);
     private static final VentaCobroCoordinator COBRO_STATICS = new DefaultVentaCobroCoordinator(
-            new VentaService(), new AutorizacionService());
+            new VentaServiceImpl(), new AutorizacionService());
 
     @FXML private TabPane tabPanePosCatalogo;
     @FXML private Tab tabCatalogo;
@@ -135,7 +138,7 @@ public class VentaController implements VentaPosOrdenHostPort,
     @FXML private Button btnNotaItem;
 
     private final ObservableList<DetalleVenta> itemsVenta = FXCollections.observableArrayList();
-    private final VentaService ventaService = new VentaService();
+    private final VentaService ventaService = new VentaServiceImpl();
     private final PromocionService promocionService = new PromocionService();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
     private final VentaPosConsultaService posConsultaService = new VentaPosConsultaService();
@@ -149,7 +152,7 @@ public class VentaController implements VentaPosOrdenHostPort,
     private final VentaCobroCoordinator cobroCoordinator;
     private final VentaFidelizacionCoordinator fidelizacionCoordinator;
 
-    private PedidoService pedidoService = new PedidoService();
+    private PedidoService pedidoService = new PedidoServiceImpl();
     private VentaPosInteractionPort interactionPort;
     private VentaPosFidelizacionHelper fidelizacionHelper;
     private VentaPosOrdenOperacionesHelper operacionesHelper;
@@ -410,7 +413,7 @@ public class VentaController implements VentaPosOrdenHostPort,
         operacionesHelper().handleEnviarComanda();
     }
 
-    public static List<VentaService.PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
+    public static List<PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
             List<DetalleVenta> items) {
         return COBRO_STATICS.construirPagosPorModalidad(modalidad, totalNeto, items);
     }
@@ -420,7 +423,7 @@ public class VentaController implements VentaPosOrdenHostPort,
         operacionesHelper().handleDividirCuenta();
     }
 
-    public Venta ejecutarCobroSplitEnPagos(List<VentaService.PagoSplit> pagos) throws Exception {
+    public Venta ejecutarCobroSplitEnPagos(List<PagoSplit> pagos) throws Exception {
         return operacionesHelper().ejecutarCobroSplitEnPagos(pagos);
     }
 

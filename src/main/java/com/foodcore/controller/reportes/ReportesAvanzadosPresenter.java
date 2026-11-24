@@ -1,6 +1,5 @@
 package com.foodcore.controller.reportes;
 
-import com.foodcore.controller.ReportesAvanzadosController;
 import com.foodcore.model.ComparativaPeriodos;
 import com.foodcore.model.ReporteCohortes;
 import java.math.BigDecimal;
@@ -19,7 +18,7 @@ public interface ReportesAvanzadosPresenter {
 
     record ResultadoAnalisisAvanzado(
             String[] headers,
-            List<ReportesAvanzadosController.FilaReporteAvanzado> filas,
+            List<FilaReporteAvanzado> filas,
             List<PieSlice> slices,
             BigDecimal montoTotal,
             int cantidadTotal,

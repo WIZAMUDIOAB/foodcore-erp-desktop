@@ -7,8 +7,8 @@ import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.model.DesgloseFiscal;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -56,7 +56,7 @@ public final class DefaultVentaCalculoValidator implements VentaCalculoValidator
 
     @Override
     public void validarYPrepararMontosVenta(Venta venta, List<DetalleVenta> detalles,
-                                           List<VentaService.PagoSplit> pagosDivididos) throws NegocioException {
+                                           List<PagoSplit> pagosDivididos) throws NegocioException {
         if (venta == null) {
             throw new NegocioException("Los datos de la venta no pueden ser nulos.");
         }
@@ -124,7 +124,7 @@ public final class DefaultVentaCalculoValidator implements VentaCalculoValidator
 
         if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
             BigDecimal sumaPagos = BigDecimal.ZERO;
-            for (VentaService.PagoSplit p : pagosDivididos) {
+            for (PagoSplit p : pagosDivididos) {
                 if (p == null || p.monto() == null || p.monto().compareTo(BigDecimal.ZERO) <= 0) {
                     throw new NegocioException("Cada pago en cuenta dividida debe tener un monto estrictamente positivo.");
                 }

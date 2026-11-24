@@ -1,10 +1,10 @@
 package com.foodcore.ops;
 
-import com.foodcore.dao.CajaDAOImpl;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.CajaDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.dao.impl.AsistenciaDAOImpl;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.CierreContableDAOImpl;
@@ -32,6 +32,8 @@ import com.foodcore.model.ReporteCumplimientoTurno;
 import com.foodcore.model.TurnoProgramado;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.ResultadoCierreConActa;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.security.SesionUsuario;
@@ -44,7 +46,9 @@ import com.foodcore.service.InventarioFisicoService.ResultadoAjusteInventarioFis
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.SupervisorAutorizacionService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.VentaService.ResultadoDevolucionParcial;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImpresoraTermicaService;
@@ -118,10 +122,10 @@ class SubFaseBOperacionesIT {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
         MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
 
-        cajaService = new CajaService();
-        ventaService = new VentaService();
+        cajaService = new CajaServiceImpl();
+        ventaService = new VentaServiceImpl();
         inventarioFisicoService = new InventarioFisicoService();
-        pedidoService = new PedidoService();
+        pedidoService = new PedidoServiceImpl();
         cierreContableService = new CierreContableService();
         asistenciaService = new AsistenciaService();
         supervisorService = new SupervisorAutorizacionService();
@@ -556,7 +560,7 @@ class SubFaseBOperacionesIT {
 
         int idCaja = asegurarCajaAbierta();
         File pdfFile = tempDir.resolve("Acta_Entrega_Relevo_IT8.pdf").toFile();
-        CajaService.ResultadoCierreConActa res = cajaService.cerrarTurnoConActaPdf(
+        ResultadoCierreConActa res = cajaService.cerrarTurnoConActaPdf(
                 idCaja, 1, new BigDecimal("300.00"),
                 "Administrador Saliente", "Supervisor Entrante", pdfFile);
 

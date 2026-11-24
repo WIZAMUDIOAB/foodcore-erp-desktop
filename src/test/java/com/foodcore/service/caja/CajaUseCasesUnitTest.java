@@ -15,9 +15,11 @@ import com.foodcore.model.CategoriaGasto;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.ActaEntregaTurnoService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.CierreContableService;
+import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.tx.TransactionManager;
 import java.io.File;
 import java.lang.reflect.Proxy;
@@ -179,7 +181,7 @@ class CajaUseCasesUnitTest {
         Map<String, Object[]> resumen = Map.of("V", new Object[]{UNO});
         Map<String, BigDecimal> totales = Map.of("EFECTIVO", UNO);
         Caja caja = caja(7, "ABIERTA");
-        CajaService.ResultadoCierreConActa resultado = new CajaService.ResultadoCierreConActa(
+        ResultadoCierreConActa resultado = new ResultadoCierreConActa(
                 caja, UNO, UNO, BigDecimal.ZERO, criticos, null);
         CajaTurnoOperacionesUseCase operaciones = new CajaTurnoOperacionesUseCase() {
             public Optional<Caja> obtenerCajaActiva() { llamadas.incrementAndGet(); return Optional.of(caja); }
@@ -196,12 +198,12 @@ class CajaUseCasesUnitTest {
             public List<InsumoCriticoTurno> obtenerInsumosCriticosTurno() { llamadas.incrementAndGet(); return criticos; }
             public List<InsumoCriticoTurno> obtenerInsumosCriticosTurno(Connection c) { llamadas.incrementAndGet(); return criticos; }
             public List<InsumoCriticoTurno> clasificarInsumosCriticos(List<Insumo> i) { llamadas.incrementAndGet(); return criticos; }
-            public CajaService.ResultadoCierreConActa cerrarTurnoCaja(int c, int u, BigDecimal f) { llamadas.incrementAndGet(); return resultado; }
-            public CajaService.ResultadoCierreConActa cerrarTurnoConActaPdf(int c, int u, BigDecimal f, String s, String e, File d) {
+            public ResultadoCierreConActa cerrarTurnoCaja(int c, int u, BigDecimal f) { llamadas.incrementAndGet(); return resultado; }
+            public ResultadoCierreConActa cerrarTurnoConActaPdf(int c, int u, BigDecimal f, String s, String e, File d) {
                 llamadas.incrementAndGet(); destino.set(d); return resultado;
             }
         };
-        CajaService service = new CajaService(operaciones, arqueo);
+        CajaService service = new CajaServiceImpl(operaciones, arqueo);
         assertEquals(Optional.of(caja), service.obtenerCajaActiva());
         assertEquals(7, service.abrirTurnoCaja(1, "Caja", UNO));
         service.registrarGastoOperativo(7, 1, UNO, "gasto");

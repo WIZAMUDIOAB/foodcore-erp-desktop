@@ -17,13 +17,14 @@ import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.PedidoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaPosConsultaService;
-import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -105,7 +106,7 @@ class VentaCoordinatorsUnitTest {
     void carritoActualizaLineasTotalesYLimitaCanje() throws NegocioException {
         DefaultVentaCarritoHandler carrito = new DefaultVentaCarritoHandler(
                 (items, bruto) -> new PromocionService.ResultadoEvaluacion(new BigDecimal("2.00"),
-                        bruto.subtract(new BigDecimal("2.00")), List.of("promo")), new VentaService());
+                        bruto.subtract(new BigDecimal("2.00")), List.of("promo")), new VentaServiceImpl());
         Producto producto = producto(4, 1, "P-04", "Producto", true);
         List<DetalleVenta> items = new ArrayList<>();
         assertTrue(carrito.agregarItemLocal(items, producto, null, null, List.of(), null, 2,
@@ -205,7 +206,7 @@ class VentaCoordinatorsUnitTest {
         Pedido pedidoExistente = new Pedido(42, 1, null, "04", "REGISTRADO", new BigDecimal("20.00"));
         pedidoExistente.setDetalles(List.of(inicial));
 
-        controller.setPedidoService(new PedidoService() {
+        controller.setPedidoService(new PedidoServiceImpl() {
             @Override
             public Pedido agregarItemsAPedido(int idPedido, List<DetallePedido> nuevos) throws SQLException {
                 throw new SQLException("BD no disponible simulada");
@@ -303,7 +304,7 @@ class VentaCoordinatorsUnitTest {
         AtomicInteger llamadasPersistencia = new AtomicInteger();
         VentaController controller = crearControllerConStubs(fakePort, fid, llamadasPersistencia);
 
-        controller.setPedidoService(new PedidoService() {
+        controller.setPedidoService(new PedidoServiceImpl() {
             @Override
             public Pedido registrarPedidoYEnviarComanda(Pedido pedido, List<DetallePedido> detalles) {
                 llamadasPersistencia.incrementAndGet();
@@ -326,7 +327,7 @@ class VentaCoordinatorsUnitTest {
         });
 
         assertThrows(NegocioException.class, () -> controller.ejecutarCobroSplitEnPagos(
-                List.of(new VentaService.PagoSplit("EFECTIVO", new BigDecimal("25.00")))));
+                List.of(new PagoSplit("EFECTIVO", new BigDecimal("25.00")))));
         assertEquals(0, llamadasPersistencia.get(),
                 "Ninguna operación POS debe persistir sin sesión de usuario activa");
         assertNull(AuthService.getUsuarioSesionActual());
@@ -341,9 +342,9 @@ class VentaCoordinatorsUnitTest {
         VentaCatalogoPresenter catalogo = new VentaCatalogoPresenter(List::of, List::of);
         DefaultVentaCarritoHandler carrito = new DefaultVentaCarritoHandler(
                 (items, bruto) -> new PromocionService.ResultadoEvaluacion(BigDecimal.ZERO, bruto, List.of()),
-                new VentaService());
+                new VentaServiceImpl());
         DefaultVentaCobroCoordinator cobro = new DefaultVentaCobroCoordinator(
-                new VentaService() {
+                new VentaServiceImpl() {
                     @Override
                     public com.foodcore.model.Venta registrarVentaDividida(com.foodcore.model.Venta venta,
                             List<DetalleVenta> det, com.foodcore.model.ComprobantePago comp,
@@ -384,9 +385,9 @@ class VentaCoordinatorsUnitTest {
         return new DetalleVenta(0, 0, id, cantidad, new BigDecimal(precio), new BigDecimal(subtotal));
     }
 
-    private static void assertSplit(List<VentaService.PagoSplit> pagos, String total) {
+    private static void assertSplit(List<PagoSplit> pagos, String total) {
         assertTrue(pagos.size() >= 2);
-        assertEquals(0, pagos.stream().map(VentaService.PagoSplit::monto)
+        assertEquals(0, pagos.stream().map(PagoSplit::monto)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(new BigDecimal(total)));
     }
 }

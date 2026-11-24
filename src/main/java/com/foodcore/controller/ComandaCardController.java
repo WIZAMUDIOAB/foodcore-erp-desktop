@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
@@ -60,7 +61,7 @@ public class ComandaCardController {
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
     private BiConsumer<Integer, Integer> onDragReordenarListener;
-    private final PedidoService pedidoService = new PedidoService();
+    private final PedidoService pedidoService = new PedidoServiceImpl();
 
     public static String determinarColorPorSegundos(long segundos) {
         long min = Math.max(0L, segundos) / 60L;

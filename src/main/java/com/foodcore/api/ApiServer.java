@@ -12,7 +12,7 @@ import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.UsuarioDAO;
-import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.dao.impl.HealthCheckDAOImpl;
 import com.foodcore.dao.impl.MesaDAOImpl;
 import com.foodcore.dao.impl.PedidoDAOImpl;
@@ -22,6 +22,9 @@ import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.AuthServiceImpl;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -76,7 +79,7 @@ public class ApiServer {
 
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                new PedidoDAOImpl(), new PedidoServiceImpl(), new UsuarioDAOImpl(), new CajaServiceImpl(), new VentaServiceImpl(),
                 new JwtService(), CorsPolicy.cargarDesdeConfiguracion(), AuthRateLimiter.cargarDesdeConfiguracion(),
                 TokenBlacklistService.getInstance());
     }
@@ -108,7 +111,7 @@ public class ApiServer {
             AuthRateLimiter rateLimiter,
             TokenBlacklistService tokenBlacklistService) {
         return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                new PedidoDAOImpl(), new PedidoServiceImpl(), new UsuarioDAOImpl(), new CajaServiceImpl(), new VentaServiceImpl(),
                 jwtService, corsPolicy, rateLimiter, tokenBlacklistService);
     }
 
@@ -120,7 +123,7 @@ public class ApiServer {
                                                  CorsPolicy corsPolicy,
                                                  AuthRateLimiter rateLimiter) {
         return new ApiServer(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                new PedidoDAOImpl(), new PedidoServiceImpl(), new UsuarioDAOImpl(), new CajaServiceImpl(), new VentaServiceImpl(),
                 jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
     }
 
@@ -130,7 +133,7 @@ public class ApiServer {
                                                  AuthService authService,
                                                  UsuarioDAO usuarioDAO) {
         return new ApiServer(authService, new ProductoDAOImpl(), new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), usuarioDAO, new CajaService(), new VentaService(),
+                new PedidoDAOImpl(), new PedidoServiceImpl(), usuarioDAO, new CajaServiceImpl(), new VentaServiceImpl(),
                 jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
     }
 
@@ -139,7 +142,7 @@ public class ApiServer {
                                                         AuthRateLimiter rateLimiter,
                                                         ProductoDAO productoDAO) {
         return new ApiServer(new AuthServiceImpl(), productoDAO, new MesaDAOImpl(),
-                new PedidoDAOImpl(), new PedidoService(), new UsuarioDAOImpl(), new CajaService(), new VentaService(),
+                new PedidoDAOImpl(), new PedidoServiceImpl(), new UsuarioDAOImpl(), new CajaServiceImpl(), new VentaServiceImpl(),
                 jwtService, corsPolicy, rateLimiter, TokenBlacklistService.crearAisladoEnMemoria());
     }
 

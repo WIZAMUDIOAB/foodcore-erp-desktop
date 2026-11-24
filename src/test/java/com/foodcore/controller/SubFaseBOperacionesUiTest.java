@@ -21,6 +21,7 @@ import com.foodcore.service.ActaEntregaTurnoService;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport.VistaCargada;
@@ -290,7 +291,7 @@ class SubFaseBOperacionesUiTest {
                 KitchenDisplayController ctrl = vista.controller();
                 ctrl.stopTimers();
 
-                PedidoService noOpPedidoService = new PedidoService(null, null, null) {
+                PedidoService noOpPedidoService = new PedidoServiceImpl(null, null, null) {
                     @Override
                     public void reordenarPrioridadKds(List<Integer> idsDetalleOrdenDescendente) {
                         // Sin BD en prueba unitaria UI

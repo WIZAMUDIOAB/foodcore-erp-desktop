@@ -10,8 +10,9 @@ import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.PedidoService;
-import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -190,7 +191,7 @@ class VentaPOSViewTest {
                 try {
                     FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
                     fakePort.configurarCobroDirecto(
-                            new DefaultVentaCobroCoordinator(new VentaService(), new AutorizacionService()));
+                            new DefaultVentaCobroCoordinator(new VentaServiceImpl(), new AutorizacionService()));
                     controller.setInteractionPort(fakePort);
                     controller.registrarAtajosTeclado();
                     controller.agregarProductoAVenta(crearProductoPrueba());
@@ -269,7 +270,7 @@ class VentaPOSViewTest {
             }
         }
 
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
         Pedido pedido = new Pedido(0, 1, null, "02", "REGISTRADO", new BigDecimal("25.00"));
         DetallePedido itemInicial = new DetallePedido(0, 0, idProductoPos, "Combo Pollo Crispy", 1,
             new BigDecimal("25.00"), new BigDecimal("25.00"), "");
@@ -351,7 +352,7 @@ class VentaPOSViewTest {
             }
         }
 
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
         Pedido pedido = new Pedido(0, 1, null, "03", "REGISTRADO", new BigDecimal("25.00"));
         DetallePedido itemInicial = new DetallePedido(0, 0, idProductoPos, "Combo Pollo Crispy", 1,
             new BigDecimal("25.00"), new BigDecimal("25.00"), "");

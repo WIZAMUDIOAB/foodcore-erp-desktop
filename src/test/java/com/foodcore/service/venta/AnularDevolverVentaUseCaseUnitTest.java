@@ -8,13 +8,13 @@ import com.foodcore.exception.NegocioException;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.SupervisorAutorizacionService;
-import com.foodcore.service.VentaService;
 import com.foodcore.tx.TransactionManager;
 import org.junit.jupiter.api.Test;
 
@@ -101,7 +101,7 @@ class AnularDevolverVentaUseCaseUnitTest {
         assertThrows(NegocioException.class, () -> h.useCase.devolverItemsParcial(10, List.of(1), sesionVigente(), "motivo"));
         h.detalles.get(0).setEstado("COMPLETADO");
 
-        VentaService.ResultadoDevolucionParcial parcial = h.useCase.devolverItemsParcial(
+        ResultadoDevolucionParcial parcial = h.useCase.devolverItemsParcial(
                 10, List.of(1), sesionVigente(), "motivo parcial");
         assertEquals("DEVUELTO", h.detalles.get(0).getEstado());
         assertEquals("COMPLETADA", parcial.nuevoEstadoVenta());
@@ -113,7 +113,7 @@ class AnularDevolverVentaUseCaseUnitTest {
         assertTrue(h.auditoriaAcciones.contains("DEVOLUCION_PARCIAL_VENTA"));
 
         Harness total = new Harness("COMPLETADA", 8, List.of(detalle(3, "50.00")));
-        VentaService.ResultadoDevolucionParcial devolucionTotal = total.useCase.devolverItemsParcial(
+        ResultadoDevolucionParcial devolucionTotal = total.useCase.devolverItemsParcial(
                 10, List.of(3), sesionVigente(), "último ítem");
         assertEquals("ANULADA", devolucionTotal.nuevoEstadoVenta());
         assertEquals(new BigDecimal("0.00"), devolucionTotal.nuevoTotalVenta());

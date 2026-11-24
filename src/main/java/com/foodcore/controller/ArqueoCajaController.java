@@ -6,8 +6,10 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
+import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -82,7 +84,7 @@ public class ArqueoCajaController {
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritMinimo;
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritEstado;
 
-    private final CajaService cajaService = new CajaService();
+    private final CajaService cajaService = new CajaServiceImpl();
     private final ObservableList<FilaCierreZ> itemsCierreZ = FXCollections.observableArrayList();
     private final ObservableList<InsumoCriticoTurno> itemsStockCritico = FXCollections.observableArrayList();
     private volatile List<CategoriaGasto> categoriasGastoCache = List.of();
@@ -593,7 +595,7 @@ public class ArqueoCajaController {
     }
 
     /** Ejecuta cierre síncrono con ruta PDF explícita para pruebas integrales del Acta de Entrega. */
-    public CajaService.ResultadoCierreConActa ejecutarCierreConActaArchivoSync(
+    public ResultadoCierreConActa ejecutarCierreConActaArchivoSync(
             BigDecimal fisico, String respEntrante, File destinoPdf) throws Exception {
         Usuario usr = AuthService.getUsuarioSesionActual();
         int idUsuario = usr != null ? usr.getIdUsuario() : 1;

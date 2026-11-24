@@ -9,7 +9,7 @@ import com.foodcore.controller.MozoOrderController;
 import com.foodcore.controller.PersonalizacionProductoController;
 import com.foodcore.controller.VentaController;
 import com.foodcore.controller.KitchenDisplayController;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
@@ -26,6 +26,7 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.MenuQrService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
@@ -101,7 +102,7 @@ class OpsAvanzadasVariantesModificadoresIT {
         personalizacionService = new PersonalizacionProductoServiceImpl();
         productoDAO = new ProductoDAOImpl();
         pedidoDAO = new PedidoDAOImpl();
-        pedidoService = new PedidoService();
+        pedidoService = new PedidoServiceImpl();
     }
 
     @Test

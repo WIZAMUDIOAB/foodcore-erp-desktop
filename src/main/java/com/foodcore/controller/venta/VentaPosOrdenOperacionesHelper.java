@@ -10,6 +10,7 @@ import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
@@ -280,7 +281,7 @@ public class VentaPosOrdenOperacionesHelper {
         BigDecimal totalNeto = host.getTotalNetoActual();
         BigDecimal basePreCanje = host.getBasePreCanjeActual();
         List<DetalleVenta> itemsSnapshot = new ArrayList<>(itemsVenta);
-        List<VentaService.PagoSplit> pagos = cobroCoordinator.construirPagosPorModalidad(
+        List<PagoSplit> pagos = cobroCoordinator.construirPagosPorModalidad(
                 res.get(), totalNeto, itemsSnapshot);
         int idUsr = usr.getIdUsuario();
         Cliente cli = host.getClienteSeleccionadoPos();
@@ -309,7 +310,7 @@ public class VentaPosOrdenOperacionesHelper {
         );
     }
 
-    public Venta ejecutarCobroSplitEnPagos(List<VentaService.PagoSplit> pagos) throws Exception {
+    public Venta ejecutarCobroSplitEnPagos(List<PagoSplit> pagos) throws Exception {
         Usuario usr = AuthService.getUsuarioSesionActual();
         if (usr == null || usr.getIdUsuario() <= 0) {
             throw new NegocioException("No hay una sesión de usuario activa para procesar la operación.");

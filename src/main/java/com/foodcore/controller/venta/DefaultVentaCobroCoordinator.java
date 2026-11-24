@@ -10,13 +10,14 @@ import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
-import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.util.ImpresoraTermicaService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,12 +46,12 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService) {
         this(ventaService, autorizacionService, ImpresoraTermicaService::new,
-                () -> new CajaService().obtenerCajaActiva());
+                () -> new CajaServiceImpl().obtenerCajaActiva());
     }
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,
             Supplier<ImpresoraTermicaService> impresoraSupplier) {
-        this(ventaService, autorizacionService, impresoraSupplier, () -> new CajaService().obtenerCajaActiva());
+        this(ventaService, autorizacionService, impresoraSupplier, () -> new CajaServiceImpl().obtenerCajaActiva());
     }
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,
@@ -62,7 +63,7 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
     }
 
     @Override
-    public List<VentaService.PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
+    public List<PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
             List<DetalleVenta> items) {
         if (totalNeto == null || totalNeto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("El total neto a dividir debe ser mayor a cero.");
@@ -76,12 +77,12 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
                 cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.DOWN);
                 ultimo = total.subtract(cuarta.multiply(new BigDecimal("3")));
             }
-            List<VentaService.PagoSplit> pagos4 = new ArrayList<>();
+            List<PagoSplit> pagos4 = new ArrayList<>();
             String[] metodos = {"EFECTIVO", "TARJETA", "YAPE_PLIN", "EFECTIVO"};
             BigDecimal[] montos = {cuarta, cuarta, cuarta, ultimo};
             for (int i = 0; i < montos.length; i++) {
                 if (montos[i].compareTo(BigDecimal.ZERO) > 0) {
-                    pagos4.add(new VentaService.PagoSplit(metodos[i], montos[i]));
+                    pagos4.add(new PagoSplit(metodos[i], montos[i]));
                 }
             }
             return pagos4;
@@ -115,15 +116,15 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
                 BigDecimal montoA = total.multiply(brutoA).divide(sumaBruta, 2, RoundingMode.HALF_UP);
                 BigDecimal montoB = total.subtract(montoA);
                 if (montoA.compareTo(BigDecimal.ZERO) > 0 && montoB.compareTo(BigDecimal.ZERO) > 0) {
-                    return List.of(new VentaService.PagoSplit("EFECTIVO", montoA),
-                            new VentaService.PagoSplit("TARJETA", montoB));
+                    return List.of(new PagoSplit("EFECTIVO", montoA),
+                            new PagoSplit("TARJETA", montoB));
                 }
             }
         }
         BigDecimal mitad = total.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP);
         BigDecimal resto = total.subtract(mitad);
-        return List.of(new VentaService.PagoSplit("EFECTIVO", mitad),
-                new VentaService.PagoSplit("TARJETA", resto));
+        return List.of(new PagoSplit("EFECTIVO", mitad),
+                new PagoSplit("TARJETA", resto));
     }
 
     @Override
@@ -138,7 +139,7 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
     public Venta registrarVentaDividida(Integer pedidoActivoId, int idUsuario, Integer idCliente,
             BigDecimal basePreCanje, BigDecimal totalNeto, BigDecimal descuentoActivo,
             BigDecimal descuentoPuntosActivo, int puntosARedimir, List<DetalleVenta> items,
-            List<VentaService.PagoSplit> pagos) throws Exception {
+            List<PagoSplit> pagos) throws Exception {
         int idCajaActiva = resolverIdCajaActiva();
         Venta venta = crearVentaConCaja(pedidoActivoId, idCajaActiva, idUsuario, idCliente, basePreCanje,
                 totalNeto, "MIXTO", descuentoActivo, descuentoPuntosActivo, puntosARedimir);

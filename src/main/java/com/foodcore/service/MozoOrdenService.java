@@ -1,7 +1,12 @@
 package com.foodcore.service;
 
+import com.foodcore.dao.ComboDAO;
+import com.foodcore.dao.ProductoDAO;
+import com.foodcore.dao.ProductoDAOImpl;
+import com.foodcore.dao.ProductoPersonalizacionDAO;
+import com.foodcore.dao.impl.ComboDAOImpl;
+import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.model.Producto;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.ConexionBD;
 
 import java.sql.Connection;
@@ -18,8 +23,9 @@ public class MozoOrdenService {
 
     private static final Logger LOGGER = Logger.getLogger(MozoOrdenService.class.getName());
 
-    private final PersonalizacionProductoService personalizacionService =
-            new PersonalizacionProductoServiceImpl();
+    private final ProductoDAO productoDAO = new ProductoDAOImpl();
+    private final ProductoPersonalizacionDAO personalizacionDAO = new ProductoPersonalizacionDAOImpl();
+    private final ComboDAO comboDAO = new ComboDAOImpl();
 
     /**
      * Lista los productos disponibles con sus opciones de personalización.
@@ -31,7 +37,8 @@ public class MozoOrdenService {
             if (conn == null) {
                 return List.of();
             }
-            return personalizacionService.listarProductosDisponiblesConOpciones(conn);
+            return CatalogoPersonalizadoHelper.listarProductosDisponiblesConOpciones(
+                    conn, productoDAO, personalizacionDAO, comboDAO);
         } catch (SQLException | RuntimeException ex) {
             LOGGER.log(Level.FINE, "No se pudieron listar los productos disponibles para la comanda", ex);
             return List.of();

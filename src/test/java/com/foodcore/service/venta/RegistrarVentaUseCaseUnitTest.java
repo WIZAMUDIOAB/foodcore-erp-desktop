@@ -13,9 +13,10 @@ import com.foodcore.model.Cliente;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
+import com.foodcore.model.dto.SubcuentaItems;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaService;
 import com.foodcore.tx.TransactionManager;
 import org.junit.jupiter.api.Test;
 
@@ -168,11 +169,11 @@ class RegistrarVentaUseCaseUnitTest {
     @Test void registrarVentaDivididaYDividirCuentaPorItemsValidacionesYExito() throws Exception {
         Estado e = new Estado(); RegistrarVentaUseCase u = caso(e); Venta v = venta(); List<DetalleVenta> d = detalles();
         assertThrows(NegocioException.class, () -> u.registrarVentaDividida(v, d, null, List.of()));
-        u.registrarVentaDividida(venta(), detalles(), null, List.of(new VentaService.PagoSplit("EFECTIVO", new BigDecimal("50.00")), new VentaService.PagoSplit("YAPE", new BigDecimal("50.00"))));
+        u.registrarVentaDividida(venta(), detalles(), null, List.of(new PagoSplit("EFECTIVO", new BigDecimal("50.00")), new PagoSplit("YAPE", new BigDecimal("50.00"))));
         assertEquals(1, e.llamadas.get("insertarVenta"));
         assertEquals(2, e.llamadas.get("registrarMovimiento"));
         assertThrows(NegocioException.class, () -> u.dividirCuentaPorItems(List.of(), 2));
-        List<Venta> ventas = u.dividirCuentaPorItems(List.of(new VentaService.SubcuentaItems(detalles(), "EFECTIVO"), new VentaService.SubcuentaItems(detalles(), "YAPE")), 2);
+        List<Venta> ventas = u.dividirCuentaPorItems(List.of(new SubcuentaItems(detalles(), "EFECTIVO"), new SubcuentaItems(detalles(), "YAPE")), 2);
         assertEquals(2, ventas.size());
     }
 

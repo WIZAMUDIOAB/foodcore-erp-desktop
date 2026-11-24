@@ -8,9 +8,11 @@ import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.controller.reportes.DefaultReportesAvanzadosPresenter;
 import com.foodcore.controller.reportes.DefaultReporteExportCoordinator;
+import com.foodcore.controller.reportes.FilaReporteAvanzado;
 import com.foodcore.controller.reportes.ReporteChartUiRenderer;
 import com.foodcore.controller.reportes.ReporteExportCoordinator;
 import com.foodcore.controller.reportes.ReportesAvanzadosPresenter;
+import com.foodcore.controller.reportes.ReportesAvanzadosViewPort;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.FormatoBiUiHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -40,7 +42,7 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ReportesAvanzadosController {
+public class ReportesAvanzadosController implements ReportesAvanzadosViewPort {
 
     public static final String REPORTE_MEDIO_PAGO = "Ventas por Medio de Pago";
     public static final String REPORTE_MARGENES_CATEGORIA = "Márgenes por Categoría";
@@ -451,31 +453,18 @@ public class ReportesAvanzadosController {
         return pieChartDistribucion;
     }
 
+    @Override
     public List<FilaReporteAvanzado> getFilasActuales() {
         return List.copyOf(listaFilas);
     }
 
+    @Override
     public List<SegmentoRetencionFila> getResumenCohortesActual() {
         return List.copyOf(listaResumenCohortes);
     }
 
+    @Override
     public List<CohorteMensualFila> getMatrizCohortesActual() {
         return List.copyOf(listaMatrizCohortes);
-    }
-
-    public static class FilaReporteAvanzado {
-        public String c1;
-        public String c2;
-        public String c3;
-        public String c4;
-        public String c5;
-
-        public FilaReporteAvanzado(String c1, String c2, String c3, String c4, String c5) {
-            this.c1 = c1;
-            this.c2 = c2;
-            this.c3 = c3;
-            this.c4 = c4;
-            this.c5 = c5;
-        }
     }
 }

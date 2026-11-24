@@ -137,7 +137,7 @@ class ReportesAvanzadosCoordinatorTest {
         DefaultReporteExportCoordinator coordinator = coordinator((titulo, headers, filas, destino) -> { },
                 (titulo, headers, filas, destino) -> { }, (titulo, headers, filas, destino) -> { });
         List<List<String>> filas = coordinator.convertirFilas(List.of(
-                new ReportesAvanzadosController.FilaReporteAvanzado("1", "2", "3", "4", "5")));
+                new FilaReporteAvanzado("1", "2", "3", "4", "5")));
         assertEquals(List.of(List.of("1", "2", "3", "4", "5")), filas);
     }
 

@@ -1,6 +1,5 @@
 package com.foodcore.controller.reportes;
 
-import com.foodcore.controller.ReportesAvanzadosController;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.util.ExportFileChooserHelper;
 import java.io.File;
@@ -48,9 +47,9 @@ public class DefaultReporteExportCoordinator implements ReporteExportCoordinator
     }
 
     @Override
-    public List<List<String>> convertirFilas(List<ReportesAvanzadosController.FilaReporteAvanzado> filas) {
+    public List<List<String>> convertirFilas(List<FilaReporteAvanzado> filas) {
         List<List<String>> resultado = new ArrayList<>();
-        for (ReportesAvanzadosController.FilaReporteAvanzado fila : filas) {
+        for (FilaReporteAvanzado fila : filas) {
             resultado.add(List.of(fila.c1, fila.c2, fila.c3, fila.c4, fila.c5));
         }
         return List.copyOf(resultado);

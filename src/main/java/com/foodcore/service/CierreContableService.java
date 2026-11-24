@@ -7,6 +7,7 @@ import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.model.CierreContable;
+import com.foodcore.service.finanzas.PeriodoContableValidator;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
@@ -23,7 +24,7 @@ import java.util.Optional;
  * Servicio de gestión del Cierre Contable Mensual (v5.2.0): bloquea ventas,
  * devoluciones parciales y gastos operativos en meses cerrados.
  */
-public class CierreContableService {
+public class CierreContableService implements PeriodoContableValidator {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
@@ -102,6 +103,7 @@ public class CierreContableService {
         });
     }
 
+    @Override
     public void validarPeriodoAbierto(Connection conn, LocalDate fecha)
             throws PeriodoCerradoException, SQLException {
         LocalDate ref = fecha != null ? fecha : LocalDate.now(ZONA_LIMA);

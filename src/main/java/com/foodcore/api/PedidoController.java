@@ -7,6 +7,7 @@ import com.foodcore.dao.impl.VentaDAOImpl;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.service.api.ApiOperacionesPort;
 import com.foodcore.service.api.DefaultApiOperacionesService;
 import io.javalin.http.Context;
@@ -30,7 +31,7 @@ public class PedidoController {
                             PedidoDAO pedidoDAO,
                             PedidoService pedidoService,
                             CajaService cajaService) {
-        this(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService, new VentaService());
+        this(state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService, new VentaServiceImpl());
     }
 
     public PedidoController(ApiState state,
@@ -47,7 +48,7 @@ public class PedidoController {
                 new VentaDAOImpl(),
                 pedidoService,
                 cajaService,
-                ventaService != null ? ventaService : new VentaService());
+                ventaService != null ? ventaService : new VentaServiceImpl());
         this.salonController = new SalonApiController(state, operaciones);
         this.kdsSyncController = new KdsSyncApiController(state, operaciones);
         this.cobroController = new CobroApiController(state, operaciones);

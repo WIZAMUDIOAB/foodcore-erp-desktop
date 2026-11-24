@@ -7,10 +7,10 @@ import com.foodcore.dao.ProductoPersonalizacionDAO;
 import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.exception.NegocioException;
-import com.foodcore.model.Combo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
+import com.foodcore.service.CatalogoPersonalizadoHelper;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -21,7 +21,6 @@ import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -202,21 +201,6 @@ public class PersonalizacionProductoServiceImpl implements PersonalizacionProduc
     }
 
     private void enriquecerListaProductos(Connection conn, List<Producto> productos) throws SQLException {
-        if (productos == null || productos.isEmpty()) {
-            return;
-        }
-        Map<Integer, List<ProductoVariante>> mapaVariantes = personalizacionDAO.listarVariantesPorProductos(conn);
-        Map<Integer, List<ProductoModificador>> mapaMods = personalizacionDAO.listarModificadoresPorProductos(conn);
-        Map<Integer, Combo> mapaCombos = comboDAO.listarMapaCombosActivosPorProducto(conn);
-        for (Producto p : productos) {
-            p.setVariantes(mapaVariantes.getOrDefault(p.getIdProducto(), List.of()));
-            p.setModificadores(mapaMods.getOrDefault(p.getIdProducto(), List.of()));
-            Combo combo = mapaCombos.get(p.getIdProducto());
-            if (combo != null) {
-                p.setEsCombo(true);
-                p.setIdCombo(combo.getIdCombo());
-                p.setComboComponentes(combo.getDetalles());
-            }
-        }
+        CatalogoPersonalizadoHelper.enriquecerListaProductos(conn, productos, personalizacionDAO, comboDAO);
     }
 }

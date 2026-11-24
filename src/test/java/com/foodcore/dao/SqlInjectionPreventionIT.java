@@ -1,6 +1,7 @@
 package com.foodcore.dao;
 
 import com.foodcore.dao.impl.CompraDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.exception.CodigoError;

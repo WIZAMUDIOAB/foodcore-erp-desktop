@@ -8,6 +8,7 @@ import com.foodcore.dao.PedidoDAO;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import io.javalin.http.Context;
@@ -46,7 +47,7 @@ public class KdsController {
     private final PedidoService pedidoService;
 
     public KdsController(ApiState state, PedidoDAO pedidoDAO) {
-        this(state, new PedidoService(pedidoDAO));
+        this(state, new PedidoServiceImpl(pedidoDAO));
     }
 
     public KdsController(ApiState state, PedidoService pedidoService) {

@@ -10,6 +10,7 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.MozoOrdenService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
@@ -82,7 +83,7 @@ public class MozoOrderController {
     private final ObservableList<DetallePedido> items = FXCollections.observableArrayList();
     private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
     private final MozoOrdenService mozoOrdenService = new MozoOrdenService();
-    private final PedidoService pedidoService = new PedidoService();
+    private final PedidoService pedidoService = new PedidoServiceImpl();
 
     public void setNumeroMesa(String mesa) {
         this.mesa = mesa;

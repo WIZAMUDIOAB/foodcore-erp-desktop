@@ -15,8 +15,8 @@ import com.foodcore.model.Caja;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.ActaEntregaTurnoService;
-import com.foodcore.service.CajaService;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -192,7 +192,7 @@ class ArqueoCierreZUseCaseUnitTest {
         DefaultArqueoCierreZUseCase useCase = useCase(cajaDAO,
                 insumoDao((proxy, method, args) -> List.of()), () -> connection());
 
-        CajaService.ResultadoCierreConActa resultado = useCase.cerrarTurnoCaja(
+        ResultadoCierreConActa resultado = useCase.cerrarTurnoCaja(
                 7, 9, new BigDecimal("295.00"));
         assertEquals(new BigDecimal("300.00"), resultado.montoEsperado());
         assertEquals(new BigDecimal("295.00"), resultado.efectivoContado());
@@ -223,7 +223,7 @@ class ArqueoCierreZUseCaseUnitTest {
                 insumoDao((proxy, method, args) -> List.of()), () -> connection());
         File destino = tempDir.resolve("acta.pdf").toFile();
 
-        CajaService.ResultadoCierreConActa resultado = useCase.cerrarTurnoConActaPdf(
+        ResultadoCierreConActa resultado = useCase.cerrarTurnoConActaPdf(
                 7, 9, new BigDecimal("100.00"), "Salida", "Entrada", destino);
         assertNotNull(resultado);
         assertSame(destino, resultado.archivoActaPdf());

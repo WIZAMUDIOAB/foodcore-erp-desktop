@@ -4,14 +4,32 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.foodcore.controller.VentaController;
+import com.foodcore.dao.CajaDAO;
+import com.foodcore.dao.InsumoDAO;
+import com.foodcore.dao.PedidoDAO;
+import com.foodcore.dao.UsuarioDAO;
+import com.foodcore.dao.impl.CajaDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.service.impl.AuthServiceImpl;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class ServiceSolidArchitectureTest {
@@ -170,5 +188,142 @@ class ServiceSolidArchitectureTest {
             int loc = Files.readAllLines(apiRoot.resolve(thinFile)).size();
             assertTrue(loc <= 400, thinFile + " debe ser <= 400 LOC, actual=" + loc);
         }
+    }
+
+    @Test
+    void sinCiclosDeClasesNiWrappersPasamanosNiCiclosDePaquetesP1() throws IOException {
+        for (String duplicado : new String[] {
+                "UsuarioDAOImpl.java", "CajaDAOImpl.java", "InsumoDAOImpl.java", "PedidoDAOImpl.java"
+        }) {
+            assertFalse(Files.exists(source("dao").resolve(duplicado)),
+                    "No debe existir DAO duplicado pasamanos en com.foodcore.dao: " + duplicado);
+        }
+
+        assertTrue(AuthService.class.isInterface(), "AuthService debe ser interfaz");
+        assertTrue(VentaService.class.isInterface(), "VentaService debe ser interfaz");
+        assertTrue(CajaService.class.isInterface(), "CajaService debe ser interfaz");
+        assertTrue(PedidoService.class.isInterface(), "PedidoService debe ser interfaz");
+
+        Map<Class<?>, Class<?>> contratosCanonicamenteImplementados = Map.of(
+                UsuarioDAOImpl.class, UsuarioDAO.class,
+                CajaDAOImpl.class, CajaDAO.class,
+                InsumoDAOImpl.class, InsumoDAO.class,
+                PedidoDAOImpl.class, PedidoDAO.class,
+                AuthServiceImpl.class, AuthService.class,
+                CajaServiceImpl.class, CajaService.class,
+                VentaServiceImpl.class, VentaService.class,
+                PedidoServiceImpl.class, PedidoService.class
+        );
+        for (Map.Entry<Class<?>, Class<?>> entry : contratosCanonicamenteImplementados.entrySet()) {
+            Class<?> impl = entry.getKey();
+            Class<?> contrato = entry.getValue();
+            assertTrue(contrato.isAssignableFrom(impl), impl.getSimpleName() + " debe implementar " + contrato.getSimpleName());
+            assertTrue(impl.getSuperclass() == Object.class,
+                    impl.getSimpleName() + " debe extender Object directamente sin herencia pasamanos");
+        }
+
+        String spotbugsExcludes = read(Path.of("config", "spotbugs-exclude.xml"));
+        assertFalse(spotbugsExcludes.contains("NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"),
+                "config/spotbugs-exclude.xml no debe suprimir NM_SAME_SIMPLE_NAME_AS_SUPERCLASS");
+        assertFalse(spotbugsExcludes.contains("com.foodcore.service.CajaService"),
+                "config/spotbugs-exclude.xml no debe referenciar com.foodcore.service.CajaService");
+
+        Map<String, Set<String>> classDeps = new HashMap<>();
+        Map<String, Set<String>> pkgDeps = new HashMap<>();
+        cargarDependenciasEstaticas(classDeps, pkgDeps);
+
+        List<String> classCycles = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> entry : classDeps.entrySet()) {
+            String a = entry.getKey();
+            for (String b : entry.getValue()) {
+                if (a.compareTo(b) < 0 && classDeps.getOrDefault(b, Set.of()).contains(a)) {
+                    classCycles.add(a + " <-> " + b);
+                }
+            }
+        }
+        assertTrue(classCycles.isEmpty(), "No deben existir ciclos binarios entre clases: " + classCycles);
+
+        List<String[]> paresSinCiclo = List.of(
+                new String[] {"com.foodcore.dao", "com.foodcore.dao.impl"},
+                new String[] {"com.foodcore.dao", "com.foodcore.service"},
+                new String[] {"com.foodcore.service", "com.foodcore.service.caja"},
+                new String[] {"com.foodcore.service", "com.foodcore.service.finanzas"},
+                new String[] {"com.foodcore.service", "com.foodcore.service.impl"},
+                new String[] {"com.foodcore.service", "com.foodcore.service.venta"},
+                new String[] {"com.foodcore.controller", "com.foodcore.controller.reportes"}
+        );
+        for (String[] par : paresSinCiclo) {
+            boolean aToB = pkgDeps.getOrDefault(par[0], Set.of()).contains(par[1]);
+            boolean bToA = pkgDeps.getOrDefault(par[1], Set.of()).contains(par[0]);
+            assertFalse(aToB && bToA, "Ciclo bidireccional P1 entre paquetes " + par[0] + " <-> " + par[1]);
+        }
+    }
+
+    private void cargarDependenciasEstaticas(Map<String, Set<String>> classDeps,
+                                             Map<String, Set<String>> pkgDeps) throws IOException {
+        Pattern pkgPat = Pattern.compile("(?m)^package\\s+([^;]+);");
+        Pattern impPat = Pattern.compile("(?m)^import\\s+(?:static\\s+)?(com\\.foodcore\\.[A-Za-z0-9_.]+);");
+        Pattern fqnPat = Pattern.compile("\\b(com\\.foodcore\\.[a-z0-9_.]+\\.[A-Z][A-Za-z0-9_]*)");
+
+        Path mainRoot = Path.of("src", "main", "java", "com", "foodcore");
+        List<Path> archivos;
+        try (var stream = Files.walk(mainRoot)) {
+            archivos = stream.filter(p -> p.toString().endsWith(".java")).toList();
+        }
+        for (Path archivo : archivos) {
+            String raw = read(archivo);
+            Matcher pm = pkgPat.matcher(raw);
+            if (!pm.find()) {
+                continue;
+            }
+            String pkg = pm.group(1).trim();
+            String simple = archivo.getFileName().toString().replace(".java", "");
+            String fqcn = pkg + "." + simple;
+            String cleaned = limpiarComentariosYLiterales(raw);
+            Set<String> depsClase = classDeps.computeIfAbsent(fqcn, k -> new HashSet<>());
+            Set<String> depsPkg = pkgDeps.computeIfAbsent(pkg, k -> new HashSet<>());
+
+            registrarReferencias(fqcn, pkg, impPat.matcher(cleaned), depsClase, depsPkg);
+            registrarReferencias(fqcn, pkg, fqnPat.matcher(cleaned), depsClase, depsPkg);
+        }
+    }
+
+    private static void registrarReferencias(String fqcnOrigen, String pkgOrigen, Matcher matcher,
+                                             Set<String> depsClase, Set<String> depsPkg) {
+        while (matcher.find()) {
+            String target = extraerClasePrincipal(matcher.group(1));
+            if (target == null || target.equals(fqcnOrigen)) {
+                continue;
+            }
+            depsClase.add(target);
+            int lastDot = target.lastIndexOf('.');
+            if (lastDot > 0) {
+                String targetPkg = target.substring(0, lastDot);
+                if (!targetPkg.equals(pkgOrigen)) {
+                    depsPkg.add(targetPkg);
+                }
+            }
+        }
+    }
+
+    private static String extraerClasePrincipal(String ref) {
+        String[] parts = ref.split("\\.");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!sb.isEmpty()) {
+                sb.append('.');
+            }
+            sb.append(part);
+            if (!part.isEmpty() && Character.isUpperCase(part.charAt(0))) {
+                return sb.toString();
+            }
+        }
+        return null;
+    }
+
+    private static String limpiarComentariosYLiterales(String src) {
+        String sinBloques = src.replaceAll("(?s)/\\*.*?\\*/", " ");
+        String sinLineas = sinBloques.replaceAll("//[^\\r\\n]*", " ");
+        return sinLineas.replaceAll("\"(?:\\\\.|[^\"\\\\])*\"", "\"\"");
     }
 }

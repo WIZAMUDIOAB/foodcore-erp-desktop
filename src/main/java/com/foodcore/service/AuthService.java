@@ -1,5 +1,6 @@
 package com.foodcore.service;
 
+import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.SesionManager;
@@ -15,7 +16,7 @@ import java.util.Optional;
  */
 public interface AuthService {
 
-    int MAX_INTENTOS_FALLIDOS = 5;
+    int MAX_INTENTOS_FALLIDOS = UsuarioDAO.MAX_INTENTOS_FALLIDOS;
 
     Usuario login(String username, String password) throws NegocioException, SQLException;
 

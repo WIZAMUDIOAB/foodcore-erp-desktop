@@ -14,13 +14,13 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.offline.LocalDatabaseManager;
 import com.foodcore.offline.OfflineCryptoService;
 import com.foodcore.offline.SyncWorker;
 import com.foodcore.security.SesionManager;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.PedidoService;
-import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.util.JsonMapperProvider;
@@ -387,19 +387,19 @@ class HardeningOfflineAndUiTest {
         List<DetalleVenta> items = List.of(d1, d2);
         BigDecimal total = new BigDecimal("100.00");
 
-        List<VentaService.PagoSplit> split2 = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> split2 = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_2, total, items);
         assertEquals(2, split2.size());
         assertEquals(new BigDecimal("50.00"), split2.get(0).monto());
         assertEquals(new BigDecimal("50.00"), split2.get(1).monto());
 
-        List<VentaService.PagoSplit> split4 = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> split4 = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_4, new BigDecimal("100.01"), items);
         assertEquals(4, split4.size(), "Modalidad 4 partes debe producir 4 pagos");
-        BigDecimal suma4 = split4.stream().map(VentaService.PagoSplit::monto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal suma4 = split4.stream().map(PagoSplit::monto).reduce(BigDecimal.ZERO, BigDecimal::add);
         assertEquals(new BigDecimal("100.01"), suma4, "La suma del split de 4 partes debe ser exacta al centavo");
 
-        List<VentaService.PagoSplit> splitItems = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> splitItems = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_ITEMS, total, items);
         assertEquals(2, splitItems.size());
         assertEquals(new BigDecimal("60.00"), splitItems.get(0).monto(), "Subcuenta A debe reflejar ítem 1 (60.00)");
@@ -420,7 +420,7 @@ class HardeningOfflineAndUiTest {
                 assertFalse(ctrl.isAtajoTecladoRegistrado(), "stopTimeline() debe remover el filtro KeyEvent");
 
                 // Inyectar PedidoService que falla siempre -> NO debe mostrar "Comanda Enviada"
-                ctrl.setPedidoService(new PedidoService() {
+                ctrl.setPedidoService(new PedidoServiceImpl() {
                     @Override
                     public Pedido registrarPedidoYEnviarComanda(Pedido pedido, List<DetallePedido> detalles)
                             throws SQLException {

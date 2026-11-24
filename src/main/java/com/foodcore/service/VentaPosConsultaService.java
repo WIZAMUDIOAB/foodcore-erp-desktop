@@ -1,17 +1,20 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.ClienteDAO;
+import com.foodcore.dao.ComboDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
-import com.foodcore.dao.ProductoDAOImpl;
+import com.foodcore.dao.ProductoPersonalizacionDAO;
 import com.foodcore.dao.impl.ClienteDAOImpl;
+import com.foodcore.dao.impl.ComboDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
+import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
+import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.ConexionBD;
 
 import java.math.BigDecimal;
@@ -29,7 +32,8 @@ public class VentaPosConsultaService {
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
     private final ClienteDAO clienteDAO = new ClienteDAOImpl();
-    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
+    private final ProductoPersonalizacionDAO personalizacionDAO = new ProductoPersonalizacionDAOImpl();
+    private final ComboDAO comboDAO = new ComboDAOImpl();
 
     public List<Pedido> listarPedidosActivosConDetalles() {
         try (Connection conn = ConexionBD.getConnection()) {
@@ -61,7 +65,8 @@ public class VentaPosConsultaService {
 
     public List<Producto> listarProductosDisponiblesConOpciones() {
         try (Connection conn = ConexionBD.getConnection()) {
-            return conn == null ? List.of() : personalizacionService.listarProductosDisponiblesConOpciones(conn);
+            return conn == null ? List.of() : CatalogoPersonalizadoHelper.listarProductosDisponiblesConOpciones(
+                    conn, productoDAO, personalizacionDAO, comboDAO);
         } catch (SQLException ex) {
             LOGGER.log(Level.FINE, "Aviso consultando catálogo POS", ex);
             return List.of();

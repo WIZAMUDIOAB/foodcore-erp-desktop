@@ -7,7 +7,7 @@ import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
 import com.foodcore.api.security.TokenBlacklistService;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.impl.MesaDAOImpl;
 import com.foodcore.model.Caja;
@@ -15,11 +15,11 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Venta;
-import com.foodcore.service.CajaService;
-import com.foodcore.service.PedidoService;
-import com.foodcore.service.VentaService;
 import com.foodcore.service.api.ApiOperacionException;
 import com.foodcore.service.api.ApiOperacionesPort;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import io.javalin.Javalin;
 import org.junit.jupiter.api.Test;
 
@@ -187,7 +187,7 @@ class RestControllersDecompositionTest {
         ApiState state = new ApiState();
         PedidoController fachada = new PedidoController(
                 state, new ProductoDAOImpl(), new MesaDAOImpl(), new PedidoDAOImpl(),
-                new PedidoService(), new CajaService(), new VentaService());
+                new PedidoServiceImpl(), new CajaServiceImpl(), new VentaServiceImpl());
         assertTrue(PedidoController.esRutaImagenSospechosa("../evil.png"));
         assertTrue(PedidoController.resolverArchivoImagenConfinado(null, "a.png").isEmpty());
         assertTrue(fachada.salonController() != null);

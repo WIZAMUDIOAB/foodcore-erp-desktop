@@ -21,8 +21,8 @@ import com.foodcore.model.Usuario;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -153,7 +153,7 @@ class CrmMinoristaV500IT {
 
     private static FakeVentaPosInteractionPort crearPortCobroDirecto() {
         FakeVentaPosInteractionPort port = new FakeVentaPosInteractionPort();
-        port.configurarCobroDirecto(new DefaultVentaCobroCoordinator(new VentaService(), new AutorizacionService()));
+        port.configurarCobroDirecto(new DefaultVentaCobroCoordinator(new VentaServiceImpl(), new AutorizacionService()));
         port.setConfirmarCumpleanos(false);
         return port;
     }

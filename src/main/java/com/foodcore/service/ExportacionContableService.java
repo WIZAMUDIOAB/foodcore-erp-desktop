@@ -1,7 +1,7 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.CajaDAO;
-import com.foodcore.dao.CajaDAOImpl;
+import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.CompraDAO;
 import com.foodcore.dao.VentaDAO;
 import com.foodcore.dao.impl.CompraDAOImpl;

@@ -4,7 +4,7 @@ import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.api.ApiServer;
 import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.SolicitudAusenciaDAO;
@@ -20,9 +20,11 @@ import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.support.TestSecuritySupport;
@@ -158,7 +160,7 @@ class FoodcoreV440FlowsTest {
         });
 
         // Verificar que PedidoDAOImpl.listarItemsPendientesCocina incluye ítems en estado LISTO
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
         Pedido p = new Pedido();
         p.setIdUsuario(1);
         p.setNumeroMesa("05");
@@ -182,7 +184,7 @@ class FoodcoreV440FlowsTest {
     @Test
     @DisplayName("v4.4.0 §2: POS muestra 12 mesas, badges [MESA 04]/[KIOSCO]/[DELIVERY] y preserva Split 35/65")
     void debeRenderizar12MesasYBadgesMulticanalEnPOS() throws Exception {
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
 
         Pedido pMesa = new Pedido();
         pMesa.setIdUsuario(1);
@@ -585,8 +587,8 @@ class FoodcoreV440FlowsTest {
         assertTrue(authz.tienePermiso(sesionAdmin, Permiso.VENTA_ANULAR));
         assertTrue(authz.tienePermiso(sesionAdmin, Permiso.VENTA_DESCUENTO));
 
-        new CajaService().abrirTurnoCaja(1, "Caja RBAC Test", new BigDecimal("100.00"));
-        VentaService ventaService = new VentaService();
+        new CajaServiceImpl().abrirTurnoCaja(1, "Caja RBAC Test", new BigDecimal("100.00"));
+        VentaService ventaService = new VentaServiceImpl();
 
         NegocioException exDescCajero = assertThrows(NegocioException.class, () ->
                 ventaService.calcularDescuentoAutorizado(new BigDecimal("100.00"), new BigDecimal("10"), true, sesionCajero));

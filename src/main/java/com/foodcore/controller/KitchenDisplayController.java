@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
@@ -57,7 +58,7 @@ public class KitchenDisplayController {
     @FXML private Label lblSocketStatus;
     @FXML private Label lblContadorActivas;
 
-    private final PedidoService pedidoService = new PedidoService();
+    private final PedidoService pedidoService = new PedidoServiceImpl();
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
     private final Set<Integer> itemsDespachadosLocal = Collections.synchronizedSet(new HashSet<>());
     private final Set<Integer> itemsSimuladosLocal = Collections.synchronizedSet(new HashSet<>());

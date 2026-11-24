@@ -3,11 +3,11 @@ package com.foodcore.service.venta;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaService;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -57,7 +57,7 @@ class VentaUseCasesUnitTest {
                 BigDecimal.ZERO, "EFECTIVO", BigDecimal.ZERO, BigDecimal.ZERO);
         DetalleVenta detalle = new DetalleVenta(0, 0, 1, 2, new BigDecimal("10"), null);
         validator.validarYPrepararMontosVenta(venta, List.of(detalle),
-                List.of(new VentaService.PagoSplit("EFECTIVO", new BigDecimal("20.00"))));
+                List.of(new PagoSplit("EFECTIVO", new BigDecimal("20.00"))));
         assertEquals(new BigDecimal("20.00"), venta.getTotal());
         assertEquals(new BigDecimal("20.00"), detalle.getSubtotal());
         assertThrows(NegocioException.class, () -> validator.validarYPrepararMontosVenta(null, List.of(detalle), null));
@@ -96,9 +96,9 @@ class VentaUseCasesUnitTest {
             validator.validarYPrepararMontosVenta(v, List.of(detalle()), null);
         });
         assertThrows(NegocioException.class, () -> validator.validarYPrepararMontosVenta(venta(),
-                List.of(detalle()), List.of(new VentaService.PagoSplit("EFECTIVO", BigDecimal.ZERO))));
+                List.of(detalle()), List.of(new PagoSplit("EFECTIVO", BigDecimal.ZERO))));
         assertThrows(NegocioException.class, () -> validator.validarYPrepararMontosVenta(venta(),
-                List.of(detalle()), List.of(new VentaService.PagoSplit("EFECTIVO", BigDecimal.ONE))));
+                List.of(detalle()), List.of(new PagoSplit("EFECTIVO", BigDecimal.ONE))));
     }
 
     @Test

@@ -17,9 +17,10 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
+import com.foodcore.model.dto.SubcuentaItems;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaService;
 import com.foodcore.tx.TransactionManager;
 
 import java.math.BigDecimal;
@@ -81,7 +82,7 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
     @Override
     public Venta registrarVentaConPagos(Venta venta, List<DetalleVenta> detalles,
                                         ComprobantePago comprobante,
-                                        List<VentaService.PagoSplit> pagosDivididos)
+                                        List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         calculoValidator.validarYPrepararMontosVenta(venta, detalles, pagosDivididos);
         return tx.executeChecked(conn ->
@@ -91,7 +92,7 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
     @Override
     public Venta registrarVentaDividida(Venta venta, List<DetalleVenta> detalles,
                                         ComprobantePago comprobante,
-                                        List<VentaService.PagoSplit> pagosDivididos)
+                                        List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         if (pagosDivididos == null || pagosDivididos.size() < 2) {
             throw new NegocioException("Para dividir la cuenta debe indicar al menos 2 pagos.");
@@ -195,13 +196,13 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
     }
 
     @Override
-    public List<Venta> dividirCuentaPorItems(List<VentaService.SubcuentaItems> subcuentas, int idUsuario)
+    public List<Venta> dividirCuentaPorItems(List<SubcuentaItems> subcuentas, int idUsuario)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         if (subcuentas == null || subcuentas.isEmpty()) {
             throw new NegocioException("Debe especificar al menos una subcuenta con ítems.");
         }
-        List<VentaService.SubcuentaItems> subcuentasValidas = new ArrayList<>();
-        for (VentaService.SubcuentaItems sub : subcuentas) {
+        List<SubcuentaItems> subcuentasValidas = new ArrayList<>();
+        for (SubcuentaItems sub : subcuentas) {
             if (sub != null && sub.detalles() != null && !sub.detalles().isEmpty()) {
                 subcuentasValidas.add(sub);
             }
@@ -213,7 +214,7 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
         return tx.executeChecked(conn -> {
             List<Venta> ventasGeneradas = new ArrayList<>();
             int correlativo = 1;
-            for (VentaService.SubcuentaItems sub : subcuentasValidas) {
+            for (SubcuentaItems sub : subcuentasValidas) {
                 BigDecimal suma = BigDecimal.ZERO;
                 for (DetalleVenta detalle : sub.detalles()) {
                     if (detalle == null || detalle.getCantidad() <= 0 || detalle.getPrecioUnitario() == null
@@ -250,7 +251,7 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
     @Override
     public Venta registrarVentaEnConexion(Connection conn, Venta venta, List<DetalleVenta> detalles,
                                           ComprobantePago comprobante,
-                                          List<VentaService.PagoSplit> pagosDivididos)
+                                          List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException {
         String idemKey = venta.getIdempotencyKey();
         if (idemKey != null && !idemKey.isBlank()) {
@@ -288,7 +289,7 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
         int idUsrMov = venta.getIdUsuario() > 0 ? venta.getIdUsuario() : 1;
         if (pagosDivididos != null && !pagosDivididos.isEmpty()) {
             int idxPago = 1;
-            for (VentaService.PagoSplit pago : pagosDivididos) {
+            for (PagoSplit pago : pagosDivididos) {
                 String medio = calculoValidator.normalizarMedioPagoMovimientoCaja(pago.medioPago());
                 MovimientoCaja movimiento = new MovimientoCaja(
                         0, idCaja, idUsrMov, "VENTA", medio,

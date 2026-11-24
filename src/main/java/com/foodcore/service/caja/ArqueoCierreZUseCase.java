@@ -3,7 +3,7 @@ package com.foodcore.service.caja;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.InsumoCriticoTurno;
-import com.foodcore.service.CajaService;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -18,11 +18,11 @@ public interface ArqueoCierreZUseCase {
 
     List<InsumoCriticoTurno> clasificarInsumosCriticos(List<Insumo> insumos);
 
-    CajaService.ResultadoCierreConActa cerrarTurnoCaja(int idCaja, int idUsuarioCierre,
+    ResultadoCierreConActa cerrarTurnoCaja(int idCaja, int idUsuarioCierre,
                                                        BigDecimal efectivoFisicoContado)
             throws NegocioException, SQLException;
 
-    CajaService.ResultadoCierreConActa cerrarTurnoConActaPdf(int idCaja, int idUsuarioCierre,
+    ResultadoCierreConActa cerrarTurnoConActaPdf(int idCaja, int idUsuarioCierre,
                                                              BigDecimal efectivoFisicoContado,
                                                              String responsableSalida,
                                                              String responsableEntrada,

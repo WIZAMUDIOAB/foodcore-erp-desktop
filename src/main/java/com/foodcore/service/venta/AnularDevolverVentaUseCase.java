@@ -2,8 +2,8 @@ package com.foodcore.service.venta;
 
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.security.SesionUsuario;
-import com.foodcore.service.VentaService;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -16,7 +16,7 @@ public interface AnularDevolverVentaUseCase {
                                      String pinSupervisor, String motivo)
             throws NegocioException, SQLException;
 
-    VentaService.ResultadoDevolucionParcial devolverItemsParcial(int idVenta,
+    ResultadoDevolucionParcial devolverItemsParcial(int idVenta,
                                                                  List<Integer> idsDetalleADevolver,
                                                                  SesionUsuario sesion, String motivo)
             throws NegocioException, SQLException;

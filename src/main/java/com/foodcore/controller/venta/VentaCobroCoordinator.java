@@ -6,6 +6,7 @@ import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.PedidoService;
@@ -26,7 +27,7 @@ public interface VentaCobroCoordinator {
 
     record ResultadoItemPedido(BigDecimal totalPedido, List<DetallePedido> detallesCompletos) { }
 
-    List<VentaService.PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
+    List<PagoSplit> construirPagosPorModalidad(String modalidad, BigDecimal totalNeto,
             List<DetalleVenta> items);
 
     Venta construirVentaParaCobro(Integer pedidoActivoId, int idUsuario, Integer idCliente,
@@ -36,7 +37,7 @@ public interface VentaCobroCoordinator {
     Venta registrarVentaDividida(Integer pedidoActivoId, int idUsuario, Integer idCliente,
             BigDecimal basePreCanje, BigDecimal totalNeto, BigDecimal descuentoActivo,
             BigDecimal descuentoPuntosActivo, int puntosARedimir, List<DetalleVenta> items,
-            List<VentaService.PagoSplit> pagos) throws Exception;
+            List<PagoSplit> pagos) throws Exception;
 
     void procesarCobroDirecto(Integer pedidoActivoId, Integer idCliente, BigDecimal basePreCanje,
             BigDecimal totalNeto, String metodo, BigDecimal descuentoActivo, BigDecimal descuentoPuntosActivo,

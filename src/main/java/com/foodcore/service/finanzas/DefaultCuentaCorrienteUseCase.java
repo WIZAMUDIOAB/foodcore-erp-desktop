@@ -1,10 +1,10 @@
 package com.foodcore.service.finanzas;
 
 import com.foodcore.dao.*;
+import com.foodcore.dao.impl.CierreContableDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.model.*;
-import com.foodcore.service.CierreContableService;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import java.math.*;
@@ -22,15 +22,25 @@ public final class DefaultCuentaCorrienteUseCase implements CuentaCorrienteUseCa
     private final ClienteDAO clienteDAO;
     private final CajaDAO cajaDAO;
     private final VentaDAO ventaDAO;
-    private final CierreContableService cierreContableService;
+    private final PeriodoContableValidator periodoContableValidator;
     private static final class AbortarSinCommitException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
-    public DefaultCuentaCorrienteUseCase(TransactionManager tx, CuentaPorPagarDAO cuentaPorPagarDAO, CuentaPorCobrarDAO cuentaPorCobrarDAO, ClienteDAO clienteDAO, CajaDAO cajaDAO, VentaDAO ventaDAO, CierreContableService cierreContableService) {
+    public DefaultCuentaCorrienteUseCase(TransactionManager tx, CuentaPorPagarDAO cuentaPorPagarDAO, CuentaPorCobrarDAO cuentaPorCobrarDAO, ClienteDAO clienteDAO, CajaDAO cajaDAO, VentaDAO ventaDAO, PeriodoContableValidator periodoContableValidator) {
         this.tx = tx == null ? new JdbcTransactionManager() : tx;
         this.cuentaPorPagarDAO = cuentaPorPagarDAO; this.cuentaPorCobrarDAO = cuentaPorCobrarDAO;
         this.clienteDAO = clienteDAO; this.cajaDAO = cajaDAO; this.ventaDAO = ventaDAO;
-        this.cierreContableService = cierreContableService == null ? new CierreContableService() : cierreContableService;
+        if (periodoContableValidator != null) {
+            this.periodoContableValidator = periodoContableValidator;
+        } else {
+            CierreContableDAO cierreDAO = new CierreContableDAOImpl();
+            this.periodoContableValidator = (conn, fecha) -> {
+                LocalDate ref = fecha != null ? fecha : LocalDate.now(ZONA_LIMA);
+                if (conn != null && cierreDAO.estaPeriodoCerrado(conn, ref.getYear(), ref.getMonthValue())) {
+                    throw new PeriodoCerradoException(ref.getYear(), ref.getMonthValue());
+                }
+            };
+        }
     }
     private static BigDecimal validarMontoPositivo(BigDecimal monto, String descripcion) {
         if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
@@ -39,7 +49,7 @@ public final class DefaultCuentaCorrienteUseCase implements CuentaCorrienteUseCa
         return monto.setScale(2, RoundingMode.HALF_UP);
     }
     private void verificarPeriodoAbierto(Connection conn, LocalDate fecha) throws SQLException {
-        try { cierreContableService.validarPeriodoAbierto(conn, fecha != null ? fecha : LocalDate.now(ZONA_LIMA)); }
+        try { periodoContableValidator.validarPeriodoAbierto(conn, fecha != null ? fecha : LocalDate.now(ZONA_LIMA)); }
         catch (PeriodoCerradoException ex) { throw new IllegalStateException(ex.getMessage(), ex); }
     }
     @Override public boolean registrarPagoProveedor(int idCuentaPagar, BigDecimal monto, String metodoPago, Integer idCaja, int idUsuario, String nota) throws SQLException {

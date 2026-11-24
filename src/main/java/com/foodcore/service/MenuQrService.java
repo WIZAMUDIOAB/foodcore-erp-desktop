@@ -2,6 +2,8 @@ package com.foodcore.service;
 
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
+import com.foodcore.dao.impl.ComboDAOImpl;
+import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
 import com.foodcore.util.ConexionBD;
@@ -118,11 +120,12 @@ public class MenuQrService {
         List<Producto> productos = new ArrayList<>();
         
         try (Connection conn = ConexionBD.getConnection()) {
-            productos = new com.foodcore.service.impl.PersonalizacionProductoServiceImpl(
-                new com.foodcore.tx.impl.JdbcTransactionManager(),
-                productoDAO,
-                new com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl()
-            ).listarProductosDisponiblesConOpciones(conn);
+            productos = CatalogoPersonalizadoHelper.listarProductosDisponiblesConOpciones(
+                    conn,
+                    productoDAO,
+                    new ProductoPersonalizacionDAOImpl(),
+                    new ComboDAOImpl()
+            );
         } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Error al consultar BD para menu digital, generando con datos demo: " + e.getMessage());
         }

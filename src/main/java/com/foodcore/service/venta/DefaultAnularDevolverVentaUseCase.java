@@ -11,13 +11,13 @@ import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.CierreContableService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.SupervisorAutorizacionService;
-import com.foodcore.service.VentaService;
 import com.foodcore.tx.TransactionManager;
 
 import java.math.BigDecimal;
@@ -200,7 +200,7 @@ public final class DefaultAnularDevolverVentaUseCase implements AnularDevolverVe
     }
 
     @Override
-    public VentaService.ResultadoDevolucionParcial devolverItemsParcial(
+    public ResultadoDevolucionParcial devolverItemsParcial(
             int idVenta, List<Integer> idsDetalleADevolver, SesionUsuario sesion, String motivo)
             throws NegocioException, SQLException {
         autorizacionService.exigir(sesion, Permiso.VENTA_ANULAR);
@@ -320,7 +320,7 @@ public final class DefaultAnularDevolverVentaUseCase implements AnularDevolverVe
                     "Total=S/ " + totalActual,
                     "Reembolso=S/ " + montoReembolso + " | NuevoTotal=S/ " + nuevoTotal
                             + " | Items=" + idsUnicos + " | Motivo=" + glosaMotivo);
-            return new VentaService.ResultadoDevolucionParcial(
+            return new ResultadoDevolucionParcial(
                     idVenta, List.copyOf(idsUnicos), montoReembolso, nuevoTotal,
                     nuevoEstado, insumos.size());
         });

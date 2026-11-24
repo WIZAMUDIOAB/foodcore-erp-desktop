@@ -12,6 +12,7 @@ import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -49,7 +50,7 @@ public class CobroModalController {
     private Cliente clienteAsociado = null;
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
-    private final VentaService ventaService = new VentaService();
+    private final VentaService ventaService = new VentaServiceImpl();
     private final ClienteGestionService clienteGestionService = new ClienteGestionService();
 
     @FXML

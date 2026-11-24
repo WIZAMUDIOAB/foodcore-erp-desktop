@@ -6,7 +6,8 @@ import com.foodcore.exception.StockInsuficienteException;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
-import com.foodcore.service.VentaService;
+import com.foodcore.model.dto.PagoSplit;
+import com.foodcore.model.dto.SubcuentaItems;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -14,11 +15,11 @@ import java.util.List;
 
 public interface RegistrarVentaUseCase {
     Venta registrarVentaConPagos(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante,
-                                 List<VentaService.PagoSplit> pagosDivididos)
+                                 List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException;
 
     Venta registrarVentaDividida(Venta venta, List<DetalleVenta> detalles, ComprobantePago comprobante,
-                                 List<VentaService.PagoSplit> pagosDivididos)
+                                 List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException;
 
     Venta registrarVentaConCreditoCorporativo(Venta venta, List<DetalleVenta> detalles,
@@ -26,10 +27,10 @@ public interface RegistrarVentaUseCase {
                                               String nombreCliente)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException;
 
-    List<Venta> dividirCuentaPorItems(List<VentaService.SubcuentaItems> subcuentas, int idUsuario)
+    List<Venta> dividirCuentaPorItems(List<SubcuentaItems> subcuentas, int idUsuario)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException;
 
     Venta registrarVentaEnConexion(Connection conn, Venta venta, List<DetalleVenta> detalles,
-                                   ComprobantePago comprobante, List<VentaService.PagoSplit> pagosDivididos)
+                                   ComprobantePago comprobante, List<PagoSplit> pagosDivididos)
             throws NegocioException, SQLException, StockInsuficienteException, InsumoNoEncontradoException;
 }

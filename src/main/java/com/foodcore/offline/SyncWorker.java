@@ -5,6 +5,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.dto.OfflineOrderPayloadDTO;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.JsonMapperProvider;
 
@@ -42,7 +43,7 @@ public class SyncWorker {
 
     private final AtomicBoolean redDisponible = new AtomicBoolean(true);
     private final AtomicBoolean simularDesconexion = new AtomicBoolean(false);
-    private final PedidoService pedidoService = new PedidoService();
+    private final PedidoService pedidoService = new PedidoServiceImpl();
     private ScheduledExecutorService scheduler;
     private String esquemaInicializadoRuta;
     private final CopyOnWriteArrayList<SyncStatusListener> listeners = new CopyOnWriteArrayList<>();

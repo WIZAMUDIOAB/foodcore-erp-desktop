@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioDAO {
+    int MAX_INTENTOS_FALLIDOS = 5;
+
     Optional<Usuario> autenticar(Connection conn, String username, String password) throws SQLException;
     Optional<Usuario> buscarPorUsername(Connection conn, String username) throws SQLException;
     void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException;

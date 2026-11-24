@@ -1,6 +1,7 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.*;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.exception.InsumoNoEncontradoException;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.exception.StockInsuficienteException;
