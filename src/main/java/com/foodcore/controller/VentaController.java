@@ -18,7 +18,10 @@ import com.foodcore.model.Venta;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
+import com.foodcore.exception.CajaCerradaException;
+import com.foodcore.model.Caja;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.CajaService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
@@ -877,8 +880,11 @@ public class VentaController {
 
         Pedido pedido = new Pedido();
         pedido.setIdPedido(idObjetivo);
-        pedido.setIdUsuario(AuthService.getUsuarioSesionActual() != null
-                ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1);
+        if (AuthService.getUsuarioSesionActual() == null || AuthService.getUsuarioSesionActual().getIdUsuario() <= 0) {
+            mostrarAlerta("Sesión Requerida", "Debe iniciar sesión para enviar comandas a cocina.", Alert.AlertType.ERROR);
+            return;
+        }
+        pedido.setIdUsuario(AuthService.getUsuarioSesionActual().getIdUsuario());
         pedido.setNumeroMesa(mesaSeleccionadaActual != null ? mesaSeleccionadaActual : "01");
         pedido.setTipoPedido(canalSeleccionadoActual != null ? canalSeleccionadoActual : "MESA");
         pedido.setEstado("REGISTRADO");
@@ -960,8 +966,11 @@ public class VentaController {
             BigDecimal basePreCanje = obtenerBasePreCanjeActual();
             List<DetalleVenta> itemsSnapshot = new ArrayList<>(itemsVenta);
             List<VentaService.PagoSplit> pagos = construirPagosPorModalidad(res.get(), totalNeto, itemsSnapshot);
-            int idUsr = AuthService.getUsuarioSesionActual() != null
-                    ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+            if (AuthService.getUsuarioSesionActual() == null || AuthService.getUsuarioSesionActual().getIdUsuario() <= 0) {
+                mostrarAlerta("Sesión Requerida", "Debe iniciar sesión para dividir la cuenta.", Alert.AlertType.ERROR);
+                return;
+            }
+            int idUsr = AuthService.getUsuarioSesionActual().getIdUsuario();
             Integer idCliVenta = clienteSeleccionadoPos != null && clienteSeleccionadoPos.getIdCliente() > 0
                     ? clienteSeleccionadoPos.getIdCliente() : null;
             Integer idPedidoSnap = pedidoActivoId;
@@ -975,14 +984,16 @@ public class VentaController {
             UiAsyncExecutor.ejecutarAsync(
                 () -> {
                     DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
-                    Venta v = new Venta(0, idPedidoSnap, 1, idUsr, idCliVenta,
+                    int idCajaActiva = resolverIdCajaActiva();
+                    Venta v = new Venta(0, idPedidoSnap, idCajaActiva, idUsr, idCliVenta,
                             desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto,
                             "MIXTO", totalNeto, BigDecimal.ZERO);
                     v.setDescuento(descSnap);
                     v.setDescuentoPuntos(descPtsSnap);
                     v.setPuntosACanjear(ptsSnap);
                     v.setIdempotencyKey(UUID.randomUUID().toString());
-                    ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", "000001", totalNeto);
+                    String corrSplit = String.format("%06d", Math.abs(UUID.randomUUID().hashCode()) % 1_000_000);
+                    ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", corrSplit, totalNeto);
                     return ventaService.registrarVentaDividida(v, itemsSnapshot, comp, pagos);
                 },
                 procesada -> {
@@ -1010,21 +1021,36 @@ public class VentaController {
         }
     }
 
+    private int resolverIdUsuarioActivo() throws NegocioException {
+        if (AuthService.getUsuarioSesionActual() == null || AuthService.getUsuarioSesionActual().getIdUsuario() <= 0) {
+            throw new NegocioException("No hay una sesión de usuario activa para procesar la operación.");
+        }
+        return AuthService.getUsuarioSesionActual().getIdUsuario();
+    }
+
+    private int resolverIdCajaActiva() throws SQLException, NegocioException {
+        return new CajaService().obtenerCajaActiva()
+                .map(Caja::getIdCaja)
+                .orElseThrow(() -> new CajaCerradaException("No hay una caja abierta para registrar el cobro dividido."));
+    }
+
     public Venta ejecutarCobroSplitEnPagos(List<VentaService.PagoSplit> pagos) throws Exception {
         BigDecimal totalNeto = obtenerTotalNetoActual();
         BigDecimal basePreCanje = obtenerBasePreCanjeActual();
         DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
-        int idUsr = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
+        int idUsr = resolverIdUsuarioActivo();
+        int idCajaActiva = resolverIdCajaActiva();
         Integer idCliVenta = clienteSeleccionadoPos != null && clienteSeleccionadoPos.getIdCliente() > 0
                 ? clienteSeleccionadoPos.getIdCliente() : null;
-        Venta v = new Venta(0, pedidoActivoId, 1, idUsr, idCliVenta,
+        Venta v = new Venta(0, pedidoActivoId, idCajaActiva, idUsr, idCliVenta,
             desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto,
             "MIXTO", totalNeto, BigDecimal.ZERO);
         v.setDescuento(descuentoActivo);
         v.setDescuentoPuntos(descuentoPuntosActivo);
         v.setPuntosACanjear(puntosARedimirPos);
         v.setIdempotencyKey(UUID.randomUUID().toString());
-        ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", "000001", totalNeto);
+        String corrSplit = String.format("%06d", Math.abs(UUID.randomUUID().hashCode()) % 1_000_000);
+                    ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", corrSplit, totalNeto);
         Venta procesada = ventaService.registrarVentaDividida(v, new ArrayList<>(itemsVenta), comp, pagos);
         itemsVenta.clear();
         descuentoActivo = BigDecimal.ZERO;

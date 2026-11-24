@@ -10,6 +10,9 @@ import com.foodcore.model.CompraClienteResumen;
 import com.foodcore.model.CuponCumpleanos;
 import com.foodcore.model.FidelizacionMovimiento;
 import com.foodcore.model.HistorialPuntos;
+import com.foodcore.exception.NegocioException;
+import com.foodcore.tx.TransactionManager;
+import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ConfiguracionFidelizacion;
 
@@ -44,14 +47,20 @@ public class FidelizacionService {
 
     private final FidelizacionDAO fidelizacionDAO;
     private final ClienteDAO clienteDAO;
+    private final TransactionManager tx;
 
     public FidelizacionService() {
         this(new FidelizacionDAOImpl(), new ClienteDAOImpl());
     }
 
     public FidelizacionService(FidelizacionDAO fidelizacionDAO, ClienteDAO clienteDAO) {
+        this(fidelizacionDAO, clienteDAO, new JdbcTransactionManager());
+    }
+
+    public FidelizacionService(FidelizacionDAO fidelizacionDAO, ClienteDAO clienteDAO, TransactionManager tx) {
         this.fidelizacionDAO = fidelizacionDAO;
         this.clienteDAO = clienteDAO;
+        this.tx = tx != null ? tx : new JdbcTransactionManager();
     }
 
     /**
@@ -105,20 +114,16 @@ public class FidelizacionService {
      * Canjea puntos por un descuento monetario en el POS (10 puntos = S/ 1.00, compatibilidad v2.0)
      * con descuento atómico condicional en BD (previene doble gasto concurrente).
      */
-    public BigDecimal canjearPuntos(int idCliente, int puntosACanjear, BigDecimal totalVenta) {
+    public BigDecimal canjearPuntos(int idCliente, int puntosACanjear, BigDecimal totalVenta) throws SQLException {
         if (idCliente <= 0 || puntosACanjear <= 0 || totalVenta == null
                 || totalVenta.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            boolean prevAuto = conn.getAutoCommit();
-            conn.setAutoCommit(false);
-            try {
+        try {
+            return tx.executeChecked(conn -> {
                 int puntosDisponibles = fidelizacionDAO.obtenerPuntosActuales(conn, idCliente);
                 int puntosEfectivos = Math.min(puntosACanjear, puntosDisponibles);
                 if (puntosEfectivos <= 0) {
-                    conn.rollback();
                     return BigDecimal.ZERO;
                 }
 
@@ -130,13 +135,11 @@ public class FidelizacionService {
                     puntosEfectivos = totalVenta.multiply(BigDecimal.valueOf(PUNTOS_POR_SOL_DESCUENTO)).intValue();
                 }
                 if (puntosEfectivos <= 0) {
-                    conn.rollback();
                     return BigDecimal.ZERO;
                 }
 
                 boolean descontado = fidelizacionDAO.descontarPuntosAtomico(conn, idCliente, puntosEfectivos);
                 if (!descontado) {
-                    conn.rollback();
                     return BigDecimal.ZERO;
                 }
 
@@ -148,25 +151,10 @@ public class FidelizacionService {
                 fidelizacionDAO.registrarMovimiento(conn, mov);
                 fidelizacionDAO.registrarHistorialPuntos(conn,
                         new HistorialPuntos(0L, idCliente, null, -puntosEfectivos, "CANJE", descCanje, ahora));
-
-                conn.commit();
                 return descuentoCalculado;
-            } catch (SQLException ex) {
-                try {
-                    conn.rollback();
-                } catch (SQLException suppressed) {
-                    ex.addSuppressed(suppressed);
-                }
-                throw ex;
-            } finally {
-                try {
-                    conn.setAutoCommit(prevAuto);
-                } catch (SQLException ignored) {
-                }
-            }
-        } catch (SQLException e) {
-            LOGGER.log(Level.WARNING, "Error al canjear puntos para cliente {0}: {1}", new Object[]{idCliente, e.getMessage()});
-            return BigDecimal.ZERO;
+            });
+        } catch (NegocioException ex) {
+            throw new IllegalStateException(ex.getMessage(), ex);
         }
     }
 

@@ -430,7 +430,15 @@ class HardeningOfflineAndUiTest {
                 DetalleVenta itemPrueba = new DetalleVenta(0, 0, 1, 1, new BigDecimal("25.00"), new BigDecimal("25.00"));
                 itemPrueba.setNombreProducto("Lomo Saltado");
                 ctrl.getItemsVenta().setAll(itemPrueba);
-                ctrl.handleEnviarComanda(null);
+                com.foodcore.model.Usuario sesionPrev = com.foodcore.service.AuthService.getUsuarioSesionActual();
+                com.foodcore.model.Usuario usrTest = new com.foodcore.model.Usuario();
+                usrTest.setIdUsuario(1);
+                com.foodcore.service.AuthService.setUsuarioSesionActual(usrTest);
+                try {
+                    ctrl.handleEnviarComanda(null);
+                } finally {
+                    com.foodcore.service.AuthService.setUsuarioSesionActual(sesionPrev);
+                }
                 ctrlRef.set(ctrl);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
