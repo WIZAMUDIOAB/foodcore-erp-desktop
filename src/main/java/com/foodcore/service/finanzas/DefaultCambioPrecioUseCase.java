@@ -19,7 +19,7 @@ public final class DefaultCambioPrecioUseCase implements CambioPrecioUseCase {
     private final HistorialPrecioDAO historialPrecioDAO;
     public DefaultCambioPrecioUseCase(TransactionManager tx, HistorialPrecioDAO historialPrecioDAO) { this.tx = tx == null ? new JdbcTransactionManager() : tx; this.historialPrecioDAO = historialPrecioDAO; }
     @Override public boolean registrarCambioPrecioConMotivo(String tipoEntidad, int idEntidad, String nombreEntidad, double precioAnterior, double precioNuevo, int idUsuario, String nombreUsuario, String motivo) throws SQLException {
-        if (tipoEntidad == null || tipoEntidad.isBlank()) throw new IllegalArgumentException("El tipo de entidad es obligatorio");
+        if (tipoEntidad == null || tipoEntidad.isBlank()) throw new IllegalArgumentException("El tipo de entidad es obligatorio"); String tipoNorm = tipoEntidad.trim().toUpperCase(Locale.ROOT); if (!"PRODUCTO".equals(tipoNorm) && !"INSUMO".equals(tipoNorm)) throw new IllegalArgumentException("Tipo de entidad no soportado: " + tipoEntidad);
         if (Double.isNaN(precioAnterior) || Double.isInfinite(precioAnterior) || precioAnterior < 0.0) throw new IllegalArgumentException("El precio anterior debe ser un número finito no negativo");
         if (Double.isNaN(precioNuevo) || Double.isInfinite(precioNuevo) || precioNuevo <= 0.0) throw new IllegalArgumentException("El precio nuevo debe ser un número finito mayor a 0");
         if (motivo == null || motivo.trim().length() < 5) throw new IllegalArgumentException("El motivo del cambio de precio es obligatorio (mínimo 5 caracteres)");

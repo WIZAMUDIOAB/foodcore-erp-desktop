@@ -23,7 +23,7 @@ public class AuthService {
 
     protected final UsuarioDAO usuarioDAO;
     protected final EncriptadorPassword encriptador;
-    private static Usuario usuarioSesionActual;
+    private static volatile Usuario usuarioSesionActual;
 
     public AuthService() {
         this(new UsuarioDAOImpl(), new EncriptadorPassword());

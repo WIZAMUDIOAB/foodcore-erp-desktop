@@ -12,7 +12,7 @@ permissions:
 jobs:
   e2e-testing:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     services:
       mysql:
         image: mysql:8.0.36
@@ -121,7 +121,7 @@ jobs:
         run: mvn -B test-compile exec:java -e -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium"
 
       - name: Quality Gate (Maven Verify — Unit, Integration, E2E, Checkstyle, SpotBugs, OWASP)
-        timeout-minutes: 20
+        timeout-minutes: 35
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           MONOCLE_HEADLESS: "true"

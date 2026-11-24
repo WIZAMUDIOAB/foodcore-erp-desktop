@@ -811,10 +811,9 @@ public class VentaController {
             }
             actualizarCachePedidoActivo(idPedido, totalPedido, detallesCompletos);
         } catch (NegocioException | SQLException ex) {
-            LOGGER.log(Level.FINE, "Fallback en memoria al agregar ítem al pedido #" + idPedido, ex);
-            agregarProductoEnCarritoLocal(
-                    p, idVariante, nombreVariante, mods, modsTexto, qty, nota, precioUnitario, subtotal
-            );
+            LOGGER.log(Level.WARNING, "Error agregando ítem al pedido #" + idPedido, ex);
+            String msg = ex.getMessage() != null ? ex.getMessage() : "Error de conexión con la base de datos";
+            mostrarAlerta("Error al Agregar Ítem", "No se pudo guardar el producto en el pedido: " + msg, Alert.AlertType.ERROR);
         }
     }
 
