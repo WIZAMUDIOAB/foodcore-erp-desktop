@@ -3,30 +3,58 @@ package com.foodcore.controller.venta;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.foodcore.controller.VentaController;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.model.Categoria;
 import com.foodcore.model.Cliente;
+import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
-import com.foodcore.model.Categoria;
+import com.foodcore.model.Usuario;
+import com.foodcore.security.AutorizacionService;
+import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
+import com.foodcore.service.PedidoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaPosConsultaService;
 import com.foodcore.service.VentaService;
+import com.foodcore.support.JavaFxTestSupport;
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class VentaCoordinatorsUnitTest {
+
+    @BeforeAll
+    static void initFx() {
+        JavaFxTestSupport.iniciarToolkit();
+    }
+
+    @AfterEach
+    void limpiarSesion() {
+        AuthService.logout();
+    }
+
     @Test
     void mesasCanalClasificaBadgeParticionaYConsultaConStub() {
         Pedido pedidoMesa = pedido(" 5 ", "MESA");
@@ -34,7 +62,7 @@ class VentaCoordinatorsUnitTest {
         Pedido delivery = pedido("DL-08", "DELIVERY");
         VentaPosConsultaService consulta = new VentaPosConsultaService() {
             @Override public List<Pedido> listarPedidosActivosConDetalles() { return List.of(pedidoMesa, kiosco); }
-            @Override public List<com.foodcore.model.DetallePedido> listarDetallesPorPedido(int id) {
+            @Override public List<DetallePedido> listarDetallesPorPedido(int id) {
                 return List.of();
             }
         };
@@ -113,17 +141,17 @@ class VentaCoordinatorsUnitTest {
         DefaultVentaCobroCoordinator cobro = new DefaultVentaCobroCoordinator(null, null, null);
         List<DetalleVenta> lineas = List.of(detalle(1, 1, "10.00", "10.00"),
                 detalle(2, 1, "20.00", "20.00"), detalle(3, 1, "30.00", "30.00"));
-        assertSplit(cobro.construirPagosPorModalidad(VentaController.MODALIDAD_SPLIT_2,
+        assertSplit(cobro.construirPagosPorModalidad(VentaCobroCoordinator.MODALIDAD_SPLIT_2,
                 new BigDecimal("60.01"), lineas), "60.01");
-        assertSplit(cobro.construirPagosPorModalidad(VentaController.MODALIDAD_SPLIT_4,
+        assertSplit(cobro.construirPagosPorModalidad(VentaCobroCoordinator.MODALIDAD_SPLIT_4,
                 new BigDecimal("60.01"), lineas), "60.01");
-        assertSplit(cobro.construirPagosPorModalidad(VentaController.MODALIDAD_SPLIT_ITEMS,
+        assertSplit(cobro.construirPagosPorModalidad(VentaCobroCoordinator.MODALIDAD_SPLIT_ITEMS,
                 new BigDecimal("60.01"), lineas), "60.01");
         List<DetalleVenta> qty = List.of(detalle(4, 3, "7.00", "21.00"));
-        assertSplit(cobro.construirPagosPorModalidad(VentaController.MODALIDAD_SPLIT_ITEMS,
+        assertSplit(cobro.construirPagosPorModalidad(VentaCobroCoordinator.MODALIDAD_SPLIT_ITEMS,
                 new BigDecimal("21.00"), qty), "21.00");
         Assertions.assertThrows(IllegalArgumentException.class, () -> cobro.construirPagosPorModalidad(
-                VentaController.MODALIDAD_SPLIT_2, BigDecimal.ZERO, lineas));
+                VentaCobroCoordinator.MODALIDAD_SPLIT_2, BigDecimal.ZERO, lineas));
         VentaCobroCoordinator.ValidacionAnulacionSupervisor valida = cobro
                 .validarAnulacionSupervisor(" 42 ", "  motivo  ");
         assertTrue(valida.valido());
@@ -162,6 +190,170 @@ class VentaCoordinatorsUnitTest {
         assertNotNull(beneficio);
         assertEquals(beneficio.bloquesDisponibles(), fidelizacion.construirOpcionesCanje(beneficio).size());
         assertTrue(fidelizacion.buscarClientePorCriterio("inexistente").isEmpty());
+    }
+
+    @Test
+    void errorBdEnAgregarProductoAPedidoExistenteNoMutaCarritoYMuestraAlerta() throws Exception {
+        FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+        DefaultVentaFidelizacionCoordinator fid = new DefaultVentaFidelizacionCoordinator(
+                criterio -> Optional.empty(), (d, n, t, f) -> null, cli -> false, b -> BigDecimal.ZERO,
+                (pts, blk, base) -> null);
+        VentaController controller = crearControllerConStubs(fakePort, fid, new AtomicInteger());
+
+        DetallePedido inicial = new DetallePedido(1, 42, 1, "Lomo", 1,
+                new BigDecimal("20.00"), new BigDecimal("20.00"), "");
+        Pedido pedidoExistente = new Pedido(42, 1, null, "04", "REGISTRADO", new BigDecimal("20.00"));
+        pedidoExistente.setDetalles(List.of(inicial));
+
+        controller.setPedidoService(new PedidoService() {
+            @Override
+            public Pedido agregarItemsAPedido(int idPedido, List<DetallePedido> nuevos) throws SQLException {
+                throw new SQLException("BD no disponible simulada");
+            }
+        });
+
+        CountDownLatch alertaLatch = new CountDownLatch(1);
+        fakePort.resetUltimaAlerta(alertaLatch);
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            controller.cargarPedidoEnPOS(pedidoExistente);
+            assertEquals(1, controller.getItemsVenta().size());
+            controller.agregarProductoAVenta(producto(99, 1, "P-99", "Chicha", true));
+        });
+
+        assertTrue(alertaLatch.await(5, TimeUnit.SECONDS), "Debe reportar error asíncrono mediante alerta");
+        assertEquals("Error al Agregar Ítem", fakePort.getUltimaAlertaTitulo());
+        assertEquals(Alert.AlertType.ERROR, fakePort.getUltimaAlertaTipo());
+        assertFalse(controller.isOperacionPedidoEnProgreso());
+        assertEquals(1, controller.getItemsVenta().size(),
+                "Ante error en BD NO debe mutar itemsVenta en RAM con fallback silencioso");
+        assertEquals(1, controller.getItemsVenta().get(0).getIdProducto());
+    }
+
+    @Test
+    void busquedaAsincronaClienteAsociaEnFxYReportaErrorSinBloquear() throws Exception {
+        FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+        Cliente cli = new Cliente();
+        cli.setIdCliente(12);
+        cli.setTipoDocumento("DNI");
+        cli.setNumeroDocumento("12345678");
+        cli.setRazonSocial("Ada Lovelace");
+        cli.setPuntosAcumulados(120);
+
+        AtomicBoolean ejecutoFueraDeFx = new AtomicBoolean(false);
+        AtomicBoolean simularError = new AtomicBoolean(false);
+        DefaultVentaFidelizacionCoordinator fid = new DefaultVentaFidelizacionCoordinator(
+                criterio -> {
+                    ejecutoFueraDeFx.set(!Platform.isFxApplicationThread());
+                    if (simularError.get()) {
+                        throw new IllegalStateException(new SQLException("Timeout consultando cliente"));
+                    }
+                    return "12345678".equals(criterio) ? Optional.of(cli) : Optional.empty();
+                },
+                (d, n, t, f) -> null,
+                c -> false,
+                b -> BigDecimal.ZERO,
+                (pts, blk, base) -> null);
+
+        VentaController controller = crearControllerConStubs(fakePort, fid, new AtomicInteger());
+
+        CountDownLatch okLatch = new CountDownLatch(1);
+        AtomicBoolean callbackEnFx = new AtomicBoolean(false);
+        AtomicReference<Optional<Cliente>> okRef = new AtomicReference<>();
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() ->
+                controller.buscarYAsociarClientePorCriterioAsync(" 12345678 ", Boolean.FALSE, opt -> {
+                    callbackEnFx.set(Platform.isFxApplicationThread());
+                    okRef.set(opt);
+                    okLatch.countDown();
+                }));
+
+        assertTrue(okLatch.await(5, TimeUnit.SECONDS));
+        assertTrue(ejecutoFueraDeFx.get(), "La búsqueda debe ejecutarse fuera del JavaFX Application Thread");
+        assertTrue(callbackEnFx.get(), "El callback debe regresar al JavaFX Application Thread");
+        assertTrue(okRef.get().isPresent());
+        assertSame(cli, controller.getClienteSeleccionadoPos());
+        assertFalse(controller.isBusquedaClienteEnProgreso());
+
+        simularError.set(true);
+        CountDownLatch errLatch = new CountDownLatch(1);
+        AtomicReference<Optional<Cliente>> errRef = new AtomicReference<>();
+        fakePort.resetUltimaAlerta(null);
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() ->
+                controller.buscarYAsociarClientePorCriterioAsync("99999999", Boolean.FALSE, opt -> {
+                    errRef.set(opt);
+                    errLatch.countDown();
+                }));
+
+        assertTrue(errLatch.await(5, TimeUnit.SECONDS));
+        assertTrue(errRef.get().isEmpty());
+        assertEquals("Error al Buscar Cliente", fakePort.getUltimaAlertaTitulo());
+        assertEquals(Alert.AlertType.ERROR, fakePort.getUltimaAlertaTipo());
+        assertFalse(controller.isBusquedaClienteEnProgreso());
+    }
+
+    @Test
+    void operacionesPosRechazanSinSesionActiva() throws Exception {
+        AuthService.logout();
+        FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+        DefaultVentaFidelizacionCoordinator fid = new DefaultVentaFidelizacionCoordinator(
+                criterio -> Optional.empty(), (d, n, t, f) -> null, c -> false, b -> BigDecimal.ZERO,
+                (pts, blk, base) -> null);
+        AtomicInteger llamadasPersistencia = new AtomicInteger();
+        VentaController controller = crearControllerConStubs(fakePort, fid, llamadasPersistencia);
+
+        controller.setPedidoService(new PedidoService() {
+            @Override
+            public Pedido registrarPedidoYEnviarComanda(Pedido pedido, List<DetallePedido> detalles) {
+                llamadasPersistencia.incrementAndGet();
+                return pedido;
+            }
+        });
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            controller.getItemsVenta().setAll(detalle(1, 1, "25.00", "25.00"));
+
+            fakePort.resetUltimaAlerta(null);
+            controller.handleEnviarComanda(null);
+            assertEquals("Sesión Requerida", fakePort.getUltimaAlertaTitulo());
+            assertEquals(Alert.AlertType.ERROR, fakePort.getUltimaAlertaTipo());
+
+            fakePort.resetUltimaAlerta(null);
+            controller.handleDividirCuenta(null);
+            assertEquals("Sesión Requerida", fakePort.getUltimaAlertaTitulo());
+            assertEquals(Alert.AlertType.ERROR, fakePort.getUltimaAlertaTipo());
+        });
+
+        assertThrows(NegocioException.class, () -> controller.ejecutarCobroSplitEnPagos(
+                List.of(new VentaService.PagoSplit("EFECTIVO", new BigDecimal("25.00")))));
+        assertEquals(0, llamadasPersistencia.get(),
+                "Ninguna operación POS debe persistir sin sesión de usuario activa");
+        assertNull(AuthService.getUsuarioSesionActual());
+    }
+
+    private static VentaController crearControllerConStubs(
+            FakeVentaPosInteractionPort fakePort,
+            VentaFidelizacionCoordinator fidCoordinator,
+            AtomicInteger llamadasPersistencia) {
+        DefaultVentaMesasCanalCoordinator mesas = new DefaultVentaMesasCanalCoordinator(null);
+        VentaMesasCanalUiRenderer renderer = new VentaMesasCanalUiRenderer();
+        VentaCatalogoPresenter catalogo = new VentaCatalogoPresenter(List::of, List::of);
+        DefaultVentaCarritoHandler carrito = new DefaultVentaCarritoHandler(
+                (items, bruto) -> new PromocionService.ResultadoEvaluacion(BigDecimal.ZERO, bruto, List.of()),
+                new VentaService());
+        DefaultVentaCobroCoordinator cobro = new DefaultVentaCobroCoordinator(
+                new VentaService() {
+                    @Override
+                    public com.foodcore.model.Venta registrarVentaDividida(com.foodcore.model.Venta venta,
+                            List<DetalleVenta> det, com.foodcore.model.ComprobantePago comp,
+                            List<PagoSplit> pagos) {
+                        llamadasPersistencia.incrementAndGet();
+                        return venta;
+                    }
+                },
+                new AutorizacionService());
+        return new VentaController(mesas, renderer, catalogo, carrito, cobro, fidCoordinator, fakePort);
     }
 
     private static Pedido pedido(String mesa, String tipo) {

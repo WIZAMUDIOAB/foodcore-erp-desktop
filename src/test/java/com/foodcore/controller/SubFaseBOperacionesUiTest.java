@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.controller.venta.ModalModoSupervisorHandle;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.model.Asistencia;
@@ -212,7 +213,7 @@ class SubFaseBOperacionesUiTest {
                 assertFalse(ctrl.getBtnAnularVenta().isDisabled(),
                         "CAJERO debe tener Anular Venta habilitado para usar Modo Supervisor");
 
-                VentaController.ModalModoSupervisorHandle modal = ctrl.construirModalModoSupervisor(1042);
+                ModalModoSupervisorHandle modal = ctrl.construirModalModoSupervisor(1042);
                 modal.txtPinSupervisor().setText("4321");
                 modal.txtMotivo().setText("Error de digitación en medio de pago");
                 modal.chkPlatoPreparado().setSelected(false);

@@ -3,12 +3,15 @@ package com.foodcore.service;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.foodcore.controller.VentaController;
 import com.foodcore.service.impl.AuthServiceImpl;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ServiceSolidArchitectureTest {
@@ -107,5 +110,40 @@ class ServiceSolidArchitectureTest {
         String spotbugsExcludes = read(Path.of("config", "spotbugs-exclude.xml"));
         assertFalse(spotbugsExcludes.contains("com.foodcore.service.AuthService"),
                 "config/spotbugs-exclude.xml no debe suprimir hallazgos sobre AuthService");
+    }
+
+    @Test
+    void ventaControllerSinCiclosNiHooksDeTest() throws IOException {
+        Path ventaDir = source("controller").resolve("venta");
+        try (var files = Files.walk(ventaDir)) {
+            List<Path> fuentes = files.filter(path -> path.toString().endsWith(".java")).toList();
+            assertFalse(fuentes.isEmpty());
+            for (Path file : fuentes) {
+                String text = read(file);
+                assertFalse(text.contains("VentaController"),
+                        "Archivo en controller.venta no debe referenciar VentaController: " + file.getFileName());
+            }
+        }
+
+        for (Field field : VentaController.class.getDeclaredFields()) {
+            String name = field.getName();
+            assertFalse(name.endsWith("Test"), "VentaController no debe tener campo de prueba: " + name);
+            assertFalse("confirmacionEscapeAutomatica".equals(name),
+                    "VentaController no debe tener flag confirmacionEscapeAutomatica");
+        }
+        for (Method method : VentaController.class.getDeclaredMethods()) {
+            String name = method.getName();
+            assertFalse(name.endsWith("Test"), "VentaController no debe tener método de prueba: " + name);
+            assertFalse("simularEstadoTransaccionEnCurso".equals(name),
+                    "VentaController no debe tener hook simularEstadoTransaccionEnCurso");
+            assertFalse("setConfirmacionEscapeAutomatica".equals(name),
+                    "VentaController no debe tener hook setConfirmacionEscapeAutomatica");
+        }
+
+        Path ventaCtrlPath = source("controller").resolve("VentaController.java");
+        List<String> lineas = Files.readAllLines(ventaCtrlPath);
+        assertTrue(lineas.size() <= 800, "VentaController.java debe ser <= 800 LOC, actual=" + lineas.size());
+        assertFalse(String.join("\n", lineas).contains("buscarYAsociarClientePorCriterioSincrono"),
+                "VentaController no debe exponer búsqueda síncrona bloqueante de clientes");
     }
 }

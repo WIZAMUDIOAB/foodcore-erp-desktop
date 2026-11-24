@@ -1,12 +1,16 @@
 package com.foodcore.controller;
 
+import com.foodcore.controller.venta.DefaultVentaCobroCoordinator;
+import com.foodcore.controller.venta.FakeVentaPosInteractionPort;
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
@@ -27,7 +31,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,6 +98,20 @@ class VentaPOSViewTest {
         );
     }
 
+    private static void esperarHastaEnFx(BooleanSupplier condicionFx, Duration timeout, String mensajeFallo)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            AtomicBoolean cumplida = new AtomicBoolean(false);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicionFx.getAsBoolean()));
+            if (cumplida.get()) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Timeout esperando condición asíncrona en FX: " + mensajeFallo);
+    }
+
     @Test
     @DisplayName("B6.6: testAgregarProductoAVenta_ActualizaTotalesYCarrito - Añadir producto actualiza items y label total")
     void testAgregarProductoAVenta_ActualizaTotalesYCarrito() throws Exception {
@@ -99,11 +122,15 @@ class VentaPOSViewTest {
                 new Scene(root, 1100, 720);
 
                 VentaController controller = loader.getController();
-                controller.agregarProductoAVenta(crearProductoPrueba());
+                try {
+                    controller.agregarProductoAVenta(crearProductoPrueba());
 
-                assertEquals(1, controller.getItemsVenta().size());
-                Label lblTotal = (Label) root.lookup("#lblTotal");
-                assertEquals("S/ 25.00", lblTotal.getText());
+                    assertEquals(1, controller.getItemsVenta().size());
+                    Label lblTotal = (Label) root.lookup("#lblTotal");
+                    assertEquals("S/ 25.00", lblTotal.getText());
+                } finally {
+                    controller.stopTimeline();
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -120,13 +147,30 @@ class VentaPOSViewTest {
                 new Scene(root, 1100, 720);
 
                 VentaController controller = loader.getController();
-                controller.agregarProductoAVenta(crearProductoPrueba());
+                try {
+                    AtomicInteger aperturasCobro = new AtomicInteger();
+                    AtomicBoolean btnDeshabilitadoDuranteCobro = new AtomicBoolean(false);
+                    FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+                    fakePort.setCobroHandler(solicitud -> {
+                        aperturasCobro.incrementAndGet();
+                        btnDeshabilitadoDuranteCobro.set(controller.getBtnEfectivo().isDisabled());
+                        // Intento reentrante de doble cobro mientras la transacción está en curso
+                        controller.handleCobroEfectivo(null);
+                    });
+                    controller.setInteractionPort(fakePort);
+                    controller.agregarProductoAVenta(crearProductoPrueba());
 
-                controller.simularEstadoTransaccionEnCurso(true);
-                assertTrue(controller.getBtnEfectivo().isDisabled(), "El botón Cobrar debe figurar deshabilitado");
-
-                controller.handleCobroEfectivo(null);
-                assertEquals(1, controller.getItemsVenta().size(), "El segundo intento de cobro debe ser completamente ignorado");
+                    controller.handleCobroEfectivo(null);
+                    assertEquals(1, aperturasCobro.get(),
+                            "El segundo intento de cobro reentrante debe ser completamente ignorado");
+                    assertTrue(btnDeshabilitadoDuranteCobro.get(),
+                            "El botón Cobrar debe figurar deshabilitado durante la transacción en curso");
+                    assertEquals(1, controller.getItemsVenta().size());
+                    assertFalse(controller.getBtnEfectivo().isDisabled(),
+                            "Al finalizar la operación los botones deben rehabilitarse");
+                } finally {
+                    controller.stopTimeline();
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -143,14 +187,23 @@ class VentaPOSViewTest {
                 Scene scene = new Scene(root, 1100, 720);
 
                 VentaController controller = loader.getController();
-                controller.setModoCobroDirectoTest(true);
-                controller.registrarAtajosTeclado();
-                controller.agregarProductoAVenta(crearProductoPrueba());
+                try {
+                    FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+                    fakePort.configurarCobroDirecto(
+                            new DefaultVentaCobroCoordinator(new VentaService(), new AutorizacionService()));
+                    controller.setInteractionPort(fakePort);
+                    controller.registrarAtajosTeclado();
+                    controller.agregarProductoAVenta(crearProductoPrueba());
 
-                KeyEvent f5Event = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F5, false, false, false, false);
-                scene.getRoot().fireEvent(f5Event);
+                    KeyEvent f5Event = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.F5,
+                            false, false, false, false);
+                    scene.getRoot().fireEvent(f5Event);
 
-                assertTrue(controller.getItemsVenta().isEmpty(), "El carrito debe vaciarse al completar la venta con F5");
+                    assertTrue(controller.getItemsVenta().isEmpty(),
+                            "El carrito debe vaciarse al completar la venta con F5");
+                } finally {
+                    controller.stopTimeline();
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -174,15 +227,22 @@ class VentaPOSViewTest {
                 Scene scene = new Scene(root, 1100, 720);
 
                 VentaController controller = loader.getController();
-                controller.setConfirmacionEscapeAutomatica(true);
-                controller.registrarAtajosTeclado();
-                controller.agregarProductoAVenta(crearProductoPrueba());
-                assertEquals(1, controller.getItemsVenta().size());
+                try {
+                    FakeVentaPosInteractionPort fakePort = new FakeVentaPosInteractionPort();
+                    fakePort.setConfirmarLimpieza(true);
+                    controller.setInteractionPort(fakePort);
+                    controller.registrarAtajosTeclado();
+                    controller.agregarProductoAVenta(crearProductoPrueba());
+                    assertEquals(1, controller.getItemsVenta().size());
 
-                KeyEvent escEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false);
-                scene.getRoot().fireEvent(escEvent);
+                    KeyEvent escEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE,
+                            false, false, false, false);
+                    scene.getRoot().fireEvent(escEvent);
 
-                assertTrue(controller.getItemsVenta().isEmpty(), "La tecla Esc debe vaciar el carrito");
+                    assertTrue(controller.getItemsVenta().isEmpty(), "La tecla Esc debe vaciar el carrito");
+                } finally {
+                    controller.stopTimeline();
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -220,37 +280,57 @@ class VentaPOSViewTest {
             "Refrescante", new BigDecimal("18.00"), new BigDecimal("50"), true
         );
 
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
-                Parent root = loader.load();
-                new Scene(root, 1100, 720);
+        AtomicReference<VentaController> ctrlRef = new AtomicReference<>();
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                    Parent root = loader.load();
+                    new Scene(root, 1100, 720);
 
-                VentaController controller = loader.getController();
-                controller.refrescarMesasYCanalesSincrono();
-                controller.seleccionarMesa("02");
+                    VentaController controller = loader.getController();
+                    ctrlRef.set(controller);
+                    controller.refrescarMesasYCanalesSincrono();
+                    controller.seleccionarMesa("02");
 
-                assertEquals(1, controller.getItemsVenta().size());
-                assertEquals("S/ 25.00", controller.getLblTotal().getText());
+                    assertEquals(1, controller.getItemsVenta().size());
+                    assertEquals("S/ 25.00", controller.getLblTotal().getText());
 
-                controller.agregarProductoAVenta(segundoProducto);
-                assertEquals(2, controller.getItemsVenta().size(), "La tabla POS debe mostrar los 2 ítems del pedido");
-                assertEquals(2, controller.getTblDetalle().getItems().size());
-                assertEquals("S/ 43.00", controller.getLblTotal().getText(),
-                    "El Label total en POS debe mostrar la suma acumulada (25 + 18 = 43.00)");
+                    controller.agregarProductoAVenta(segundoProducto);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                controller.agregarProductoAVenta(crearProductoPrueba());
-                assertEquals(3, controller.getItemsVenta().size(), "Debe incluir también el tercer ítem");
-                assertEquals("S/ 68.00", controller.getLblTotal().getText());
+            VentaController ctrl = ctrlRef.get();
+            esperarHastaEnFx(() -> !ctrl.isOperacionPedidoEnProgreso() && ctrl.getItemsVenta().size() == 2,
+                    Duration.ofSeconds(5), "Debe agregar segundo ítem al pedido existente de forma asíncrona");
 
-                controller.refrescarMesasYCanalesSincrono();
-                controller.seleccionarMesa("02");
-                assertEquals(3, controller.getItemsVenta().size(), "Al recargar mesa deben permanecer los 3 ítems");
-                assertEquals("S/ 68.00", controller.getLblTotal().getText());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                assertEquals(2, ctrl.getItemsVenta().size(), "La tabla POS debe mostrar los 2 ítems del pedido");
+                assertEquals(2, ctrl.getTblDetalle().getItems().size());
+                assertEquals("S/ 43.00", ctrl.getLblTotal().getText(),
+                        "El Label total en POS debe mostrar la suma acumulada (25 + 18 = 43.00)");
+                ctrl.agregarProductoAVenta(crearProductoPrueba());
+            });
+
+            esperarHastaEnFx(() -> !ctrl.isOperacionPedidoEnProgreso() && ctrl.getItemsVenta().size() == 3,
+                    Duration.ofSeconds(5), "Debe agregar tercer ítem al pedido existente de forma asíncrona");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                assertEquals(3, ctrl.getItemsVenta().size(), "Debe incluir también el tercer ítem");
+                assertEquals("S/ 68.00", ctrl.getLblTotal().getText());
+
+                ctrl.refrescarMesasYCanalesSincrono();
+                ctrl.seleccionarMesa("02");
+                assertEquals(3, ctrl.getItemsVenta().size(), "Al recargar mesa deben permanecer los 3 ítems");
+                assertEquals("S/ 68.00", ctrl.getLblTotal().getText());
+            });
+        } finally {
+            if (ctrlRef.get() != null) {
+                JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrlRef.get().stopTimeline());
             }
-        });
+        }
 
         assertEquals(0, new BigDecimal("68.00").compareTo(pedidoService.calcularTotal(creado.getIdPedido())));
     }

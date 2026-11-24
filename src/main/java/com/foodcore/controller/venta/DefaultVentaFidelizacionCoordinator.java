@@ -1,6 +1,5 @@
 package com.foodcore.controller.venta;
 
-import com.foodcore.controller.VentaController;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.service.FidelizacionService;
@@ -14,7 +13,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class DefaultVentaFidelizacionCoordinator implements VentaFidelizacionCoordinator {
     private final Function<String, Optional<Cliente>> buscarCliente;

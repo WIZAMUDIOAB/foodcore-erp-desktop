@@ -1,45 +1,64 @@
 package com.foodcore.controller.venta;
 
-import com.foodcore.controller.VentaController;
+import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.NegocioException;
+import com.foodcore.model.Caja;
 import com.foodcore.model.ComprobantePago;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
-import com.foodcore.model.Venta;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.Venta;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
+import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
-
+import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.util.ImpresoraTermicaService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.function.Supplier;
 
 public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
     private static final Logger LOGGER = Logger.getLogger(DefaultVentaCobroCoordinator.class.getName());
+
+    @FunctionalInterface
+    public interface CajaActivaResolver {
+        Optional<Caja> obtenerCajaActiva() throws SQLException;
+    }
+
     private final VentaService ventaService;
     private final AutorizacionService autorizacionService;
     private final Supplier<ImpresoraTermicaService> impresoraSupplier;
+    private final CajaActivaResolver cajaActivaResolver;
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService) {
-        this(ventaService, autorizacionService, ImpresoraTermicaService::new);
+        this(ventaService, autorizacionService, ImpresoraTermicaService::new,
+                () -> new CajaService().obtenerCajaActiva());
     }
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,
             Supplier<ImpresoraTermicaService> impresoraSupplier) {
+        this(ventaService, autorizacionService, impresoraSupplier, () -> new CajaService().obtenerCajaActiva());
+    }
+
+    public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,
+            Supplier<ImpresoraTermicaService> impresoraSupplier, CajaActivaResolver cajaActivaResolver) {
         this.ventaService = ventaService;
         this.autorizacionService = autorizacionService;
         this.impresoraSupplier = impresoraSupplier;
+        this.cajaActivaResolver = Objects.requireNonNull(cajaActivaResolver);
     }
 
     @Override
@@ -49,7 +68,7 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
             throw new IllegalArgumentException("El total neto a dividir debe ser mayor a cero.");
         }
         BigDecimal total = totalNeto.setScale(2, RoundingMode.HALF_UP);
-        if (VentaController.MODALIDAD_SPLIT_4.equals(modalidad)) {
+        if (MODALIDAD_SPLIT_4.equals(modalidad)) {
             BigDecimal cuarta = total.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
             BigDecimal acum = cuarta.multiply(new BigDecimal("3"));
             BigDecimal ultimo = total.subtract(acum);
@@ -67,7 +86,7 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
             }
             return pagos4;
         }
-        if (VentaController.MODALIDAD_SPLIT_ITEMS.equals(modalidad) && items != null && !items.isEmpty()) {
+        if (MODALIDAD_SPLIT_ITEMS.equals(modalidad) && items != null && !items.isEmpty()) {
             BigDecimal brutoA = BigDecimal.ZERO;
             BigDecimal brutoB = BigDecimal.ZERO;
             if (items.size() >= 2) {
@@ -111,14 +130,8 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
     public Venta construirVentaParaCobro(Integer pedidoActivoId, int idUsuario, Integer idCliente,
             BigDecimal basePreCanje, BigDecimal totalNeto, String metodoPago, BigDecimal descuentoActivo,
             BigDecimal descuentoPuntosActivo, int puntosARedimir) throws NegocioException {
-        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
-        Venta venta = new Venta(0, pedidoActivoId, 1, idUsuario, idCliente,
-                desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto, metodoPago, totalNeto, BigDecimal.ZERO);
-        venta.setDescuento(descuentoActivo);
-        venta.setDescuentoPuntos(descuentoPuntosActivo);
-        venta.setPuntosACanjear(puntosARedimir);
-        venta.setIdempotencyKey(UUID.randomUUID().toString());
-        return venta;
+        return crearVentaConCaja(pedidoActivoId, 1, idUsuario, idCliente, basePreCanje,
+                totalNeto, metodoPago, descuentoActivo, descuentoPuntosActivo, puntosARedimir);
     }
 
     @Override
@@ -126,19 +139,25 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
             BigDecimal basePreCanje, BigDecimal totalNeto, BigDecimal descuentoActivo,
             BigDecimal descuentoPuntosActivo, int puntosARedimir, List<DetalleVenta> items,
             List<VentaService.PagoSplit> pagos) throws Exception {
-        Venta venta = construirVentaParaCobro(pedidoActivoId, idUsuario, idCliente, basePreCanje,
+        int idCajaActiva = resolverIdCajaActiva();
+        Venta venta = crearVentaConCaja(pedidoActivoId, idCajaActiva, idUsuario, idCliente, basePreCanje,
                 totalNeto, "MIXTO", descuentoActivo, descuentoPuntosActivo, puntosARedimir);
-        ComprobantePago comprobante = new ComprobantePago(0, 0, "TICKET", "SPL", "000001", totalNeto);
-        return ventaService.registrarVentaDividida(venta, items, comprobante, pagos);
+        String corrSplit = generarCorrelativo();
+        ComprobantePago comprobante = new ComprobantePago(0, 0, "TICKET", "SPL", corrSplit, totalNeto);
+        return ventaService.registrarVentaDividida(venta, new ArrayList<>(items), comprobante, pagos);
     }
 
     @Override
     public void procesarCobroDirecto(Integer pedidoActivoId, Integer idCliente, BigDecimal basePreCanje,
             BigDecimal totalNeto, String metodo, BigDecimal descuentoActivo, BigDecimal descuentoPuntosActivo,
             int puntosARedimir, List<DetalleVenta> items) throws Exception {
-        Venta venta = construirVentaParaCobro(pedidoActivoId, 1, idCliente, basePreCanje, totalNeto,
+        Usuario usr = SesionManager.getUsuarioActual();
+        int idUsuario = (usr != null && usr.getIdUsuario() > 0) ? usr.getIdUsuario() : 1;
+        int idCajaActiva = resolverIdCajaActiva();
+        Venta venta = crearVentaConCaja(pedidoActivoId, idCajaActiva, idUsuario, idCliente, basePreCanje, totalNeto,
                 metodo, descuentoActivo, descuentoPuntosActivo, puntosARedimir);
-        ComprobantePago comprobante = new ComprobantePago(0, 0, "TICKET", "TCK", "000001", totalNeto);
+        String corrTicket = generarCorrelativo();
+        ComprobantePago comprobante = new ComprobantePago(0, 0, "TICKET", "TCK", corrTicket, totalNeto);
         ventaService.procesarCobroVenta(venta, new ArrayList<>(items), comprobante);
     }
 
@@ -157,6 +176,18 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
             LOGGER.log(Level.WARNING, "Comanda persistida pero falló la impresión térmica", exImp);
         }
         return new ResultadoEnvioComanda(pedidoFinal, impresionOk);
+    }
+
+    @Override
+    public ResultadoItemPedido agregarItemAPedidoExistente(PedidoService pedidoServiceActual, int idPedido,
+            DetallePedido nuevoItem) throws NegocioException, SQLException {
+        Pedido actualizado = pedidoServiceActual.agregarItemsAPedido(idPedido, List.of(nuevoItem));
+        BigDecimal totalPedido = pedidoServiceActual.calcularTotal(idPedido);
+        actualizado.setTotal(totalPedido);
+        List<DetallePedido> detallesCompletos = actualizado.getDetalles() != null
+                ? actualizado.getDetalles()
+                : pedidoServiceActual.listarDetallesPorPedido(idPedido);
+        return new ResultadoItemPedido(totalPedido, detallesCompletos);
     }
 
     @Override
@@ -204,5 +235,29 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
         long idUsr = usr != null ? usr.getIdUsuario() : 2L;
         String nombreUsr = usr != null && usr.getUsername() != null ? usr.getUsername() : "usuario";
         return autorizacionService.crearSesion(idUsr, nombreUsr, codigoRol, "POS-01");
+    }
+
+    private Venta crearVentaConCaja(Integer pedidoActivoId, int idCajaActiva, int idUsuario, Integer idCliente,
+            BigDecimal basePreCanje, BigDecimal totalNeto, String metodoPago, BigDecimal descuentoActivo,
+            BigDecimal descuentoPuntosActivo, int puntosARedimir) throws NegocioException {
+        DesgloseFiscal desglose = DesgloseFiscal.desdeTotalConImpuestos(basePreCanje);
+        Venta venta = new Venta(0, pedidoActivoId, idCajaActiva, idUsuario, idCliente,
+                desglose.getSubtotalGravado(), desglose.getIgv(), totalNeto, metodoPago, totalNeto, BigDecimal.ZERO);
+        venta.setDescuento(descuentoActivo);
+        venta.setDescuentoPuntos(descuentoPuntosActivo);
+        venta.setPuntosACanjear(puntosARedimir);
+        venta.setIdempotencyKey(UUID.randomUUID().toString());
+        return venta;
+    }
+
+    private int resolverIdCajaActiva() throws SQLException, NegocioException {
+        return cajaActivaResolver.obtenerCajaActiva()
+                .map(Caja::getIdCaja)
+                .orElseThrow(() -> new CajaCerradaException(
+                        "No hay una caja abierta para registrar la operación de cobro."));
+    }
+
+    private static String generarCorrelativo() {
+        return String.format("%06d", Math.floorMod(UUID.randomUUID().hashCode(), 1_000_000));
     }
 }

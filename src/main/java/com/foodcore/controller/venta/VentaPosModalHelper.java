@@ -1,39 +1,31 @@
 package com.foodcore.controller.venta;
 
-import com.foodcore.controller.VentaController;
-import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
-import com.foodcore.service.FidelizacionService;
-import com.foodcore.service.VentaPosConsultaService;
-import java.math.BigDecimal;
-import java.sql.SQLException;
+import com.foodcore.util.DialogService;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
+import javafx.geometry.Insets;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
-import javafx.geometry.Insets;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
 import javafx.stage.Modality;
-import com.foodcore.util.DialogService;
 
 public final class VentaPosModalHelper {
-    private VentaPosModalHelper() { }
+    private VentaPosModalHelper() {
+    }
 
     @FunctionalInterface
     public interface RegistroClienteRapidoFn {
         Cliente registrar(String dni, String nombreCompleto, String telefono, LocalDate fechaNacimiento);
     }
 
-    public static VentaController.ModalModoSupervisorHandle construirModalModoSupervisor(int idVentaPrellenado) {
+    public static ModalModoSupervisorHandle construirModalModoSupervisor(int idVentaPrellenado) {
         Dialog<ButtonType> dialog = DialogService.crearDialogo(
                 "Modo Supervisor — Autorización de Anulación", null);
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -64,7 +56,7 @@ public final class VentaPosModalHelper {
         ButtonType btnConfirmar = new ButtonType("Autorizar y Anular Venta", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().setContent(root);
         dialog.getDialogPane().getButtonTypes().setAll(btnConfirmar, ButtonType.CANCEL);
-        return new VentaController.ModalModoSupervisorHandle(dialog, root, txtId, txtPin, txtMotivo, chkMerma);
+        return new ModalModoSupervisorHandle(dialog, root, txtId, txtPin, txtMotivo, chkMerma);
     }
 
     public static Optional<Cliente> mostrarDialogoRegistroRapidoCliente(String prefill,

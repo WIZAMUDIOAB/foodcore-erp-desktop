@@ -8,7 +8,7 @@ import com.foodcore.controller.MainDashboardController;
 import com.foodcore.controller.MozoOrderController;
 import com.foodcore.controller.ReportesAvanzadosController;
 import com.foodcore.controller.VentaController;
-import com.foodcore.controller.VentaController.ModalModoSupervisorHandle;
+import com.foodcore.controller.venta.ModalModoSupervisorHandle;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.MenuQrService;
