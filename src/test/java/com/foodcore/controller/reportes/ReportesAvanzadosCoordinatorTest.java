@@ -31,7 +31,8 @@ class ReportesAvanzadosCoordinatorTest {
                     categoriaVista.set(categoria);
                     return new ResultadoReporteAvanzado(new String[]{"a", "b", "c", "d", "e"},
                             List.<String[]>of(new String[]{"1", "2", "3", "4", "5"}),
-                            List.of(new RebanadaPie("efectivo", 12.5)), 12.5, 1, "efectivo", 12.5,
+                            List.of(new RebanadaPie("efectivo", new BigDecimal("12.50"))),
+                            new BigDecimal("12.50"), 1, "efectivo", new BigDecimal("12.50"),
                             null, null, "total", "subtotal", "promedio", "top");
                 }, (ini, fin) -> List.of(), fecha -> null, fecha -> comparativa(fecha));
         ReportesAvanzadosPresenter.ResultadoAnalisisAvanzado resultado = presenter.consultarAnalisis(
@@ -40,7 +41,7 @@ class ReportesAvanzadosCoordinatorTest {
         assertEquals(List.of("a", "b", "c", "d", "e"), List.of(resultado.headers()));
         assertEquals("1", resultado.filas().get(0).c1);
         assertEquals("efectivo", resultado.slices().get(0).label());
-        assertEquals(12.5, resultado.montoTotal());
+        assertEquals(0, new BigDecimal("12.50").compareTo(resultado.montoTotal()));
         assertEquals("promedio", resultado.kpiPromedioText());
     }
 
@@ -51,10 +52,10 @@ class ReportesAvanzadosCoordinatorTest {
         DefaultReportesAvanzadosPresenter presenter = presenter(categorias, fecha -> null, fecha -> comparativa(fecha));
         ReportesAvanzadosPresenter.ResultadoAnalisisAvanzado resultado = presenter.consultarAnalisis(
                 ReportesAvanzadosController.REPORTE_MARGENES_CATEGORIA, INICIO, FIN, FIN);
-        assertEquals(90.0, resultado.montoTotal());
+        assertEquals(0, new BigDecimal("90.00").compareTo(resultado.montoTotal()));
         assertEquals(2, resultado.cantidadTotal());
         assertEquals("A", resultado.topItem());
-        assertEquals(60.0, resultado.topValor());
+        assertEquals(0, new BigDecimal("60.00").compareTo(resultado.topValor()));
         assertEquals("60.0% prom.", resultado.kpiPromedioText());
         assertEquals("Margen 60.0% (S/ 60.00)", resultado.kpiTopValorText());
         assertEquals(2, resultado.filas().size());
@@ -80,7 +81,7 @@ class ReportesAvanzadosCoordinatorTest {
                         ReportesAvanzadosController.REPORTE_COHORTES_CLIENTES, INICIO, FIN, FIN);
         assertEquals("66.7% ret.", resultado.kpiPromedioText());
         assertEquals("6 recurrentes", resultado.topItem());
-        assertEquals(9, resultado.montoTotal());
+        assertEquals(0, new BigDecimal("9.00").compareTo(resultado.montoTotal()));
         assertEquals(9, resultado.cantidadTotal());
         assertEquals(2, resultado.filas().size());
 
@@ -205,8 +206,8 @@ class ReportesAvanzadosCoordinatorTest {
     }
 
     private static ResultadoReporteAvanzado resultadoVacio() {
-        return new ResultadoReporteAvanzado(null, List.of(), List.of(), 0, 0, "-", 0,
-                null, null, "", "", "", "");
+        return new ResultadoReporteAvanzado(null, List.of(), List.of(), BigDecimal.ZERO, 0, "-",
+                BigDecimal.ZERO, null, null, "", "", "", "");
     }
 
     private static ComparativaPeriodos comparativa(LocalDate fecha) {

@@ -21,6 +21,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -249,7 +251,8 @@ public class ExpedienteEmpleadoController {
                         ? usuario.getTipoContrato()
                         : "PLAZO_FIJO");
         dpFechaIngreso.setValue(usuario.getFechaIngreso());
-        txtSueldoBase.setText(String.format(Locale.US, "%.2f", usuario.getSueldoBase()));
+        BigDecimal sueldoMostrar = usuario.getSueldoBase() != null ? usuario.getSueldoBase() : BigDecimal.ZERO;
+        txtSueldoBase.setText(String.format(Locale.US, "%.2f", sueldoMostrar));
         txtHorarioLaboral.setText(nvl(usuario.getHorarioLaboral()));
         txtHoraEntrada.setText(usuario.getHoraEntradaProgramada() != null
                 ? usuario.getHoraEntradaProgramada().format(HORA_FMT)
@@ -301,7 +304,8 @@ public class ExpedienteEmpleadoController {
             return;
         }
         try {
-            double sueldo = Double.parseDouble(txtSueldoBase.getText().trim().replace(',', '.'));
+            BigDecimal sueldo = new BigDecimal(txtSueldoBase.getText().trim().replace(',', '.'))
+                    .setScale(2, RoundingMode.HALF_UP);
             LocalTime entrada = parsearHoraOpcional(txtHoraEntrada.getText());
             LocalTime salida = parsearHoraOpcional(txtHoraSalida.getText());
 

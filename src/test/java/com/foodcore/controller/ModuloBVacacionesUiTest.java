@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -50,7 +51,7 @@ class ModuloBVacacionesUiTest {
         cajero.setUsername("cajero");
         cajero.setNombreEmpleado("Maria Cajera");
         cajero.setNombreRol("CAJERO");
-        cajero.setSueldoBase(1600.00);
+        cajero.setSueldoBase(new BigDecimal("1600.00"));
         AuthService.setUsuarioSesionActual(cajero);
 
         AtomicReference<MiHorarioController> ctrlRef = new AtomicReference<>();

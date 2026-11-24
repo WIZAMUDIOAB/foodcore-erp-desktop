@@ -2,6 +2,7 @@ package com.foodcore.dao;
 
 import com.foodcore.model.HistorialPrecio;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -12,5 +13,5 @@ public interface HistorialPrecioDAO {
     List<HistorialPrecio> listarPorEntidad(Connection conn, String tipoEntidad, int idEntidad) throws SQLException;
     List<HistorialPrecio> listarPorRangoFecha(Connection conn, LocalDate inicio, LocalDate fin) throws SQLException;
     int insertar(Connection conn, HistorialPrecio historial) throws SQLException;
-    double obtenerPrecioPromedioInsumo(Connection conn, int idInsumo) throws SQLException;
+    BigDecimal obtenerPrecioPromedioInsumo(Connection conn, int idInsumo) throws SQLException;
 }

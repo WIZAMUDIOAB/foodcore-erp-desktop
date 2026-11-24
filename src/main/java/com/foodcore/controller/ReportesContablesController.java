@@ -23,6 +23,8 @@ import javafx.scene.control.TableView;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -87,9 +89,9 @@ public class ReportesContablesController {
         colFecha.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().fechaEmision));
         colComprobante.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().serie + "-" + String.format("%08d", d.getValue().idVenta)));
         colCliente.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().nombreCliente));
-        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().subtotal)));
-        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().igv)));
-        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().total)));
+        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().subtotal))));
+        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().igv))));
+        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().total))));
         colMedioPago.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().medioPago));
         colEstado.setCellValueFactory(d -> new SimpleStringProperty("1".equals(d.getValue().estado) ? "VÁLIDO" : "ANULADO"));
         tblVentasSunat.setItems(listaVentas);
@@ -188,21 +190,28 @@ public class ReportesContablesController {
      * @param ventas Lista completa de ventas a paginar.
      */
     public void cargarVentasDirectoParaPaginacion(List<VentaRegistroSunat> ventas) {
-        double sumTotal = 0.0;
-        double sumBase = 0.0;
-        double sumIgv = 0.0;
+        BigDecimal sumTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumBase = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumIgv = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (ventas != null) {
             for (VentaRegistroSunat v : ventas) {
-                sumTotal += v.total;
-                sumBase += v.subtotal;
-                sumIgv += v.igv;
+                sumTotal = sumTotal.add(normalizarMoneda(v.total)).setScale(2, RoundingMode.HALF_UP);
+                sumBase = sumBase.add(normalizarMoneda(v.subtotal)).setScale(2, RoundingMode.HALF_UP);
+                sumIgv = sumIgv.add(normalizarMoneda(v.igv)).setScale(2, RoundingMode.HALF_UP);
             }
         }
         LocalDate hoy = LocalDate.now();
         aplicarResultadoPeriodo(
-                new PeriodoContableResumen(ventas != null ? ventas : List.of(), sumTotal, sumBase, sumIgv, 0.0),
+                new PeriodoContableResumen(ventas != null ? ventas : List.of(),
+                        sumTotal, sumBase, sumIgv, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)),
                 hoy.withDayOfMonth(1),
                 hoy);
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     @FXML

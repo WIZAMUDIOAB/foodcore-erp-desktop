@@ -1,5 +1,7 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 /**
@@ -24,10 +26,10 @@ public record ResultadoReporteAvanzado(
         String[] headers,
         List<String[]> filas,
         List<RebanadaPie> slices,
-        double montoTotal,
+        BigDecimal montoTotal,
         int cantidadTotal,
         String topItem,
-        double topValor,
+        BigDecimal topValor,
         ComparativaPeriodos comparativa,
         ReporteCohortes cohortesReporte,
         String kpiMontoTotalText,
@@ -36,12 +38,20 @@ public record ResultadoReporteAvanzado(
         String kpiTopValorText) {
 
     /**
-     * Normaliza arreglos y listas a copias no nulas e inmutables.
+     * Normaliza arreglos, listas y montos monetarios a copias no nulas e inmutables.
      */
     public ResultadoReporteAvanzado {
         headers = headers != null ? headers.clone() : new String[]{"", "", "", "", ""};
         filas = filas != null ? List.copyOf(filas) : List.of();
         slices = slices != null ? List.copyOf(slices) : List.of();
+        montoTotal = normalizarMoneda(montoTotal);
+        topValor = normalizarMoneda(topValor);
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override
@@ -81,6 +91,9 @@ public record ResultadoReporteAvanzado(
      * @param etiqueta Texto visible de la leyenda.
      * @param valor    Magnitud proporcional de la rodaja.
      */
-    public record RebanadaPie(String etiqueta, double valor) {
+    public record RebanadaPie(String etiqueta, BigDecimal valor) {
+        public RebanadaPie {
+            valor = normalizarMoneda(valor);
+        }
     }
 }

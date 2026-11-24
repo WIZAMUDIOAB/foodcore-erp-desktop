@@ -115,38 +115,46 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
         String[] headers = {"Categoría", "Ingresos S/", "Costo Receta S/", "Margen Bruto S/", "Margen %"};
         List<ReportesAvanzadosController.FilaReporteAvanzado> filas = new ArrayList<>();
         List<PieSlice> slices = new ArrayList<>();
-        double totalMargen = 0.0;
-        double totalIngresos = 0.0;
+        BigDecimal cero = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal minSlice = new BigDecimal("0.01");
+        BigDecimal cien = new BigDecimal("100");
+        BigDecimal totalMargen = cero;
+        BigDecimal totalIngresos = cero;
         int totalCategorias = 0;
         String topItem = "-";
-        double topValor = 0.0;
-        BigDecimal topMargenPct = BigDecimal.ZERO;
+        BigDecimal topValor = cero;
+        BigDecimal topMargenPct = BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
         try {
             List<MargenCategoria> margenes = margenesFn.calcular(ini, fin);
             for (MargenCategoria mc : margenes) {
+                BigDecimal ingresos = mc.ingresosVenta() != null ? mc.ingresosVenta().setScale(2, RoundingMode.HALF_UP) : cero;
+                BigDecimal costo = mc.costoReceta() != null ? mc.costoReceta().setScale(2, RoundingMode.HALF_UP) : cero;
+                BigDecimal margen = mc.margenBruto() != null ? mc.margenBruto().setScale(2, RoundingMode.HALF_UP) : cero;
                 filas.add(new ReportesAvanzadosController.FilaReporteAvanzado(mc.nombreCategoria(),
-                        "S/ " + fmt2(mc.ingresosVenta()), "S/ " + fmt2(mc.costoReceta()),
-                        "S/ " + fmt2(mc.margenBruto()), fmt1(mc.margenPorcentaje()) + "%"));
+                        "S/ " + fmt2(ingresos), "S/ " + fmt2(costo),
+                        "S/ " + fmt2(margen), fmt1(mc.margenPorcentaje()) + "%"));
                 slices.add(new PieSlice(mc.nombreCategoria() + " (" + fmt1(mc.margenPorcentaje()) + "%)",
-                        Math.max(0.01, mc.margenBruto().doubleValue())));
-                totalMargen += mc.margenBruto().doubleValue();
-                totalIngresos += mc.ingresosVenta().doubleValue();
+                        margen.max(minSlice)));
+                totalMargen = totalMargen.add(margen).setScale(2, RoundingMode.HALF_UP);
+                totalIngresos = totalIngresos.add(ingresos).setScale(2, RoundingMode.HALF_UP);
                 totalCategorias++;
             }
             if (!margenes.isEmpty()) {
                 MargenCategoria primero = margenes.get(0);
                 topItem = primero.nombreCategoria();
-                topValor = primero.margenBruto().doubleValue();
+                topValor = primero.margenBruto() != null ? primero.margenBruto().setScale(2, RoundingMode.HALF_UP) : cero;
                 topMargenPct = primero.margenPorcentaje();
             }
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Error calculando márgenes por categoría", ex);
         }
-        double margenPromedioPct = totalIngresos > 0.0 ? totalMargen / totalIngresos * 100.0 : 0.0;
-        String kpiSub = totalCategorias + String.format(" categorías · Ventas S/ %.2f", totalIngresos);
-        String kpiProm = String.format("%.1f%% prom.", margenPromedioPct);
+        BigDecimal margenPromedioPct = totalIngresos.compareTo(BigDecimal.ZERO) > 0
+                ? totalMargen.multiply(cien).divide(totalIngresos, 1, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        String kpiSub = totalCategorias + String.format(Locale.US, " categorías · Ventas S/ %.2f", totalIngresos);
+        String kpiProm = String.format(Locale.US, "%.1f%% prom.", margenPromedioPct);
         String kpiTopSub = totalCategorias > 0
-                ? String.format("Margen %s%% (S/ %.2f)", fmt1(topMargenPct), topValor)
+                ? String.format(Locale.US, "Margen %s%% (S/ %.2f)", fmt1(topMargenPct), topValor)
                 : "Sin datos en el rango";
         return new ResultadoAnalisisAvanzado(headers, filas, slices, totalMargen, totalCategorias, topItem, topValor,
                 comparativa, null, null, kpiSub, kpiProm, kpiTopSub);
@@ -173,12 +181,20 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
                     FormatoBiUiHelper.formatearPorcentajeCohorte(coh.mes4Pct())));
         }
         int activosMes = reporte.clientesNuevosMes() + reporte.clientesRecurrentesMes();
-        double tasaRecurrentePct = activosMes > 0 ? reporte.clientesRecurrentesMes() * 100.0 / activosMes : 0.0;
-        return new ResultadoAnalisisAvanzado(headers, filas, List.of(), activosMes, reporte.totalClientesIdentificados(),
-                reporte.clientesRecurrentesMes() + " recurrentes", reporte.clientesRecurrentesMes(), comparativa, reporte,
+        BigDecimal tasaRecurrentePct = activosMes > 0
+                ? BigDecimal.valueOf(reporte.clientesRecurrentesMes())
+                        .multiply(new BigDecimal("100"))
+                        .divide(BigDecimal.valueOf(activosMes), 1, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        return new ResultadoAnalisisAvanzado(headers, filas, List.of(),
+                BigDecimal.valueOf(activosMes).setScale(2, RoundingMode.HALF_UP),
+                reporte.totalClientesIdentificados(),
+                reporte.clientesRecurrentesMes() + " recurrentes",
+                BigDecimal.valueOf(reporte.clientesRecurrentesMes()).setScale(2, RoundingMode.HALF_UP),
+                comparativa, reporte,
                 reporte.totalClientesIdentificados() + " clientes",
                 reporte.clientesNuevosMes() + " nuevos · " + reporte.clientesPerdidosMas60Dias() + " perdidos >60d",
-                String.format("%.1f%% ret.", tasaRecurrentePct),
+                String.format(Locale.US, "%.1f%% ret.", tasaRecurrentePct),
                 reporte.clientesPerdidosMas60Dias() + " perdidos (> 60 días)");
     }
 
@@ -195,13 +211,13 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
     @Override
     public String fmt2(BigDecimal val) {
         BigDecimal v = val != null ? val.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        return String.format(Locale.US, "%.2f", v.doubleValue());
+        return v.toPlainString();
     }
 
     @Override
     public String fmt1(BigDecimal val) {
         BigDecimal v = val != null ? val.setScale(1, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
-        return String.format(Locale.US, "%.1f", v.doubleValue());
+        return v.toPlainString();
     }
 
     @Override

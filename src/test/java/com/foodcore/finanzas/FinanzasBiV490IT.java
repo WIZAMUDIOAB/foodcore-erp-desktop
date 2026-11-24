@@ -877,7 +877,7 @@ class FinanzasBiV490IT {
             cli.setContacto(nombre);
             cli.setTelefono("999000111");
             cli.setEmail(doc.toLowerCase() + "@test.pe");
-            cli.setLimiteCredito(0.0);
+            cli.setLimiteCredito(BigDecimal.ZERO);
             cli.setDiasCredito(0);
             cli.setPuntosFidelidad(10);
             cli.setEstado("ACTIVO");

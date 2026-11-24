@@ -32,35 +32,37 @@ public final class DefaultCuentaCorrienteUseCase implements CuentaCorrienteUseCa
         this.clienteDAO = clienteDAO; this.cajaDAO = cajaDAO; this.ventaDAO = ventaDAO;
         this.cierreContableService = cierreContableService == null ? new CierreContableService() : cierreContableService;
     }
-    private static BigDecimal validarMontoPositivo(double monto, String descripcion) {
-        if (Double.isNaN(monto) || Double.isInfinite(monto) || monto <= 0.0) throw new IllegalArgumentException("El " + descripcion + " debe ser un número finito mayor a 0");
-        return BigDecimal.valueOf(monto).setScale(2, RoundingMode.HALF_UP);
+    private static BigDecimal validarMontoPositivo(BigDecimal monto, String descripcion) {
+        if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El " + descripcion + " debe ser un importe mayor a 0");
+        }
+        return monto.setScale(2, RoundingMode.HALF_UP);
     }
     private void verificarPeriodoAbierto(Connection conn, LocalDate fecha) throws SQLException {
         try { cierreContableService.validarPeriodoAbierto(conn, fecha != null ? fecha : LocalDate.now(ZONA_LIMA)); }
         catch (PeriodoCerradoException ex) { throw new IllegalStateException(ex.getMessage(), ex); }
     }
-    @Override public boolean registrarPagoProveedor(int idCuentaPagar, double monto, String metodoPago, Integer idCaja, int idUsuario, String nota) throws SQLException {
+    @Override public boolean registrarPagoProveedor(int idCuentaPagar, BigDecimal monto, String metodoPago, Integer idCaja, int idUsuario, String nota) throws SQLException {
         BigDecimal mb = validarMontoPositivo(monto, "monto a abonar");
         try { return tx.executeChecked(conn -> {
             verificarPeriodoAbierto(conn, LocalDate.now(ZONA_LIMA));
             CuentaPorPagar cxp = cuentaPorPagarDAO.buscarPorIdParaActualizar(conn, idCuentaPagar).orElseThrow(() -> new IllegalArgumentException("Cuenta por pagar no encontrada #" + idCuentaPagar));
-            BigDecimal saldo = BigDecimal.valueOf(cxp.getMontoTotal()).setScale(2, RoundingMode.HALF_UP).subtract(BigDecimal.valueOf(cxp.getMontoPagado()).setScale(2, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal saldo = cxp.getMontoTotal().setScale(2, RoundingMode.HALF_UP).subtract(cxp.getMontoPagado().setScale(2, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
             if (mb.compareTo(saldo.add(TOLERANCIA_REDONDEO)) > 0) throw new IllegalArgumentException("El monto (S/ " + mb + ") excede el saldo pendiente (S/ " + saldo + ")");
-            PagoProveedor pago = new PagoProveedor(); pago.setIdCuentaPagar(idCuentaPagar); pago.setIdCaja(idCaja); pago.setIdUsuario(idUsuario); pago.setMonto(mb.doubleValue()); pago.setMetodoPago(metodoPago); pago.setNota(nota);
+            PagoProveedor pago = new PagoProveedor(); pago.setIdCuentaPagar(idCuentaPagar); pago.setIdCaja(idCaja); pago.setIdUsuario(idUsuario); pago.setMonto(mb); pago.setMetodoPago(metodoPago); pago.setNota(nota);
             if (!cuentaPorPagarDAO.registrarPago(conn, pago)) throw new AbortarSinCommitException();
             if (idCaja != null && "EFECTIVO".equalsIgnoreCase(metodoPago)) { Optional<Caja> caja = cajaDAO.obtenerCajaAbierta(conn); if (caja.isPresent()) { MovimientoCaja m = new MovimientoCaja(); m.setIdCaja(caja.get().getIdCaja()); m.setIdUsuario(idUsuario); m.setTipoMovimiento("EGRESO"); m.setMedioPago("EFECTIVO"); m.setMonto(mb); m.setConcepto("PAGO PROVEEDOR: " + cxp.getRazonSocialProveedor() + " (Doc: " + cxp.getNumeroDocumento() + ")"); cajaDAO.registrarMovimiento(conn, m); } }
             return true;
         }); } catch (AbortarSinCommitException ex) { return false; } catch (NegocioException ex) { throw new IllegalStateException(ex.getMessage(), ex); }
     }
-    @Override public boolean registrarCobroCliente(int idCuentaCobrar, double monto, String metodoPago, Integer idCaja, int idUsuario, String nota) throws SQLException {
+    @Override public boolean registrarCobroCliente(int idCuentaCobrar, BigDecimal monto, String metodoPago, Integer idCaja, int idUsuario, String nota) throws SQLException {
         BigDecimal mb = validarMontoPositivo(monto, "monto a cobrar");
         try { return tx.executeChecked(conn -> {
             verificarPeriodoAbierto(conn, LocalDate.now(ZONA_LIMA));
             CuentaPorCobrar cxc = cuentaPorCobrarDAO.buscarPorIdParaActualizar(conn, idCuentaCobrar).orElseThrow(() -> new IllegalArgumentException("Cuenta por cobrar no encontrada #" + idCuentaCobrar));
-            BigDecimal saldo = BigDecimal.valueOf(cxc.getMontoTotal()).setScale(2, RoundingMode.HALF_UP).subtract(BigDecimal.valueOf(cxc.getMontoCobrado()).setScale(2, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal saldo = cxc.getMontoTotal().setScale(2, RoundingMode.HALF_UP).subtract(cxc.getMontoCobrado().setScale(2, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
             if (mb.compareTo(saldo.add(TOLERANCIA_REDONDEO)) > 0) throw new IllegalArgumentException("El monto (S/ " + mb + ") excede el saldo adeudado (S/ " + saldo + ")");
-            CobroCliente cobro = new CobroCliente(); cobro.setIdCuentaCobrar(idCuentaCobrar); cobro.setIdCaja(idCaja); cobro.setIdUsuario(idUsuario); cobro.setMonto(mb.doubleValue()); cobro.setMetodoPago(metodoPago); cobro.setNota(nota);
+            CobroCliente cobro = new CobroCliente(); cobro.setIdCuentaCobrar(idCuentaCobrar); cobro.setIdCaja(idCaja); cobro.setIdUsuario(idUsuario); cobro.setMonto(mb); cobro.setMetodoPago(metodoPago); cobro.setNota(nota);
             if (!cuentaPorCobrarDAO.registrarCobro(conn, cobro)) throw new AbortarSinCommitException();
             if (idCaja != null && "EFECTIVO".equalsIgnoreCase(metodoPago)) { Optional<Caja> caja = cajaDAO.obtenerCajaAbierta(conn); if (caja.isPresent()) { MovimientoCaja m = new MovimientoCaja(); m.setIdCaja(caja.get().getIdCaja()); m.setIdUsuario(idUsuario); m.setTipoMovimiento("INGRESO"); m.setMedioPago("EFECTIVO"); m.setMonto(mb); m.setConcepto("COBRO CLIENTE: " + cxc.getRazonSocialCliente() + " (Comp: " + cxc.getNumeroComprobante() + ")"); cajaDAO.registrarMovimiento(conn, m); } }
             return true;
@@ -74,10 +76,10 @@ public final class DefaultCuentaCorrienteUseCase implements CuentaCorrienteUseCa
             LocalDate fecha = venta.getFechaHora() != null ? venta.getFechaHora().toLocalDate() : LocalDate.now(ZONA_LIMA); verificarPeriodoAbierto(conn, fecha);
             try (PreparedStatement ps = conn.prepareStatement(SQL_LOCK_CLIENTE)) { ps.setInt(1, idCliente); try (ResultSet rs = ps.executeQuery()) { if (!rs.next()) throw new IllegalArgumentException("Cliente corporativo no encontrado #" + idCliente); } }
             Cliente cliente = clienteDAO.buscarPorId(conn, idCliente).orElseThrow(() -> new IllegalArgumentException("Cliente corporativo no encontrado #" + idCliente));
-            BigDecimal limite = BigDecimal.valueOf(cliente.getLimiteCredito()).setScale(2, RoundingMode.HALF_UP), deuda = BigDecimal.valueOf(cliente.getSaldoDeudor()).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal limite = cliente.getLimiteCredito().setScale(2, RoundingMode.HALF_UP), deuda = cliente.getSaldoDeudor().setScale(2, RoundingMode.HALF_UP);
             if (limite.compareTo(BigDecimal.ZERO) > 0 && deuda.add(total).compareTo(limite) > 0) throw new IllegalStateException("Límite de crédito superado (Límite: S/ " + limite + ", Deuda actual: S/ " + deuda + ", Total venta: S/ " + total + ")");
             venta.setMetodoPago("CREDITO"); venta.setMontoRecibido(BigDecimal.ZERO); venta.setVuelto(BigDecimal.ZERO); venta.setTotal(total);
-            int idVenta = ventaDAO.insertarVenta(conn, venta); CuentaPorCobrar cxc = new CuentaPorCobrar(); cxc.setIdCliente(idCliente); cxc.setIdVenta(idVenta); cxc.setNumeroComprobante("CR-" + String.format("%06d", idVenta)); LocalDate hoy = LocalDate.now(ZONA_LIMA); cxc.setFechaEmision(hoy); cxc.setFechaVencimiento(hoy.plusDays(diasCredito > 0 ? diasCredito : Math.max(1, cliente.getDiasCredito()))); cxc.setMontoTotal(total.doubleValue()); cxc.setMontoCobrado(0.0); cxc.setEstado("PENDIENTE"); cxc.setObservaciones("Venta POS a crédito corporativo. Cliente: " + cliente.getRazonSocial()); cuentaPorCobrarDAO.insertar(conn, cxc); return idVenta;
+            int idVenta = ventaDAO.insertarVenta(conn, venta); CuentaPorCobrar cxc = new CuentaPorCobrar(); cxc.setIdCliente(idCliente); cxc.setIdVenta(idVenta); cxc.setNumeroComprobante("CR-" + String.format("%06d", idVenta)); LocalDate hoy = LocalDate.now(ZONA_LIMA); cxc.setFechaEmision(hoy); cxc.setFechaVencimiento(hoy.plusDays(diasCredito > 0 ? diasCredito : Math.max(1, cliente.getDiasCredito()))); cxc.setMontoTotal(total); cxc.setMontoCobrado(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)); cxc.setEstado("PENDIENTE"); cxc.setObservaciones("Venta POS a crédito corporativo. Cliente: " + cliente.getRazonSocial()); cuentaPorCobrarDAO.insertar(conn, cxc); return idVenta;
         }); } catch (NegocioException ex) { throw new IllegalStateException(ex.getMessage(), ex); }
     }
 }

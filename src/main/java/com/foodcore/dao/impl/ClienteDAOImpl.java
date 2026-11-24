@@ -3,6 +3,8 @@ package com.foodcore.dao.impl;
 import com.foodcore.dao.ClienteDAO;
 import com.foodcore.model.Cliente;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -150,7 +152,7 @@ public class ClienteDAOImpl implements ClienteDAO {
             ps.setString(6, cliente.getContacto());
             ps.setString(7, cliente.getTelefono());
             ps.setString(8, cliente.getEmail());
-            ps.setDouble(9, cliente.getLimiteCredito());
+            ps.setBigDecimal(9, normalizarMoneda(cliente.getLimiteCredito()));
             ps.setInt(10, cliente.getDiasCredito());
             ps.setInt(11, puntos);
             ps.setInt(12, puntos);
@@ -187,7 +189,7 @@ public class ClienteDAOImpl implements ClienteDAO {
             ps.setString(6, cliente.getContacto());
             ps.setString(7, cliente.getTelefono());
             ps.setString(8, cliente.getEmail());
-            ps.setDouble(9, cliente.getLimiteCredito());
+            ps.setBigDecimal(9, normalizarMoneda(cliente.getLimiteCredito()));
             ps.setInt(10, cliente.getDiasCredito());
             if (cliente.getFechaNacimiento() != null) {
                 ps.setDate(11, java.sql.Date.valueOf(cliente.getFechaNacimiento()));
@@ -226,7 +228,7 @@ public class ClienteDAOImpl implements ClienteDAO {
         c.setContacto(rs.getString("contacto"));
         c.setTelefono(rs.getString("telefono"));
         c.setEmail(rs.getString("email"));
-        c.setLimiteCredito(rs.getDouble("limite_credito"));
+        c.setLimiteCredito(leerMoneda(rs, "limite_credito"));
         c.setDiasCredito(rs.getInt("dias_credito"));
         int pf = rs.getInt("puntos_fidelidad");
         c.setPuntosFidelidad(pf);
@@ -248,8 +250,18 @@ public class ClienteDAOImpl implements ClienteDAO {
         if (rs.getTimestamp("fecha_registro") != null) {
             c.setFechaRegistro(rs.getTimestamp("fecha_registro").toLocalDateTime());
         }
-        c.setSaldoDeudor(rs.getDouble("saldo_deudor"));
+        c.setSaldoDeudor(leerMoneda(rs, "saldo_deudor"));
         c.setComprobantesPendientes(rs.getInt("comprobantes_pendientes"));
         return c;
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        return normalizarMoneda(rs.getBigDecimal(columna));
     }
 }

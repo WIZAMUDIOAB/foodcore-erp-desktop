@@ -24,6 +24,7 @@ import javafx.scene.layout.VBox;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -85,7 +86,7 @@ public class ProveedoresController {
         colContacto.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getContacto() != null ? p.getValue().getContacto() : "-"));
         colTelefono.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getTelefono() != null ? p.getValue().getTelefono() : "-"));
         colDiasCredito.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getDiasCredito() + " d"));
-        colDeudaActual.setCellValueFactory(p -> new SimpleStringProperty(String.format("S/ %.2f", p.getValue().getDeudaActual())));
+        colDeudaActual.setCellValueFactory(p -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", p.getValue().getDeudaActual())));
         colEstado.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().isActivo() ? "ACTIVO" : "INACTIVO"));
         tblProveedores.setItems(listaProveedores);
     }
@@ -139,7 +140,7 @@ public class ProveedoresController {
         lblDetalleContacto.setText((p.getContacto() != null ? p.getContacto() : "-") + " (" + (p.getTelefono() != null ? p.getTelefono() : "-") + ")");
         lblDetalleEmail.setText(p.getEmail() != null ? p.getEmail() : "-");
         lblDetalleDias.setText(p.getDiasCredito() + " días calendario");
-        lblDetalleDeuda.setText(String.format("S/ %.2f", p.getDeudaActual()));
+        lblDetalleDeuda.setText(String.format(Locale.US, "S/ %.2f", p.getDeudaActual()));
         lblDetalleFacturas.setText(p.getFacturasPendientes() + " facturas pendientes de pago");
     }
 

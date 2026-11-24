@@ -34,6 +34,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -227,18 +229,20 @@ public class UsuariosController {
         };
 
         String dni = txtDni != null && txtDni.getText() != null ? txtDni.getText().trim() : null;
-        double sueldo = 1200.0;
+        BigDecimal sueldo = new BigDecimal("1200.00");
         if (txtSueldoBase != null && txtSueldoBase.getText() != null && !txtSueldoBase.getText().isBlank()) {
             try {
-                sueldo = Double.parseDouble(txtSueldoBase.getText().trim());
-            } catch (Exception ignored) {
-                sueldo = 1200.0;
+                sueldo = new BigDecimal(txtSueldoBase.getText().trim().replace(',', '.'))
+                        .setScale(2, RoundingMode.HALF_UP);
+            } catch (NumberFormatException ex) {
+                LOGGER.log(Level.FINE, "Sueldo base inválido en formulario de usuario; usando S/ 1200.00", ex);
+                sueldo = new BigDecimal("1200.00");
             }
         }
         String horario = txtHorarioLaboral != null && txtHorarioLaboral.getText() != null && !txtHorarioLaboral.getText().isBlank()
             ? txtHorarioLaboral.getText().trim() : "08:00-16:00";
         boolean activoSel = chkUsuarioActivo.isSelected();
-        final double sueldoFinal = sueldo;
+        final BigDecimal sueldoFinal = sueldo;
 
         if (btnCrearUsuario != null) {
             btnCrearUsuario.setDisable(true);

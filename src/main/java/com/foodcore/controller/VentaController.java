@@ -992,7 +992,7 @@ public class VentaController {
                     v.setDescuentoPuntos(descPtsSnap);
                     v.setPuntosACanjear(ptsSnap);
                     v.setIdempotencyKey(UUID.randomUUID().toString());
-                    String corrSplit = String.format("%06d", Math.abs(UUID.randomUUID().hashCode()) % 1_000_000);
+                    String corrSplit = String.format("%06d", Math.floorMod(UUID.randomUUID().hashCode(), 1_000_000));
                     ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", corrSplit, totalNeto);
                     return ventaService.registrarVentaDividida(v, itemsSnapshot, comp, pagos);
                 },
@@ -1049,7 +1049,7 @@ public class VentaController {
         v.setDescuentoPuntos(descuentoPuntosActivo);
         v.setPuntosACanjear(puntosARedimirPos);
         v.setIdempotencyKey(UUID.randomUUID().toString());
-        String corrSplit = String.format("%06d", Math.abs(UUID.randomUUID().hashCode()) % 1_000_000);
+        String corrSplit = String.format("%06d", Math.floorMod(UUID.randomUUID().hashCode(), 1_000_000));
                     ComprobantePago comp = new ComprobantePago(0, 0, "TICKET", "SPL", corrSplit, totalNeto);
         Venta procesada = ventaService.registrarVentaDividida(v, new ArrayList<>(itemsVenta), comp, pagos);
         itemsVenta.clear();

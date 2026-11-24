@@ -30,9 +30,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -294,7 +296,7 @@ public class ReportesAvanzadosController {
         } else {
             ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
             for (ReportesAvanzadosPresenter.PieSlice s : res.slices()) {
-                pieData.add(new PieChart.Data(s.label(), s.value()));
+                pieData.add(new PieChart.Data(s.label(), s.value().doubleValue()));
             }
             if (pieChartDistribucion != null) {
                 pieChartDistribucion.setData(pieData);
@@ -306,18 +308,20 @@ public class ReportesAvanzadosController {
 
         lblKpiMontoTotal.setText(res.kpiMontoTotalText() != null
                 ? res.kpiMontoTotalText()
-                : String.format("S/ %.2f", res.montoTotal()));
+                : String.format(Locale.US, "S/ %.2f", res.montoTotal()));
         lblKpiSubTotal.setText(res.kpiSubTotalText() != null
                 ? res.kpiSubTotalText()
                 : res.cantidadTotal() + " registros procesados");
-        double prom = res.cantidadTotal() > 0 ? (res.montoTotal() / res.cantidadTotal()) : 0.0;
+        BigDecimal prom = res.cantidadTotal() > 0
+                ? res.montoTotal().divide(BigDecimal.valueOf(res.cantidadTotal()), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         lblKpiPromedio.setText(res.kpiPromedioText() != null
                 ? res.kpiPromedioText()
-                : String.format("S/ %.2f", prom));
+                : String.format(Locale.US, "S/ %.2f", prom));
         lblKpiTopItem.setText(res.topItem());
         lblKpiTopValor.setText(res.kpiTopValorText() != null
                 ? res.kpiTopValorText()
-                : String.format("S/ %.2f aporte", res.topValor()));
+                : String.format(Locale.US, "S/ %.2f aporte", res.topValor()));
         lblEstadoReporte.setText("✓ " + categoria + " generado (" + ini + " al " + fin + ")");
     }
 

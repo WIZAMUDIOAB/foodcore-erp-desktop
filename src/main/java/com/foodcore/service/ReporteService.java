@@ -399,10 +399,12 @@ public class ReporteService {
         String[] headers;
         List<String[]> filas = new ArrayList<>();
         List<RebanadaPie> slices = new ArrayList<>();
-        double montoTotal = 0.0;
+        BigDecimal montoTotal = CERO;
         int cantidadTotal = 0;
         String topItem = "-";
-        double topValor = 0.0;
+        BigDecimal topValor = CERO;
+        BigDecimal cien = new BigDecimal("100");
+        BigDecimal minSlice = new BigDecimal("0.01");
 
         if ("Ventas por Medio de Pago".equals(categoria)) {
             headers = new String[]{"Medio de Pago", "Comprobantes", "Subtotal S/", "Total Ventas S/", "Participación %"};
@@ -429,24 +431,24 @@ public class ReporteService {
                             FilaTemp t = new FilaTemp();
                             t.nombre = rs.getString("metodo_pago");
                             t.qty = rs.getInt("transacciones");
-                            t.sub = rs.getDouble("sub");
-                            t.tot = rs.getDouble("tot");
+                            t.sub = leerMoneda(rs, "sub");
+                            t.tot = leerMoneda(rs, "tot");
                             temps.add(t);
-                            montoTotal += t.tot;
+                            montoTotal = montoTotal.add(t.tot).setScale(2, RoundingMode.HALF_UP);
                             cantidadTotal += t.qty;
                         }
                         for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
+                            BigDecimal pct = calcularPorcentaje(t.tot, montoTotal, cien);
                             filas.add(new String[]{
                                     t.nombre,
                                     t.qty + " ops",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)});
+                                    String.format(Locale.US, "S/ %.2f", t.sub),
+                                    String.format(Locale.US, "S/ %.2f", t.tot),
+                                    String.format(Locale.US, "%.1f%%", pct)});
                             slices.add(new RebanadaPie(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
+                                    t.nombre + " (" + String.format(Locale.US, "%.1f%%", pct) + ")",
+                                    t.tot.max(minSlice)));
+                            if (t.tot.compareTo(topValor) > 0) {
                                 topValor = t.tot;
                                 topItem = t.nombre;
                             }
@@ -466,24 +468,24 @@ public class ReporteService {
                             FilaTemp t = new FilaTemp();
                             t.nombre = rs.getString("username");
                             t.qty = rs.getInt("ops");
-                            t.sub = rs.getDouble("sub");
-                            t.tot = rs.getDouble("tot");
+                            t.sub = leerMoneda(rs, "sub");
+                            t.tot = leerMoneda(rs, "tot");
                             temps.add(t);
-                            montoTotal += t.tot;
+                            montoTotal = montoTotal.add(t.tot).setScale(2, RoundingMode.HALF_UP);
                             cantidadTotal += t.qty;
                         }
                         for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
+                            BigDecimal pct = calcularPorcentaje(t.tot, montoTotal, cien);
                             filas.add(new String[]{
                                     t.nombre,
                                     t.qty + " pedidos",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)});
+                                    String.format(Locale.US, "S/ %.2f", t.sub),
+                                    String.format(Locale.US, "S/ %.2f", t.tot),
+                                    String.format(Locale.US, "%.1f%%", pct)});
                             slices.add(new RebanadaPie(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
+                                    t.nombre + " (" + String.format(Locale.US, "%.1f%%", pct) + ")",
+                                    t.tot.max(minSlice)));
+                            if (t.tot.compareTo(topValor) > 0) {
                                 topValor = t.tot;
                                 topItem = t.nombre;
                             }
@@ -504,24 +506,24 @@ public class ReporteService {
                             FilaTemp t = new FilaTemp();
                             t.nombre = rs.getString("nombre");
                             t.qty = rs.getInt("cant");
-                            t.sub = rs.getDouble("precio");
-                            t.tot = rs.getDouble("tot");
+                            t.sub = leerMoneda(rs, "precio");
+                            t.tot = leerMoneda(rs, "tot");
                             temps.add(t);
-                            montoTotal += t.tot;
+                            montoTotal = montoTotal.add(t.tot).setScale(2, RoundingMode.HALF_UP);
                             cantidadTotal += t.qty;
                         }
                         for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
+                            BigDecimal pct = calcularPorcentaje(t.tot, montoTotal, cien);
                             filas.add(new String[]{
                                     t.nombre,
                                     t.qty + " und",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)});
+                                    String.format(Locale.US, "S/ %.2f", t.sub),
+                                    String.format(Locale.US, "S/ %.2f", t.tot),
+                                    String.format(Locale.US, "%.1f%%", pct)});
                             slices.add(new RebanadaPie(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
+                                    t.nombre + " (" + String.format(Locale.US, "%.1f%%", pct) + ")",
+                                    t.tot.max(minSlice)));
+                            if (t.tot.compareTo(topValor) > 0) {
                                 topValor = t.tot;
                                 topItem = t.nombre;
                             }
@@ -541,24 +543,24 @@ public class ReporteService {
                             FilaTemp t = new FilaTemp();
                             t.nombre = rs.getString("razon_social");
                             t.qty = rs.getInt("docs");
-                            t.sub = rs.getDouble("base");
-                            t.tot = rs.getDouble("tot");
+                            t.sub = leerMoneda(rs, "base");
+                            t.tot = leerMoneda(rs, "tot");
                             temps.add(t);
-                            montoTotal += t.tot;
+                            montoTotal = montoTotal.add(t.tot).setScale(2, RoundingMode.HALF_UP);
                             cantidadTotal += t.qty;
                         }
                         for (FilaTemp t : temps) {
-                            double pct = montoTotal > 0 ? (t.tot / montoTotal) * 100.0 : 0.0;
+                            BigDecimal pct = calcularPorcentaje(t.tot, montoTotal, cien);
                             filas.add(new String[]{
                                     t.nombre,
                                     t.qty + " facturas",
-                                    String.format("S/ %.2f", t.sub),
-                                    String.format("S/ %.2f", t.tot),
-                                    String.format("%.1f%%", pct)});
+                                    String.format(Locale.US, "S/ %.2f", t.sub),
+                                    String.format(Locale.US, "S/ %.2f", t.tot),
+                                    String.format(Locale.US, "%.1f%%", pct)});
                             slices.add(new RebanadaPie(
-                                    t.nombre + " (" + String.format("%.1f%%", pct) + ")",
-                                    Math.max(0.01, t.tot)));
-                            if (t.tot > topValor) {
+                                    t.nombre + " (" + String.format(Locale.US, "%.1f%%", pct) + ")",
+                                    t.tot.max(minSlice)));
+                            if (t.tot.compareTo(topValor) > 0) {
                                 topValor = t.tot;
                                 topItem = t.nombre;
                             }
@@ -573,22 +575,24 @@ public class ReporteService {
                      ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         String nom = rs.getString("nombre");
-                        double pv = rs.getDouble("precio_venta");
-                        double cr = rs.getDouble("costo_receta");
-                        double mgSoles = Math.max(0.01, pv - cr);
-                        double mgPct = pv > 0 ? (mgSoles / pv) * 100.0 : 0.0;
+                        BigDecimal pv = leerMoneda(rs, "precio_venta");
+                        BigDecimal cr = leerMoneda(rs, "costo_receta");
+                        BigDecimal mgSoles = pv.subtract(cr).setScale(2, RoundingMode.HALF_UP).max(minSlice);
+                        BigDecimal mgPct = calcularPorcentaje(mgSoles, pv, cien);
                         filas.add(new String[]{
                                 nom,
-                                String.format("S/ %.2f", pv),
-                                String.format("S/ %.2f", cr),
-                                String.format("S/ %.2f", mgSoles),
-                                String.format("%.1f%%", mgPct)});
+                                String.format(Locale.US, "S/ %.2f", pv),
+                                String.format(Locale.US, "S/ %.2f", cr),
+                                String.format(Locale.US, "S/ %.2f", mgSoles),
+                                String.format(Locale.US, "%.1f%%", mgPct)});
                         slices.add(new RebanadaPie(nom, mgSoles));
-                        montoTotal += mgSoles;
+                        montoTotal = montoTotal.add(mgSoles).setScale(2, RoundingMode.HALF_UP);
                         cantidadTotal++;
                     }
                     topItem = "Margen Promedio";
-                    topValor = cantidadTotal > 0 ? montoTotal / cantidadTotal : 0.0;
+                    topValor = cantidadTotal > 0
+                            ? montoTotal.divide(BigDecimal.valueOf(cantidadTotal), 2, RoundingMode.HALF_UP)
+                            : CERO;
                 }
             }
         } catch (SQLException | RuntimeException ex) {
@@ -599,13 +603,13 @@ public class ReporteService {
             filas.add(new String[]{"EFECTIVO", "12 ops", "S/ 457.63", "S/ 540.00", "45.0%"});
             filas.add(new String[]{"TARJETA", "8 ops", "S/ 322.03", "S/ 380.00", "31.7%"});
             filas.add(new String[]{"YAPE / PLIN", "6 ops", "S/ 237.29", "S/ 280.00", "23.3%"});
-            slices.add(new RebanadaPie("EFECTIVO (45.0%)", 540.0));
-            slices.add(new RebanadaPie("TARJETA (31.7%)", 380.0));
-            slices.add(new RebanadaPie("YAPE / PLIN (23.3%)", 280.0));
-            montoTotal = 1200.00;
+            slices.add(new RebanadaPie("EFECTIVO (45.0%)", new BigDecimal("540.00")));
+            slices.add(new RebanadaPie("TARJETA (31.7%)", new BigDecimal("380.00")));
+            slices.add(new RebanadaPie("YAPE / PLIN (23.3%)", new BigDecimal("280.00")));
+            montoTotal = new BigDecimal("1200.00");
             cantidadTotal = 26;
             topItem = "EFECTIVO";
-            topValor = 540.00;
+            topValor = new BigDecimal("540.00");
         }
 
         return new ResultadoReporteAvanzado(
@@ -624,10 +628,22 @@ public class ReporteService {
                 null);
     }
 
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        BigDecimal valor = rs.getBigDecimal(columna);
+        return valor != null ? valor.setScale(2, RoundingMode.HALF_UP) : CERO;
+    }
+
+    private static BigDecimal calcularPorcentaje(BigDecimal parcial, BigDecimal total, BigDecimal cien) {
+        if (total == null || total.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        }
+        return parcial.multiply(cien).divide(total, 1, RoundingMode.HALF_UP);
+    }
+
     private static class FilaTemp {
         String nombre;
         int qty;
-        double sub;
-        double tot;
+        BigDecimal sub;
+        BigDecimal tot;
     }
 }

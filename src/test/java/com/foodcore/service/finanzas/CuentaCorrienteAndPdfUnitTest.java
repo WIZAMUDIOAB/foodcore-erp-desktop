@@ -57,40 +57,40 @@ class CuentaCorrienteAndPdfUnitTest {
     void registrarPagoProveedorCubreErroresAbortYMovCajaEfectivo() throws Exception {
         CuentaPorPagarDAO ausente = cuentaPagar(Optional.empty(), true);
         assertThrows(IllegalArgumentException.class, () -> cuentas(ausente, null, null, null, servicioCierre(false))
-                .registrarPagoProveedor(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarPagoProveedor(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
 
-        CuentaPorPagar saldo = cuentaPagar(100, 20);
+        CuentaPorPagar saldo = cuentaPagar("100.00", "20.00");
         assertThrows(IllegalArgumentException.class, () -> cuentas(cuentaPagar(Optional.of(saldo), true), null, null, null, servicioCierre(false))
-                .registrarPagoProveedor(1, 81, "EFECTIVO", 1, 2, null));
+                .registrarPagoProveedor(1, new BigDecimal("81.00"), "EFECTIVO", 1, 2, null));
         assertThrows(IllegalStateException.class, () -> cuentas(null, null, null, null, servicioCierre(true))
-                .registrarPagoProveedor(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarPagoProveedor(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
 
         assertFalse(cuentas(cuentaPagar(Optional.of(saldo), false), null, null, null, servicioCierre(false))
-                .registrarPagoProveedor(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarPagoProveedor(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
         AtomicReference<MovimientoCaja> movimiento = new AtomicReference<>();
         DefaultCuentaCorrienteUseCase efectivo = cuentas(cuentaPagar(Optional.of(saldo), true), null, cajaDAO(movimiento), null, servicioCierre(false));
-        assertTrue(efectivo.registrarPagoProveedor(1, 10, "EFECTIVO", 1, 2, null));
+        assertTrue(efectivo.registrarPagoProveedor(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
         assertEquals("EGRESO", movimiento.get().getTipoMovimiento());
 
         movimiento.set(null);
         assertTrue(cuentas(cuentaPagar(Optional.of(saldo), true), null, cajaDAO(movimiento), null, servicioCierre(false))
-                .registrarPagoProveedor(1, 10, "TRANSFERENCIA", 1, 2, null));
+                .registrarPagoProveedor(1, new BigDecimal("10.00"), "TRANSFERENCIA", 1, 2, null));
         assertEquals(null, movimiento.get());
     }
 
     @Test
     void registrarCobroClienteCubreErroresAbortYMovCajaEfectivo() throws Exception {
-        CuentaPorCobrar cxc = cuentaCobrar(100, 20);
+        CuentaPorCobrar cxc = cuentaCobrar("100.00", "20.00");
         assertThrows(IllegalArgumentException.class, () -> cuentas(null, cuentaCobrarDAO(Optional.empty(), true), null, null, servicioCierre(false))
-                .registrarCobroCliente(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarCobroCliente(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
         assertThrows(IllegalArgumentException.class, () -> cuentas(null, cuentaCobrarDAO(Optional.of(cxc), true), null, null, servicioCierre(false))
-                .registrarCobroCliente(1, 81, "EFECTIVO", 1, 2, null));
+                .registrarCobroCliente(1, new BigDecimal("81.00"), "EFECTIVO", 1, 2, null));
         assertFalse(cuentas(null, cuentaCobrarDAO(Optional.of(cxc), false), null, null, servicioCierre(false))
-                .registrarCobroCliente(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarCobroCliente(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
 
         AtomicReference<MovimientoCaja> movimiento = new AtomicReference<>();
         assertTrue(cuentas(null, cuentaCobrarDAO(Optional.of(cxc), true), cajaDAO(movimiento), null, servicioCierre(false))
-                .registrarCobroCliente(1, 10, "EFECTIVO", 1, 2, null));
+                .registrarCobroCliente(1, new BigDecimal("10.00"), "EFECTIVO", 1, 2, null));
         assertEquals("INGRESO", movimiento.get().getTipoMovimiento());
     }
 
@@ -98,16 +98,16 @@ class CuentaCorrienteAndPdfUnitTest {
     void registrarVentaCreditoCorporativoValidaLimiteYRegistraCuentaPorCobrar() throws Exception {
         Cliente cliente = new Cliente();
         cliente.setRazonSocial("Cliente corporativo");
-        cliente.setLimiteCredito(100);
-        cliente.setSaldoDeudor(80);
+        cliente.setLimiteCredito(new BigDecimal("100.00"));
+        cliente.setSaldoDeudor(new BigDecimal("80.00"));
         assertThrows(IllegalArgumentException.class, () -> ventaCredito(clienteDAO(Optional.of(cliente)), ventaDAO(), cuentaCobrarInsercion(new AtomicReference<>()), resultSet(false))
-                .registrarVentaCreditoCorporativo(venta(20), 7, 30));
+                .registrarVentaCreditoCorporativo(venta("20.00"), 7, 30));
         assertThrows(IllegalStateException.class, () -> ventaCredito(clienteDAO(Optional.of(cliente)), ventaDAO(), cuentaCobrarInsercion(new AtomicReference<>()), resultSet(true))
-                .registrarVentaCreditoCorporativo(venta(21), 7, 30));
+                .registrarVentaCreditoCorporativo(venta("21.00"), 7, 30));
 
         AtomicReference<CuentaPorCobrar> insertada = new AtomicReference<>();
         VentaDAO ventas = ventaDAO();
-        Venta venta = venta(20);
+        Venta venta = venta("20.00");
         int id = ventaCredito(clienteDAO(Optional.of(cliente)), ventas, cuentaCobrarInsercion(insertada), resultSet(true))
                 .registrarVentaCreditoCorporativo(venta, 7, 30);
         assertEquals(41, id);
@@ -123,10 +123,10 @@ class CuentaCorrienteAndPdfUnitTest {
         AtomicInteger historial = new AtomicInteger();
         HistorialPrecioDAO dao = historialPrecioDAO(historial);
         DefaultCambioPrecioUseCase useCase = new DefaultCambioPrecioUseCase(transacciones(conexion(sqls, null)), dao);
-        assertTrue(useCase.registrarCambioPrecioConMotivo("PRODUCTO", 3, "Producto", 2, 4, 1, "Usuario", "Ajuste costo"));
+        assertTrue(useCase.registrarCambioPrecioConMotivo("PRODUCTO", 3, "Producto", new BigDecimal("2.0000"), new BigDecimal("4.0000"), 1, "Usuario", "Ajuste costo"));
         assertEquals(1, historial.get());
         assertTrue(sqls.contains("UPDATE producto SET precio_venta = ? WHERE id_producto = ?"));
-        assertTrue(useCase.registrarCambioPrecioConMotivo("INSUMO", 5, "Insumo", 2, 4, 1, "Usuario", "Ajuste costo"));
+        assertTrue(useCase.registrarCambioPrecioConMotivo("INSUMO", 5, "Insumo", new BigDecimal("2.0000"), new BigDecimal("4.0000"), 1, "Usuario", "Ajuste costo"));
         assertEquals(2, historial.get());
         assertTrue(sqls.contains("UPDATE insumo SET costo_unitario = ?, costo_unitario_actual = ? WHERE id_insumo = ?"));
     }
@@ -137,8 +137,8 @@ class CuentaCorrienteAndPdfUnitTest {
         cliente.setRazonSocial("Cliente PDF");
         CuentaPorCobrar cxc = new CuentaPorCobrar();
         cxc.setNumeroComprobante("CR-000001");
-        cxc.setMontoTotal(100);
-        cxc.setMontoCobrado(25);
+        cxc.setMontoTotal(new BigDecimal("100.00"));
+        cxc.setMontoCobrado(new BigDecimal("25.00"));
         DefaultFinanzasDocumentoPdfGenerator generator = new DefaultFinanzasDocumentoPdfGenerator(
                 proveedorDAO(), clienteDAO(Optional.of(cliente)), cuentaCobrarListado(List.of(cxc)), () -> conexion(new ArrayList<>(), null));
         Insumo insumo = new Insumo(1, "INS-1", "Harina", "KG", BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ONE);
@@ -156,25 +156,25 @@ class CuentaCorrienteAndPdfUnitTest {
         assertTrue(new String(bytes, 0, Math.min(bytes.length, 5), java.nio.charset.StandardCharsets.US_ASCII).startsWith("%PDF-"));
     }
 
-    private static Venta venta(double total) {
+    private static Venta venta(String total) {
         Venta venta = new Venta();
-        venta.setTotal(BigDecimal.valueOf(total));
+        venta.setTotal(new BigDecimal(total));
         return venta;
     }
 
-    private static CuentaPorPagar cuentaPagar(double total, double pagado) {
+    private static CuentaPorPagar cuentaPagar(String total, String pagado) {
         CuentaPorPagar cuenta = new CuentaPorPagar();
-        cuenta.setMontoTotal(total);
-        cuenta.setMontoPagado(pagado);
+        cuenta.setMontoTotal(new BigDecimal(total));
+        cuenta.setMontoPagado(new BigDecimal(pagado));
         cuenta.setRazonSocialProveedor("Proveedor");
         cuenta.setNumeroDocumento("F001-1");
         return cuenta;
     }
 
-    private static CuentaPorCobrar cuentaCobrar(double total, double cobrado) {
+    private static CuentaPorCobrar cuentaCobrar(String total, String cobrado) {
         CuentaPorCobrar cuenta = new CuentaPorCobrar();
-        cuenta.setMontoTotal(total);
-        cuenta.setMontoCobrado(cobrado);
+        cuenta.setMontoTotal(new BigDecimal(total));
+        cuenta.setMontoCobrado(new BigDecimal(cobrado));
         cuenta.setRazonSocialCliente("Cliente");
         cuenta.setNumeroComprobante("CR-1");
         return cuenta;

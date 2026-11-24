@@ -81,13 +81,13 @@ class HardeningFinanceUnitTest {
     void testValidacionesPreviasFinanzasYVenta() {
         FinanzasService fin = new FinanzasService();
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarPagoProveedor(1, Double.NaN, "EFECTIVO", null, 1, "NaN"));
+                () -> fin.registrarPagoProveedor(1, null, "EFECTIVO", null, 1, "Null"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarPagoProveedor(1, Double.POSITIVE_INFINITY, "EFECTIVO", null, 1, "Inf"));
+                () -> fin.registrarPagoProveedor(1, new BigDecimal("-10.00"), "EFECTIVO", null, 1, "Neg"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarCobroCliente(1, 0.0, "EFECTIVO", null, 1, "Zero"));
+                () -> fin.registrarCobroCliente(1, BigDecimal.ZERO, "EFECTIVO", null, 1, "Zero"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarCambioPrecioConMotivo("PRODUCTO", 1, "P", 10.0, -5.0, 1, "Neg", null));
+                () -> fin.registrarCambioPrecioConMotivo("PRODUCTO", 1, "P", new BigDecimal("10.0000"), new BigDecimal("-5.0000"), 1, "Neg", null));
 
         VentaService vs = new VentaService();
         DetalleVenta d50 = new DetalleVenta(0, 0, 1, "Plato", 1, new BigDecimal("50.00"), new BigDecimal("50.00"));

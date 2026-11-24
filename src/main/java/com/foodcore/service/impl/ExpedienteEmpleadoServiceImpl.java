@@ -12,6 +12,7 @@ import com.foodcore.util.ConexionBD;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,7 +106,7 @@ public class ExpedienteEmpleadoServiceImpl implements ExpedienteEmpleadoService 
     @Override
     public void guardarDatosLaborales(Usuario usuario) {
         validarUsuarioBase(usuario);
-        if (usuario.getSueldoBase() < 0) {
+        if (usuario.getSueldoBase() == null || usuario.getSueldoBase().compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("El sueldo base no puede ser negativo.");
         }
         String tipoContrato = normalizarRequerido(usuario.getTipoContrato(), "El tipo de contrato es obligatorio.");

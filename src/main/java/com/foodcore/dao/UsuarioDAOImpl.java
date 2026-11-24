@@ -8,6 +8,8 @@ import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -241,8 +243,11 @@ public class UsuarioDAOImpl implements UsuarioDAO {
 
     @Override
     public boolean actualizarDatosLaborales(Connection conn, int idUsuario, String dni, String pin,
-                                            double sueldoBase, String horarioLaboral,
+                                            BigDecimal sueldoBase, String horarioLaboral,
                                             LocalTime horaEntrada, LocalTime horaSalida) throws SQLException {
+        BigDecimal sueldoNorm = sueldoBase != null
+                ? sueldoBase.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         boolean actualizarHashPin = pin != null && !pin.isBlank();
         if (actualizarHashPin) {
             String pinHash = pin.trim().startsWith("$2") ? pin.trim() : encriptador.hashear(pin.trim());
@@ -251,7 +256,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, dni);
                 ps.setString(2, pinHash);
-                ps.setDouble(3, sueldoBase);
+                ps.setBigDecimal(3, sueldoNorm);
                 ps.setString(4, horarioLaboral);
                 ps.setTime(5, horaEntrada != null ? Time.valueOf(horaEntrada) : Time.valueOf("08:00:00"));
                 ps.setTime(6, horaSalida != null ? Time.valueOf(horaSalida) : Time.valueOf("16:00:00"));
@@ -263,7 +268,7 @@ public class UsuarioDAOImpl implements UsuarioDAO {
                 + "hora_entrada_programada = ?, hora_salida_programada = ? WHERE id_usuario = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, dni);
-            ps.setDouble(2, sueldoBase);
+            ps.setBigDecimal(2, sueldoNorm);
             ps.setString(3, horarioLaboral);
             ps.setTime(4, horaEntrada != null ? Time.valueOf(horaEntrada) : Time.valueOf("08:00:00"));
             ps.setTime(5, horaSalida != null ? Time.valueOf(horaSalida) : Time.valueOf("16:00:00"));
@@ -353,7 +358,10 @@ public class UsuarioDAOImpl implements UsuarioDAO {
         mapearCamposBloqueoYLogin(rs, u);
         try {
             mapearCamposPinYSeguridad(rs, u);
-            u.setSueldoBase(rs.getDouble("sueldo_base"));
+            BigDecimal sueldo = rs.getBigDecimal("sueldo_base");
+            u.setSueldoBase(sueldo != null
+                    ? sueldo.setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
             u.setHorarioLaboral(rs.getString("horario_laboral"));
             Time te = rs.getTime("hora_entrada_programada");
             if (te != null) {

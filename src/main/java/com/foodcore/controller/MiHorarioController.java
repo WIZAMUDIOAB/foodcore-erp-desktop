@@ -282,7 +282,10 @@ public class MiHorarioController {
         lblMiRolBadge.setText(rol);
         lblBienvenida.setText("Bienvenido/a, " + nombre + ". Aquí puede consultar su horario, asistencias y boletas.");
 
-        double sueldo = usuario != null && usuario.getSueldoBase() > 0 ? usuario.getSueldoBase() : 1350.00;
+        BigDecimal sueldo = (usuario != null && usuario.getSueldoBase() != null
+                && usuario.getSueldoBase().compareTo(BigDecimal.ZERO) > 0)
+                ? usuario.getSueldoBase().setScale(2, RoundingMode.HALF_UP)
+                : new BigDecimal("1350.00");
         lblMiSueldoBase.setText(String.format(Locale.US, "S/ %.2f", sueldo));
 
         double horasExtrasMes = 0.0;
@@ -316,16 +319,17 @@ public class MiHorarioController {
         cargarSaldoYSolicitudesVacaciones(idUser);
     }
 
-    private void cargarBoletasMensuales(double sueldoBaseDouble, double horasExtrasMes) {
+    private void cargarBoletasMensuales(BigDecimal sueldoBase, double horasExtrasMes) {
         listaBoletas.clear();
-        BigDecimal base = BigDecimal.valueOf(sueldoBaseDouble).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal base = (sueldoBase != null ? sueldoBase : new BigDecimal("1350.00"))
+                .setScale(2, RoundingMode.HALF_UP);
         YearMonth mesActual = YearMonth.now();
 
         for (int i = 0; i < 4; i++) {
             YearMonth ym = mesActual.minusMonths(i);
             String periodo = ym.getMonth().getDisplayName(TextStyle.FULL, LOCALE_ES).toUpperCase(LOCALE_ES) + " " + ym.getYear();
             BigDecimal bonoExtras = (i == 0 && horasExtrasMes > 0)
-                    ? BigDecimal.valueOf(horasExtrasMes * 9.50).setScale(2, RoundingMode.HALF_UP)
+                    ? BigDecimal.valueOf(horasExtrasMes).multiply(new BigDecimal("9.50")).setScale(2, RoundingMode.HALF_UP)
                     : ((i % 2) != 0 ? new BigDecimal("65.00") : new BigDecimal("42.50"));
             BigDecimal bruto = base.add(bonoExtras);
             BigDecimal descuentoLey = bruto.multiply(new BigDecimal("0.13")).setScale(2, RoundingMode.HALF_UP);

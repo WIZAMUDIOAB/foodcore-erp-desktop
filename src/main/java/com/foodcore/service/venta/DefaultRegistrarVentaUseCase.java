@@ -165,8 +165,8 @@ public final class DefaultRegistrarVentaUseCase implements RegistrarVentaUseCase
             cxc.setNumeroComprobante(nroComprobante);
             cxc.setFechaEmision(hoyLima);
             cxc.setFechaVencimiento(hoyLima.plusDays(diasCredito));
-            cxc.setMontoTotal(ventaRegistrada.getTotal().doubleValue());
-            cxc.setMontoCobrado(0.0);
+            cxc.setMontoTotal(ventaRegistrada.getTotal());
+            cxc.setMontoCobrado(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
             cxc.setEstado("PENDIENTE");
             String etiquetaNombre = nombreCliente != null && !nombreCliente.isBlank()
                     ? nombreCliente.trim() : clienteCredito.getRazonSocial();

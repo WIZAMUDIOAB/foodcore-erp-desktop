@@ -30,10 +30,12 @@ import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -163,8 +165,8 @@ public class ClientesController {
         colRazonSocial.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getRazonSocial()));
         colContacto.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getContacto() != null ? c.getValue().getContacto() : "-"));
         colTelefono.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getTelefono() != null ? c.getValue().getTelefono() : "-"));
-        colLimiteCredito.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getLimiteCredito())));
-        colSaldoDeudor.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getSaldoDeudor())));
+        colLimiteCredito.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getLimiteCredito())));
+        colSaldoDeudor.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getSaldoDeudor())));
         colPuntos.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPuntosAcumulados() + " pts"));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActivo() ? "ACTIVO" : "INACTIVO"));
         tblClientes.setItems(listaCorporativosPagina);
@@ -498,9 +500,9 @@ public class ClientesController {
         }
         lblDetalleLimite.setText(esMin
                 ? "Minorista (Sin línea de crédito)"
-                : "S/ " + String.format("%.2f", c.getLimiteCredito()) + " (" + c.getDiasCredito() + " días)");
+                : "S/ " + String.format(Locale.US, "%.2f", c.getLimiteCredito()) + " (" + c.getDiasCredito() + " días)");
         lblDetallePuntos.setText(c.getPuntosAcumulados() + " Puntos Acumulados");
-        lblDetalleSaldoDeudor.setText(String.format("S/ %.2f", c.getSaldoDeudor()));
+        lblDetalleSaldoDeudor.setText(String.format(Locale.US, "S/ %.2f", c.getSaldoDeudor()));
         lblDetalleComprobantes.setText(c.getComprobantesPendientes() + " facturas pendientes de cobro");
         cargarHistorialComprasAsync(c.getIdCliente());
     }
@@ -583,7 +585,9 @@ public class ClientesController {
         if (dpModalFechaNacimiento != null) {
             dpModalFechaNacimiento.setValue(clienteSeleccionado.getFechaNacimiento());
         }
-        txtModalLimite.setText(String.valueOf(clienteSeleccionado.getLimiteCredito()));
+        txtModalLimite.setText(clienteSeleccionado.getLimiteCredito() != null
+                ? clienteSeleccionado.getLimiteCredito().toPlainString()
+                : "0.00");
         txtModalDiasCredito.setText(String.valueOf(clienteSeleccionado.getDiasCredito()));
         if (boxModalCredito != null) {
             boolean esMin = clienteSeleccionado.isMinorista();
@@ -620,19 +624,25 @@ public class ClientesController {
             lblModalError.setText("La razón social o nombre completo es obligatorio");
             return;
         }
-        double lim = 0.0;
+        BigDecimal lim = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         int dias = "MINORISTA".equalsIgnoreCase(segmento) ? 0 : 30;
         try {
-            lim = Double.parseDouble(txtModalLimite.getText().trim());
+            String limTexto = txtModalLimite.getText() != null
+                    ? txtModalLimite.getText().trim().replace(',', '.')
+                    : "";
+            if (!limTexto.isEmpty()) {
+                lim = new BigDecimal(limTexto).setScale(2, RoundingMode.HALF_UP);
+            }
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
-        } catch (Exception ignored) {
+        } catch (NumberFormatException ex) {
+            LOGGER.log(Level.FINE, "Valor de crédito inválido en modal de cliente; usando valores por defecto", ex);
         }
 
         final String contacto = txtModalContacto.getText() != null ? txtModalContacto.getText().trim() : "";
         final String telefono = txtModalTelefono.getText() != null ? txtModalTelefono.getText().trim() : "";
         final String email = txtModalEmail.getText() != null ? txtModalEmail.getText().trim() : "";
         final LocalDate fechaNacimiento = dpModalFechaNacimiento != null ? dpModalFechaNacimiento.getValue() : null;
-        final double limFinal = lim;
+        final BigDecimal limFinal = lim;
         final int diasFinal = dias;
         final boolean edicion = modoEdicion && clienteSeleccionado != null;
         final Cliente objEdicion = clienteSeleccionado;

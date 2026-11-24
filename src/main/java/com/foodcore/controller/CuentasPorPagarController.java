@@ -25,9 +25,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 
 public class CuentasPorPagarController {
@@ -81,9 +84,9 @@ public class CuentasPorPagarController {
         colDocumento.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNumeroDocumento()));
         colEmision.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaEmision() != null ? c.getValue().getFechaEmision().toString() : "-"));
         colVencimiento.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaVencimiento() != null ? c.getValue().getFechaVencimiento().toString() : "-"));
-        colMontoTotal.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getMontoTotal())));
-        colMontoPagado.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getMontoPagado())));
-        colSaldo.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getSaldo())));
+        colMontoTotal.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getMontoTotal())));
+        colMontoPagado.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getMontoPagado())));
+        colSaldo.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getSaldo())));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getEstado()));
         tblCuentasPorPagar.setItems(listaCxp);
 
@@ -109,11 +112,11 @@ public class CuentasPorPagarController {
             },
             cuentas -> {
                 listaCxp.setAll(cuentas);
-                double deudaTotal = 0.0;
+                BigDecimal deudaTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
                 int vencidas = 0;
                 for (CuentaPorPagar c : cuentas) {
                     if (!"PAGADA".equalsIgnoreCase(c.getEstado())) {
-                        deudaTotal += c.getSaldo();
+                        deudaTotal = deudaTotal.add(c.getSaldo()).setScale(2, RoundingMode.HALF_UP);
                     }
                     if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
                         vencidas++;
@@ -122,7 +125,7 @@ public class CuentasPorPagarController {
                 if (!cuentas.isEmpty()) {
                     tblCuentasPorPagar.getSelectionModel().selectFirst();
                 }
-                lblDeudaTotal.setText(String.format("S/ %.2f", deudaTotal));
+                lblDeudaTotal.setText(String.format(Locale.US, "S/ %.2f", deudaTotal));
                 lblContadorCxp.setText(listaCxp.size() + " Facturas");
                 if (vencidas > 0) {
                     lblBadgeAlertaVencidas.setText(vencidas + " FACTURAS VENCIDAS");
@@ -149,8 +152,8 @@ public class CuentasPorPagarController {
 
         this.cuentaSeleccionada = sel;
         lblModalDocInfo.setText(sel.getRazonSocialProveedor() + " — Comprobante: " + sel.getNumeroDocumento());
-        lblModalSaldoPendiente.setText(String.format("S/ %.2f", sel.getSaldo()));
-        txtModalMontoAbonar.setText(String.format("%.2f", sel.getSaldo()));
+        lblModalSaldoPendiente.setText(String.format(Locale.US, "S/ %.2f", sel.getSaldo()));
+        txtModalMontoAbonar.setText(String.format(Locale.US, "%.2f", sel.getSaldo()));
         txtModalNota.setText("Abono comprobante " + sel.getNumeroDocumento());
         lblModalPagoError.setText("");
         modalPago.setVisible(true);
@@ -164,10 +167,13 @@ public class CuentasPorPagarController {
     @FXML
     public void handleConfirmarPago() {
         if (cuentaSeleccionada == null) return;
-        double monto;
+        BigDecimal monto;
         try {
-            monto = Double.parseDouble(txtModalMontoAbonar.getText().trim());
-        } catch (Exception ex) {
+            String textoMonto = txtModalMontoAbonar.getText() != null
+                    ? txtModalMontoAbonar.getText().trim().replace(',', '.')
+                    : "";
+            monto = new BigDecimal(textoMonto).setScale(2, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ex) {
             lblModalPagoError.setText("Ingrese un importe numérico válido");
             return;
         }
@@ -177,7 +183,7 @@ public class CuentasPorPagarController {
         int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
 
         final int idCuenta = cuentaSeleccionada.getIdCuentaPagar();
-        final double montoFinal = monto;
+        final BigDecimal montoFinal = monto;
         final String metodoFinal = metodo;
         final String notaFinal = nota;
         final int idUsrFinal = idUsuario;
@@ -220,9 +226,9 @@ public class CuentasPorPagarController {
                     c.getNumeroDocumento() != null ? c.getNumeroDocumento() : "",
                     c.getFechaEmision() != null ? c.getFechaEmision().toString() : "-",
                     c.getFechaVencimiento() != null ? c.getFechaVencimiento().toString() : "-",
-                    String.format("S/ %.2f", c.getMontoTotal()),
-                    String.format("S/ %.2f", c.getMontoPagado()),
-                    String.format("S/ %.2f", c.getSaldo()),
+                    String.format(Locale.US, "S/ %.2f", c.getMontoTotal()),
+                    String.format(Locale.US, "S/ %.2f", c.getMontoPagado()),
+                    String.format(Locale.US, "S/ %.2f", c.getSaldo()),
                     c.getEstado() != null ? c.getEstado() : ""
             ));
         }

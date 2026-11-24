@@ -1,14 +1,18 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 public class PagoProveedor {
+    private static final BigDecimal CERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
     private int idPagoProveedor;
     private int idCuentaPagar;
     private Integer idCaja;
     private int idUsuario;
     private String nombreUsuario;
-    private double monto;
+    private BigDecimal monto = CERO;
     private String metodoPago;
     private LocalDateTime fechaPago;
     private String nota;
@@ -57,12 +61,12 @@ public class PagoProveedor {
         this.nombreUsuario = nombreUsuario;
     }
 
-    public double getMonto() {
+    public BigDecimal getMonto() {
         return monto;
     }
 
-    public void setMonto(double monto) {
-        this.monto = monto;
+    public void setMonto(BigDecimal monto) {
+        this.monto = monto != null ? monto.setScale(2, RoundingMode.HALF_UP) : CERO;
     }
 
     public String getMetodoPago() {

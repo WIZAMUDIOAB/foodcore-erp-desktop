@@ -1,9 +1,14 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class Compra {
+    private static final int ESCALA_MONETARIA = 2;
+    private static final BigDecimal CERO = BigDecimal.ZERO.setScale(ESCALA_MONETARIA, RoundingMode.HALF_UP);
+
     private int idCompra;
     private int idProveedor;
     private String rucProveedor;
@@ -11,15 +16,19 @@ public class Compra {
     private String serie;
     private String numero;
     private LocalDate fechaEmision;
-    private double baseImponible;
-    private double igv;
-    private double total;
+    private BigDecimal baseImponible = CERO;
+    private BigDecimal igv = CERO;
+    private BigDecimal total = CERO;
     private String estado;
     private int idUsuario;
     private LocalDateTime fechaRegistro;
 
     public Compra() {
         this.estado = "REGISTRADA";
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null ? valor.setScale(ESCALA_MONETARIA, RoundingMode.HALF_UP) : CERO;
     }
 
     public int getIdCompra() {
@@ -78,28 +87,28 @@ public class Compra {
         this.fechaEmision = fechaEmision;
     }
 
-    public double getBaseImponible() {
+    public BigDecimal getBaseImponible() {
         return baseImponible;
     }
 
-    public void setBaseImponible(double baseImponible) {
-        this.baseImponible = baseImponible;
+    public void setBaseImponible(BigDecimal baseImponible) {
+        this.baseImponible = normalizarMoneda(baseImponible);
     }
 
-    public double getIgv() {
+    public BigDecimal getIgv() {
         return igv;
     }
 
-    public void setIgv(double igv) {
-        this.igv = igv;
+    public void setIgv(BigDecimal igv) {
+        this.igv = normalizarMoneda(igv);
     }
 
-    public double getTotal() {
+    public BigDecimal getTotal() {
         return total;
     }
 
-    public void setTotal(double total) {
-        this.total = total;
+    public void setTotal(BigDecimal total) {
+        this.total = normalizarMoneda(total);
     }
 
     public String getEstado() {

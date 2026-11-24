@@ -13,6 +13,7 @@ import com.foodcore.security.SesionUsuario;
 import com.foodcore.util.ConexionBD;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -141,11 +142,13 @@ public class UsuarioGestionService {
      * El PIN nunca se persiste en texto plano: la columna {@code pin} queda en NULL.
      */
     public void crearOActualizarUsuario(int idRol, String user, String nombreCompleto, String rol,
-            String passwordTemporal, boolean activo, String dni, double sueldo, String horario)
+            String passwordTemporal, boolean activo, String dni, BigDecimal sueldo, String horario)
             throws NegocioException, SQLException {
         exigirPermisoGestionUsuarios();
         validarPasswordTemporal(passwordTemporal);
         String hash = encriptador.hashear(passwordTemporal);
+        BigDecimal sueldoNorm = (sueldo != null ? sueldo : new BigDecimal("1200.00"))
+                .setScale(2, RoundingMode.HALF_UP);
         String sql = "INSERT INTO usuario (id_empleado, id_rol, username, nombre_usuario, nombre_completo, "
             + "password_hash, hash_password, codigo_rol, activo, cambio_password_requerido, dni, pin, pin_hash, sueldo_base, horario_laboral) "
             + "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, NULL, ?, ?) "
@@ -162,7 +165,7 @@ public class UsuarioGestionService {
             ps.setString(7, rol);
             ps.setBoolean(8, activo);
             ps.setString(9, dni);
-            ps.setBigDecimal(10, BigDecimal.valueOf(sueldo));
+            ps.setBigDecimal(10, sueldoNorm);
             ps.setString(11, horario);
             ps.executeUpdate();
         }

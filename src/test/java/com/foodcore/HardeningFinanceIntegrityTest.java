@@ -156,8 +156,8 @@ class HardeningFinanceIntegrityTest {
         cxp.setNumeroDocumento("F001-HARD-" + UUID.randomUUID().toString().substring(0, 6));
         cxp.setFechaEmision(LocalDate.now(ZONA_LIMA));
         cxp.setFechaVencimiento(LocalDate.now(ZONA_LIMA).plusDays(15));
-        cxp.setMontoTotal(100.00);
-        cxp.setMontoPagado(0.0);
+        cxp.setMontoTotal(new BigDecimal("100.00"));
+        cxp.setMontoPagado(BigDecimal.ZERO);
         cxp.setEstado("PENDIENTE");
         int idCxp;
         try (Connection conn = ConexionBD.getConnection()) {
@@ -165,20 +165,20 @@ class HardeningFinanceIntegrityTest {
         }
 
         // Pagar 50% -> debe quedar PENDIENTE, NO PAGADA
-        assertTrue(finanzas.registrarPagoProveedor(idCxp, 50.00, "EFECTIVO", null, 1, "Abono 50%"));
+        assertTrue(finanzas.registrarPagoProveedor(idCxp, new BigDecimal("50.00"), "EFECTIVO", null, 1, "Abono 50%"));
         try (Connection conn = ConexionBD.getConnection()) {
             CuentaPorPagar tras50 = cxpDAO.buscarPorId(conn, idCxp).orElseThrow();
             assertEquals("PENDIENTE", tras50.getEstado(), "Pago del 50% debe dejar CxP en PENDIENTE (no PAGADA)");
-            assertEquals(50.00, tras50.getMontoPagado(), 0.001);
+            assertEquals(0, new BigDecimal("50.00").compareTo(tras50.getMontoPagado()));
         }
 
         // Sobrepago S/ 60.00 sobre saldo de S/ 50.00 -> rechazado sin dejar fila huérfana en pago_proveedor
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarPagoProveedor(idCxp, 60.00, "EFECTIVO", null, 1, "Sobrepago"));
+                () -> finanzas.registrarPagoProveedor(idCxp, new BigDecimal("60.00"), "EFECTIVO", null, 1, "Sobrepago"));
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarPagoProveedor(idCxp, Double.NaN, "EFECTIVO", null, 1, "NaN"));
+                () -> finanzas.registrarPagoProveedor(idCxp, null, "EFECTIVO", null, 1, "Null"));
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarPagoProveedor(idCxp, Double.POSITIVE_INFINITY, "EFECTIVO", null, 1, "Inf"));
+                () -> finanzas.registrarPagoProveedor(idCxp, new BigDecimal("-1.00"), "EFECTIVO", null, 1, "Neg"));
 
         try (Connection conn = ConexionBD.getConnection();
              PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM pago_proveedor WHERE id_cuenta_pagar = ?")) {
@@ -190,11 +190,11 @@ class HardeningFinanceIntegrityTest {
         }
 
         // Pagar saldo restante S/ 50.00 -> PAGADA
-        assertTrue(finanzas.registrarPagoProveedor(idCxp, 50.00, "EFECTIVO", null, 1, "Liquidación"));
+        assertTrue(finanzas.registrarPagoProveedor(idCxp, new BigDecimal("50.00"), "EFECTIVO", null, 1, "Liquidación"));
         try (Connection conn = ConexionBD.getConnection()) {
             CuentaPorPagar finalCxp = cxpDAO.buscarPorId(conn, idCxp).orElseThrow();
             assertEquals("PAGADA", finalCxp.getEstado());
-            assertEquals(100.00, finalCxp.getMontoPagado(), 0.001);
+            assertEquals(0, new BigDecimal("100.00").compareTo(finalCxp.getMontoPagado()));
         }
 
         // CxC de S/ 100.00
@@ -203,30 +203,30 @@ class HardeningFinanceIntegrityTest {
         cxc.setNumeroComprobante("B001-HARD-" + UUID.randomUUID().toString().substring(0, 6));
         cxc.setFechaEmision(LocalDate.now(ZONA_LIMA));
         cxc.setFechaVencimiento(LocalDate.now(ZONA_LIMA).plusDays(30));
-        cxc.setMontoTotal(100.00);
-        cxc.setMontoCobrado(0.0);
+        cxc.setMontoTotal(new BigDecimal("100.00"));
+        cxc.setMontoCobrado(BigDecimal.ZERO);
         cxc.setEstado("PENDIENTE");
         int idCxc;
         try (Connection conn = ConexionBD.getConnection()) {
             idCxc = cxcDAO.insertar(conn, cxc);
         }
 
-        assertTrue(finanzas.registrarCobroCliente(idCxc, 50.00, "EFECTIVO", null, 1, "Cobro 50%"));
+        assertTrue(finanzas.registrarCobroCliente(idCxc, new BigDecimal("50.00"), "EFECTIVO", null, 1, "Cobro 50%"));
         try (Connection conn = ConexionBD.getConnection()) {
             CuentaPorCobrar tras50 = cxcDAO.buscarPorId(conn, idCxc).orElseThrow();
             assertEquals("PENDIENTE", tras50.getEstado(), "Cobro del 50% debe dejar CxC en PENDIENTE (no COBRADA)");
-            assertEquals(50.00, tras50.getMontoCobrado(), 0.001);
+            assertEquals(0, new BigDecimal("50.00").compareTo(tras50.getMontoCobrado()));
         }
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarCobroCliente(idCxc, 55.00, "EFECTIVO", null, 1, "Sobrecobro"));
+                () -> finanzas.registrarCobroCliente(idCxc, new BigDecimal("55.00"), "EFECTIVO", null, 1, "Sobrecobro"));
         Venta vCero = crearVentaBase("CREDITO");
         vCero.setTotal(BigDecimal.ZERO);
         assertThrows(IllegalArgumentException.class,
                 () -> finanzas.registrarVentaCreditoCorporativo(vCero, idCliente, 15));
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarCambioPrecioConMotivo("PRODUCTO", 1, "Prod", 10.0, 0.0, 1, "Cero", "Obs"));
+                () -> finanzas.registrarCambioPrecioConMotivo("PRODUCTO", 1, "Prod", new BigDecimal("10.0000"), BigDecimal.ZERO, 1, "Cero", "Obs valida"));
         assertThrows(IllegalArgumentException.class,
-                () -> finanzas.registrarCambioPrecioConMotivo("PRODUCTO", 1, "Prod", 10.0, Double.NaN, 1, "NaN", "Obs"));
+                () -> finanzas.registrarCambioPrecioConMotivo("PRODUCTO", 1, "Prod", new BigDecimal("10.0000"), null, 1, "Null", "Obs valida"));
     }
 
     @Test
@@ -234,7 +234,7 @@ class HardeningFinanceIntegrityTest {
     void testVentaCreditoCorporativoAtomicaYLimiteCredito() throws Exception {
         asegurarCajaAbierta();
         int idProd = crearProductoConReceta("PROD-CRED-" + sufijo(), new BigDecimal("60.00"), new BigDecimal("20.0000"));
-        int idCli = crearClienteCorporativo("2099" + sufijoNum(7), 50.00);
+        int idCli = crearClienteCorporativo("2099" + sufijoNum(7), new BigDecimal("50.00"));
 
         VentaService ventaService = new VentaService();
         Venta v = new Venta();
@@ -262,7 +262,7 @@ class HardeningFinanceIntegrityTest {
         }
 
         // Con límite suficiente (S/ 200) -> persiste venta Y CxC vinculada en la misma transacción
-        int idCliOk = crearClienteCorporativo("2088" + sufijoNum(7), 200.00);
+        int idCliOk = crearClienteCorporativo("2088" + sufijoNum(7), new BigDecimal("200.00"));
         Venta vOk = new Venta();
         vOk.setIdUsuario(1);
         vOk.setIdCliente(idCliOk);
@@ -976,7 +976,7 @@ class HardeningFinanceIntegrityTest {
         }
     }
 
-    private static int crearClienteCorporativo(String ruc, double limite) throws Exception {
+    private static int crearClienteCorporativo(String ruc, BigDecimal limite) throws Exception {
         ClienteDAO dao = new ClienteDAOImpl();
         Cliente c = new Cliente();
         c.setTipoDocumento("RUC");

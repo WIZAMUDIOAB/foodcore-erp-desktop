@@ -14,6 +14,8 @@ import com.foodcore.model.Producto;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.ConexionBD;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -86,7 +88,7 @@ public class VentaPosConsultaService {
             nuevo.setContacto(nombreCompleto);
             nuevo.setTelefono(telefono != null && !telefono.isBlank() ? telefono.trim() : null);
             nuevo.setFechaNacimiento(fechaNacimiento);
-            nuevo.setLimiteCredito(0.0);
+            nuevo.setLimiteCredito(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
             nuevo.setDiasCredito(0);
             clienteDAO.insertar(conn, nuevo);
             return nuevo;

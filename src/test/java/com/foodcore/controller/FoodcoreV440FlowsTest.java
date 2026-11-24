@@ -310,7 +310,7 @@ class FoodcoreV440FlowsTest {
         admin.setNombreEmpleado("Administrador General");
         admin.setNombreRol("ADMIN");
         admin.setDni("70000001");
-        admin.setSueldoBase(3500.00);
+        admin.setSueldoBase(new BigDecimal("3500.00"));
         AuthService.setUsuarioSesionActual(admin);
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {

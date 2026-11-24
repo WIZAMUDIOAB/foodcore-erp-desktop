@@ -12,7 +12,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -124,8 +123,8 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
             ps.setString(2, cxp.getNumeroDocumento());
             ps.setDate(3, Date.valueOf(cxp.getFechaEmision()));
             ps.setDate(4, Date.valueOf(cxp.getFechaVencimiento()));
-            ps.setBigDecimal(5, BigDecimal.valueOf(cxp.getMontoTotal()).setScale(2, RoundingMode.HALF_UP));
-            ps.setBigDecimal(6, BigDecimal.valueOf(cxp.getMontoPagado()).setScale(2, RoundingMode.HALF_UP));
+            ps.setBigDecimal(5, normalizarMoneda(cxp.getMontoTotal()));
+            ps.setBigDecimal(6, normalizarMoneda(cxp.getMontoPagado()));
             ps.setString(7, cxp.getEstado());
             ps.setString(8, cxp.getObservaciones());
             ps.executeUpdate();
@@ -141,10 +140,10 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
 
     @Override
     public boolean registrarPago(Connection conn, PagoProveedor pago) throws SQLException {
-        if (pago == null || Double.isNaN(pago.getMonto()) || Double.isInfinite(pago.getMonto()) || pago.getMonto() <= 0.0) {
+        if (pago == null || pago.getMonto() == null || pago.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
-        BigDecimal montoPago = BigDecimal.valueOf(pago.getMonto()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal montoPago = pago.getMonto().setScale(2, RoundingMode.HALF_UP);
 
         // 1. Actualizar monto_pagado y estado de forma atómica con guarda anti-sobrepago.
         // En MySQL SET evalúa de izquierda a derecha: tras monto_pagado = monto_pagado + ?,
@@ -219,13 +218,23 @@ public class CuentaPorPagarDAOImpl implements CuentaPorPagarDAO {
         if (rs.getDate("fecha_vencimiento") != null) {
             c.setFechaVencimiento(rs.getDate("fecha_vencimiento").toLocalDate());
         }
-        c.setMontoTotal(rs.getDouble("monto_total"));
-        c.setMontoPagado(rs.getDouble("monto_pagado"));
+        c.setMontoTotal(leerMoneda(rs, "monto_total"));
+        c.setMontoPagado(leerMoneda(rs, "monto_pagado"));
         c.setEstado(rs.getString("estado"));
         c.setObservaciones(rs.getString("observaciones"));
         if (rs.getTimestamp("fecha_registro") != null) {
             c.setFechaRegistro(rs.getTimestamp("fecha_registro").toLocalDateTime());
         }
         return c;
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        return normalizarMoneda(rs.getBigDecimal(columna));
     }
 }
