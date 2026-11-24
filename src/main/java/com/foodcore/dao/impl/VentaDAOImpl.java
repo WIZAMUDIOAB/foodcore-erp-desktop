@@ -355,4 +355,16 @@ public class VentaDAOImpl implements VentaDAO {
         }
         return lista;
     }
+
+    @Override
+    public int obtenerSiguienteCorrelativoComprobante(Connection conn) throws SQLException {
+        String sql = "SELECT COALESCE(MAX(id_comprobante), 0) + 1 FROM comprobante_pago";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return Math.max(1, rs.getInt(1));
+            }
+        }
+        return 1;
+    }
 }

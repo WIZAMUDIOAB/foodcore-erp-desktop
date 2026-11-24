@@ -6,57 +6,39 @@ import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
 import com.foodcore.api.security.TokenBlacklistService;
+import com.foodcore.dao.HealthCheckDAO;
 import com.foodcore.dao.MesaDAO;
 import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.UsuarioDAO;
 import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.HealthCheckDAOImpl;
 import com.foodcore.dao.impl.MesaDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.AuthServiceImpl;
-import com.foodcore.util.ConexionBD;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import io.javalin.http.staticfiles.Location;
-import org.eclipse.jetty.http.HttpVersion;
-import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.cert.Certificate;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.Map;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Servidor HTTP/HTTPS REST basado en Javalin modularizado mediante controladores dedicados
- * ({@link AuthController}, {@link PedidoController}, {@link KdsController}, {@link ReportesController}),
- * cabeceras de seguridad HTTP y conector loopback dedicado exclusivamente al menú QR público
- * para aislamiento de Cloudflare Tunnel (v5.7.1 Hardening).
+ * Orquestador de ciclo de vida para el servidor HTTP/HTTPS REST (Javalin) y su conector público loopback de menú QR.
  */
 public class ApiServer {
 
@@ -71,13 +53,6 @@ public class ApiServer {
     public static final String ENV_CERT_PATH = "FOODCORE_CERT_PATH";
     public static final int MIN_KEYSTORE_PASS_LENGTH = 8;
 
-    private static final String CSP_API_JSON =
-            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
-    private static final String CSP_HTML_PWA =
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-            + "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; "
-            + "frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
-
     private static ApiServer instance;
 
     private final ApiState state = new ApiState();
@@ -90,13 +65,14 @@ public class ApiServer {
     private final PedidoController pedidoController;
     private final KdsController kdsController;
     private final ReportesController reportesController;
+    private final HealthCheckDAO healthCheckDAO;
+    private final ApiTlsConfigurator tlsConfigurator;
 
     private Javalin app;
     private Javalin publicMenuApp;
     private int puertoActual = DEFAULT_PORT;
     private int puertoHttpsActual = DEFAULT_HTTPS_PORT;
     private int puertoMenuPublicoActual = -1;
-    private volatile byte[] certificadoActivo;
 
     private ApiServer() {
         this(new AuthServiceImpl(), new ProductoDAOImpl(), new MesaDAOImpl(),
@@ -123,11 +99,10 @@ public class ApiServer {
                 state, productoDAO, mesaDAO, pedidoDAO, pedidoService, cajaService, ventaService);
         this.kdsController = new KdsController(state, pedidoDAO);
         this.reportesController = new ReportesController(state);
+        this.healthCheckDAO = new HealthCheckDAOImpl();
+        this.tlsConfigurator = new ApiTlsConfigurator();
     }
 
-    /**
-     * Crea una instancia aislada para pruebas de seguridad HTTP con lista negra dedicada.
-     */
     public static ApiServer crearServidorAisladoConBlacklist(JwtService jwtService,
             CorsPolicy corsPolicy,
             AuthRateLimiter rateLimiter,
@@ -141,10 +116,6 @@ public class ApiServer {
         return tokenBlacklistService;
     }
 
-    /**
-     * Crea una instancia aislada en memoria para pruebas unitarias de seguridad HTTP sin interferir
-     * con el singleton compartido ni requerir conexión MySQL activa.
-     */
     public static ApiServer crearServidorAislado(JwtService jwtService,
                                                  CorsPolicy corsPolicy,
                                                  AuthRateLimiter rateLimiter) {
@@ -179,9 +150,6 @@ public class ApiServer {
         return instance;
     }
 
-    /**
-     * Lee el puerto configurado en {@code application.properties} ({@code api.rest.port}), por defecto 8080.
-     */
     public static int leerPuertoConfigurado() {
         Properties props = new Properties();
         try (InputStream is = ApiServer.class.getResourceAsStream("/application.properties")) {
@@ -196,37 +164,8 @@ public class ApiServer {
         return DEFAULT_PORT;
     }
 
-    /**
-     * Lee el puerto loopback exclusivo del menú QR público (por defecto 8081),
-     * configurable vía {@code FOODCORE_PUBLIC_MENU_PORT} o {@code api.public.menu.port}.
-     */
     public static int leerPuertoPublicoMenuConfigurado() {
-        String configured = leerVariableOPropiedad(ENV_PUBLIC_MENU_PORT);
-        if (configured != null) {
-            try {
-                int parsed = Integer.parseInt(configured);
-                if (parsed >= 0 && parsed <= 65535) {
-                    return parsed;
-                }
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        Properties props = new Properties();
-        try (InputStream is = ApiServer.class.getResourceAsStream("/application.properties")) {
-            if (is != null) {
-                props.load(is);
-                String val = props.getProperty(PROP_PUBLIC_MENU_PORT);
-                if (val != null && !val.isBlank()) {
-                    int parsed = Integer.parseInt(val.trim());
-                    if (parsed >= 0 && parsed <= 65535) {
-                        return parsed;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Usando puerto de menú público por defecto 8081", e);
-        }
-        return DEFAULT_PUBLIC_MENU_PORT;
+        return PublicMenuServerHelper.leerPuertoPublicoMenuConfigurado();
     }
 
     public synchronized void iniciar() {
@@ -248,142 +187,21 @@ public class ApiServer {
         this.puertoActual = httpPort;
         this.puertoHttpsActual = httpsPort;
         this.puertoMenuPublicoActual = -1;
-        this.certificadoActivo = null;
-        File pwaDir = new File("pwa");
+        this.tlsConfigurator.limpiarCertificadoActivo();
         SslContextFactory.Server sslContextFactory = httpsPort >= 0 ? obtenerSslContextFactory() : null;
 
+        SalonApiController salonCtrl = pedidoController.salonController();
+        KdsSyncApiController kdsSyncCtrl = pedidoController.kdsSyncController();
+        CobroApiController cobroCtrl = pedidoController.cobroController();
+
         app = Javalin.create(config -> {
-            config.startup.showJavalinBanner = false;
-            if (esDevLoggingHabilitado()) {
-                config.bundledPlugins.enableDevLogging();
-            }
-
-            if (pwaDir.exists() && pwaDir.isDirectory()) {
-                config.staticFiles.add(staticFiles -> {
-                    staticFiles.hostedPath = "/";
-                    staticFiles.directory = pwaDir.getAbsolutePath();
-                    staticFiles.location = Location.EXTERNAL;
-                });
-            }
-            if (getClass().getResource("/pwa/index.html") != null) {
-                config.staticFiles.add(staticFiles -> {
-                    staticFiles.hostedPath = "/";
-                    staticFiles.directory = "/pwa";
-                    staticFiles.location = Location.CLASSPATH;
-                });
-            }
-
-            // Conector HTTP (8080)
-            config.jetty.addConnector((server, httpConfig) -> {
-                ServerConnector httpConnector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
-                httpConnector.setPort(httpPort);
-                return httpConnector;
-            });
-
-            // Conector HTTPS SSL (8443) con keystore externo
-            if (httpsPort >= 0 && sslContextFactory != null) {
-                config.jetty.addConnector((server, httpConfig) -> {
-                    HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-                    SecureRequestCustomizer customizer = new SecureRequestCustomizer();
-                    customizer.setSniHostCheck(false);
-                    httpsConfig.addCustomizer(customizer);
-
-                    ServerConnector sslConnector = new ServerConnector(server,
-                            new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
-                            new HttpConnectionFactory(httpsConfig));
-                    sslConnector.setPort(httpsPort);
-                    return sslConnector;
-                });
-            }
-
-            // Seguridad HTTP global: cabeceras defensivas, bloqueo Cloudflare en rutas no públicas y CORS whitelist
-            config.routes.before(ctx -> {
-                aplicarCabecerasSeguridad(ctx);
-                if (ApiSecurityFilter.esSolicitudDesdeCloudflare(ctx)
-                        && !ApiSecurityFilter.esRutaPublicaTunel(ctx.method().name(), ctx.path())) {
-                    state.responderError(ctx, 403, "Ruta no permitida a través del túnel público.");
-                    ctx.skipRemainingHandlers();
-                    return;
-                }
-                corsPolicy.apply(ctx);
-            });
-            config.routes.options("/*", ctx -> {
-                if (!ctx.res().isCommitted()) {
-                    ctx.status(204);
-                }
-            });
-            config.routes.before("/api/*", securityFilter::handle);
-
-            // 1. Health, AuthController & Catálogo Público de Solo Lectura
-            config.routes.get("/health", this::handleHealthReadiness);
-            config.routes.head("/health", this::handleHealthReadiness);
-            config.routes.get("/api/health", this::handleHealth);
-            config.routes.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
-            config.routes.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
-            config.routes.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
-            config.routes.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
-            config.routes.post("/api/auth/login", authController::handleLogin);
-            config.routes.post("/api/auth/pin-login", authController::handlePinLogin);
-            config.routes.post("/api/auth/pin-switch", authController::handlePinSwitch);
-            config.routes.post("/api/auth/force-logout", authController::handleForceLogout);
-            config.routes.get("/api/usuarios/activos", authController::handleListarUsuariosActivos);
-            config.routes.patch("/api/usuarios/{id}/pin", authController::handleActualizarPinUsuario);
-
-            // 2. PedidoController (Catálogo, Mesas, Pedidos y Caja)
-            config.routes.get("/api/productos", pedidoController::handleListarProductos);
-            config.routes.get("/api/productos/disponibles", pedidoController::handleListarProductosDisponibles);
-            config.routes.patch("/api/productos/{id}/disponibilidad", pedidoController::handleActualizarDisponibilidad);
-            config.routes.get("/api/productos/{id}/imagen", pedidoController::handleImagenProducto);
-            config.routes.get("/uploads/platillos/{archivo}", pedidoController::handleServirUploadPlatillo);
-            config.routes.get("/api/mesas", pedidoController::handleListarMesas);
-            config.routes.get("/api/pedidos", pedidoController::handleListarPedidos);
-            config.routes.get("/api/pedidos/{uuid}", pedidoController::handleObtenerPedidoPorUuid);
-            config.routes.post("/api/pedidos", pedidoController::handleCrearPedido);
-            config.routes.patch("/api/pedidos/{id}/estado", pedidoController::handleActualizarEstadoPedido);
-            config.routes.get("/api/caja/estado", pedidoController::handleCajaEstado);
-            config.routes.post("/api/caja/abrir", pedidoController::handleCajaAbrir);
-            config.routes.post("/api/caja/cerrar", pedidoController::handleCajaCerrar);
-            config.routes.post("/api/caja/cobrar", pedidoController::handleCajaCobrar);
-
-            // 3. KdsController (Cocina / Bar)
-            config.routes.get("/api/kds/comandas", kdsController::handleKdsComandas);
-            config.routes.get("/api/kds/items", kdsController::handleKdsItems);
-            config.routes.get("/api/kds/pendientes", kdsController::handleKdsItems);
-            config.routes.patch("/api/kds/items/{id}/estado", kdsController::handleActualizarEstadoItemKds);
-            config.routes.patch("/api/kds/{id}/estado", kdsController::handleActualizarEstadoItemKds);
-            config.routes.patch("/api/kds/pedidos/{id}/entregar", kdsController::handleMarcarPedidoEntregado);
-
-            // 4. ReportesController (Dashboard Ejecutivo)
-            config.routes.get("/api/dashboard/kpis", reportesController::handleDashboardKpis);
-            config.routes.get("/api/reportes/dashboard", reportesController::handleDashboardKpis);
-            config.routes.get("/api/dashboard/ventas-por-hora", reportesController::handleDashboardVentasPorHora);
-            config.routes.get("/api/dashboard/top-platos", reportesController::handleDashboardTopPlatos);
-            config.routes.get("/api/dashboard/ventas-recientes", reportesController::handleDashboardVentasRecientes);
-            config.routes.get("/api/menu-digital/view", reportesController::handleMenuDigitalView);
-
-            // 5. Rutas directas para PWAs y Certificado SSL
-            config.routes.get("/kds", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
-            config.routes.get("/kds/", ctx -> servirPwaHtml(ctx, "pwa/kds/index.html"));
-            config.routes.get("/dashboard", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
-            config.routes.get("/dashboard/", ctx -> servirPwaHtml(ctx, "pwa/dashboard/index.html"));
-            config.routes.get("/foodcore.cer", this::servirCertificadoSsl);
-
-            config.routes.get("/", ctx -> {
-                File indexFile = new File("pwa/index.html");
-                if (indexFile.exists()) {
-                    ctx.contentType("text/html; charset=UTF-8");
-                    ctx.result(Files.readString(indexFile.toPath(), StandardCharsets.UTF_8));
-                    return;
-                }
-                try (InputStream is = getClass().getResourceAsStream("/pwa/index.html")) {
-                    if (is != null) {
-                        ctx.contentType("text/html; charset=UTF-8");
-                        ctx.result(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-                        return;
-                    }
-                }
-                ctx.json(Map.of("service", "FoodCore ERP API v5.7.1", "status", "ONLINE"));
-            });
+            ApiRouteRegistrar.configurarEstaticosYConectores(config, httpPort, httpsPort, sslContextFactory);
+            ApiRouteRegistrar.registrarMiddlewares(config, state, corsPolicy, securityFilter);
+            ApiRouteRegistrar.registrarRutasSaludPublicasYAuth(
+                    config, state, healthCheckDAO, authController, salonCtrl, reportesController);
+            ApiRouteRegistrar.registrarRutasOperativas(
+                    config, salonCtrl, kdsSyncCtrl, cobroCtrl, kdsController, reportesController);
+            ApiRouteRegistrar.registrarRutasPwaYCertificado(config, this::servirCertificadoSsl);
         });
 
         app.start();
@@ -391,125 +209,19 @@ public class ApiServer {
             this.puertoActual = app.port();
         }
         if (publicMenuPort >= 0) {
-            iniciarServidorMenuPublico(publicMenuPort);
+            this.publicMenuApp = PublicMenuServerHelper.iniciarServidorMenuPublico(
+                    publicMenuPort, state, corsPolicy, salonCtrl, reportesController);
+            if (this.publicMenuApp != null) {
+                this.puertoMenuPublicoActual = this.publicMenuApp.port();
+            }
         }
         LOGGER.info("FoodCore API REST (Javalin) activa en HTTP (puerto " + this.puertoActual
                 + "), HTTPS SSL (puerto " + httpsPort + ") y Menú Público loopback (puerto "
                 + this.puertoMenuPublicoActual + ")");
     }
 
-    /**
-     * Levanta un conector Javalin/Jetty aislado exclusivamente en {@code 127.0.0.1} para el túnel Cloudflare,
-     * exponiendo únicamente {@code /api/public/*}, {@code /menu-digital/*}, {@code /fonts/*}
-     * y {@code /uploads/platillos/*}.
-     */
-    private void iniciarServidorMenuPublico(int publicMenuPort) {
-        try {
-            File menuDir = new File("pwa/menu-digital");
-            File fontsDir = new File("pwa/fonts");
-            publicMenuApp = Javalin.create(config -> {
-                config.startup.showJavalinBanner = false;
-
-                if (menuDir.exists() && menuDir.isDirectory()) {
-                    config.staticFiles.add(sf -> {
-                        sf.hostedPath = "/menu-digital";
-                        sf.directory = menuDir.getAbsolutePath();
-                        sf.location = Location.EXTERNAL;
-                    });
-                }
-                if (getClass().getResource("/pwa/menu-digital/index.html") != null) {
-                    config.staticFiles.add(sf -> {
-                        sf.hostedPath = "/menu-digital";
-                        sf.directory = "/pwa/menu-digital";
-                        sf.location = Location.CLASSPATH;
-                    });
-                }
-                if (fontsDir.exists() && fontsDir.isDirectory()) {
-                    config.staticFiles.add(sf -> {
-                        sf.hostedPath = "/fonts";
-                        sf.directory = fontsDir.getAbsolutePath();
-                        sf.location = Location.EXTERNAL;
-                    });
-                }
-
-                config.jetty.addConnector((server, httpConfig) -> {
-                    ServerConnector loopbackConnector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
-                    loopbackConnector.setHost("127.0.0.1");
-                    loopbackConnector.setPort(publicMenuPort);
-                    return loopbackConnector;
-                });
-
-                config.routes.before(ctx -> {
-                    aplicarCabecerasSeguridad(ctx);
-                    if (!ApiSecurityFilter.esRutaPublicaTunel(ctx.method().name(), ctx.path())) {
-                        state.responderError(ctx, 403, "Ruta no permitida en el conector de menú público.");
-                        ctx.skipRemainingHandlers();
-                        return;
-                    }
-                    corsPolicy.apply(ctx);
-                });
-
-                config.routes.get("/api/public/productos", pedidoController::handleListarProductosPublicos);
-                config.routes.get("/api/public/productos/disponibles", pedidoController::handleListarProductosDisponiblesPublicos);
-                config.routes.get("/api/public/productos/{id}/imagen", pedidoController::handleImagenProducto);
-                config.routes.get("/api/public/menu-digital", reportesController::handleMenuDigitalView);
-                config.routes.get("/uploads/platillos/{archivo}", pedidoController::handleServirUploadPlatillo);
-                config.routes.get("/menu-digital", ctx -> servirPwaHtml(ctx, "pwa/menu-digital/index.html"));
-                config.routes.get("/menu-digital/", ctx -> servirPwaHtml(ctx, "pwa/menu-digital/index.html"));
-            });
-            publicMenuApp.start();
-            this.puertoMenuPublicoActual = publicMenuApp.port();
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "No se pudo iniciar el conector aislado de menú público en 127.0.0.1:" + publicMenuPort, e);
-            if (publicMenuApp != null) {
-                try {
-                    publicMenuApp.stop();
-                } catch (Exception ignored) {
-                }
-                publicMenuApp = null;
-            }
-            this.puertoMenuPublicoActual = -1;
-        }
-    }
-
     static void aplicarCabecerasSeguridad(Context ctx) {
-        ctx.header("X-Content-Type-Options", "nosniff");
-        ctx.header("X-Frame-Options", "DENY");
-        ctx.header("Referrer-Policy", "no-referrer");
-        ctx.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-        String path = ctx.path();
-        boolean esApiJson = path.startsWith("/api/")
-                && !"/api/public/menu-digital".equals(path)
-                && !"/api/menu-digital/view".equals(path);
-        ctx.header("Content-Security-Policy", esApiJson ? CSP_API_JSON : CSP_HTML_PWA);
-        boolean esHttps = "https".equalsIgnoreCase(ctx.scheme())
-                || ctx.req().isSecure()
-                || "https".equalsIgnoreCase(ctx.header("X-Forwarded-Proto"));
-        if (esHttps) {
-            ctx.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-        }
-    }
-
-    private void servirPwaHtml(Context ctx, String ruta) {
-        try {
-            File f = new File(ruta);
-            if (f.exists()) {
-                ctx.contentType("text/html; charset=UTF-8");
-                ctx.result(Files.readString(f.toPath(), StandardCharsets.UTF_8));
-                return;
-            }
-            try (InputStream is = getClass().getResourceAsStream("/" + ruta)) {
-                if (is != null) {
-                    ctx.contentType("text/html; charset=UTF-8");
-                    ctx.result(new String(is.readAllBytes(), StandardCharsets.UTF_8));
-                    return;
-                }
-            }
-            ctx.status(404).result("PWA no encontrada: " + ruta);
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Error sirviendo " + ruta, e);
-            ctx.status(500).result("Error interno sirviendo PWA");
-        }
+        PublicMenuServerHelper.aplicarCabecerasSeguridad(ctx);
     }
 
     public static String resolverKeystorePasswordObligatorio() {
@@ -517,42 +229,12 @@ public class ApiServer {
     }
 
     static String resolverKeystorePasswordObligatorio(Function<String, String> envReader) {
-        String configured = leerVariableOPropiedad(ENV_KEYSTORE_PASS, envReader);
-        if (configured == null || configured.isBlank() || configured.startsWith("${")) {
-            throw new IllegalStateException(
-                "Variable de entorno obligatoria no configurada: " + ENV_KEYSTORE_PASS
-                + " (mínimo " + MIN_KEYSTORE_PASS_LENGTH + " caracteres)."
-            );
-        }
-        if (configured.length() < MIN_KEYSTORE_PASS_LENGTH) {
-            throw new IllegalStateException(
-                ENV_KEYSTORE_PASS + " es demasiado corta; debe tener al menos "
-                + MIN_KEYSTORE_PASS_LENGTH + " caracteres."
-            );
-        }
-        return configured;
-    }
-
-    private static String leerVariableOPropiedad(String name) {
-        return leerVariableOPropiedad(name, System::getenv);
-    }
-
-    private static String leerVariableOPropiedad(String name, Function<String, String> envReader) {
-        String sysProp = System.getProperty(name);
-        if (sysProp != null) {
-            String trimmed = sysProp.trim();
-            return trimmed.isEmpty() ? null : trimmed;
-        }
-        String envVal = envReader != null ? envReader.apply(name) : null;
-        if (envVal != null && !envVal.isBlank()) {
-            return envVal.trim();
-        }
-        return null;
+        return ApiTlsConfigurator.resolverKeystorePasswordObligatorio(envReader);
     }
 
     private void servirCertificadoSsl(Context ctx) {
         try {
-            String configuredCert = leerVariableOPropiedad(ENV_CERT_PATH);
+            String configuredCert = ApiTlsConfigurator.leerVariableOPropiedad(ENV_CERT_PATH);
             if (configuredCert != null) {
                 File certFile = new File(configuredCert);
                 if (certFile.exists() && certFile.isFile()) {
@@ -561,28 +243,9 @@ public class ApiServer {
                     return;
                 }
             }
-            if (certificadoActivo != null && certificadoActivo.length > 0) {
-                ctx.contentType("application/x-x509-ca-cert");
-                ctx.result(certificadoActivo);
-                return;
+            if (!tlsConfigurator.servirCertificadoDesdeMemoriaOClasspath(ctx)) {
+                ctx.status(404);
             }
-            try (InputStream is = getClass().getResourceAsStream("/foodcore.cer")) {
-                if (is != null) {
-                    ctx.contentType("application/x-x509-ca-cert");
-                    ctx.result(is.readAllBytes());
-                    return;
-                }
-            }
-            File f = new File("foodcore.cer");
-            if (!f.exists()) {
-                f = new File("pwa/foodcore.cer");
-            }
-            if (f.exists()) {
-                ctx.contentType("application/x-x509-ca-cert");
-                ctx.result(Files.readAllBytes(f.toPath()));
-                return;
-            }
-            ctx.status(404);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Error sirviendo foodcore.cer", e);
             ctx.status(500);
@@ -593,85 +256,40 @@ public class ApiServer {
         String keystorePassword = resolverKeystorePasswordObligatorio();
         char[] passwordChars = keystorePassword.toCharArray();
         try {
-            KeyStore ks = null;
-            String configuredPath = leerVariableOPropiedad(ENV_KEYSTORE_PATH);
+            KeyStore ks;
+            String configuredPath = ApiTlsConfigurator.leerVariableOPropiedad(ENV_KEYSTORE_PATH);
             if (configuredPath != null) {
                 File configuredFile = new File(configuredPath);
                 if (!configuredFile.exists() || !configuredFile.isFile()) {
                     throw new IllegalStateException(
-                        "No se encontró el keystore HTTPS configurado en " + ENV_KEYSTORE_PATH + ": " + configuredPath
+                            "No se encontró el keystore HTTPS configurado en "
+                            + ENV_KEYSTORE_PATH + ": " + configuredPath
                     );
                 }
                 ks = KeyStore.getInstance(configuredFile, passwordChars);
             } else {
-                File defaultFile = new File("keystore.jks");
-                if (defaultFile.exists() && defaultFile.isFile()) {
-                    ks = KeyStore.getInstance(defaultFile, passwordChars);
-                } else {
-                    try (InputStream is = getClass().getResourceAsStream("/keystore.jks")) {
-                        if (is != null) {
-                            ks = cargarKeystoreStream(is.readAllBytes(), passwordChars);
-                        }
-                    }
-                }
+                ks = tlsConfigurator.cargarKeystorePorDefecto(passwordChars);
             }
-
             if (ks == null) {
                 LOGGER.warning("No se encontró keystore.jks para SSL HTTPS. El servidor funcionará solo en HTTP.");
                 return null;
             }
-
-            extraerCertificadoActivo(ks);
-            SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
-            sslContextFactory.setKeyStore(ks);
-            sslContextFactory.setKeyStorePassword(keystorePassword);
-            sslContextFactory.setKeyManagerPassword(keystorePassword);
-            return sslContextFactory;
+            return tlsConfigurator.construirDesdeKeystore(ks, keystorePassword);
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException(
-                "Error al inicializar el keystore SSL HTTPS en puerto " + DEFAULT_HTTPS_PORT + ": " + e.getMessage(),
-                e
+                    "Error al inicializar el keystore SSL HTTPS en puerto "
+                    + DEFAULT_HTTPS_PORT + ": " + e.getMessage(),
+                    e
             );
         } finally {
             Arrays.fill(passwordChars, '\0');
         }
     }
 
-    private KeyStore cargarKeystoreStream(byte[] rawBytes, char[] passwordChars) {
-        for (String type : new String[]{"PKCS12", "JKS"}) {
-            try {
-                KeyStore ks = KeyStore.getInstance(type);
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(rawBytes)) {
-                    ks.load(bais, passwordChars);
-                    return ks;
-                }
-            } catch (IOException | GeneralSecurityException ignored) {
-                // Probar siguiente formato compatible (PKCS12 / JKS)
-            }
-        }
-        throw new IllegalStateException("Formato de keystore HTTPS inválido o contraseña incorrecta.");
-    }
-
-    private void extraerCertificadoActivo(KeyStore ks) {
-        try {
-            Enumeration<String> aliases = ks.aliases();
-            while (aliases.hasMoreElements()) {
-                String alias = aliases.nextElement();
-                Certificate cert = ks.getCertificate(alias);
-                if (cert != null) {
-                    this.certificadoActivo = cert.getEncoded();
-                    return;
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "No se pudo extraer certificado X.509 desde keystore activo", e);
-        }
-    }
-
     public synchronized void detener() {
-        this.certificadoActivo = null;
+        tlsConfigurator.limpiarCertificadoActivo();
         if (publicMenuApp != null) {
             try {
                 publicMenuApp.stop();
@@ -713,80 +331,7 @@ public class ApiServer {
         return authController.generarTokenJwt(idUsuario, username, rol);
     }
 
-    private void handleHealthReadiness(Context ctx) {
-        try (Connection conn = ConexionBD.getConnection()) {
-            ObjectNode node = evaluarEstadoSalud(conn);
-            int status = "UP".equals(node.path("status").asText()) ? 200 : 503;
-            ctx.status(status)
-                    .contentType("application/json; charset=UTF-8")
-                    .result(node.toString());
-        } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Readiness /health en espera de BD/Flyway", e);
-            ObjectNode node = evaluarEstadoSalud(null);
-            ctx.status(503)
-                    .contentType("application/json; charset=UTF-8")
-                    .result(node.toString());
-        }
-    }
-
     ObjectNode evaluarEstadoSalud(Connection conn) {
-        ObjectNode node = state.mapper.createObjectNode();
-        boolean dbOk = false;
-        int migracionesAplicadas = 0;
-        if (conn != null) {
-            try {
-                if (conn.isValid(2)) {
-                    dbOk = true;
-                    try (PreparedStatement ps = conn.prepareStatement(
-                            "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1");
-                         ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            migracionesAplicadas = rs.getInt(1);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.FINE, "BD o historial Flyway aún no disponible para /health", e);
-            }
-        }
-
-        boolean flywayListo = dbOk && migracionesAplicadas > 0;
-        node.put("status", flywayListo ? "UP" : "DOWN");
-        node.put("db", dbOk ? "UP" : "DOWN");
-        node.put("flyway", flywayListo ? "READY" : "NOT_READY");
-        return node;
-    }
-
-    private void handleHealth(Context ctx) {
-        ObjectNode node = state.mapper.createObjectNode();
-        node.put("status", "UP");
-        ctx.status(200).contentType("application/json; charset=UTF-8").result(node.toString());
-    }
-
-    private static boolean esDevLoggingHabilitado() {
-        String sysProp = System.getProperty("FOODCORE_DEV_LOGGING");
-        if (sysProp != null) {
-            return Boolean.parseBoolean(sysProp.trim());
-        }
-        String envVal = System.getenv("FOODCORE_DEV_LOGGING");
-        if (envVal != null) {
-            return Boolean.parseBoolean(envVal.trim());
-        }
-        Properties props = new Properties();
-        try (InputStream is = ApiServer.class.getResourceAsStream("/application.properties")) {
-            if (is != null) {
-                props.load(is);
-            }
-        } catch (java.io.IOException ignored) {
-        }
-        if (ConexionBD.esPerfilPruebasActivo()) {
-            try (InputStream is = ApiServer.class.getResourceAsStream("/application-test.properties")) {
-                if (is != null) {
-                    props.load(is);
-                }
-            } catch (java.io.IOException ignored) {
-            }
-        }
-        return Boolean.parseBoolean(props.getProperty("app.devLogging", "false").trim());
+        return ApiRouteRegistrar.evaluarEstadoSalud(state, healthCheckDAO, conn);
     }
 }

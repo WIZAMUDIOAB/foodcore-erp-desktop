@@ -146,4 +146,29 @@ class ServiceSolidArchitectureTest {
         assertFalse(String.join("\n", lineas).contains("buscarYAsociarClientePorCriterioSincrono"),
                 "VentaController no debe exponer búsqueda síncrona bloqueante de clientes");
     }
+
+    @Test
+    void apiServerYControladoresRestSinJdbcDirectoYDelgados() throws IOException {
+        Path apiRoot = source("api");
+        for (String rel : new String[] {
+                "ApiServer.java", "PedidoController.java", "SalonApiController.java",
+                "CobroApiController.java", "KdsSyncApiController.java",
+                "ApiRouteRegistrar.java", "PublicMenuServerHelper.java", "ApiTlsConfigurator.java"
+        }) {
+            Path file = apiRoot.resolve(rel);
+            assertTrue(Files.exists(file), "Debe existir archivo modularizado en api: " + rel);
+            String text = read(file);
+            assertFalse(text.contains("PreparedStatement"), rel + " no debe usar PreparedStatement directo");
+            assertFalse(text.contains("ResultSet"), rel + " no debe usar ResultSet directo");
+            assertFalse(text.contains("ConexionBD.getConnection"), rel + " no debe invocar ConexionBD.getConnection");
+        }
+
+        for (String thinFile : new String[] {
+                "ApiServer.java", "PedidoController.java",
+                "SalonApiController.java", "CobroApiController.java", "KdsSyncApiController.java"
+        }) {
+            int loc = Files.readAllLines(apiRoot.resolve(thinFile)).size();
+            assertTrue(loc <= 400, thinFile + " debe ser <= 400 LOC, actual=" + loc);
+        }
+    }
 }

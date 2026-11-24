@@ -6,6 +6,7 @@ import com.foodcore.model.Producto;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductoDAO {
     List<Categoria> listarCategorias(Connection conn) throws SQLException;
@@ -14,6 +15,7 @@ public interface ProductoDAO {
     List<Producto> listarTodos(Connection conn) throws SQLException;
     List<Producto> listarPorCategoria(Connection conn, int idCategoria) throws SQLException;
     Producto buscarPorCodigo(Connection conn, String codigo) throws SQLException;
+    Optional<String> obtenerImagenUrlPorId(Connection conn, int idProducto) throws SQLException;
     int crear(Connection conn, Producto p) throws SQLException;
     void actualizar(Connection conn, Producto p) throws SQLException;
     void reactivar(Connection conn, int idProducto) throws SQLException;

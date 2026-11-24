@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface PedidoDAO {
@@ -37,4 +38,6 @@ public interface PedidoDAO {
     void moverPedidoAMesa(Connection conn, int idPedido, long idMesaDestino, String numeroMesaDestino) throws SQLException;
     Optional<String> obtenerNumeroMesaPorId(Connection conn, long idMesa) throws SQLException;
     void actualizarEstadoMesaDirecto(Connection conn, long idMesa, String estado, Integer idPedidoActual) throws SQLException;
+    Map<String, BigDecimal> obtenerTotalesPedidosActivosPorMesa(Connection conn) throws SQLException;
+    Map<Integer, List<DetallePedido>> listarDetallesPedidosActivosAgrupados(Connection conn) throws SQLException;
 }

@@ -17,6 +17,8 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -726,5 +728,53 @@ public class PedidoDAOImpl implements PedidoDAO {
             // Si el número de mesa no corresponde a una fila en mesa (e.g. M01, DELIVERY), queda null
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Map<String, BigDecimal> obtenerTotalesPedidosActivosPorMesa(Connection conn) throws SQLException {
+        Map<String, BigDecimal> totales = new LinkedHashMap<>();
+        String sql = "SELECT numero_mesa, total FROM pedido "
+                + "WHERE estado NOT IN ('COBRADO', 'CERRADO', 'ANULADO', 'CANCELADO', 'PAGADO')";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String num = rs.getString("numero_mesa");
+                if (num != null && !num.isBlank()) {
+                    BigDecimal total = rs.getBigDecimal("total");
+                    totales.put(num, total != null ? total : BigDecimal.ZERO);
+                }
+            }
+        }
+        return totales;
+    }
+
+    @Override
+    public Map<Integer, List<DetallePedido>> listarDetallesPedidosActivosAgrupados(Connection conn)
+            throws SQLException {
+        Map<Integer, List<DetallePedido>> mapa = new HashMap<>();
+        String sql = "SELECT dp.*, p.nombre AS nombre_prod, ped.numero_mesa "
+                + "FROM detalle_pedido dp "
+                + "JOIN producto p ON dp.id_producto = p.id_producto "
+                + "JOIN pedido ped ON dp.id_pedido = ped.id_pedido "
+                + "WHERE ped.estado IN ('ABIERTO', 'PENDIENTE', 'REGISTRADO', 'EN_PREPARACION', "
+                + "'LISTO', 'ENTREGADO', 'ITEMS_ADICIONALES', 'POR_COBRAR') "
+                + "ORDER BY dp.id_pedido ASC, dp.id_detalle_pedido ASC";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                DetallePedido dp = new DetallePedido();
+                dp.setIdDetallePedido(rs.getInt("id_detalle_pedido"));
+                dp.setIdPedido(rs.getInt("id_pedido"));
+                dp.setIdProducto(rs.getInt("id_producto"));
+                dp.setNombreProducto(rs.getString("nombre_prod"));
+                dp.setCantidad(rs.getInt("cantidad"));
+                dp.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
+                dp.setSubtotal(rs.getBigDecimal("subtotal"));
+                dp.setNotasPreparacion(rs.getString("notas_preparacion"));
+                dp.setEstadoCocina(rs.getString("estado_cocina"));
+                mapa.computeIfAbsent(dp.getIdPedido(), k -> new ArrayList<>()).add(dp);
+            }
+        }
+        return mapa;
     }
 }

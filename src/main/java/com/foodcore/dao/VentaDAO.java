@@ -23,4 +23,5 @@ public interface VentaDAO {
     int marcarDetalleDevuelto(Connection conn, int idDetalleVenta, String motivo) throws SQLException;
     void actualizarTotalesVentaPorDevolucion(Connection conn, int idVenta, BigDecimal nuevoSubtotal,
                                              BigDecimal nuevoIgv, BigDecimal nuevoTotal, String nuevoEstado) throws SQLException;
+    int obtenerSiguienteCorrelativoComprobante(Connection conn) throws SQLException;
 }

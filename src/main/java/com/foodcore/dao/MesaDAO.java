@@ -20,4 +20,7 @@ public interface MesaDAO {
     List<MesaUnion> listarUnionesActivas(Connection conn) throws SQLException;
 
     List<String> listarMesasSecundariasDePedido(Connection conn, int idPedido) throws SQLException;
+
+    boolean actualizarEstadoMesaPorNumero(Connection conn, String numeroMesa, String estado,
+            Integer idPedidoActual) throws SQLException;
 }

@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -292,5 +293,21 @@ public class MesaDAOImpl implements MesaDAO {
             }
         }
         return res;
+    }
+
+    @Override
+    public boolean actualizarEstadoMesaPorNumero(Connection conn, String numeroMesa, String estado,
+            Integer idPedidoActual) throws SQLException {
+        String sql = "UPDATE mesa SET estado = ?, id_pedido_actual = ? WHERE numero = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, estado);
+            if (idPedidoActual != null) {
+                ps.setInt(2, idPedidoActual);
+            } else {
+                ps.setNull(2, Types.INTEGER);
+            }
+            ps.setString(3, numeroMesa);
+            return ps.executeUpdate() > 0;
+        }
     }
 }
