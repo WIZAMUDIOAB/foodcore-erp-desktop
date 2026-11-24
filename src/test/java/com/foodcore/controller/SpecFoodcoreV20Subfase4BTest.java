@@ -88,8 +88,9 @@ class SpecFoodcoreV20Subfase4BTest {
     @DisplayName("4B-1: Marcaje Kiosco - Entrada puntual y detección de colaborador por DNI/PIN")
     void testMarcajeKioscoEntrada() throws Exception {
         // Limpiar asistencias abiertas de hoy (reloj JVM) y asegurar entrada programada en el futuro (puntual)
-        LocalDate hoy = LocalDate.now();
-        LocalTime ahora = LocalTime.now();
+        ZoneId zonaLima = ZoneId.of("America/Lima");
+        LocalDate hoy = LocalDate.now(zonaLima);
+        LocalTime ahora = LocalTime.now(zonaLima);
         LocalTime entradaProgramada = !ahora.isBefore(LocalTime.of(22, 55))
                 ? LocalTime.of(23, 59, 59)
                 : ahora.plusHours(1);
