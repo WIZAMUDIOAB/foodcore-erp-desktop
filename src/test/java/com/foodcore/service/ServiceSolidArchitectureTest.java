@@ -3,7 +3,10 @@ package com.foodcore.service;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.foodcore.service.impl.AuthServiceImpl;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -78,5 +81,31 @@ class ServiceSolidArchitectureTest {
         assertTrue(pom.contains("com/foodcore/service/venta"));
         assertTrue(pom.contains("com/foodcore/service/finanzas"));
         assertTrue(pom.contains("com/foodcore/service/caja"));
+    }
+
+    @Test
+    void authServiceEsInterfazSinCicloNiEstadoEstaticoDuplicado() throws IOException {
+        assertTrue(AuthService.class.isInterface(), "AuthService debe ser interfaz para romper ciclo con AuthServiceImpl");
+        assertTrue(AuthService.class.isAssignableFrom(AuthServiceImpl.class));
+        assertTrue(AuthServiceImpl.class.getSuperclass() == Object.class,
+                "AuthServiceImpl debe implementar AuthService sin herencia circular");
+
+        for (Field field : AuthService.class.getDeclaredFields()) {
+            assertFalse("usuarioSesionActual".equals(field.getName()),
+                    "AuthService no debe duplicar estado de sesión propio");
+            int mods = field.getModifiers();
+            assertTrue(Modifier.isPublic(mods) && Modifier.isStatic(mods) && Modifier.isFinal(mods),
+                    "AuthService solo debe declarar constantes public static final: " + field.getName());
+        }
+
+        String authSource = read(source("service").resolve("AuthService.java"));
+        assertFalse(authSource.contains("AuthServiceImpl"),
+                "AuthService no debe referenciar ni instanciar AuthServiceImpl");
+        assertFalse(authSource.contains("usuarioSesionActual"),
+                "AuthService no debe declarar ni referenciar usuarioSesionActual");
+
+        String spotbugsExcludes = read(Path.of("config", "spotbugs-exclude.xml"));
+        assertFalse(spotbugsExcludes.contains("com.foodcore.service.AuthService"),
+                "config/spotbugs-exclude.xml no debe suprimir hallazgos sobre AuthService");
     }
 }

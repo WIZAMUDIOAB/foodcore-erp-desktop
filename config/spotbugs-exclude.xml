@@ -59,12 +59,6 @@
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
 
-    <!-- Justificación: AuthService mantiene la referencia del Usuario autenticado de la sesión escritorio actual compartida entre controladores JavaFX (el hash de contraseña nunca se usa como secreto expuesto en sesión). Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
-    <Match>
-        <Class name="com.foodcore.service.AuthService"/>
-        <Bug pattern="MS_EXPOSE_REP,EI_EXPOSE_STATIC_REP2"/>
-    </Match>
-
     <!-- Justificación: Adaptadores de transición en com.foodcore.dao.impl heredan de sus clases base históricas homónimas en com.foodcore.dao para preservar compatibilidad binaria sin duplicar lógica. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-10 -->
     <Match>
         <Class name="~com\.foodcore\.dao\.impl\.(CajaDAOImpl|InsumoDAOImpl|PedidoDAOImpl|UsuarioDAOImpl)"/>

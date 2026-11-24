@@ -4,10 +4,7 @@ import com.foodcore.App;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
-import com.foodcore.model.enums.Permiso;
-import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionManager;
-import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
@@ -46,13 +43,10 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Controlador de la pantalla de inicio de sesión (§3 y §4 de UI-REDESIGN-SPEC-FOODCORE-v1.1).
@@ -189,8 +183,6 @@ public class LoginController {
         return auroraCanvas;
     }
 
-    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
-
     @FXML
     private void handleLogin() {
         if (autenticating) {
@@ -237,7 +229,7 @@ public class LoginController {
         }
         Usuario usuario = authService.login(user, pass);
         if (usuario != null && usuario.isTotpHabilitado()) {
-            AuthService.logout();
+            SesionManager.cerrarSesion();
         }
         return usuario;
     }
@@ -253,7 +245,7 @@ public class LoginController {
         // Si una subclase de prueba sobrescribe únicamente login(String, String), respetarla sin saltar el mock.
         boolean declaraLoginEnSubclase = false;
         boolean declaraStatelessEnSubclase = false;
-        if (clazz != AuthService.class && clazz != AuthServiceImpl.class) {
+        if (clazz != AuthServiceImpl.class) {
             try {
                 clazz.getDeclaredMethod("login", String.class, String.class);
                 declaraLoginEnSubclase = true;
@@ -277,26 +269,7 @@ public class LoginController {
         if (usuario == null) {
             return;
         }
-        try {
-            Method m = authService.getClass().getMethod("establecerSesionActiva", Usuario.class);
-            m.invoke(authService, usuario);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // Fallback previo a merge con swarm/auth-api-sec
-        } catch (IllegalAccessException | InvocationTargetException ex) {
-            LOGGER.warn("No se pudo invocar AuthService.establecerSesionActiva; usando respaldo directo", ex);
-        }
-        Set<Permiso> permisos = AutorizacionService.permisosPorDefectoParaRol(usuario.getNombreRol());
-        SesionUsuario sesion = new SesionUsuario(
-                usuario.getIdUsuario(),
-                usuario.getNombreEmpleado() != null ? usuario.getNombreEmpleado() : usuario.getUsername(),
-                usuario.getNombreRol(),
-                permisos,
-                "POS-01",
-                LocalDateTime.now(ZONA_LIMA)
-        );
-        SesionManager.iniciarSesion(sesion, usuario.isCambioPasswordRequerido());
-        AuthService.setUsuarioSesionActual(usuario);
+        authService.establecerSesionActiva(usuario);
     }
 
     /**
@@ -311,7 +284,7 @@ public class LoginController {
             return;
         }
         if (usuario.isTotpHabilitado()) {
-            AuthService.logout();
+            SesionManager.cerrarSesion();
             abrirModalTotp(usuario);
             return;
         }
@@ -370,7 +343,7 @@ public class LoginController {
     @FXML
     public void handleCancelarTotp() {
         cerrarModalTotp();
-        AuthService.logout();
+        SesionManager.cerrarSesion();
         if (txtPassword != null) {
             txtPassword.clear();
             txtPassword.requestFocus();
@@ -530,8 +503,8 @@ public class LoginController {
         String vistaObjetivo = requiereOnboarding
                 ? "/com/foodcore/view/OnboardingWizardView.fxml"
                 : "/com/foodcore/view/MainLayout.fxml";
-        String rol = AuthService.getUsuarioSesionActual() != null
-                ? AuthService.getUsuarioSesionActual().getNombreRol()
+        String rol = SesionManager.getUsuarioActual() != null
+                ? SesionManager.getUsuarioActual().getNombreRol()
                 : "ADMIN";
         String titulo = requiereOnboarding
                 ? "FoodCore ERP v5.5 - Configuración Inicial (Onboarding)"

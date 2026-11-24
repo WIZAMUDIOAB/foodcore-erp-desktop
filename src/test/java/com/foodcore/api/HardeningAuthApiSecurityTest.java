@@ -224,7 +224,7 @@ class HardeningAuthApiSecurityTest {
         admin.setNombreRol("ADMIN");
 
         UsuarioDAO dao = crearUsuarioDaoEnMemoria(List.of(admin, cajero, mozo));
-        AuthService fakeAuth = new AuthService(dao, new EncriptadorPassword()) {
+        AuthService fakeAuth = new AuthServiceImpl(dao, new EncriptadorPassword()) {
             @Override
             public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) {
                 if ("admin".equals(username) && "9999".equals(pin)) {

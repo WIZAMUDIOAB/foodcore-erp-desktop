@@ -8,6 +8,7 @@ import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +63,7 @@ class AuthControllerProductionTest {
     @DisplayName("Sin respaldo en memoria: credenciales legacy o PIN hardcoded no autentican con DAO vacío")
     void credencialesLegacyOPinHardcodedNoAutenticanSinBd() throws Exception {
         UsuarioDAO emptyDao = crearUsuarioDaoVacio();
-        AuthService emptyAuth = new AuthService(emptyDao, new com.foodcore.security.EncriptadorPassword()) {
+        AuthService emptyAuth = new AuthServiceImpl(emptyDao, new com.foodcore.security.EncriptadorPassword()) {
             @Override
             public Usuario login(String username, String password) throws NegocioException {
                 throw new NegocioException(CodigoError.CREDENCIALES_INVALIDAS, "Credenciales inválidas.");
