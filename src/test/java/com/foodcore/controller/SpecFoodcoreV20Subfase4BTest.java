@@ -47,6 +47,7 @@ import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -115,7 +116,7 @@ class SpecFoodcoreV20Subfase4BTest {
 
         // Verificar en BD que el registro está abierto (hora_salida IS NULL)
         try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Asistencia> abierta = asistenciaDAO.buscarMarcajeAbierto(conn, 1, LocalDate.now());
+            Optional<Asistencia> abierta = asistenciaDAO.buscarMarcajeAbierto(conn, 1, hoy);
             assertTrue(abierta.isPresent(), "Debe existir marcaje abierto en BD");
             assertEquals("PRESENTE", abierta.get().getEstado());
         }
