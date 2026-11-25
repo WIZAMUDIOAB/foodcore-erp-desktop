@@ -1,10 +1,10 @@
 package com.foodcore.controller.menu;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.service.PersonalizacionProductoService;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -15,7 +15,7 @@ public class DefaultMenuPersonalizacionCoordinator implements MenuPersonalizacio
     private final PersonalizacionProductoService personalizacionService;
 
     public DefaultMenuPersonalizacionCoordinator() {
-        this(new PersonalizacionProductoServiceImpl());
+        this(AppContainer.getDefault().personalizacionProductoService());
     }
 
     public DefaultMenuPersonalizacionCoordinator(PersonalizacionProductoService personalizacionService) {

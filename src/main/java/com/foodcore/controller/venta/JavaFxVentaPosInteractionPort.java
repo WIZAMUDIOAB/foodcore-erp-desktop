@@ -1,6 +1,7 @@
 package com.foodcore.controller.venta;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.controller.CobroModalController;
 import com.foodcore.controller.PersonalizacionProductoController;
 import com.foodcore.model.Cliente;
@@ -150,7 +151,8 @@ public class JavaFxVentaPosInteractionPort implements VentaPosInteractionPort {
 
     @Override
     public void abrirModalCobro(SolicitudCobroModal solicitud) throws IOException {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
+        FXMLLoader loader = AppContainer.getDefault().createLoader(
+                getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
         Parent root = loader.load();
 
         CobroModalController ctrl = loader.getController();
@@ -182,7 +184,8 @@ public class JavaFxVentaPosInteractionPort implements VentaPosInteractionPort {
 
     @Override
     public void abrirModalArqueo() throws IOException {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CajaView.fxml"));
+        FXMLLoader loader = AppContainer.getDefault().createLoader(
+                getClass().getResource("/com/foodcore/view/CajaView.fxml"));
         Parent root = loader.load();
 
         Stage stage = new Stage();

@@ -1,12 +1,12 @@
 package com.foodcore.controller;
 
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.SolicitudAusenciaConsultaService;
-import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
 import com.foodcore.util.AnimationUtils;
 
 import com.foodcore.util.UiAsyncExecutor;
@@ -65,9 +65,21 @@ public class SolicitudesController {
     @FXML private TableColumn<SolicitudAusencia, String> colEstado;
     @FXML private TableColumn<SolicitudAusencia, Void> colAcciones;
 
-    private final SolicitudAusenciaConsultaService solicitudConsultaService = new SolicitudAusenciaConsultaService();
-    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
+    private final SolicitudAusenciaConsultaService solicitudConsultaService;
+    private final AusenciasVacacionesService ausenciasService;
     private final ObservableList<SolicitudAusencia> listaSolicitudes = FXCollections.observableArrayList();
+
+    public SolicitudesController() {
+        this(AppContainer.getDefault().resolve(SolicitudAusenciaConsultaService.class),
+                AppContainer.getDefault().ausenciasVacacionesService());
+    }
+
+    public SolicitudesController(SolicitudAusenciaConsultaService solicitudConsultaService,
+                                 AusenciasVacacionesService ausenciasService) {
+        this.solicitudConsultaService =
+                java.util.Objects.requireNonNull(solicitudConsultaService, "solicitudConsultaService");
+        this.ausenciasService = java.util.Objects.requireNonNull(ausenciasService, "ausenciasService");
+    }
 
     @FXML
     public void initialize() {

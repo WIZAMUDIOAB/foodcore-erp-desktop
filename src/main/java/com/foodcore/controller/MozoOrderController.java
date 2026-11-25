@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
@@ -10,8 +11,6 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.MozoOrdenService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
-import com.foodcore.service.impl.PedidoServiceImpl;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
@@ -81,9 +80,25 @@ public class MozoOrderController {
     private String clienteReferencia;
     private BigDecimal costoEnvio = BigDecimal.ZERO;
     private final ObservableList<DetallePedido> items = FXCollections.observableArrayList();
-    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
-    private final MozoOrdenService mozoOrdenService = new MozoOrdenService();
-    private final PedidoService pedidoService = new PedidoServiceImpl();
+    private final PersonalizacionProductoService personalizacionService;
+    private final MozoOrdenService mozoOrdenService;
+    private final PedidoService pedidoService;
+
+    public MozoOrderController() {
+        this(AppContainer.getDefault().personalizacionProductoService(),
+                AppContainer.getDefault().resolve(MozoOrdenService.class),
+                AppContainer.getDefault().pedidoService());
+    }
+
+    public MozoOrderController(PersonalizacionProductoService personalizacionService,
+                               MozoOrdenService mozoOrdenService,
+                               PedidoService pedidoService) {
+        this.personalizacionService =
+                java.util.Objects.requireNonNull(personalizacionService, "personalizacionService no puede ser nulo");
+        this.mozoOrdenService =
+                java.util.Objects.requireNonNull(mozoOrdenService, "mozoOrdenService no puede ser nulo");
+        this.pedidoService = java.util.Objects.requireNonNull(pedidoService, "pedidoService no puede ser nulo");
+    }
 
     public void setNumeroMesa(String mesa) {
         this.mesa = mesa;

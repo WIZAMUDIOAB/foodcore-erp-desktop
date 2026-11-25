@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.CumplimientoTurnoFila;
 import com.foodcore.model.ReporteCumplimientoTurno;
@@ -231,7 +232,8 @@ public class AsistenciaController {
     @FXML
     public void handleAbrirKiosco() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/RelojAsistenciaView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/RelojAsistenciaView.fxml"));
             Parent root = loader.load();
 
             Stage stage = new Stage();

@@ -1,5 +1,6 @@
 package com.foodcore.service;
 
+import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.CierreContableDAO;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.CierreContableDAOImpl;
@@ -30,7 +31,7 @@ public class CierreContableService implements PeriodoContableValidator {
 
     private final TransactionManager tx;
     private final CierreContableDAO cierreDAO;
-    private final AuditoriaDAOImpl auditoriaDAO;
+    private final AuditoriaDAO auditoriaDAO;
 
     public CierreContableService() {
         this(new JdbcTransactionManager(), new CierreContableDAOImpl(), new AuditoriaDAOImpl());
@@ -38,7 +39,7 @@ public class CierreContableService implements PeriodoContableValidator {
 
     public CierreContableService(TransactionManager tx,
                                  CierreContableDAO cierreDAO,
-                                 AuditoriaDAOImpl auditoriaDAO) {
+                                 AuditoriaDAO auditoriaDAO) {
         this.tx = tx;
         this.cierreDAO = cierreDAO;
         this.auditoriaDAO = auditoriaDAO;

@@ -1,14 +1,14 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.SesionManager;
 import com.foodcore.security.TotpService;
+import com.foodcore.service.AuditoriaConsultaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
-import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.Animation;
@@ -76,9 +76,9 @@ public class LoginController {
     @FXML private Button btnCancelarTotp;
 
     private final AuthService authService;
-    private final OnboardingService onboardingService = new OnboardingService();
-    private final TotpService totpService = new TotpService();
-    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+    private final OnboardingService onboardingService;
+    private final TotpService totpService;
+    private final AuditoriaConsultaService auditoriaService;
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
     private Usuario usuarioPendiente2FA;
@@ -87,11 +87,31 @@ public class LoginController {
     private boolean autenticating = false;
 
     public LoginController() {
-        this(new AuthServiceImpl());
+        this(AppContainer.getDefault());
+    }
+
+    private LoginController(AppContainer container) {
+        this(container.authService(),
+                container.resolve(OnboardingService.class),
+                container.resolve(TotpService.class),
+                container.auditoriaConsultaService());
     }
 
     LoginController(AuthService authService) {
+        this(authService,
+                AppContainer.getDefault().resolve(OnboardingService.class),
+                AppContainer.getDefault().resolve(TotpService.class),
+                AppContainer.getDefault().auditoriaConsultaService());
+    }
+
+    public LoginController(AuthService authService,
+                           OnboardingService onboardingService,
+                           TotpService totpService,
+                           AuditoriaConsultaService auditoriaService) {
         this.authService = Objects.requireNonNull(authService, "authService no puede ser nulo");
+        this.onboardingService = Objects.requireNonNull(onboardingService, "onboardingService no puede ser nulo");
+        this.totpService = Objects.requireNonNull(totpService, "totpService no puede ser nulo");
+        this.auditoriaService = Objects.requireNonNull(auditoriaService, "auditoriaService no puede ser nulo");
     }
 
     @FXML
@@ -245,7 +265,7 @@ public class LoginController {
         // Si una subclase de prueba sobrescribe únicamente login(String, String), respetarla sin saltar el mock.
         boolean declaraLoginEnSubclase = false;
         boolean declaraStatelessEnSubclase = false;
-        if (clazz != AuthServiceImpl.class) {
+        if (clazz.getSuperclass() != Object.class) {
             try {
                 clazz.getDeclaredMethod("login", String.class, String.class);
                 declaraLoginEnSubclase = true;
@@ -323,7 +343,7 @@ public class LoginController {
         }
         String codigo = txtTotpCodigo != null ? txtTotpCodigo.getText() : "";
         if (!totpService.verificarCodigo(usuarioPendiente2FA.getTotpSecret(), codigo)) {
-            auditoriaDAO.registrarEventoBestEffort(
+            auditoriaService.registrarEventoBestEffort(
                     usuarioPendiente2FA.getIdUsuario(),
                     "2FA_FALLIDO",
                     "USUARIO",
@@ -451,7 +471,8 @@ public class LoginController {
     public void abrirDialogoCambioPassword(Usuario usuario) {
         try {
             cerrarDialogoCambioPassword();
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
             Parent dialogRoot = loader.load();
             PasswordChangeDialogController ctrl = loader.getController();
 
@@ -510,7 +531,7 @@ public class LoginController {
                 ? "FoodCore ERP v5.5 - Configuración Inicial (Onboarding)"
                 : "FoodCore ERP v3.0 - Panel Principal [" + rol + "]";
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(vistaObjetivo));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(getClass().getResource(vistaObjetivo));
             Parent root = loader.load();
 
             Scene currentScene = rootStackPane != null ? rootStackPane.getScene() : null;

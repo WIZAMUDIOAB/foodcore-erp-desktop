@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.CompraClienteResumen;
 import com.foodcore.service.ClienteGestionService;
@@ -118,9 +119,9 @@ public class ClientesController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ClienteGestionService clienteGestionService = new ClienteGestionService();
-    private final FinanzasService finanzasService = new FinanzasService();
-    private final FidelizacionService fidelizacionService = new FidelizacionService();
+    private final ClienteGestionService clienteGestionService;
+    private final FinanzasService finanzasService;
+    private final FidelizacionService fidelizacionService;
 
     private final ObservableList<Cliente> listaTodosClientes = FXCollections.observableArrayList();
     private final ObservableList<Cliente> listaCorporativos = FXCollections.observableArrayList();
@@ -132,6 +133,21 @@ public class ClientesController {
     private PaginadorTablaHelper<Cliente> paginadorMinoristas;
     private Cliente clienteSeleccionado = null;
     private boolean modoEdicion = false;
+
+    public ClientesController() {
+        this(AppContainer.getDefault().resolve(ClienteGestionService.class),
+                AppContainer.getDefault().finanzasService(),
+                AppContainer.getDefault().fidelizacionService());
+    }
+
+    public ClientesController(ClienteGestionService clienteGestionService,
+                              FinanzasService finanzasService,
+                              FidelizacionService fidelizacionService) {
+        this.clienteGestionService =
+                java.util.Objects.requireNonNull(clienteGestionService, "clienteGestionService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+        this.fidelizacionService = java.util.Objects.requireNonNull(fidelizacionService, "fidelizacionService");
+    }
 
     @FXML
     public void initialize() {

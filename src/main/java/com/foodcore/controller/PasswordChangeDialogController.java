@@ -1,11 +1,11 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
@@ -39,13 +39,23 @@ public class PasswordChangeDialogController {
     @FXML private Button btnCambiarPassword;
     @FXML private ProgressIndicator spinnerCarga;
 
-    private final AuthService authService = new AuthServiceImpl();
-    private final EncriptadorPassword encriptador = new EncriptadorPassword();
+    private final AuthService authService;
+    private final EncriptadorPassword encriptador;
 
     private Usuario usuarioObjetivo;
     private Runnable onCambioExitoso;
     private Runnable onCancelar;
     private boolean procesando = false;
+
+    public PasswordChangeDialogController() {
+        this(AppContainer.getDefault().authService(),
+                AppContainer.getDefault().resolve(EncriptadorPassword.class));
+    }
+
+    public PasswordChangeDialogController(AuthService authService, EncriptadorPassword encriptador) {
+        this.authService = java.util.Objects.requireNonNull(authService, "authService");
+        this.encriptador = java.util.Objects.requireNonNull(encriptador, "encriptador");
+    }
 
     @FXML
     public void initialize() {

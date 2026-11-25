@@ -22,6 +22,7 @@ import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
@@ -31,15 +32,14 @@ import com.foodcore.model.Venta;
 import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.CajaService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaPosConsultaService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.impl.PedidoServiceImpl;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
-import com.foodcore.service.impl.VentaServiceImpl;
+import com.foodcore.util.ImpresoraTermicaService;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -84,7 +84,7 @@ public class VentaController implements VentaPosOrdenHostPort,
     public static final String MODALIDAD_SPLIT_ITEMS = VentaCobroCoordinator.MODALIDAD_SPLIT_ITEMS;
     private static final VentaMesasCanalCoordinator CANAL_STATICS = new DefaultVentaMesasCanalCoordinator(null);
     private static final VentaCobroCoordinator COBRO_STATICS = new DefaultVentaCobroCoordinator(
-            new VentaServiceImpl(), new AutorizacionService());
+            null, null, ImpresoraTermicaService::new, Optional::empty);
 
     @FXML private TabPane tabPanePosCatalogo;
     @FXML private Tab tabCatalogo;
@@ -138,12 +138,12 @@ public class VentaController implements VentaPosOrdenHostPort,
     @FXML private Button btnNotaItem;
 
     private final ObservableList<DetalleVenta> itemsVenta = FXCollections.observableArrayList();
-    private final VentaService ventaService = new VentaServiceImpl();
-    private final PromocionService promocionService = new PromocionService();
-    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
-    private final VentaPosConsultaService posConsultaService = new VentaPosConsultaService();
-    private final FidelizacionService fidelizacionService = new FidelizacionService();
-    private final AutorizacionService autorizacionService = new AutorizacionService();
+    private final VentaService ventaService;
+    private final PromocionService promocionService;
+    private final PersonalizacionProductoService personalizacionService;
+    private final VentaPosConsultaService posConsultaService;
+    private final FidelizacionService fidelizacionService;
+    private final AutorizacionService autorizacionService;
 
     private final VentaMesasCanalCoordinator mesasCanalCoordinator;
     private final VentaMesasCanalUiRenderer mesasCanalUiRenderer;
@@ -152,7 +152,7 @@ public class VentaController implements VentaPosOrdenHostPort,
     private final VentaCobroCoordinator cobroCoordinator;
     private final VentaFidelizacionCoordinator fidelizacionCoordinator;
 
-    private PedidoService pedidoService = new PedidoServiceImpl();
+    private PedidoService pedidoService;
     private VentaPosInteractionPort interactionPort;
     private VentaPosFidelizacionHelper fidelizacionHelper;
     private VentaPosOrdenOperacionesHelper operacionesHelper;
@@ -165,12 +165,41 @@ public class VentaController implements VentaPosOrdenHostPort,
     private VentaPosTicketUiHelper.AtajosHandle atajosHandle;
 
     public VentaController() {
-        this.mesasCanalCoordinator = new DefaultVentaMesasCanalCoordinator(posConsultaService);
+        this(AppContainer.getDefault());
+    }
+
+    private VentaController(AppContainer c) {
+        this(c.ventaService(), c.cajaService(), c.pedidoService(),
+                c.resolve(PromocionService.class), c.personalizacionProductoService(),
+                c.resolve(VentaPosConsultaService.class), c.fidelizacionService(),
+                c.resolve(AutorizacionService.class));
+    }
+
+    public VentaController(VentaService ventaService,
+                           CajaService cajaService,
+                           PedidoService pedidoService,
+                           PromocionService promocionService,
+                           PersonalizacionProductoService personalizacionService,
+                           VentaPosConsultaService posConsultaService,
+                           FidelizacionService fidelizacionService,
+                           AutorizacionService autorizacionService) {
+        this.ventaService = Objects.requireNonNull(ventaService, "ventaService");
+        CajaService effectiveCaja = Objects.requireNonNull(cajaService, "cajaService");
+        this.pedidoService = Objects.requireNonNull(pedidoService, "pedidoService");
+        this.promocionService = Objects.requireNonNull(promocionService, "promocionService");
+        this.personalizacionService = Objects.requireNonNull(personalizacionService, "personalizacionService");
+        this.posConsultaService = Objects.requireNonNull(posConsultaService, "posConsultaService");
+        this.fidelizacionService = Objects.requireNonNull(fidelizacionService, "fidelizacionService");
+        this.autorizacionService = Objects.requireNonNull(autorizacionService, "autorizacionService");
+        this.mesasCanalCoordinator = new DefaultVentaMesasCanalCoordinator(this.posConsultaService);
         this.mesasCanalUiRenderer = new VentaMesasCanalUiRenderer();
-        this.catalogoPresenter = new VentaCatalogoPresenter(posConsultaService);
-        this.carritoHandler = new DefaultVentaCarritoHandler(promocionService, ventaService);
-        this.cobroCoordinator = new DefaultVentaCobroCoordinator(ventaService, autorizacionService);
-        this.fidelizacionCoordinator = new DefaultVentaFidelizacionCoordinator(posConsultaService, fidelizacionService);
+        this.catalogoPresenter = new VentaCatalogoPresenter(this.posConsultaService);
+        this.carritoHandler = new DefaultVentaCarritoHandler(this.promocionService, this.ventaService);
+        this.cobroCoordinator = new DefaultVentaCobroCoordinator(
+                this.ventaService, this.autorizacionService, ImpresoraTermicaService::new,
+                effectiveCaja::obtenerCajaActiva);
+        this.fidelizacionCoordinator =
+                new DefaultVentaFidelizacionCoordinator(this.posConsultaService, this.fidelizacionService);
         this.interactionPort = new JavaFxVentaPosInteractionPort();
     }
 
@@ -191,6 +220,14 @@ public class VentaController implements VentaPosOrdenHostPort,
                            VentaCobroCoordinator cobroCoordinator,
                            VentaFidelizacionCoordinator fidelizacionCoordinator,
                            VentaPosInteractionPort interactionPort) {
+        AppContainer c = AppContainer.getDefault();
+        this.ventaService = c.ventaService();
+        this.promocionService = c.resolve(PromocionService.class);
+        this.personalizacionService = c.personalizacionProductoService();
+        this.posConsultaService = c.resolve(VentaPosConsultaService.class);
+        this.fidelizacionService = c.fidelizacionService();
+        this.autorizacionService = c.resolve(AutorizacionService.class);
+        this.pedidoService = c.pedidoService();
         this.mesasCanalCoordinator = Objects.requireNonNull(mesasCanalCoordinator);
         this.mesasCanalUiRenderer = Objects.requireNonNull(mesasCanalUiRenderer);
         this.catalogoPresenter = Objects.requireNonNull(catalogoPresenter);

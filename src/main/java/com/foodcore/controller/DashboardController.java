@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.ComparativaPeriodos;
 import com.foodcore.model.ResumenDashboard;
 import com.foodcore.model.ResumenSeguridadHoy;
@@ -157,7 +158,8 @@ public class DashboardController {
     @FXML
     public void handleExpandirVentana(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
             Parent root = loader.load();
             Scene scene = new Scene(root, 1280, 768);
             App.applyStylesheets(scene);

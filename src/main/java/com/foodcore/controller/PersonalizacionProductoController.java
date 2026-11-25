@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
@@ -301,7 +302,7 @@ public class PersonalizacionProductoController {
                                                                   List<ProductoVariante> variantes,
                                                                   List<ProductoModificador> modificadores) {
         try {
-            FXMLLoader loader = new FXMLLoader(
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
                     PersonalizacionProductoController.class.getResource("/com/foodcore/view/PersonalizacionProductoView.fxml"));
             Parent root = loader.load();
             PersonalizacionProductoController ctrl = loader.getController();

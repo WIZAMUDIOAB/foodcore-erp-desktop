@@ -4,6 +4,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.HistorialPrecio;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
@@ -60,10 +61,21 @@ public class HistorialPreciosController {
     @FXML private TextField txtModalMotivo;
     @FXML private Label lblModalAjusteError;
 
-    private final HistorialPreciosService historialPreciosService = new HistorialPreciosService();
-    private final FinanzasService finanzasService = new FinanzasService();
+    private final HistorialPreciosService historialPreciosService;
+    private final FinanzasService finanzasService;
 
     private final ObservableList<HistorialPrecio> listaHistorial = FXCollections.observableArrayList();
+
+    public HistorialPreciosController() {
+        this(AppContainer.getDefault().resolve(HistorialPreciosService.class),
+                AppContainer.getDefault().finanzasService());
+    }
+
+    public HistorialPreciosController(HistorialPreciosService historialPreciosService, FinanzasService finanzasService) {
+        this.historialPreciosService =
+                java.util.Objects.requireNonNull(historialPreciosService, "historialPreciosService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+    }
 
     @FXML
     public void initialize() {

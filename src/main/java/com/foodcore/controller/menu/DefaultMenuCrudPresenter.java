@@ -1,5 +1,6 @@
 package com.foodcore.controller.menu;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
@@ -7,7 +8,6 @@ import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.service.MenuGestionService;
 import com.foodcore.service.PersonalizacionProductoService;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 
 import java.math.BigDecimal;
@@ -23,7 +23,8 @@ public class DefaultMenuCrudPresenter implements MenuCrudPresenter {
     private final PersonalizacionProductoService personalizacionService;
 
     public DefaultMenuCrudPresenter() {
-        this(new MenuGestionService(), new PersonalizacionProductoServiceImpl());
+        this(AppContainer.getDefault().resolve(MenuGestionService.class),
+                AppContainer.getDefault().personalizacionProductoService());
     }
 
     public DefaultMenuCrudPresenter(MenuGestionService menuGestionService,

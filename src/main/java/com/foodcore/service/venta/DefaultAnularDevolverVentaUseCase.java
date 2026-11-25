@@ -1,8 +1,8 @@
 package com.foodcore.service.venta;
 
+import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.CajaDAO;
 import com.foodcore.dao.VentaDAO;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Caja;
@@ -53,7 +53,7 @@ public final class DefaultAnularDevolverVentaUseCase implements AnularDevolverVe
     private final SupervisorAutorizacionService supervisorAutorizacionService;
     private final CierreContableService cierreContableService;
     private final FidelizacionService fidelizacionService;
-    private final AuditoriaDAOImpl auditoriaDAO;
+    private final AuditoriaDAO auditoriaDAO;
     private final VentaCalculoValidator calculoValidator;
     private final VentaInventarioKardexHandler inventarioKardexHandler;
 
@@ -65,7 +65,7 @@ public final class DefaultAnularDevolverVentaUseCase implements AnularDevolverVe
             SupervisorAutorizacionService supervisorAutorizacionService,
             CierreContableService cierreContableService,
             FidelizacionService fidelizacionService,
-            AuditoriaDAOImpl auditoriaDAO,
+            AuditoriaDAO auditoriaDAO,
             VentaCalculoValidator calculoValidator,
             VentaInventarioKardexHandler inventarioKardexHandler) {
         this.tx = tx;

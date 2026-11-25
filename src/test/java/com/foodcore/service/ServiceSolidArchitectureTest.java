@@ -1,13 +1,23 @@
 package com.foodcore.service;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.foodcore.controller.VentaController;
+import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.CajaDAO;
+import com.foodcore.dao.ClienteDAO;
+import com.foodcore.dao.ComboDAO;
+import com.foodcore.dao.CuentaPorCobrarDAO;
+import com.foodcore.dao.CuentaPorPagarDAO;
+import com.foodcore.dao.HistorialPrecioDAO;
 import com.foodcore.dao.InsumoDAO;
 import com.foodcore.dao.PedidoDAO;
+import com.foodcore.dao.ProductoDAO;
+import com.foodcore.dao.ProveedorDAO;
 import com.foodcore.dao.UsuarioDAO;
+import com.foodcore.dao.VentaDAO;
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.impl.PedidoDAOImpl;
@@ -263,6 +273,89 @@ class ServiceSolidArchitectureTest {
             boolean bToA = pkgDeps.getOrDefault(par[1], Set.of()).contains(par[0]);
             assertFalse(aToB && bToA, "Ciclo bidireccional P1 entre paquetes " + par[0] + " <-> " + par[1]);
         }
+    }
+
+    @Test
+    void controladoresSinDaoNiServiceImplYDipEstrictoEnCompositionRoot() throws Exception {
+        java.nio.file.Path controllerDir = java.nio.file.Path.of("src/main/java/com/foodcore/controller");
+        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(controllerDir)) {
+            for (java.nio.file.Path file : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                String limpio = limpiarComentariosYLiterales(java.nio.file.Files.readString(file));
+                assertFalse(
+                        limpio.contains("com.foodcore.dao.impl."),
+                        "Controlador importa/usa dao.impl directamente: " + file);
+                assertFalse(
+                        limpio.contains("com.foodcore.service.impl."),
+                        "Controlador importa/usa service.impl directamente: " + file);
+            }
+        }
+
+        java.nio.file.Path configDir = java.nio.file.Path.of("src/main/java/com/foodcore/config");
+        assertTrue(
+                java.nio.file.Files.exists(configDir.resolve("AppContainer.java")),
+                "Debe existir Composition Root AppContainer");
+        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(configDir)) {
+            for (java.nio.file.Path file : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                String limpio = limpiarComentariosYLiterales(java.nio.file.Files.readString(file));
+                assertFalse(
+                        limpio.contains("com.foodcore.controller."),
+                        "Composition Root no debe acoplarse directamente a controller: " + file);
+            }
+        }
+
+        java.lang.reflect.Constructor<VentaServiceImpl> ventaCtor = VentaServiceImpl.class.getConstructor(
+                com.foodcore.tx.TransactionManager.class,
+                VentaDAO.class,
+                CajaDAO.class,
+                InsumoDAO.class,
+                PedidoDAO.class,
+                ComboDAO.class,
+                ClienteDAO.class,
+                CuentaPorCobrarDAO.class,
+                AuditoriaDAO.class,
+                com.foodcore.security.AutorizacionService.class,
+                FidelizacionService.class,
+                CierreContableService.class,
+                SupervisorAutorizacionService.class);
+        assertTrue(ventaCtor.getParameterCount() == 13);
+
+        String ventaSource = limpiarComentariosYLiterales(java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/java/com/foodcore/service/impl/VentaServiceImpl.java")));
+        int ctorStart = ventaSource.indexOf("SupervisorAutorizacionService supervisorAutorizacionService)");
+        assertTrue(ctorStart > 0, "Debe existir constructor DI canonico de 13 parametros en VentaServiceImpl");
+        int ctorEnd = ventaSource.indexOf("\n    }", ctorStart);
+        assertTrue(ctorEnd > ctorStart, "No se pudo delimitar cuerpo del constructor DI en VentaServiceImpl");
+        String ventaCtorBody = ventaSource.substring(ctorStart, ctorEnd);
+        assertFalse(ventaCtorBody.contains("Impl("), "Constructor DI de VentaServiceImpl no debe instanciar *Impl");
+        assertFalse(ventaCtorBody.contains("new JdbcTransactionManager"),
+                "Constructor DI de VentaServiceImpl no debe instanciar JdbcTransactionManager");
+
+        java.lang.reflect.Constructor<FinanzasService> finanzasCtor = FinanzasService.class.getConstructor(
+                com.foodcore.tx.TransactionManager.class,
+                ProveedorDAO.class,
+                CuentaPorPagarDAO.class,
+                ClienteDAO.class,
+                CuentaPorCobrarDAO.class,
+                HistorialPrecioDAO.class,
+                InsumoDAO.class,
+                ProductoDAO.class,
+                CajaDAO.class,
+                VentaDAO.class,
+                com.foodcore.service.finanzas.PeriodoContableValidator.class);
+        java.lang.reflect.InvocationTargetException thrown = assertThrows(
+                java.lang.reflect.InvocationTargetException.class,
+                () -> finanzasCtor.newInstance(null, null, null, null, null, null, null, null, null, null, null));
+        assertTrue(
+                thrown.getCause() instanceof NullPointerException,
+                "FinanzasService debe rechazar TransactionManager nulo con NullPointerException");
+
+        String finanzasCompact = limpiarComentariosYLiterales(java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/java/com/foodcore/service/FinanzasService.java")))
+                .replaceAll("\\s+", "");
+        assertFalse(finanzasCompact.contains("DefaultCuentaCorrienteUseCase(null"),
+                "FinanzasService no debe pasar null como TransactionManager a DefaultCuentaCorrienteUseCase");
+        assertFalse(finanzasCompact.contains("DefaultCambioPrecioUseCase(null"),
+                "FinanzasService no debe pasar null como TransactionManager a DefaultCambioPrecioUseCase");
     }
 
     private void cargarDependenciasEstaticas(Map<String, Set<String>> classDeps,

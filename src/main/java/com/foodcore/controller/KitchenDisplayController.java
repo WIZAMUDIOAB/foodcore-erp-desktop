@@ -2,9 +2,9 @@ package com.foodcore.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
-import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
@@ -58,11 +58,19 @@ public class KitchenDisplayController {
     @FXML private Label lblSocketStatus;
     @FXML private Label lblContadorActivas;
 
-    private final PedidoService pedidoService = new PedidoServiceImpl();
+    private final PedidoService pedidoService;
     private final Map<Integer, ComandaCardController> tarjetasActivas = new ConcurrentHashMap<>();
     private final Set<Integer> itemsDespachadosLocal = Collections.synchronizedSet(new HashSet<>());
     private final Set<Integer> itemsSimuladosLocal = Collections.synchronizedSet(new HashSet<>());
     private Timeline autoSyncTimer;
+
+    public KitchenDisplayController() {
+        this(AppContainer.getDefault().pedidoService());
+    }
+
+    public KitchenDisplayController(PedidoService pedidoService) {
+        this.pedidoService = java.util.Objects.requireNonNull(pedidoService, "pedidoService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
@@ -276,7 +284,8 @@ public class KitchenDisplayController {
                                      int segundos,
                                      DetallePedido item) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ComandaCard.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/ComandaCard.fxml"));
             Parent cardNode = loader.load();
             ComandaCardController cardCtrl = loader.getController();
             cardCtrl.initData(mesa, comanda, estado);

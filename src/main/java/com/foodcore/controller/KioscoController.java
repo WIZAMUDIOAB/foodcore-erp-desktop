@@ -406,7 +406,8 @@ public class KioscoController {
     @FXML
     public void handleExpandirVentana(javafx.event.ActionEvent event) {
         try {
-            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
+            javafx.fxml.FXMLLoader loader = com.foodcore.config.AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
             javafx.scene.Parent root = loader.load();
             javafx.scene.Scene scene = new javafx.scene.Scene(root, 1280, 768);
             com.foodcore.App.applyStylesheets(scene);
@@ -436,7 +437,8 @@ public class KioscoController {
                 javafx.scene.Scene currentScene = btn.getScene();
                 if (currentScene != null && currentScene.lookup("#contentArea") instanceof javafx.scene.layout.StackPane contentArea) {
                     try {
-                        javafx.fxml.FXMLLoader l = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
+                        javafx.fxml.FXMLLoader l = com.foodcore.config.AppContainer.getDefault().createLoader(
+                                getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
                         javafx.scene.Parent dash = l.load();
                         contentArea.getChildren().setAll(dash);
                     } catch (Exception ex) {

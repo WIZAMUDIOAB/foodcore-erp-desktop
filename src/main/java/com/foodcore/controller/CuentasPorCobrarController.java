@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.CuentaPorCobrar;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CuentasPorCobrarService;
@@ -62,12 +63,27 @@ public class CuentasPorCobrarController {
     @FXML private TextField txtModalNota;
     @FXML private Label lblModalCobroError;
 
-    private final CuentasPorCobrarService cuentasPorCobrarService = new CuentasPorCobrarService();
-    private final FinanzasService finanzasService = new FinanzasService();
-    private final ExportacionContableService exportacionService = new ExportacionContableService();
+    private final CuentasPorCobrarService cuentasPorCobrarService;
+    private final FinanzasService finanzasService;
+    private final ExportacionContableService exportacionService;
 
     private final ObservableList<CuentaPorCobrar> listaCxc = FXCollections.observableArrayList();
     private CuentaPorCobrar cuentaSeleccionada = null;
+
+    public CuentasPorCobrarController() {
+        this(AppContainer.getDefault().resolve(CuentasPorCobrarService.class),
+                AppContainer.getDefault().finanzasService(),
+                AppContainer.getDefault().resolve(ExportacionContableService.class));
+    }
+
+    public CuentasPorCobrarController(CuentasPorCobrarService cuentasPorCobrarService,
+                                      FinanzasService finanzasService,
+                                      ExportacionContableService exportacionService) {
+        this.cuentasPorCobrarService =
+                java.util.Objects.requireNonNull(cuentasPorCobrarService, "cuentasPorCobrarService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+        this.exportacionService = java.util.Objects.requireNonNull(exportacionService, "exportacionService");
+    }
 
     @FXML
     public void initialize() {

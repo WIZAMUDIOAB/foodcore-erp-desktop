@@ -1,9 +1,9 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DocumentoEmpleado;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.ExpedienteEmpleadoService;
-import com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl;
 import com.foodcore.util.ExportFileChooserHelper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -103,7 +103,7 @@ public class ExpedienteEmpleadoController {
     private Usuario colaboradorActual;
 
     public ExpedienteEmpleadoController() {
-        this(new ExpedienteEmpleadoServiceImpl());
+        this(AppContainer.getDefault().expedienteEmpleadoService());
     }
 
     public ExpedienteEmpleadoController(ExpedienteEmpleadoService expedienteService) {

@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
 import com.foodcore.util.AnimationUtils;
@@ -74,10 +75,10 @@ public class OnboardingWizardController {
     private int platilloCreadoId = 0;
 
     public OnboardingWizardController() {
-        this(new OnboardingService());
+        this(AppContainer.getDefault().resolve(OnboardingService.class));
     }
 
-    OnboardingWizardController(OnboardingService onboardingService) {
+    public OnboardingWizardController(OnboardingService onboardingService) {
         this.onboardingService = Objects.requireNonNull(onboardingService, "onboardingService obligatorio");
     }
 
@@ -191,7 +192,8 @@ public class OnboardingWizardController {
     }
 
     protected void redirigirAlDashboard() throws IOException {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
+        FXMLLoader loader = AppContainer.getDefault().createLoader(
+                getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
         Parent root = loader.load();
         Scene currentScene = rootOnboardingStack != null ? rootOnboardingStack.getScene() : null;
         if (currentScene != null && currentScene.getWindow() instanceof Stage stage) {

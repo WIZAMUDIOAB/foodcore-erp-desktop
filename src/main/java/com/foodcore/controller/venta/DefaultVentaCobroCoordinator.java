@@ -1,5 +1,6 @@
 package com.foodcore.controller.venta;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.CajaCerradaException;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Caja;
@@ -17,7 +18,6 @@ import com.foodcore.security.SesionManager;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.util.ImpresoraTermicaService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -46,12 +46,13 @@ public class DefaultVentaCobroCoordinator implements VentaCobroCoordinator {
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService) {
         this(ventaService, autorizacionService, ImpresoraTermicaService::new,
-                () -> new CajaServiceImpl().obtenerCajaActiva());
+                () -> AppContainer.getDefault().cajaService().obtenerCajaActiva());
     }
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,
             Supplier<ImpresoraTermicaService> impresoraSupplier) {
-        this(ventaService, autorizacionService, impresoraSupplier, () -> new CajaServiceImpl().obtenerCajaActiva());
+        this(ventaService, autorizacionService, impresoraSupplier,
+                () -> AppContainer.getDefault().cajaService().obtenerCajaActiva());
     }
 
     public DefaultVentaCobroCoordinator(VentaService ventaService, AutorizacionService autorizacionService,

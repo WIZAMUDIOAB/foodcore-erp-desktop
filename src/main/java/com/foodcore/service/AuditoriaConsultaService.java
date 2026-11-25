@@ -9,6 +9,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Servicio de consulta de la bitácora de auditoría (SPEC-FOODCORE-v1.3-ENTERPRISE §5.2).
@@ -17,6 +19,7 @@ import java.util.List;
  */
 public class AuditoriaConsultaService {
 
+    private static final Logger LOGGER = Logger.getLogger(AuditoriaConsultaService.class.getName());
     private static final int LIMITE_EXPORTACION = 10_000;
     private static final int TAMANO_PAGINA_POR_DEFECTO = 50;
 
@@ -88,6 +91,18 @@ public class AuditoriaConsultaService {
             }
             return auditoriaDAO.listarEventosFiltrados(
                     conn, usuario, accion, desde, hasta, 0, LIMITE_EXPORTACION);
+        }
+    }
+
+    /**
+     * Registra un evento de auditoría de forma best-effort gestionando la conexión desde la capa de servicio.
+     */
+    public void registrarEventoBestEffort(int idUsuario, String accion, String entidadAfectada,
+                                          String datosAnteriores, String datosNuevos) {
+        try (Connection conn = ConexionBD.getConnection()) {
+            auditoriaDAO.registrarEventoSeguro(conn, idUsuario, accion, entidadAfectada, datosAnteriores, datosNuevos);
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.FINE, "Sin conexión para registrar evento de auditoría (" + accion + ")", ex);
         }
     }
 }

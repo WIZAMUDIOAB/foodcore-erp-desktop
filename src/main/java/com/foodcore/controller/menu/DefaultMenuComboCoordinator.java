@@ -1,11 +1,11 @@
 package com.foodcore.controller.menu;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Combo;
 import com.foodcore.model.ComboDetalle;
 import com.foodcore.model.Producto;
 import com.foodcore.service.ComboService;
-import com.foodcore.service.impl.ComboServiceImpl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,7 +17,7 @@ public class DefaultMenuComboCoordinator implements MenuComboCoordinator {
     private final ComboService comboService;
 
     public DefaultMenuComboCoordinator() {
-        this(new ComboServiceImpl());
+        this(AppContainer.getDefault().comboService());
     }
 
     public DefaultMenuComboCoordinator(ComboService comboService) {

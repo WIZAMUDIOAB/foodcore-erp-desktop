@@ -1,11 +1,11 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.MovimientoPago;
 import com.foodcore.model.PlanillaConsolidada;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PlanillaService;
-import com.foodcore.service.impl.PlanillaServiceImpl;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import javafx.beans.property.SimpleStringProperty;
@@ -76,7 +76,7 @@ public class PlanillaController {
     private final ObservableList<PlanillaConsolidada> listaPlanilla = FXCollections.observableArrayList();
 
     public PlanillaController() {
-        this(new PlanillaServiceImpl());
+        this(AppContainer.getDefault().planillaService());
     }
 
     public PlanillaController(PlanillaService planillaService) {

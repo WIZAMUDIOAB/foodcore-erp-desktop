@@ -1,8 +1,8 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.impl.AuthServiceImpl;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -11,13 +11,22 @@ import javafx.scene.control.TextField;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 public class MarcacionAsistenciaController {
 
     @FXML private TextField txtDni;
     @FXML private Label lblEstado;
 
-    private final AuthService authService = new AuthServiceImpl();
+    private final AuthService authService;
+
+    public MarcacionAsistenciaController() {
+        this(AppContainer.getDefault().authService());
+    }
+
+    public MarcacionAsistenciaController(AuthService authService) {
+        this.authService = Objects.requireNonNull(authService, "authService no puede ser nulo");
+    }
 
     @FXML
     public void handleNumClick(ActionEvent event) {

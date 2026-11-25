@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AsistenciaService;
@@ -166,7 +167,8 @@ public class RelojAsistenciaController {
     @FXML
     public void handleExpandirVentana(ActionEvent event) {
         try {
-            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/RelojAsistenciaView.fxml"));
+            javafx.fxml.FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/RelojAsistenciaView.fxml"));
             javafx.scene.Parent root = loader.load();
             RelojAsistenciaController newCtrl = loader.getController();
             javafx.scene.Scene scene = new javafx.scene.Scene(root, 1080, 768);
@@ -222,7 +224,8 @@ public class RelojAsistenciaController {
             if (puedeAccederADashboardDesdeKiosco(usuarioActual)
                     && currentScene.lookup("#contentArea") instanceof javafx.scene.layout.StackPane contentArea) {
                 try {
-                    javafx.fxml.FXMLLoader l = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
+                    javafx.fxml.FXMLLoader l = AppContainer.getDefault().createLoader(
+                            getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
                     javafx.scene.Parent dash = l.load();
                     contentArea.getChildren().setAll(dash);
                 } catch (Exception ex) {
@@ -234,7 +237,8 @@ public class RelojAsistenciaController {
             // Fail-closed: usuarios no ADMIN nunca pueden ingresar al Dashboard desde el Kiosco
             AuthService.logout();
             try {
-                javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+                javafx.fxml.FXMLLoader loader = AppContainer.getDefault().createLoader(
+                        getClass().getResource("/com/foodcore/view/LoginView.fxml"));
                 javafx.scene.Parent loginRoot = loader.load();
                 javafx.scene.Scene loginScene = new javafx.scene.Scene(loginRoot, 1080, 700);
                 App.applyStylesheets(loginScene);

@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Usuario;
 import com.foodcore.controller.dashboard.DashboardNavigationCatalog;
 import com.foodcore.controller.dashboard.DashboardRbacPolicy;
@@ -124,6 +125,7 @@ public class MainDashboardController {
     private final DashboardNavigationCatalog navigationCatalog;
     private final DashboardSyncIndicatorPresenter syncIndicatorPresenter;
     private final DashboardViewLifecycleHelper lifecycleHelper;
+    private final AppContainer appContainer;
     private final EnumMap<NavSection, Node> nodosSeccion = new EnumMap<>(NavSection.class);
     private final EnumMap<NavDestination, Button> botonesDestino = new EnumMap<>(NavDestination.class);
     private boolean sidebarColapsado = false;
@@ -133,17 +135,28 @@ public class MainDashboardController {
     private String rutaBreadcrumbsActual = "Inicio > Operaciones > Dashboard Gerencial";
 
     public MainDashboardController() {
+        this(AppContainer.getDefault());
+    }
+
+    public MainDashboardController(AppContainer appContainer) {
         this(new DefaultDashboardRbacPolicy(), new DashboardNavigationCatalog(),
-                new DashboardSyncIndicatorPresenter(), new DashboardViewLifecycleHelper());
+                new DashboardSyncIndicatorPresenter(), new DashboardViewLifecycleHelper(), appContainer);
     }
 
     public MainDashboardController(DashboardRbacPolicy rbacPolicy, DashboardNavigationCatalog navigationCatalog,
             DashboardSyncIndicatorPresenter syncIndicatorPresenter, DashboardViewLifecycleHelper lifecycleHelper) {
+        this(rbacPolicy, navigationCatalog, syncIndicatorPresenter, lifecycleHelper, AppContainer.getDefault());
+    }
+
+    public MainDashboardController(DashboardRbacPolicy rbacPolicy, DashboardNavigationCatalog navigationCatalog,
+            DashboardSyncIndicatorPresenter syncIndicatorPresenter, DashboardViewLifecycleHelper lifecycleHelper,
+            AppContainer appContainer) {
         this.rbacPolicy = rbacPolicy != null ? rbacPolicy : new DefaultDashboardRbacPolicy();
         this.navigationCatalog = navigationCatalog != null ? navigationCatalog : new DashboardNavigationCatalog();
         this.syncIndicatorPresenter = syncIndicatorPresenter != null
                 ? syncIndicatorPresenter : new DashboardSyncIndicatorPresenter();
         this.lifecycleHelper = lifecycleHelper != null ? lifecycleHelper : new DashboardViewLifecycleHelper();
+        this.appContainer = appContainer != null ? appContainer : AppContainer.getDefault();
     }
 
     private void inicializarMapasNavegacion() {
@@ -545,7 +558,8 @@ public class MainDashboardController {
             return;
         }
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
+            FXMLLoader loader = appContainer.createLoader(
+                    getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
             Parent dialogRoot = loader.load();
             PasswordChangeDialogController ctrl = loader.getController();
             this.dialogoPasswordActivo = dialogRoot;
@@ -593,7 +607,7 @@ public class MainDashboardController {
                 contentArea.getChildren().clear();
             }
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
+            FXMLLoader loader = appContainer.createLoader(getClass().getResource(fxmlPath));
             Parent view = loader.load();
             controladorActivo = loader.getController();
 
@@ -677,7 +691,8 @@ public class MainDashboardController {
         this.usuarioAccesoActual = null;
         AuthService.logout();
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+            FXMLLoader loader = appContainer.createLoader(
+                    getClass().getResource("/com/foodcore/view/LoginView.fxml"));
             Parent loginRoot = loader.load();
             Scene currentScene = rootDashboardStack != null ? rootDashboardStack.getScene() : null;
             if (currentScene != null && currentScene.getWindow() instanceof Stage stage) {

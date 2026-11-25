@@ -1,7 +1,10 @@
 package com.foodcore.service.impl;
 
+import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.CajaDAO;
+import com.foodcore.dao.ClienteDAO;
 import com.foodcore.dao.ComboDAO;
+import com.foodcore.dao.CuentaPorCobrarDAO;
 import com.foodcore.dao.InsumoDAO;
 import com.foodcore.dao.PedidoDAO;
 import com.foodcore.dao.VentaDAO;
@@ -46,6 +49,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Implementación canónica de {@link VentaService} en paquete {@code com.foodcore.service.impl}
@@ -69,27 +73,65 @@ public class VentaServiceImpl implements VentaService {
 
     public VentaServiceImpl(TransactionManager tx, VentaDAO ventaDAO, CajaDAO cajaDAO,
                             InsumoDAO insumoDAO, PedidoDAO pedidoDAO, ComboDAO comboDAO) {
-        this.ventaDAO = ventaDAO;
-        CajaDAO effectiveCajaDAO = cajaDAO != null ? cajaDAO : new CajaDAOImpl();
-        InsumoDAO effectiveInsumoDAO = insumoDAO != null ? insumoDAO : new InsumoDAOImpl();
-        PedidoDAO effectivePedidoDAO = pedidoDAO != null ? pedidoDAO : new PedidoDAOImpl();
-        ComboDAO effectiveComboDAO = comboDAO != null ? comboDAO : new ComboDAOImpl();
-        AutorizacionService autorizacionService = new AutorizacionService();
-        FidelizacionService fidelizacionService = new FidelizacionService();
-        CierreContableService cierreContableService = new CierreContableService();
-        SupervisorAutorizacionService supervisorAutorizacionService = new SupervisorAutorizacionService();
-        AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
-        this.calculoValidator = new DefaultVentaCalculoValidator(autorizacionService, fidelizacionService);
+        this(tx, ventaDAO,
+                cajaDAO != null ? cajaDAO : new CajaDAOImpl(),
+                insumoDAO != null ? insumoDAO : new InsumoDAOImpl(),
+                pedidoDAO != null ? pedidoDAO : new PedidoDAOImpl(),
+                comboDAO != null ? comboDAO : new ComboDAOImpl(),
+                new ClienteDAOImpl(),
+                new CuentaPorCobrarDAOImpl(),
+                new AuditoriaDAOImpl(),
+                new AutorizacionService(),
+                new FidelizacionService(),
+                new CierreContableService(),
+                new SupervisorAutorizacionService());
+    }
+
+    /**
+     * Constructor principal de inyección de dependencias sin instanciaciones concretas internas.
+     */
+    public VentaServiceImpl(TransactionManager tx,
+                            VentaDAO ventaDAO,
+                            CajaDAO cajaDAO,
+                            InsumoDAO insumoDAO,
+                            PedidoDAO pedidoDAO,
+                            ComboDAO comboDAO,
+                            ClienteDAO clienteDAO,
+                            CuentaPorCobrarDAO cuentaPorCobrarDAO,
+                            AuditoriaDAO auditoriaDAO,
+                            AutorizacionService autorizacionService,
+                            FidelizacionService fidelizacionService,
+                            CierreContableService cierreContableService,
+                            SupervisorAutorizacionService supervisorAutorizacionService) {
+        TransactionManager effectiveTx = Objects.requireNonNull(tx, "tx no puede ser nulo");
+        this.ventaDAO = Objects.requireNonNull(ventaDAO, "ventaDAO no puede ser nulo");
+        CajaDAO effectiveCajaDAO = Objects.requireNonNull(cajaDAO, "cajaDAO no puede ser nulo");
+        InsumoDAO effectiveInsumoDAO = Objects.requireNonNull(insumoDAO, "insumoDAO no puede ser nulo");
+        PedidoDAO effectivePedidoDAO = Objects.requireNonNull(pedidoDAO, "pedidoDAO no puede ser nulo");
+        ComboDAO effectiveComboDAO = Objects.requireNonNull(comboDAO, "comboDAO no puede ser nulo");
+        ClienteDAO effectiveClienteDAO = Objects.requireNonNull(clienteDAO, "clienteDAO no puede ser nulo");
+        CuentaPorCobrarDAO effectiveCxcDAO =
+                Objects.requireNonNull(cuentaPorCobrarDAO, "cuentaPorCobrarDAO no puede ser nulo");
+        AuditoriaDAO effectiveAuditoriaDAO = Objects.requireNonNull(auditoriaDAO, "auditoriaDAO no puede ser nulo");
+        AutorizacionService effectiveAuth =
+                Objects.requireNonNull(autorizacionService, "autorizacionService no puede ser nulo");
+        FidelizacionService effectiveFidelizacion =
+                Objects.requireNonNull(fidelizacionService, "fidelizacionService no puede ser nulo");
+        CierreContableService effectiveCierre =
+                Objects.requireNonNull(cierreContableService, "cierreContableService no puede ser nulo");
+        SupervisorAutorizacionService effectiveSupervisor =
+                Objects.requireNonNull(supervisorAutorizacionService, "supervisorAutorizacionService no puede ser nulo");
+
+        this.calculoValidator = new DefaultVentaCalculoValidator(effectiveAuth, effectiveFidelizacion);
         VentaInventarioKardexHandler inventarioKardexHandler =
                 new DefaultVentaInventarioKardexHandler(effectiveInsumoDAO, effectiveComboDAO);
-        ClienteDAOImpl clienteDAO = new ClienteDAOImpl();
-        CuentaPorCobrarDAOImpl cuentaPorCobrarDAO = new CuentaPorCobrarDAOImpl();
         this.registrarVentaUseCase = new DefaultRegistrarVentaUseCase(
-                tx, ventaDAO, effectiveCajaDAO, effectivePedidoDAO, clienteDAO, cuentaPorCobrarDAO,
-                cierreContableService, fidelizacionService, calculoValidator, inventarioKardexHandler);
+                effectiveTx, this.ventaDAO, effectiveCajaDAO, effectivePedidoDAO, effectiveClienteDAO,
+                effectiveCxcDAO, effectiveCierre, effectiveFidelizacion, calculoValidator, inventarioKardexHandler);
         this.anularDevolverVentaUseCase = new DefaultAnularDevolverVentaUseCase(
-                tx, ventaDAO, effectiveCajaDAO, autorizacionService, supervisorAutorizacionService,
-                cierreContableService, fidelizacionService, auditoriaDAO, calculoValidator, inventarioKardexHandler);
+                effectiveTx, this.ventaDAO, effectiveCajaDAO, effectiveAuth, effectiveSupervisor,
+                effectiveCierre, effectiveFidelizacion, effectiveAuditoriaDAO,
+                calculoValidator, inventarioKardexHandler);
     }
 
     public VentaServiceImpl(VentaDAO ventaDAO, VentaCalculoValidator calculoValidator,

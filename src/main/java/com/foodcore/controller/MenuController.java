@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Combo;
@@ -20,8 +21,6 @@ import com.foodcore.service.ComboService;
 import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.service.MenuGestionService;
 import com.foodcore.service.PersonalizacionProductoService;
-import com.foodcore.service.impl.ComboServiceImpl;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -172,23 +171,42 @@ public class MenuController {
     private final MenuTablaUiConfigurer tablaUiConfigurer;
 
     public MenuController() {
-        this(new LocalMenuImagenStorage(), new DefaultMenuCrudPresenter(),
-                new DefaultMenuPersonalizacionCoordinator(), new DefaultMenuComboCoordinator(),
-                new MenuTablaUiConfigurer());
+        this(AppContainer.getDefault().resolve(MenuGestionService.class),
+                AppContainer.getDefault().resolve(ImportacionMasivaService.class),
+                AppContainer.getDefault().personalizacionProductoService(),
+                AppContainer.getDefault().comboService());
+    }
+
+    public MenuController(MenuGestionService menuGestionService,
+                          ImportacionMasivaService importacionMasivaService,
+                          PersonalizacionProductoService personalizacionService,
+                          ComboService comboService) {
+        this.menuGestionService = java.util.Objects.requireNonNull(menuGestionService, "menuGestionService");
+        this.importacionMasivaService =
+                java.util.Objects.requireNonNull(importacionMasivaService, "importacionMasivaService");
+        this.personalizacionService =
+                java.util.Objects.requireNonNull(personalizacionService, "personalizacionService");
+        this.comboService = java.util.Objects.requireNonNull(comboService, "comboService");
+        this.imagenStorage = new LocalMenuImagenStorage();
+        this.crudPresenter = new DefaultMenuCrudPresenter(this.menuGestionService, this.personalizacionService);
+        this.personalizacionCoordinator = new DefaultMenuPersonalizacionCoordinator(this.personalizacionService);
+        this.comboCoordinator = new DefaultMenuComboCoordinator(this.comboService);
+        this.tablaUiConfigurer = new MenuTablaUiConfigurer();
     }
 
     public MenuController(MenuImagenStorage imagenStorage, MenuCrudPresenter crudPresenter,
                           MenuPersonalizacionCoordinator personalizacionCoordinator,
                           MenuComboCoordinator comboCoordinator, MenuTablaUiConfigurer tablaUiConfigurer) {
+        AppContainer c = AppContainer.getDefault();
         this.imagenStorage = imagenStorage;
         this.crudPresenter = crudPresenter;
         this.personalizacionCoordinator = personalizacionCoordinator;
         this.comboCoordinator = comboCoordinator;
         this.tablaUiConfigurer = tablaUiConfigurer;
-        this.menuGestionService = new MenuGestionService();
-        this.importacionMasivaService = new ImportacionMasivaService();
-        this.personalizacionService = new PersonalizacionProductoServiceImpl();
-        this.comboService = new ComboServiceImpl();
+        this.menuGestionService = c.resolve(MenuGestionService.class);
+        this.importacionMasivaService = c.resolve(ImportacionMasivaService.class);
+        this.personalizacionService = c.personalizacionProductoService();
+        this.comboService = c.comboService();
     }
 
     @FXML
@@ -508,7 +526,8 @@ public class MenuController {
     @FXML
     public void handleAbrirMenuQr(ActionEvent event) {
         try {
-            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/MenuQrModalView.fxml"));
+            javafx.fxml.FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/MenuQrModalView.fxml"));
             javafx.scene.Parent root = loader.load();
             javafx.stage.Stage stage = new javafx.stage.Stage();
             stage.setTitle("FoodCore — Menú Digital QR");

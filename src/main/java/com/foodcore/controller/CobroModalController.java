@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.ComprobantePago;
@@ -12,7 +13,6 @@ import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -50,8 +50,19 @@ public class CobroModalController {
     private Cliente clienteAsociado = null;
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
-    private final VentaService ventaService = new VentaServiceImpl();
-    private final ClienteGestionService clienteGestionService = new ClienteGestionService();
+    private final VentaService ventaService;
+    private final ClienteGestionService clienteGestionService;
+
+    public CobroModalController() {
+        this(AppContainer.getDefault().ventaService(),
+                AppContainer.getDefault().resolve(ClienteGestionService.class));
+    }
+
+    public CobroModalController(VentaService ventaService, ClienteGestionService clienteGestionService) {
+        this.ventaService = java.util.Objects.requireNonNull(ventaService, "ventaService no puede ser nulo");
+        this.clienteGestionService =
+                java.util.Objects.requireNonNull(clienteGestionService, "clienteGestionService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {

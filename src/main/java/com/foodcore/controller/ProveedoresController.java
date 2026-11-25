@@ -3,6 +3,7 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Proveedor;
 import com.foodcore.service.FinanzasService;
@@ -65,12 +66,23 @@ public class ProveedoresController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ProveedorGestionService proveedorGestionService = new ProveedorGestionService();
-    private final FinanzasService finanzasService = new FinanzasService();
+    private final ProveedorGestionService proveedorGestionService;
+    private final FinanzasService finanzasService;
 
     private final ObservableList<Proveedor> listaProveedores = FXCollections.observableArrayList();
     private Proveedor proveedorSeleccionado = null;
     private boolean modoEdicion = false;
+
+    public ProveedoresController() {
+        this(AppContainer.getDefault().resolve(ProveedorGestionService.class),
+                AppContainer.getDefault().finanzasService());
+    }
+
+    public ProveedoresController(ProveedorGestionService proveedorGestionService, FinanzasService finanzasService) {
+        this.proveedorGestionService =
+                java.util.Objects.requireNonNull(proveedorGestionService, "proveedorGestionService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+    }
 
     @FXML
     public void initialize() {

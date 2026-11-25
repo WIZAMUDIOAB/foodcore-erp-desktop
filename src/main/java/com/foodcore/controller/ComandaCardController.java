@@ -1,9 +1,9 @@
 package com.foodcore.controller;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
-import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
@@ -61,7 +61,15 @@ public class ComandaCardController {
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
     private BiConsumer<Integer, Integer> onDragReordenarListener;
-    private final PedidoService pedidoService = new PedidoServiceImpl();
+    private final PedidoService pedidoService;
+
+    public ComandaCardController() {
+        this(AppContainer.getDefault().pedidoService());
+    }
+
+    public ComandaCardController(PedidoService pedidoService) {
+        this.pedidoService = java.util.Objects.requireNonNull(pedidoService, "pedidoService no puede ser nulo");
+    }
 
     public static String determinarColorPorSegundos(long segundos) {
         long min = Math.max(0L, segundos) / 60L;

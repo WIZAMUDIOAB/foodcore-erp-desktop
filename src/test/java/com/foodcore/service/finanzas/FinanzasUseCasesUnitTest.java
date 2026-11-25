@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Venta;
+import com.foodcore.service.CierreContableService;
 import com.foodcore.service.FinanzasService;
+import com.foodcore.tx.impl.JdbcTransactionManager;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
@@ -57,5 +60,17 @@ class FinanzasUseCasesUnitTest {
         service.generarOrdenCompraPdf(1, null, new File("unused.pdf"));
         service.generarEstadoCuentaClientePdf(1, new File("unused.pdf"));
         assertEquals(6, calls.get());
+    }
+
+    @Test
+    void finanzasServiceRechazaTransactionManagerNulo() {
+        assertThrows(NullPointerException.class, () -> new FinanzasService(
+                null, null, null, null, null, null, null, new ProductoDAOImpl(), null, null));
+        assertThrows(NullPointerException.class, () -> new FinanzasService(
+                null, null, null, null, null, null, null, new ProductoDAOImpl(), null, null,
+                new CierreContableService()));
+        assertThrows(NullPointerException.class, () -> new FinanzasService(
+                new JdbcTransactionManager(), null, null, null, null, null, null,
+                new ProductoDAOImpl(), null, null, null));
     }
 }

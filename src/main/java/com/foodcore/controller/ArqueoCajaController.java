@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Caja;
 import com.foodcore.model.CategoriaGasto;
 import com.foodcore.model.DesgloseFiscal;
@@ -9,7 +10,6 @@ import com.foodcore.model.Usuario;
 import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
-import com.foodcore.service.impl.CajaServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
@@ -84,12 +84,20 @@ public class ArqueoCajaController {
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritMinimo;
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritEstado;
 
-    private final CajaService cajaService = new CajaServiceImpl();
+    private final CajaService cajaService;
     private final ObservableList<FilaCierreZ> itemsCierreZ = FXCollections.observableArrayList();
     private final ObservableList<InsumoCriticoTurno> itemsStockCritico = FXCollections.observableArrayList();
     private volatile List<CategoriaGasto> categoriasGastoCache = List.of();
     private Caja cajaActual;
     private BigDecimal totalEsperado = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+    public ArqueoCajaController() {
+        this(AppContainer.getDefault().cajaService());
+    }
+
+    public ArqueoCajaController(CajaService cajaService) {
+        this.cajaService = java.util.Objects.requireNonNull(cajaService, "cajaService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {

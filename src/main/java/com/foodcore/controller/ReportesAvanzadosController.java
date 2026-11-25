@@ -1,11 +1,13 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.ComparativaPeriodos;
 import com.foodcore.model.ReporteCohortes;
 import com.foodcore.model.ReporteCohortes.CohorteMensualFila;
 import com.foodcore.model.ReporteCohortes.SegmentoRetencionFila;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasBiService;
+import com.foodcore.service.ReporteService;
 import com.foodcore.controller.reportes.DefaultReportesAvanzadosPresenter;
 import com.foodcore.controller.reportes.DefaultReporteExportCoordinator;
 import com.foodcore.controller.reportes.FilaReporteAvanzado;
@@ -114,13 +116,22 @@ public class ReportesAvanzadosController implements ReportesAvanzadosViewPort {
     private final ObservableList<CohorteMensualFila> listaMatrizCohortes = FXCollections.observableArrayList();
 
     public ReportesAvanzadosController() {
-        this(new ExportacionContableService(), new FinanzasBiService());
+        this(AppContainer.getDefault().resolve(ExportacionContableService.class),
+                AppContainer.getDefault().resolve(FinanzasBiService.class),
+                AppContainer.getDefault().resolve(ReporteService.class));
     }
 
     public ReportesAvanzadosController(
             ExportacionContableService exportacionService,
             FinanzasBiService finanzasBiService) {
-        this(new DefaultReportesAvanzadosPresenter(finanzasBiService, new com.foodcore.service.ReporteService()),
+        this(exportacionService, finanzasBiService, AppContainer.getDefault().resolve(ReporteService.class));
+    }
+
+    public ReportesAvanzadosController(
+            ExportacionContableService exportacionService,
+            FinanzasBiService finanzasBiService,
+            ReporteService reporteService) {
+        this(new DefaultReportesAvanzadosPresenter(finanzasBiService, reporteService),
                 new DefaultReporteExportCoordinator(exportacionService), new ReporteChartUiRenderer());
     }
 

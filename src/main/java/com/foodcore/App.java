@@ -2,6 +2,7 @@ package com.foodcore;
 
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.api.ApiServer;
+import com.foodcore.config.AppContainer;
 import com.foodcore.config.FlywayMigrator;
 import com.foodcore.config.LoggingBootstrap;
 import com.foodcore.controller.SplashController;
@@ -149,7 +150,8 @@ public class App extends Application {
 
     private BootstrapSplash crearPantallaSplashBootstrap() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/SplashView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/SplashView.fxml"));
             Parent loaded = loader.load();
             SplashController ctrl = loader.getController();
             if (loaded instanceof StackPane root && ctrl != null) {
@@ -196,7 +198,8 @@ public class App extends Application {
 
     private void cargarVistaLoginInicial(Stage stage, BootstrapSplash splash) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/LoginView.fxml"));
             Parent root = loader.load();
             Scene scene = stage.getScene();
             if (scene == null) {
@@ -366,7 +369,8 @@ public class App extends Application {
     }
 
     public static void setRoot(String fxml) throws IOException {
-        FXMLLoader loader = new FXMLLoader(App.class.getResource("/com/foodcore/view/" + fxml + ".fxml"));
+        FXMLLoader loader = AppContainer.getDefault().createLoader(
+                App.class.getResource("/com/foodcore/view/" + fxml + ".fxml"));
         Parent root = loader.load();
         if (primaryStage != null && primaryStage.getScene() != null) {
             applyStylesheets(primaryStage.getScene());

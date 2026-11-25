@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.CierreContable;
 import com.foodcore.model.EstadoResultadosReporte;
 import com.foodcore.model.EstadoResultadosReporte.GastoPorCategoria;
@@ -94,13 +95,16 @@ public class EstadoResultadosController {
     private EstadoResultadosReporte ultimoReporte;
 
     public EstadoResultadosController() {
-        this(new FinanzasBiService(), new ExportacionContableService(), new CierreContableService());
+        this(AppContainer.getDefault().resolve(FinanzasBiService.class),
+                AppContainer.getDefault().resolve(ExportacionContableService.class),
+                AppContainer.getDefault().resolve(CierreContableService.class));
     }
 
     public EstadoResultadosController(
             FinanzasBiService finanzasBiService,
             ExportacionContableService exportacionService) {
-        this(finanzasBiService, exportacionService, new CierreContableService());
+        this(finanzasBiService, exportacionService,
+                AppContainer.getDefault().resolve(CierreContableService.class));
     }
 
     public EstadoResultadosController(

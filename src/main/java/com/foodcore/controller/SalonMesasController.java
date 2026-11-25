@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
@@ -54,10 +55,24 @@ public class SalonMesasController {
 
     @FXML private FlowPane flowMesas;
 
-    private final SalonService salonService = new SalonService();
-    private final ReservasService reservasService = new ReservasService();
-    private final ImpresoraTermicaService impresoraService = new ImpresoraTermicaService();
+    private final SalonService salonService;
+    private final ReservasService reservasService;
+    private final ImpresoraTermicaService impresoraService;
     private final Map<String, Pedido> pedidosActivosPorMesa = new HashMap<>();
+
+    public SalonMesasController() {
+        this(AppContainer.getDefault().resolve(SalonService.class),
+                AppContainer.getDefault().resolve(ReservasService.class),
+                AppContainer.getDefault().resolve(ImpresoraTermicaService.class));
+    }
+
+    public SalonMesasController(SalonService salonService,
+                                ReservasService reservasService,
+                                ImpresoraTermicaService impresoraService) {
+        this.salonService = java.util.Objects.requireNonNull(salonService, "salonService");
+        this.reservasService = java.util.Objects.requireNonNull(reservasService, "reservasService");
+        this.impresoraService = java.util.Objects.requireNonNull(impresoraService, "impresoraService");
+    }
 
     @FXML
     public void initialize() {
@@ -215,7 +230,8 @@ public class SalonMesasController {
 
     private void abrirTomaPedido(String mesa, Pedido pedidoExistente) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
             Parent root = loader.load();
 
             MozoOrderController controller = loader.getController();
@@ -404,7 +420,8 @@ public class SalonMesasController {
     @FXML
     public void handleAbrirReservas() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ReservasView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/ReservasView.fxml"));
             Parent root = loader.load();
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
@@ -444,7 +461,8 @@ public class SalonMesasController {
                 }
 
                 try {
-                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
+                    FXMLLoader loader = AppContainer.getDefault().createLoader(
+                            getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
                     Parent root = loader.load();
 
                     CobroModalController ctrl = loader.getController();

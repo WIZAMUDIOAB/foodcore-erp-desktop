@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.TurnoProgramado;
@@ -9,7 +10,6 @@ import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.HorariosService;
-import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
@@ -135,12 +135,26 @@ public class MiHorarioController {
     @FXML private TableColumn<SolicitudAusencia, String> colMisVacMotivo;
     @FXML private TableColumn<SolicitudAusencia, String> colMisVacEstado;
 
-    private final HorariosService horariosService = new HorariosService();
-    private final AsistenciaService asistenciaService = new AsistenciaService();
-    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
+    private final HorariosService horariosService;
+    private final AsistenciaService asistenciaService;
+    private final AusenciasVacacionesService ausenciasService;
     private final ObservableList<Asistencia> listaAsistencias = FXCollections.observableArrayList();
     private final ObservableList<BoletaPago> listaBoletas = FXCollections.observableArrayList();
     private final ObservableList<SolicitudAusencia> listaMisVacaciones = FXCollections.observableArrayList();
+
+    public MiHorarioController() {
+        this(AppContainer.getDefault().resolve(HorariosService.class),
+                AppContainer.getDefault().resolve(AsistenciaService.class),
+                AppContainer.getDefault().ausenciasVacacionesService());
+    }
+
+    public MiHorarioController(HorariosService horariosService,
+                               AsistenciaService asistenciaService,
+                               AusenciasVacacionesService ausenciasService) {
+        this.horariosService = java.util.Objects.requireNonNull(horariosService, "horariosService");
+        this.asistenciaService = java.util.Objects.requireNonNull(asistenciaService, "asistenciaService");
+        this.ausenciasService = java.util.Objects.requireNonNull(ausenciasService, "ausenciasService");
+    }
 
     private static final String[] DIAS_SEMANA = {"LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"};
 

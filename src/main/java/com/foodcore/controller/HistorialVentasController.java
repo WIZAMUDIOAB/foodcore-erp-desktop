@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Usuario;
@@ -8,7 +9,6 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -76,12 +76,23 @@ public class HistorialVentasController {
     @FXML private Label lblTotalReembolso;
     @FXML private Button btnDevolucionParcial;
 
-    private final VentaService ventaService = new VentaServiceImpl();
-    private final AutorizacionService autorizacionService = new AutorizacionService();
+    private final VentaService ventaService;
+    private final AutorizacionService autorizacionService;
     private final ObservableList<Venta> ventas = FXCollections.observableArrayList();
     private final ObservableList<DetalleVenta> detalles = FXCollections.observableArrayList();
     private final Set<Integer> idsDetallesSeleccionados = new LinkedHashSet<>();
     private Venta ventaActual;
+
+    public HistorialVentasController() {
+        this(AppContainer.getDefault().ventaService(),
+                AppContainer.getDefault().resolve(AutorizacionService.class));
+    }
+
+    public HistorialVentasController(VentaService ventaService, AutorizacionService autorizacionService) {
+        this.ventaService = java.util.Objects.requireNonNull(ventaService, "ventaService no puede ser nulo");
+        this.autorizacionService =
+                java.util.Objects.requireNonNull(autorizacionService, "autorizacionService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
