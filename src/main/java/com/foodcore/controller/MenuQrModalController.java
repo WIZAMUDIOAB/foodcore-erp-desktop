@@ -1,9 +1,11 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.service.MenuQrService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ToastService;
-import javafx.application.Platform;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -19,65 +21,126 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class MenuQrModalController {
+public class MenuQrModalController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(MenuQrModalController.class.getName());
+
+    private static final class QrGenerado {
+        private final String urlRed;
+        private final byte[] pngBytes;
+        private final boolean tunnelActivo;
+
+        private QrGenerado(String urlRed, byte[] pngBytes, boolean tunnelActivo) {
+            this.urlRed = urlRed;
+            this.pngBytes = pngBytes;
+            this.tunnelActivo = tunnelActivo;
+        }
+
+        private ByteArrayInputStream comoStreamImagen() {
+            return new ByteArrayInputStream(pngBytes);
+        }
+    }
 
     @FXML private ImageView imgCodigoQr;
     @FXML private Label lblEstadoQr;
     @FXML private TextField txtUrlMenu;
     @FXML private Button btnImprimirQr;
 
-    private final MenuQrService menuQrService = new MenuQrService();
+    private final MenuQrService menuQrService;
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicLong cargaSeq = new AtomicLong(0L);
     private File archivoHtmlGenerado;
+
+    public MenuQrModalController() {
+        this(AppContainer.getDefault().resolve(MenuQrService.class));
+    }
+
+    public MenuQrModalController(MenuQrService menuQrService) {
+        this.menuQrService = Objects.requireNonNull(menuQrService, "menuQrService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         generarMenuYQr();
         if (btnImprimirQr != null) {
             AnimationUtils.attachTactileFeedback(btnImprimirQr);
         }
     }
 
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
+    }
+
     public void generarMenuYQr() {
-        try {
-            Files.createDirectories(Path.of("uploads", "qr"));
-
-            // v4.6.0 Fase 2: Cero caché HTML estático; el endpoint consulta MySQL en vivo en cada petición.
-            archivoHtmlGenerado = null;
-
-            // URL pública de Cloudflare Tunnel o fallback a IP de red local
-            String urlRed = MenuQrService.construirUrlMenuDigital(8443);
-            txtUrlMenu.setText(urlRed);
-
-            // Generar código QR PNG y cargar en el ImageView con la URL de red
-            BufferedImage bi = menuQrService.generarCodigoQr(urlRed, 300, 300);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(bi, "png", baos);
-            ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-            Image fxImage = new Image(bais);
-
-            imgCodigoQr.setImage(fxImage);
-            String prefijoEstado = com.foodcore.service.TunnelService.tieneUrlActiva()
-                    ? "✓ QR público activo (Cloudflare): "
-                    : "✓ QR activo en red local: ";
-            lblEstadoQr.setText(prefijoEstado + urlRed);
-
-            // También exportar en disco para acceso persistente
-            File archivoQrPng = new File("uploads/qr/menu_qr.png");
-            menuQrService.exportarQrPng(urlRed, 300, 300, archivoQrPng);
-
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error al generar menu y QR: " + e.getMessage(), e);
-            lblEstadoQr.setText("Error al generar QR dinámico");
+        long seq = cargaSeq.incrementAndGet();
+        // v4.6.0 Fase 2: Cero caché HTML estático; el endpoint consulta MySQL en vivo en cada petición.
+        archivoHtmlGenerado = null;
+        if (lblEstadoQr != null) {
+            lblEstadoQr.setText("Generando código QR dinámico...");
         }
+        if (btnImprimirQr != null) {
+            btnImprimirQr.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> {
+                Files.createDirectories(Path.of("uploads", "qr"));
+                String urlRed = MenuQrService.construirUrlMenuDigital(8443);
+                BufferedImage bi = menuQrService.generarCodigoQr(urlRed, 300, 300);
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(bi, "png", baos);
+
+                boolean tunnelActivo = com.foodcore.service.TunnelService.tieneUrlActiva();
+                File archivoQrPng = new File("uploads/qr/menu_qr.png");
+                menuQrService.exportarQrPng(urlRed, 300, 300, archivoQrPng);
+                return new QrGenerado(urlRed, baos.toByteArray(), tunnelActivo);
+            },
+            res -> {
+                if (btnImprimirQr != null) {
+                    btnImprimirQr.setDisable(false);
+                }
+                if (!vistaActiva.get() || seq != cargaSeq.get()) {
+                    return;
+                }
+                if (txtUrlMenu != null) {
+                    txtUrlMenu.setText(res.urlRed);
+                }
+                if (imgCodigoQr != null) {
+                    imgCodigoQr.setImage(new Image(res.comoStreamImagen()));
+                }
+                if (lblEstadoQr != null) {
+                    String prefijoEstado = res.tunnelActivo
+                            ? "✓ QR público activo (Cloudflare): "
+                            : "✓ QR activo en red local: ";
+                    lblEstadoQr.setText(prefijoEstado + res.urlRed);
+                }
+            },
+            e -> {
+                if (btnImprimirQr != null) {
+                    btnImprimirQr.setDisable(false);
+                }
+                LOGGER.log(Level.SEVERE, "Error al generar menu y QR: " + e.getMessage(), e);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (lblEstadoQr != null) {
+                    lblEstadoQr.setText("Error al generar QR dinámico");
+                }
+                mostrarAlerta(Alert.AlertType.ERROR, "Menú Digital",
+                        "Error al generar QR dinámico: " + e.getMessage());
+            }
+        );
     }
 
     @FXML

@@ -79,6 +79,7 @@ import com.foodcore.service.HistorialPreciosService;
 import com.foodcore.service.HorariosService;
 import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.service.MenuGestionService;
+import com.foodcore.service.MenuQrService;
 import com.foodcore.service.MozoOrdenService;
 import com.foodcore.service.OnboardingService;
 import com.foodcore.service.PedidoService;
@@ -295,6 +296,7 @@ public final class AppContainer {
         reg.put(SalonService.class, new SalonService(mesaDAO));
         reg.put(ReservasService.class, new ReservasService(reservaDAO));
         reg.put(MenuGestionService.class, new MenuGestionService());
+        reg.put(MenuQrService.class, new MenuQrService(productoDAO));
         reg.put(ImportacionMasivaService.class,
                 new ImportacionMasivaService(productoDAO, categoriaDAO, insumoDAO, tx));
         reg.put(HorariosService.class, new HorariosService(turnoProgramadoDAO, usuarioDAO));

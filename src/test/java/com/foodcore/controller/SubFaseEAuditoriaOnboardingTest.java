@@ -199,60 +199,82 @@ class SubFaseEAuditoriaOnboardingTest {
         AtomicReference<Parent> rootRef = new AtomicReference<>();
         AtomicBoolean dashboardRedirigido = new AtomicBoolean(false);
 
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/OnboardingWizardView.fxml"));
-                loader.setControllerFactory(type -> new OnboardingWizardController() {
-                    @Override
-                    protected void redirigirAlDashboard() {
-                        dashboardRedirigido.set(true);
-                    }
-                });
-                Parent root = loader.load();
-                new Scene(root, 1080, 768);
-                OnboardingWizardController ctrl = loader.getController();
-                ctrlRef.set(ctrl);
-                rootRef.set(root);
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    FXMLLoader loader = new FXMLLoader(
+                            getClass().getResource("/com/foodcore/view/OnboardingWizardView.fxml"));
+                    loader.setControllerFactory(type -> new OnboardingWizardController() {
+                        @Override
+                        protected void redirigirAlDashboard() {
+                            dashboardRedirigido.set(true);
+                        }
+                    });
+                    Parent root = loader.load();
+                    new Scene(root, 1080, 768);
+                    OnboardingWizardController ctrl = loader.getController();
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
 
-                // Intento fallido en Paso 1 con campos vacíos debe permanecer en Paso 1 y mostrar error
-                ctrl.handleSiguiente(null);
-                assertEquals(1, ctrl.getPasoActual());
-                assertTrue(ctrl.getLblErrorWizard().isVisible(), "Debe mostrar error de validación en paso 1");
+                    // Intento fallido en Paso 1 con campos vacíos debe permanecer en Paso 1 y mostrar error
+                    ctrl.handleSiguiente(null);
+                    assertEquals(1, ctrl.getPasoActual());
+                    assertTrue(ctrl.getLblErrorWizard().isVisible(), "Debe mostrar error de validación en paso 1");
 
-                // Completar Paso 1 y avanzar
-                ((TextField) root.lookup("#txtNombreRestaurante")).setText("La Cocina de Prueba S.A.C.");
-                ((TextField) root.lookup("#txtRuc")).setText("20554433221");
-                ((TextField) root.lookup("#txtDireccion")).setText("Av. Arequipa 1200");
-                ((TextField) root.lookup("#txtTelefono")).setText("01-4455667");
-                ctrl.handleSiguiente(null);
-                assertEquals(2, ctrl.getPasoActual(), "Debe avanzar al paso 2");
+                    // Completar Paso 1 y avanzar
+                    ((TextField) root.lookup("#txtNombreRestaurante")).setText("La Cocina de Prueba S.A.C.");
+                    ((TextField) root.lookup("#txtRuc")).setText("20554433221");
+                    ((TextField) root.lookup("#txtDireccion")).setText("Av. Arequipa 1200");
+                    ((TextField) root.lookup("#txtTelefono")).setText("01-4455667");
+                    ctrl.handleSiguiente(null);
+                    assertEquals(2, ctrl.getPasoActual(), "Debe avanzar al paso 2");
 
-                // Completar Paso 2 (primer platillo) y guardar en BD
-                ((TextField) root.lookup("#txtNombrePlatillo")).setText("Ceviche Clásico Onboarding");
-                ((TextField) root.lookup("#txtPrecioPlatillo")).setText("34.00");
-                @SuppressWarnings("unchecked")
-                ComboBox<String> cmbCat = (ComboBox<String>) root.lookup("#cmbCategoriaPlatillo");
-                cmbCat.setValue("Entradas Marina");
-                ctrl.handleSiguiente(null);
-                assertEquals(3, ctrl.getPasoActual(), "Debe avanzar al paso 3");
-                assertTrue(ctrl.getPlatilloCreadoId() > 0, "Debe persistir el primer platillo en BD");
+                    // Completar Paso 2 (primer platillo) y lanzar guardado asíncrono en BD
+                    ((TextField) root.lookup("#txtNombrePlatillo")).setText("Ceviche Clásico Onboarding");
+                    ((TextField) root.lookup("#txtPrecioPlatillo")).setText("34.00");
+                    @SuppressWarnings("unchecked")
+                    ComboBox<String> cmbCat = (ComboBox<String>) root.lookup("#cmbCategoriaPlatillo");
+                    cmbCat.setValue("Entradas Marina");
+                    ctrl.handleSiguiente(null);
+                } catch (Exception ex) {
+                    throw new RuntimeException(ex);
+                }
+            });
 
-                // Completar Paso 3 (primera mesa) y guardar en BD
+            OnboardingWizardController ctrl = ctrlRef.get();
+            Parent root = rootRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> ctrl.getPasoActual() == 3,
+                    10L,
+                    "Debe avanzar al paso 3 tras persistir el primer platillo");
+            assertTrue(ctrl.getPlatilloCreadoId() > 0, "Debe persistir el primer platillo en BD");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 ((TextField) root.lookup("#txtNumeroMesa")).setText("M95");
                 ((TextField) root.lookup("#txtCapacidadMesa")).setText("6");
                 ctrl.handleSiguiente(null);
-                assertEquals(4, ctrl.getPasoActual(), "Debe avanzar al paso 4 de resumen");
+            });
+
+            JavaFxTestSupport.awaitCondition(
+                    () -> ctrl.getPasoActual() == 4,
+                    10L,
+                    "Debe avanzar al paso 4 de resumen tras guardar la primera mesa");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 Label lblRes = (Label) root.lookup("#lblResumenRestaurante");
                 assertTrue(lblRes.getText().contains("La Cocina de Prueba S.A.C."));
-
-                // Finalizar onboarding
                 ctrl.handleEmpezarOperar(null);
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        });
+            });
 
-        assertTrue(dashboardRedirigido.get(), "Al finalizar onboarding debe redirigir al Dashboard principal");
+            JavaFxTestSupport.awaitCondition(
+                    dashboardRedirigido::get,
+                    10L,
+                    "Al finalizar onboarding debe redirigir al Dashboard principal");
+        } finally {
+            if (ctrlRef.get() != null) {
+                ctrlRef.get().detenerRecursos();
+            }
+        }
 
         try (Connection conn = ConexionBD.getConnection();
              Statement st = conn.createStatement()) {

@@ -25,10 +25,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,6 +66,7 @@ class ModuloCPlanillaUiTest {
 
         PlanillaService service = new PlanillaServiceImpl();
         AtomicReference<PlanillaController> ctrlRef = new AtomicReference<>();
+        AtomicReference<Parent> rootRef = new AtomicReference<>();
         AtomicReference<Long> idMovimientoUi = new AtomicReference<>();
 
         try {
@@ -74,25 +77,58 @@ class ModuloCPlanillaUiTest {
                     FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/PlanillaView.fxml"));
                     Parent root = loader.load();
                     PlanillaController ctrl = loader.getController();
-                    ctrlRef.set(ctrl);
-
-                    ctrl.getCbTipoMovimiento().setValue("BONO");
-                    ctrl.getTxtConcepto().setText("Bono cierre inventario UI");
-                    ctrl.getTxtMonto().setText("125.00");
-                    ctrl.handleRegistrarMovimiento();
-
-                    ctrl.getListaMovimientos().stream()
-                            .filter(m -> "Bono cierre inventario UI".equals(m.getConcepto()))
-                            .findFirst()
-                            .map(MovimientoPago::getIdMovimiento)
-                            .ifPresent(idMovimientoUi::set);
-
-                    ExportFileChooserHelper.setTestSelectorOverride(
-                            req -> Optional.of(tempDir.resolve(req.nombreSugerido()).toFile()));
-                    ctrl.handleExportarExcel();
-                    ctrl.handleExportarPdf();
-
                     new Scene(root, 1280, 820);
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            PlanillaController ctrl = ctrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> ctrl.getCbColaborador().getValue() != null && !ctrl.getListaPlanilla().isEmpty(),
+                    10L,
+                    "La carga inicial asíncrona de PlanillaView debe poblar colaboradores y planilla");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                ctrl.getCbTipoMovimiento().setValue("BONO");
+                ctrl.getTxtConcepto().setText("Bono cierre inventario UI");
+                ctrl.getTxtMonto().setText("125.00");
+                ctrl.handleRegistrarMovimiento();
+            });
+
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getBtnRegistrarMovimiento().isDisabled()
+                            && ctrl.getListaMovimientos().stream()
+                                    .anyMatch(m -> "Bono cierre inventario UI".equals(m.getConcepto())),
+                    10L,
+                    "El movimiento registrado de forma asíncrona debe reflejarse en listaMovimientos");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                ctrl.getListaMovimientos().stream()
+                        .filter(m -> "Bono cierre inventario UI".equals(m.getConcepto()))
+                        .findFirst()
+                        .map(MovimientoPago::getIdMovimiento)
+                        .ifPresent(idMovimientoUi::set);
+
+                ExportFileChooserHelper.setTestSelectorOverride(
+                        req -> Optional.of(tempDir.resolve(req.nombreSugerido()).toFile()));
+                ctrl.handleExportarExcel();
+                ctrl.handleExportarPdf();
+            });
+
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getBtnExportarExcel().isDisabled()
+                            && !ctrl.getBtnExportarPdf().isDisabled()
+                            && existeArchivoConExtension(tempDir, ".xlsx")
+                            && existeArchivoConExtension(tempDir, ".pdf"),
+                    10L,
+                    "Las exportaciones asíncronas de Excel y PDF deben completarse en tempDir");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
                     root.applyCss();
                     root.layout();
                     guardarSnapshot(root, "07_planilla_pagos_movimientos_v470.png");
@@ -101,17 +137,27 @@ class ModuloCPlanillaUiTest {
                 }
             });
 
-            PlanillaController ctrl = ctrlRef.get();
             assertFalse(ctrl.getListaPlanilla().isEmpty());
             assertFalse(ctrl.getListaMovimientos().isEmpty());
             assertTrue(idMovimientoUi.get() != null && idMovimientoUi.get() > 0);
             assertTrue(ctrl.getLblKpiNetoPagar().getText().startsWith("S/ "));
-            assertTrue(Files.list(tempDir).anyMatch(p -> p.getFileName().toString().endsWith(".xlsx")));
-            assertTrue(Files.list(tempDir).anyMatch(p -> p.getFileName().toString().endsWith(".pdf")));
+            assertTrue(existeArchivoConExtension(tempDir, ".xlsx"));
+            assertTrue(existeArchivoConExtension(tempDir, ".pdf"));
         } finally {
+            if (ctrlRef.get() != null) {
+                ctrlRef.get().detenerRecursos();
+            }
             if (idMovimientoUi.get() != null) {
                 service.eliminarMovimiento(idMovimientoUi.get());
             }
+        }
+    }
+
+    private static boolean existeArchivoConExtension(Path dir, String ext) {
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.anyMatch(p -> p.getFileName().toString().endsWith(ext));
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
     }
 

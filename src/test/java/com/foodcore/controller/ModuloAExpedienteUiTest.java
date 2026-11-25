@@ -94,7 +94,20 @@ class ModuloAExpedienteUiTest {
                     new Scene(root, 1280, 820);
                     root.applyCss();
                     root.layout();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
+            ExpedienteEmpleadoController ctrl = ctrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getTblColaboradores().getItems().isEmpty(),
+                    10L,
+                    "ExpedienteEmpleadoView debe poblar colaboradores de forma asíncrona");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
                     assertEquals(3, ctrl.getTabPaneExpediente().getTabs().size());
                     ctrl.getTabPaneExpediente().getSelectionModel().select(0);
                     root.layout();
@@ -106,6 +119,22 @@ class ModuloAExpedienteUiTest {
 
                     ctrl.getTabPaneExpediente().getSelectionModel().select(2);
                     ctrl.handleSubirPdf();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getBtnSubirPdf().isDisabled()
+                            && ctrl.getTblDocumentos().getItems().stream()
+                                    .anyMatch(d -> "contrato_temporal_ui.pdf".equals(d.getNombreArchivo()))
+                            && ctrl.getLblMensajeEstado().getText().contains("PDF adjuntado correctamente"),
+                    10L,
+                    "El PDF adjuntado de forma asíncrona debe listarse en tblDocumentos");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
                     List<DocumentoEmpleado> docs = ctrl.getTblDocumentos().getItems();
                     docs.stream()
                             .filter(d -> "contrato_temporal_ui.pdf".equals(d.getNombreArchivo()))
@@ -117,8 +146,6 @@ class ModuloAExpedienteUiTest {
                     throw new RuntimeException(e);
                 }
             });
-
-            ExpedienteEmpleadoController ctrl = ctrlRef.get();
             assertEquals("Datos Personales", ctrl.getTabPaneExpediente().getTabs().get(0).getText());
             assertEquals("Datos Laborales", ctrl.getTabPaneExpediente().getTabs().get(1).getText());
             assertEquals("Documentos", ctrl.getTabPaneExpediente().getTabs().get(2).getText());
@@ -127,6 +154,9 @@ class ModuloAExpedienteUiTest {
                     "El PDF seleccionado desde ExportFileChooserHelper debe quedar registrado");
             assertTrue(ctrl.getLblMensajeEstado().getText().contains("PDF adjuntado correctamente"));
         } finally {
+            if (ctrlRef.get() != null) {
+                ctrlRef.get().detenerRecursos();
+            }
             if (docSubidoId.get() != null) {
                 serviceTemp.eliminarDocumento(docSubidoId.get());
             }
