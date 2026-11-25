@@ -55,38 +55,68 @@ class ModuloBVacacionesUiTest {
         AuthService.setUsuarioSesionActual(cajero);
 
         AtomicReference<MiHorarioController> ctrlRef = new AtomicReference<>();
+        AtomicReference<Parent> rootRef = new AtomicReference<>();
 
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-                App.cargarFuentesSistema();
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MiHorarioView.fxml"));
-                Parent root = loader.load();
-                MiHorarioController ctrl = loader.getController();
-                ctrlRef.set(ctrl);
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+                    App.cargarFuentesSistema();
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MiHorarioView.fxml"));
+                    Parent root = loader.load();
+                    MiHorarioController ctrl = loader.getController();
+                    new Scene(root, 1240, 820);
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
+            MiHorarioController ctrl = ctrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getListaBoletas().isEmpty()
+                            && ctrl.getLblVacDisponibles().getText().contains("Disponibles:"),
+                    10L,
+                    "La carga inicial asíncrona de MiHorarioView debe poblar boletas y vacaciones");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 LocalDate inicio = LocalDate.now().plusDays(10);
                 LocalDate fin = inicio.plusDays(3);
                 ctrl.getDpVacInicio().setValue(inicio);
                 ctrl.getDpVacFin().setValue(fin);
                 ctrl.getTxtVacMotivo().setText("Vacaciones anuales programadas");
                 ctrl.handleSolicitarVacaciones();
+            });
 
-                new Scene(root, 1240, 820);
-                root.applyCss();
-                root.layout();
-                guardarSnapshot(root, "05_portal_empleado_vacaciones_v470.png");
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getBtnSolicitarVacaciones().isDisabled()
+                            && ctrl.getLblVacEstadoMsg().getText().contains("Solicitud registrada")
+                            && !ctrl.getListaMisVacaciones().isEmpty(),
+                    10L,
+                    "La solicitud de vacaciones asíncrona debe registrarse y rehabilitar el botón");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
+                    root.applyCss();
+                    root.layout();
+                    guardarSnapshot(root, "05_portal_empleado_vacaciones_v470.png");
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            assertEquals(3, ctrl.getTabPaneMiPortal().getTabs().size());
+            assertEquals("4 días", ctrl.getLblVacDiasCalculados().getText());
+            assertTrue(ctrl.getLblVacDisponibles().getText().contains("Disponibles:"));
+            assertTrue(ctrl.getLblVacEstadoMsg().getText().contains("Solicitud registrada"));
+            assertFalse(ctrl.getListaMisVacaciones().isEmpty());
+        } finally {
+            if (ctrlRef.get() != null) {
+                ctrlRef.get().detenerRecursos();
             }
-        });
-
-        MiHorarioController ctrl = ctrlRef.get();
-        assertEquals(3, ctrl.getTabPaneMiPortal().getTabs().size());
-        assertEquals("4 días", ctrl.getLblVacDiasCalculados().getText());
-        assertTrue(ctrl.getLblVacDisponibles().getText().contains("Disponibles:"));
-        assertTrue(ctrl.getLblVacEstadoMsg().getText().contains("Solicitud registrada"));
-        assertFalse(ctrl.getListaMisVacaciones().isEmpty());
+        }
     }
 
     @Test

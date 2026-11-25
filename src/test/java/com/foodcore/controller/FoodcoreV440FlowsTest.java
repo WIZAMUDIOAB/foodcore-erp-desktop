@@ -342,6 +342,7 @@ class FoodcoreV440FlowsTest {
 
         // 2. Portal del Empleado (3 Tabs + Descarga Boleta PDF con OpenPDF)
         Path tempPdf = Files.createTempFile("foodcore_boleta_v44_", ".pdf");
+        AtomicReference<MiHorarioController> miHorarioCtrlRef = new AtomicReference<>();
         try {
             JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 try {
@@ -349,16 +350,30 @@ class FoodcoreV440FlowsTest {
                     Parent root = loader.load();
                     Scene sc = new Scene(root, 1080, 720);
                     App.applyStylesheets(sc);
+                    miHorarioCtrlRef.set(loader.getController());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                    MiHorarioController ctrl = loader.getController();
-                    assertEquals(3, ctrl.getTabPaneMiPortal().getTabs().size());
-                    assertEquals("Mi Horario", ctrl.getTabPaneMiPortal().getTabs().get(0).getText());
-                    assertEquals("Mis Asistencias", ctrl.getTabPaneMiPortal().getTabs().get(1).getText());
-                    assertEquals("Mis Boletas", ctrl.getTabPaneMiPortal().getTabs().get(2).getText());
-                    assertFalse(ctrl.getListaBoletas().isEmpty());
+            MiHorarioController miHorarioCtrl = miHorarioCtrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> !miHorarioCtrl.getListaBoletas().isEmpty(),
+                    10L,
+                    "MiHorarioController debe poblar boletas de forma asíncrona");
 
-                    File out = ctrl.generarBoletaPdf(ctrl.getListaBoletas().get(0), admin, tempPdf.toFile());
-                    assertTrue(out.exists() && out.length() > 800, "El PDF de la boleta debe generarse con contenido válido");
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    assertEquals(3, miHorarioCtrl.getTabPaneMiPortal().getTabs().size());
+                    assertEquals("Mi Horario", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(0).getText());
+                    assertEquals("Mis Asistencias", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(1).getText());
+                    assertEquals("Mis Boletas", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(2).getText());
+                    assertFalse(miHorarioCtrl.getListaBoletas().isEmpty());
+
+                    File out = miHorarioCtrl.generarBoletaPdf(
+                            miHorarioCtrl.getListaBoletas().get(0), admin, tempPdf.toFile());
+                    assertTrue(out.exists() && out.length() > 800,
+                            "El PDF de la boleta debe generarse con contenido válido");
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -368,6 +383,9 @@ class FoodcoreV440FlowsTest {
             String header = new String(pdfBytes, 0, Math.min(5, pdfBytes.length), StandardCharsets.US_ASCII);
             assertEquals("%PDF-", header, "El archivo generado debe tener cabecera PDF válida");
         } finally {
+            if (miHorarioCtrlRef.get() != null) {
+                miHorarioCtrlRef.get().detenerRecursos();
+            }
             Files.deleteIfExists(tempPdf);
         }
 

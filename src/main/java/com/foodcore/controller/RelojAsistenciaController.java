@@ -8,6 +8,7 @@ import com.foodcore.model.Usuario;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
@@ -23,6 +24,8 @@ import javafx.util.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,12 +43,24 @@ public class RelojAsistenciaController implements LifecycleAwareController {
     @FXML private Label lblConfirmacionNombre;
     @FXML private Label lblConfirmacionDetalle;
 
-    private final AsistenciaService asistenciaService = new AsistenciaService();
+    private final AsistenciaService asistenciaService;
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicBoolean marcajeEnCurso = new AtomicBoolean(false);
     private Timeline relojTimeline;
     private PauseTransition feedbackPause;
 
+    public RelojAsistenciaController() {
+        this(AppContainer.getDefault().resolve(AsistenciaService.class));
+    }
+
+    public RelojAsistenciaController(AsistenciaService asistenciaService) {
+        this.asistenciaService = Objects.requireNonNull(
+                asistenciaService, "asistenciaService no puede ser nulo");
+    }
+
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         iniciarReloj();
         AnimationUtils.attachTactileFeedback(btnMarcar);
     }
@@ -88,87 +103,161 @@ public class RelojAsistenciaController implements LifecycleAwareController {
 
     @FXML
     public void handleMarcar() {
-        String credencial = txtCredencial.getText();
+        String credencial = txtCredencial != null ? txtCredencial.getText() : null;
         if (credencial == null || credencial.trim().isEmpty()) {
             mostrarError("Por favor ingrese su DNI o PIN");
             return;
         }
+        if (!marcajeEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        String credLimpia = credencial.trim();
+        setControlesMarcajeDeshabilitados(true);
 
-        try {
-            AsistenciaService.ResultadoMarcaje res = asistenciaService.registrarMarcajeKiosco(credencial.trim());
-            if (res.isExitoso()) {
-                mostrarConfirmacion(res);
-                txtCredencial.clear();
-            } else {
-                mostrarError(res.getMensaje());
+        UiAsyncExecutor.ejecutarAsync(
+            () -> asistenciaService.registrarMarcajeKiosco(credLimpia),
+            res -> {
+                marcajeEnCurso.set(false);
+                setControlesMarcajeDeshabilitados(false);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (res != null && res.isExitoso()) {
+                    mostrarConfirmacion(res);
+                    if (txtCredencial != null) {
+                        txtCredencial.clear();
+                    }
+                } else {
+                    mostrarError(res != null ? res.getMensaje() : "No se pudo registrar asistencia");
+                }
+            },
+            ex -> {
+                marcajeEnCurso.set(false);
+                setControlesMarcajeDeshabilitados(false);
+                LOGGER.log(Level.WARNING, "Error al registrar marcaje en kiosco", ex);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                mostrarError("Error en base de datos: " + ex.getMessage());
             }
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al registrar marcaje en kiosco", ex);
-            mostrarError("Error en base de datos: " + ex.getMessage());
+        );
+    }
+
+    private void setControlesMarcajeDeshabilitados(boolean disabled) {
+        if (btnMarcar != null) {
+            btnMarcar.setDisable(disabled);
+        }
+        if (txtCredencial != null) {
+            txtCredencial.setDisable(disabled);
         }
     }
 
     private void mostrarConfirmacion(AsistenciaService.ResultadoMarcaje res) {
-        cardConfirmacion.setVisible(true);
-        AnimationUtils.animateModalEnter(cardConfirmacion);
+        if (cardConfirmacion != null) {
+            cardConfirmacion.setVisible(true);
+            AnimationUtils.animateModalEnter(cardConfirmacion);
+        }
 
         Usuario u = res.getUsuario();
-        String nom = u.getNombreEmpleado() != null && !u.getNombreEmpleado().isBlank() ? u.getNombreEmpleado() : u.getUsername();
-        lblConfirmacionNombre.setText(nom + " (" + u.getNombreRol() + ")");
-        lblConfirmacionDetalle.setText(res.getMensaje());
+        String nom = u != null && u.getNombreEmpleado() != null && !u.getNombreEmpleado().isBlank()
+                ? u.getNombreEmpleado()
+                : (u != null ? u.getUsername() : "Colaborador");
+        String rol = u != null && u.getNombreRol() != null ? u.getNombreRol() : "PERSONAL";
+        if (lblConfirmacionNombre != null) {
+            lblConfirmacionNombre.setText(nom + " (" + rol + ")");
+        }
+        if (lblConfirmacionDetalle != null) {
+            lblConfirmacionDetalle.setText(res.getMensaje());
+        }
 
-        if ("ENTRADA".equalsIgnoreCase(res.getTipo())) {
-            Asistencia a = res.getAsistencia();
-            if (a != null && a.getTardanzaMinutos() > 0) {
-                lblConfirmacionBadge.setText("⚠ ENTRADA CON TARDANZA (" + a.getTardanzaMinutos() + " MIN)");
-                lblConfirmacionBadge.getStyleClass().removeAll(
-                        "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
-                        "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
-                lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-warning");
-            } else {
-                lblConfirmacionBadge.setText("✓ ENTRADA REGISTRADA PUNTUAL");
-                lblConfirmacionBadge.getStyleClass().removeAll(
-                        "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
-                        "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
-                lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-success");
-            }
-        } else {
-            lblConfirmacionBadge.setText("✓ SALIDA REGISTRADA");
+        if (lblConfirmacionBadge != null) {
             lblConfirmacionBadge.getStyleClass().removeAll(
                     "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
                     "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
-            lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-info");
+            if ("ENTRADA".equalsIgnoreCase(res.getTipo())) {
+                Asistencia a = res.getAsistencia();
+                if (a != null && a.getTardanzaMinutos() > 0) {
+                    lblConfirmacionBadge.setText("⚠ ENTRADA CON TARDANZA (" + a.getTardanzaMinutos() + " MIN)");
+                    lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-warning");
+                } else {
+                    lblConfirmacionBadge.setText("✓ ENTRADA REGISTRADA PUNTUAL");
+                    lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-success");
+                }
+            } else {
+                lblConfirmacionBadge.setText("✓ SALIDA REGISTRADA");
+                lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-info");
+            }
         }
 
         reiniciarFeedbackAutoOcultar(Duration.seconds(4));
     }
 
     private void mostrarError(String error) {
-        cardConfirmacion.setVisible(true);
-        AnimationUtils.animateModalEnter(cardConfirmacion);
-        lblConfirmacionBadge.setText("✕ NO REGISTRADO");
-        lblConfirmacionBadge.getStyleClass().removeAll(
-                "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
-                "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
-        lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-danger");
-        lblConfirmacionNombre.setText("Atención");
-        lblConfirmacionDetalle.setText(error);
+        if (cardConfirmacion != null) {
+            cardConfirmacion.setVisible(true);
+            AnimationUtils.animateModalEnter(cardConfirmacion);
+        }
+        if (lblConfirmacionBadge != null) {
+            lblConfirmacionBadge.setText("✕ NO REGISTRADO");
+            lblConfirmacionBadge.getStyleClass().removeAll(
+                    "fc-kiosk-badge-warning", "fc-kiosk-badge-success",
+                    "fc-kiosk-badge-info", "fc-kiosk-badge-danger");
+            lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-danger");
+        }
+        if (lblConfirmacionNombre != null) {
+            lblConfirmacionNombre.setText("Atención");
+        }
+        if (lblConfirmacionDetalle != null) {
+            lblConfirmacionDetalle.setText(error);
+        }
 
         reiniciarFeedbackAutoOcultar(Duration.seconds(3));
     }
 
     private void reiniciarFeedbackAutoOcultar(Duration duracion) {
+        if (!vistaActiva.get()) {
+            return;
+        }
         if (feedbackPause != null) {
             feedbackPause.stop();
         }
         feedbackPause = new PauseTransition(duracion);
-        feedbackPause.setOnFinished(e -> cardConfirmacion.setVisible(false));
+        feedbackPause.setOnFinished(e -> {
+            if (cardConfirmacion != null) {
+                cardConfirmacion.setVisible(false);
+            }
+        });
         feedbackPause.play();
     }
 
     @Override
     public void detenerRecursos() {
+        vistaActiva.set(false);
         stopTimeline();
+    }
+
+    public Animation.Status getRelojTimelineStatus() {
+        return relojTimeline != null ? relojTimeline.getStatus() : Animation.Status.STOPPED;
+    }
+
+    public TextField getTxtCredencial() {
+        return txtCredencial;
+    }
+
+    public Button getBtnMarcar() {
+        return btnMarcar;
+    }
+
+    public VBox getCardConfirmacion() {
+        return cardConfirmacion;
+    }
+
+    public Label getLblConfirmacionBadge() {
+        return lblConfirmacionBadge;
+    }
+
+    public Label getLblConfirmacionDetalle() {
+        return lblConfirmacionDetalle;
     }
 
     public void stopTimeline() {

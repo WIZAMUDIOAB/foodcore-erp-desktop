@@ -9,8 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -138,5 +140,57 @@ class ControllerThreadingArchitectureTest {
         }
 
         assertTrue(violaciones.isEmpty(), "Referencias a Gson prohibidas: " + violaciones);
+    }
+
+    @Test
+    @DisplayName("PR-12: 100% de los controladores con I/O usan UiAsyncExecutor sin exenciones para Lote 1 ni Lote 2")
+    void todosLosControladoresConServiciosUsanUiAsyncExecutor() throws IOException {
+        Path controllersDir = Path.of("src", "main", "java", "com", "foodcore", "controller");
+        Set<String> sinIoPermitidos = Set.of(
+                "MainDashboardController.java",
+                "SplashController.java",
+                "PersonalizacionProductoController.java");
+
+        List<String> sinAsync = new ArrayList<>();
+        List<String> allowlistViolations = new ArrayList<>();
+        try (Stream<Path> files = Files.list(controllersDir)) {
+            for (Path path : files.filter(p -> !Files.isDirectory(p) && p.toString().endsWith(".java")).toList()) {
+                String nombre = path.getFileName().toString();
+                String content = Files.readString(path, StandardCharsets.UTF_8);
+                if (sinIoPermitidos.contains(nombre)) {
+                    if (content.contains("java.sql.")
+                            || content.contains("SQLException")
+                            || content.contains("FileOutputStream")
+                            || content.contains("Files.")) {
+                        allowlistViolations.add(nombre);
+                    }
+                    continue;
+                }
+                if ("VentaController.java".equals(nombre)) {
+                    Path ventaPkg = controllersDir.resolve("venta");
+                    for (String helper : List.of(
+                            "VentaPosOrdenOperacionesHelper.java",
+                            "VentaPosMesasCatalogoHelper.java",
+                            "VentaPosFidelizacionHelper.java")) {
+                        String helperSrc = Files.readString(ventaPkg.resolve(helper), StandardCharsets.UTF_8);
+                        assertTrue(helperSrc.contains("UiAsyncExecutor"),
+                                "Helper POS delegado debe usar UiAsyncExecutor: " + helper);
+                    }
+                    continue;
+                }
+                if (!content.contains("UiAsyncExecutor")) {
+                    sinAsync.add(nombre);
+                }
+                assertFalse(content.contains("com.foodcore.dao.impl."),
+                        "Controlador no debe referenciar dao.impl: " + nombre);
+                assertFalse(content.contains("com.foodcore.service.impl."),
+                        "Controlador no debe referenciar service.impl: " + nombre);
+            }
+        }
+
+        assertTrue(allowlistViolations.isEmpty(),
+                "Controladores declarados sin I/O no deben ejecutar I/O bloqueante: " + allowlistViolations);
+        assertTrue(sinAsync.isEmpty(),
+                "Todos los controladores con I/O/servicios deben usar UiAsyncExecutor: " + sinAsync);
     }
 }

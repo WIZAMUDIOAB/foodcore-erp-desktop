@@ -1,24 +1,31 @@
 package com.foodcore.controller;
 
 import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.service.AuthService;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class MarcacionAsistenciaController {
+public class MarcacionAsistenciaController implements LifecycleAwareController {
+
+    private static final Logger LOGGER = Logger.getLogger(MarcacionAsistenciaController.class.getName());
 
     @FXML private TextField txtDni;
     @FXML private Label lblEstado;
 
     private final AuthService authService;
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicBoolean marcandoEnCurso = new AtomicBoolean(false);
 
     public MarcacionAsistenciaController() {
         this(AppContainer.getDefault().authService());
@@ -26,6 +33,16 @@ public class MarcacionAsistenciaController {
 
     public MarcacionAsistenciaController(AuthService authService) {
         this.authService = Objects.requireNonNull(authService, "authService no puede ser nulo");
+    }
+
+    @FXML
+    public void initialize() {
+        vistaActiva.set(true);
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
     }
 
     @FXML
@@ -52,21 +69,61 @@ public class MarcacionAsistenciaController {
 
     @FXML
     public void handleRegistrar(ActionEvent event) {
-        String dni = txtDni.getText();
-        try {
-            String resultado = authService.marcarAsistenciaInteligente(dni);
-            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
-            lblEstado.getStyleClass().add("fc-status-ok");
-            lblEstado.setText(resultado);
-            txtDni.clear();
-        } catch (NegocioException e) {
-            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
-            lblEstado.getStyleClass().add("fc-status-error");
-            lblEstado.setText(e.getMessage());
-        } catch (Exception e) {
-            lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
-            lblEstado.getStyleClass().add("fc-status-error");
-            lblEstado.setText("Error al registrar marcación: " + e.getMessage());
+        String dni = txtDni != null && txtDni.getText() != null ? txtDni.getText().trim() : "";
+        Button trigger = (event != null && event.getSource() instanceof Button b) ? b : null;
+        if (!marcandoEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        if (trigger != null) {
+            trigger.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> authService.marcarAsistenciaInteligente(dni),
+            resultado -> {
+                marcandoEnCurso.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                aplicarEstadoEnUi(true, resultado);
+                if (txtDni != null) {
+                    txtDni.clear();
+                }
+            },
+            e -> {
+                marcandoEnCurso.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error al registrar marcación de asistencia", e);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                String msg = e instanceof NegocioException
+                        ? e.getMessage()
+                        : "Error al registrar marcación: " + e.getMessage();
+                aplicarEstadoEnUi(false, msg);
+            }
+        );
+    }
+
+    private void aplicarEstadoEnUi(boolean ok, String mensaje) {
+        if (lblEstado == null) {
+            return;
+        }
+        lblEstado.getStyleClass().removeAll("fc-status-ok", "fc-status-error");
+        lblEstado.getStyleClass().add(ok ? "fc-status-ok" : "fc-status-error");
+        lblEstado.setText(mensaje);
+    }
+
+    public TextField getTxtDni() {
+        return txtDni;
+    }
+
+    public Label getLblEstado() {
+        return lblEstado;
     }
 }
