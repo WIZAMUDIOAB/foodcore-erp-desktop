@@ -8,6 +8,7 @@ import com.foodcore.controller.dashboard.DashboardRbacPolicy;
 import com.foodcore.controller.dashboard.DashboardSyncIndicatorPresenter;
 import com.foodcore.controller.dashboard.DashboardViewLifecycleHelper;
 import com.foodcore.controller.dashboard.DefaultDashboardRbacPolicy;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.controller.dashboard.NavDestination;
 import com.foodcore.controller.dashboard.NavSection;
 import com.foodcore.offline.SyncWorker;
@@ -48,7 +49,7 @@ import java.util.logging.Logger;
  *   <li>{@code COCINERO}: KDS, Mi Portal y Solicitudes.</li>
  * </ul>
  */
-public class MainDashboardController {
+public class MainDashboardController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(MainDashboardController.class.getName());
     @FXML private StackPane rootDashboardStack;
@@ -594,6 +595,12 @@ public class MainDashboardController {
         return controladorActivo;
     }
 
+    @Override
+    public void detenerRecursos() {
+        desregistrarSyncWorkerListener();
+        detenerControladorActivo();
+    }
+
     private void detenerControladorActivo() {
         lifecycleHelper.detenerControladorActivo(controladorActivo);
         controladorActivo = null;
@@ -686,8 +693,7 @@ public class MainDashboardController {
 
     @FXML
     public void handleCerrarSesion(ActionEvent event) {
-        desregistrarSyncWorkerListener();
-        detenerControladorActivo();
+        detenerRecursos();
         this.usuarioAccesoActual = null;
         AuthService.logout();
         try {

@@ -2,12 +2,14 @@ package com.foodcore.controller;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
+import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.event.ActionEvent;
@@ -35,7 +37,7 @@ import java.util.logging.Logger;
  * (<5m verde, 5-10m ámbar, >10m rojo con pulso suave de 1.5s) y botones de 44px
  * según UI-REDESIGN-SPEC-FOODCORE-v1.1 (§7) y SPEC-FOODCORE-v1.0 (§8.5).
  */
-public class ComandaCardController {
+public class ComandaCardController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(ComandaCardController.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
@@ -285,6 +287,15 @@ public class ComandaCardController {
         return colorUmbral;
     }
 
+    @Override
+    public void detenerRecursos() {
+        stopTimer();
+    }
+
+    public Animation.Status getTimerStatus() {
+        return timer != null ? timer.getStatus() : Animation.Status.STOPPED;
+    }
+
     public void stopTimer() {
         if (timer != null) {
             timer.stop();
@@ -349,6 +360,9 @@ public class ComandaCardController {
     }
 
     private void iniciarTemporizador() {
+        if (timer != null) {
+            timer.stop();
+        }
         actualizarEstiloTiempo();
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             segundosTranscurridos++;

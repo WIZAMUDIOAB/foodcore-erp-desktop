@@ -1,6 +1,5 @@
 package com.foodcore.controller.dashboard;
 
-import com.foodcore.controller.AuditoriaController;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
@@ -132,11 +131,15 @@ public class DefaultDashboardRbacPolicy implements DashboardRbacPolicy {
 
     @Override
     public boolean puedeAccederAuditoria(Usuario user) {
-        return AuditoriaController.esUsuarioAdmin(user);
+        return esRolAdmin(user);
     }
 
     @Override
     public boolean puedeAccederEstadoSistema(Usuario user) {
+        return esRolAdmin(user);
+    }
+
+    private static boolean esRolAdmin(Usuario user) {
         return user != null && user.getNombreRol() != null
                 && user.getNombreRol().toUpperCase(Locale.ROOT).contains("ADMIN");
     }

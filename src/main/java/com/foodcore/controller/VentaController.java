@@ -1,5 +1,7 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.controller.venta.DefaultVentaCarritoHandler;
 import com.foodcore.controller.venta.DefaultVentaCobroCoordinator;
 import com.foodcore.controller.venta.DefaultVentaFidelizacionCoordinator;
@@ -22,7 +24,6 @@ import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
-import com.foodcore.config.AppContainer;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
@@ -73,7 +74,8 @@ import java.util.logging.Logger;
  * Controlador del Punto de Venta (POS) que enlaza la vista FXML
  * con los coordinadores y helpers de {@code controller.venta}.
  */
-public class VentaController implements VentaPosOrdenHostPort,
+public class VentaController implements LifecycleAwareController,
+        VentaPosOrdenHostPort,
         VentaPosFidelizacionHelper.HostCallbacks,
         VentaPosMesasCatalogoHelper.HostCallbacks {
 
@@ -334,6 +336,11 @@ public class VentaController implements VentaPosOrdenHostPort,
         autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(5), ev -> refrescarMesasYCanalesAsync()));
         autoRefreshTimeline.setCycleCount(Timeline.INDEFINITE);
         autoRefreshTimeline.play();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        stopTimeline();
     }
 
     public void stopTimeline() {

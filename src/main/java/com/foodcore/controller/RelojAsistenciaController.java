@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.App;
 import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AsistenciaService;
@@ -25,7 +26,7 @@ import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class RelojAsistenciaController {
+public class RelojAsistenciaController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(RelojAsistenciaController.class.getName());
 
@@ -41,6 +42,7 @@ public class RelojAsistenciaController {
 
     private final AsistenciaService asistenciaService = new AsistenciaService();
     private Timeline relojTimeline;
+    private PauseTransition feedbackPause;
 
     @FXML
     public void initialize() {
@@ -49,6 +51,7 @@ public class RelojAsistenciaController {
     }
 
     private void iniciarReloj() {
+        stopTimeline();
         actualizarTiempo();
         relojTimeline = new Timeline(new KeyFrame(Duration.seconds(1), e -> actualizarTiempo()));
         relojTimeline.setCycleCount(Animation.INDEFINITE);
@@ -137,9 +140,7 @@ public class RelojAsistenciaController {
             lblConfirmacionBadge.getStyleClass().add("fc-kiosk-badge-info");
         }
 
-        PauseTransition pause = new PauseTransition(Duration.seconds(4));
-        pause.setOnFinished(e -> cardConfirmacion.setVisible(false));
-        pause.play();
+        reiniciarFeedbackAutoOcultar(Duration.seconds(4));
     }
 
     private void mostrarError(String error) {
@@ -153,14 +154,29 @@ public class RelojAsistenciaController {
         lblConfirmacionNombre.setText("Atención");
         lblConfirmacionDetalle.setText(error);
 
-        PauseTransition pause = new PauseTransition(Duration.seconds(3));
-        pause.setOnFinished(e -> cardConfirmacion.setVisible(false));
-        pause.play();
+        reiniciarFeedbackAutoOcultar(Duration.seconds(3));
+    }
+
+    private void reiniciarFeedbackAutoOcultar(Duration duracion) {
+        if (feedbackPause != null) {
+            feedbackPause.stop();
+        }
+        feedbackPause = new PauseTransition(duracion);
+        feedbackPause.setOnFinished(e -> cardConfirmacion.setVisible(false));
+        feedbackPause.play();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        stopTimeline();
     }
 
     public void stopTimeline() {
         if (relojTimeline != null) {
             relojTimeline.stop();
+        }
+        if (feedbackPause != null) {
+            feedbackPause.stop();
         }
     }
 
@@ -181,14 +197,14 @@ public class RelojAsistenciaController {
             newStage.setScene(scene);
             newStage.setOnCloseRequest(e -> {
                 if (newCtrl != null) {
-                    newCtrl.stopTimeline();
+                    newCtrl.detenerRecursos();
                 }
                 newStage.close();
                 newStage.setScene(null);
             });
             newStage.setOnHidden(e -> {
                 if (newCtrl != null) {
-                    newCtrl.stopTimeline();
+                    newCtrl.detenerRecursos();
                 }
             });
             newStage.show();
@@ -211,7 +227,7 @@ public class RelojAsistenciaController {
 
     @FXML
     public void handleSalirKiosco(ActionEvent event) {
-        stopTimeline();
+        detenerRecursos();
         if (event != null && event.getSource() instanceof Button btn && btn.getScene() != null
                 && btn.getScene().getWindow() instanceof javafx.stage.Stage stage) {
             if (stage.getOwner() != null || stage.getStyle() == javafx.stage.StageStyle.UNDECORATED) {

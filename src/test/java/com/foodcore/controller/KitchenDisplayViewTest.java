@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
@@ -9,6 +10,7 @@ import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;
+import javafx.animation.Animation;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -248,5 +250,63 @@ class KitchenDisplayViewTest {
             assertTrue(rs.next());
             assertEquals("ENTREGADO", rs.getString("estado"));
         }
+    }
+
+    @Test
+    @DisplayName("F-CONC-017: recargar KDS y detenerRecursos() pasan Timeline de todas las tarjetas a STOPPED")
+    void testRecargaYDetenerRecursosKdsDetienenTimelinesDeTarjetas() throws Exception {
+        LocalDateTime ahora = LocalDateTime.now(ZONA_LIMA);
+        DetallePedido itemSinClave = crearDetalle(1, "PENDIENTE");
+        itemSinClave.setIdPedido(0);
+        itemSinClave.setIdDetallePedido(0);
+        DetallePedido itemConClave = crearDetalle(3, "EN_PREPARACION");
+        itemConClave.setIdPedido(50);
+        itemConClave.setIdDetallePedido(501);
+        DetallePedido itemNuevo = crearDetalle(6, "PENDIENTE");
+        itemNuevo.setIdPedido(51);
+        itemNuevo.setIdDetallePedido(502);
+
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            KitchenDisplayController kdsCtrl = null;
+            try {
+                FXMLLoader loader = AppContainer.getDefault().createLoader(
+                        getClass().getResource("/com/foodcore/view/KitchenDisplayView.fxml"));
+                Parent root = loader.load();
+                new Scene(root, 1200, 760);
+                kdsCtrl = loader.getController();
+
+                kdsCtrl.renderizarItemsKds(List.of(itemSinClave, itemConClave), ahora);
+                List<ComandaCardController> tarjetasLote1 = kdsCtrl.getTarjetasRenderizadas();
+                assertEquals(2, tarjetasLote1.size());
+                assertEquals(Animation.Status.RUNNING, kdsCtrl.getAutoSyncTimerStatus());
+                for (ComandaCardController card : tarjetasLote1) {
+                    assertEquals(Animation.Status.RUNNING, card.getTimerStatus());
+                }
+
+                kdsCtrl.renderizarItemsKds(List.of(itemNuevo), ahora);
+                for (ComandaCardController previa : tarjetasLote1) {
+                    assertEquals(Animation.Status.STOPPED, previa.getTimerStatus(),
+                            "Al recargar el tablero KDS, el Timeline previo debe quedar STOPPED");
+                }
+                List<ComandaCardController> tarjetasLote2 = kdsCtrl.getTarjetasRenderizadas();
+                assertEquals(1, tarjetasLote2.size());
+                assertEquals(Animation.Status.RUNNING, tarjetasLote2.get(0).getTimerStatus());
+
+                kdsCtrl.detenerRecursos();
+                kdsCtrl.detenerRecursos();
+                assertEquals(Animation.Status.STOPPED, kdsCtrl.getAutoSyncTimerStatus());
+                for (ComandaCardController activa : tarjetasLote2) {
+                    assertEquals(Animation.Status.STOPPED, activa.getTimerStatus());
+                }
+                assertTrue(kdsCtrl.getTarjetasActivas().isEmpty());
+                assertTrue(kdsCtrl.getTarjetasRenderizadas().isEmpty());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+                if (kdsCtrl != null) {
+                    kdsCtrl.detenerRecursos();
+                }
+            }
+        });
     }
 }

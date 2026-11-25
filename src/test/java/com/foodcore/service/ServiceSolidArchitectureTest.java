@@ -266,6 +266,7 @@ class ServiceSolidArchitectureTest {
                 new String[] {"com.foodcore.service", "com.foodcore.service.finanzas"},
                 new String[] {"com.foodcore.service", "com.foodcore.service.impl"},
                 new String[] {"com.foodcore.service", "com.foodcore.service.venta"},
+                new String[] {"com.foodcore.controller", "com.foodcore.controller.dashboard"},
                 new String[] {"com.foodcore.controller", "com.foodcore.controller.reportes"}
         );
         for (String[] par : paresSinCiclo) {
@@ -356,6 +357,64 @@ class ServiceSolidArchitectureTest {
                 "FinanzasService no debe pasar null como TransactionManager a DefaultCuentaCorrienteUseCase");
         assertFalse(finanzasCompact.contains("DefaultCambioPrecioUseCase(null"),
                 "FinanzasService no debe pasar null como TransactionManager a DefaultCambioPrecioUseCase");
+    }
+
+    @Test
+    void dashboardLifecycleHelperCumpleOcpYSinCicloDePaqueteConController() throws Exception {
+        Path dashboardDir = Path.of("src/main/java/com/foodcore/controller/dashboard");
+        assertTrue(
+                Files.exists(dashboardDir.resolve("LifecycleAwareController.java")),
+                "Debe existir el contrato OCP LifecycleAwareController en controller.dashboard");
+
+        String helperLimpio = limpiarComentariosYLiterales(
+                Files.readString(dashboardDir.resolve("DashboardViewLifecycleHelper.java")));
+        assertTrue(
+                helperLimpio.contains("LifecycleAwareController"),
+                "DashboardViewLifecycleHelper debe depender de la abstraccion LifecycleAwareController");
+        String helperSinPaqueteDashboard = helperLimpio
+                .replace("package com.foodcore.controller.dashboard;", "")
+                .replace("com.foodcore.controller.dashboard.", "");
+        assertFalse(
+                helperSinPaqueteDashboard.contains("com.foodcore.controller."),
+                "DashboardViewLifecycleHelper no debe importar controladores concretos de com.foodcore.controller");
+
+        for (String claseConcreta : List.of(
+                "RelojAsistenciaController",
+                "VentaController",
+                "KitchenDisplayController",
+                "EstadoSistemaController",
+                "ComandaCardController",
+                "LoginController",
+                "MainDashboardController")) {
+            assertFalse(
+                    helperLimpio.contains("instanceof " + claseConcreta),
+                    "DashboardViewLifecycleHelper no debe usar instanceof sobre " + claseConcreta);
+        }
+
+        try (var files = Files.walk(dashboardDir)) {
+            for (Path file : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                String limpio = limpiarComentariosYLiterales(Files.readString(file))
+                        .replace("package com.foodcore.controller.dashboard;", "")
+                        .replace("com.foodcore.controller.dashboard.", "");
+                assertFalse(
+                        limpio.contains("com.foodcore.controller."),
+                        "controller.dashboard no debe depender de com.foodcore.controller: " + file);
+            }
+        }
+
+        List<Class<?>> lifecycleControllers = List.of(
+                com.foodcore.controller.RelojAsistenciaController.class,
+                com.foodcore.controller.VentaController.class,
+                com.foodcore.controller.KitchenDisplayController.class,
+                com.foodcore.controller.EstadoSistemaController.class,
+                com.foodcore.controller.ComandaCardController.class,
+                com.foodcore.controller.LoginController.class,
+                com.foodcore.controller.MainDashboardController.class);
+        for (Class<?> controllerClass : lifecycleControllers) {
+            assertTrue(
+                    com.foodcore.controller.dashboard.LifecycleAwareController.class.isAssignableFrom(controllerClass),
+                    controllerClass.getSimpleName() + " debe implementar LifecycleAwareController");
+        }
     }
 
     private void cargarDependenciasEstaticas(Map<String, Set<String>> classDeps,

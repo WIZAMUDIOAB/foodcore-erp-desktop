@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import com.foodcore.App;
 import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.SesionManager;
@@ -51,7 +52,7 @@ import java.util.Objects;
 /**
  * Controlador de la pantalla de inicio de sesión (§3 y §4 de UI-REDESIGN-SPEC-FOODCORE-v1.1).
  */
-public class LoginController {
+public class LoginController implements LifecycleAwareController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginController.class);
     static final String MENSAJE_ERROR_BD_DESACTUALIZADA =
@@ -129,6 +130,7 @@ public class LoginController {
         if (auroraCanvas == null) {
             return;
         }
+        detenerAnimacionAurora();
         if (rootStackPane != null) {
             auroraCanvas.widthProperty().bind(rootStackPane.widthProperty());
             auroraCanvas.heightProperty().bind(rootStackPane.heightProperty());
@@ -184,6 +186,11 @@ public class LoginController {
                 new Stop(0.0, Color.rgb(63, 63, 70, 0.55)),
                 new Stop(1.0, Color.TRANSPARENT)));
         gc.fillRect(0, 0, w, h);
+    }
+
+    @Override
+    public void detenerRecursos() {
+        detenerAnimacionAurora();
     }
 
     /**
