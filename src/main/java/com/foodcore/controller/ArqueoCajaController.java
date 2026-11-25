@@ -13,7 +13,6 @@ import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;

@@ -10,7 +10,6 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Usuario;
-import com.foodcore.model.Venta;
 import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
@@ -21,7 +20,6 @@ import com.foodcore.service.SupervisorAutorizacionService;
 import com.foodcore.tx.TransactionManager;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;

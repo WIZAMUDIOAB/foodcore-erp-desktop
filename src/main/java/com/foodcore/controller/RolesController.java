@@ -23,8 +23,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -82,7 +80,9 @@ public class RolesController {
     }
 
     public static String getPermisoLabel(Permiso permiso) {
-        if (permiso == null) return "";
+        if (permiso == null) {
+            return "";
+        }
         return switch (permiso) {
             case PEDIDO_CREAR -> "Crear Pedido y abrir mesa";
             case PEDIDO_ADICIONAR -> "Adicionar ítems a pedido";
@@ -156,7 +156,9 @@ public class RolesController {
     }
 
     public void seleccionarRolSincrono(Rol r) {
-        if (r == null) return;
+        if (r == null) {
+            return;
+        }
         this.rolSeleccionadoActual = r;
         lblRolSeleccionadoTitulo.setText("Permisos del Rol: " + r.getNombre() + " (" + r.getCodigo() + ")");
         lblRolDescripcion.setText(r.getDescripcion() != null ? r.getDescripcion() : "Sin descripción.");

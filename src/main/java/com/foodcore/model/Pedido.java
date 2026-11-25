@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -86,8 +87,8 @@ public class Pedido {
     public int getVersion() { return version; }
     public void setVersion(int version) { this.version = version; }
 
-    public List<DetallePedido> getDetalles() { return detalles; }
-    public void setDetalles(List<DetallePedido> detalles) { this.detalles = detalles; }
+    public List<DetallePedido> getDetalles() { return detalles != null ? Collections.unmodifiableList(detalles) : null; }
+    public void setDetalles(List<DetallePedido> detalles) { this.detalles = detalles != null ? new ArrayList<>(detalles) : null; }
 
     public String getTipoPedido() { return tipoPedido; }
     public void setTipoPedido(String tipoPedido) { this.tipoPedido = tipoPedido != null ? tipoPedido : "MESA"; }

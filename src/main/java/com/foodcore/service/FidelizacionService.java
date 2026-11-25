@@ -10,7 +10,6 @@ import com.foodcore.model.CompraClienteResumen;
 import com.foodcore.model.CuponCumpleanos;
 import com.foodcore.model.FidelizacionMovimiento;
 import com.foodcore.model.HistorialPuntos;
-import com.foodcore.exception.NegocioException;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
 import com.foodcore.util.ConexionBD;

@@ -4,7 +4,6 @@ import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
-import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
 import com.foodcore.service.MenuGestionService;
 import com.foodcore.service.PersonalizacionProductoService;
@@ -16,7 +15,6 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class DefaultMenuCrudPresenter implements MenuCrudPresenter {
     private final MenuGestionService menuGestionService;

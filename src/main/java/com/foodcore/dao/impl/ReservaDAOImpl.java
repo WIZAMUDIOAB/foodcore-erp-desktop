@@ -155,14 +155,20 @@ public class ReservaDAOImpl implements ReservaDAO {
         r.setClienteNombre(rs.getString("cliente_nombre"));
         r.setClienteTelefono(rs.getString("cliente_telefono"));
         Date f = rs.getDate("fecha");
-        if (f != null) r.setFecha(f.toLocalDate());
+        if (f != null) {
+            r.setFecha(f.toLocalDate());
+        }
         Time h = rs.getTime("hora");
-        if (h != null) r.setHora(h.toLocalTime());
+        if (h != null) {
+            r.setHora(h.toLocalTime());
+        }
         r.setPersonas(rs.getInt("personas"));
         r.setEstado(rs.getString("estado"));
         r.setNotas(rs.getString("notas"));
         int u = rs.getInt("id_usuario_registro");
-        if (!rs.wasNull()) r.setIdUsuarioRegistro(u);
+        if (!rs.wasNull()) {
+            r.setIdUsuarioRegistro(u);
+        }
         return r;
     }
 }

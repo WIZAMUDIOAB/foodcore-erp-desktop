@@ -39,6 +39,10 @@ public class KardexConsultaService {
     }
 
     public record KardexCargaData(List<String> insumos, List<FilaKardexData> filas) {
+        public KardexCargaData {
+            insumos = insumos != null ? List.copyOf(insumos) : List.of();
+            filas = filas != null ? List.copyOf(filas) : List.of();
+        }
     }
 
     /**

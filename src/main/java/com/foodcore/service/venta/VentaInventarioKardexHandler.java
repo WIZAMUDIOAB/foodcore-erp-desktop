@@ -8,8 +8,6 @@ import com.foodcore.model.DetalleVenta;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,13 +17,9 @@ public interface VentaInventarioKardexHandler {
             List<Long> idsOrdenados,
             Map<Long, BigDecimal> saldosAnteriores) {
         public PlanConsumoInsumos {
-            requerimientosPorInsumo = requerimientosPorInsumo != null
-                    ? Collections.unmodifiableMap(new LinkedHashMap<>(requerimientosPorInsumo))
-                    : Collections.emptyMap();
+            requerimientosPorInsumo = requerimientosPorInsumo != null ? Map.copyOf(requerimientosPorInsumo) : Map.of();
             idsOrdenados = idsOrdenados != null ? List.copyOf(idsOrdenados) : List.of();
-            saldosAnteriores = saldosAnteriores != null
-                    ? Collections.unmodifiableMap(new LinkedHashMap<>(saldosAnteriores))
-                    : Collections.emptyMap();
+            saldosAnteriores = saldosAnteriores != null ? Map.copyOf(saldosAnteriores) : Map.of();
         }
     }
 

@@ -44,27 +44,41 @@ public class DefaultVentaMesasCanalCoordinator implements VentaMesasCanalCoordin
 
     @Override
     public String determinarCanalPedido(Pedido p) {
-        if (p == null) return "MESA";
+        if (p == null) {
+            return "MESA";
+        }
         String tipo = p.getTipoPedido() != null ? p.getTipoPedido().trim().toUpperCase(Locale.ROOT) : "";
         String mesa = p.getNumeroMesa() != null ? p.getNumeroMesa().trim().toUpperCase(Locale.ROOT) : "";
-        if (tipo.contains("KIOSCO") || mesa.startsWith("T-") || mesa.contains("KIOSCO")) return "KIOSCO";
-        if (tipo.contains("DELIVERY") || mesa.startsWith("DL-") || mesa.contains("DELIVERY")) return "DELIVERY";
+        if (tipo.contains("KIOSCO") || mesa.startsWith("T-") || mesa.contains("KIOSCO")) {
+            return "KIOSCO";
+        }
+        if (tipo.contains("DELIVERY") || mesa.startsWith("DL-") || mesa.contains("DELIVERY")) {
+            return "DELIVERY";
+        }
         return "MESA";
     }
 
     @Override
     public String construirTextoBadgeCanal(Pedido p) {
         String canal = determinarCanalPedido(p);
-        if ("KIOSCO".equals(canal)) return "[KIOSCO]";
-        if ("DELIVERY".equals(canal)) return "[DELIVERY]";
+        if ("KIOSCO".equals(canal)) {
+            return "[KIOSCO]";
+        }
+        if ("DELIVERY".equals(canal)) {
+            return "[DELIVERY]";
+        }
         return "[MESA " + normalizarNumeroMesa(p != null ? p.getNumeroMesa() : "01") + "]";
     }
 
     @Override
     public String normalizarNumeroMesa(String raw) {
-        if (raw == null || raw.isBlank()) return "01";
+        if (raw == null || raw.isBlank()) {
+            return "01";
+        }
         String digits = raw.replaceAll("\\D+", "");
-        if (digits.isEmpty()) return raw.trim();
+        if (digits.isEmpty()) {
+            return raw.trim();
+        }
         return String.format("%02d", Integer.parseInt(digits));
     }
 
@@ -111,7 +125,9 @@ public class DefaultVentaMesasCanalCoordinator implements VentaMesasCanalCoordin
     @Override
     public List<DetalleVenta> convertirDetallesPedidoAVenta(List<DetallePedido> detalles) {
         List<DetalleVenta> ventas = new ArrayList<>();
-        if (detalles == null) return ventas;
+        if (detalles == null) {
+            return ventas;
+        }
         for (DetallePedido dp : detalles) {
             BigDecimal precio = dp.getPrecioUnitario() != null ? dp.getPrecioUnitario() : BigDecimal.ZERO;
             int cantidad = Math.max(1, dp.getCantidad());

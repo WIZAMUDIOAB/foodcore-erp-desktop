@@ -69,12 +69,17 @@ public class DefaultVentaCarritoHandler implements VentaCarritoHandler {
         dv.setSubtotal(dv.getPrecioUnitario().multiply(BigDecimal.valueOf(dv.getCantidad())).setScale(2, RoundingMode.HALF_UP));
     }
 
-    @Override public boolean decrementarOEliminar(List<DetalleVenta> items, DetalleVenta sel) {
-        if (sel == null || !items.contains(sel)) return false;
+    @Override
+    public boolean decrementarOEliminar(List<DetalleVenta> items, DetalleVenta sel) {
+        if (sel == null || !items.contains(sel)) {
+            return false;
+        }
         if (sel.getCantidad() > 1) {
             sel.setCantidad(sel.getCantidad() - 1);
             sel.setSubtotal(sel.getPrecioUnitario().multiply(BigDecimal.valueOf(sel.getCantidad())).setScale(2, RoundingMode.HALF_UP));
-        } else items.remove(sel);
+        } else {
+            items.remove(sel);
+        }
         return true;
     }
 

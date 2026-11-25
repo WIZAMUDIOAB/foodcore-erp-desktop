@@ -30,7 +30,6 @@ import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;

@@ -1,6 +1,5 @@
 package com.foodcore.controller.reportes;
 
-import com.foodcore.controller.reportes.ReportesAvanzadosPresenter;
 import com.foodcore.model.ReporteCohortes.CohorteMensualFila;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -14,13 +13,17 @@ import java.util.Set;
 
 public class ReporteChartUiRenderer {
     public void aplicarEstilosDonut(PieChart pieChartDistribucion, String[] paleta) {
-        if (pieChartDistribucion == null || pieChartDistribucion.getData().isEmpty()) return;
+        if (pieChartDistribucion == null || pieChartDistribucion.getData().isEmpty()) {
+            return;
+        }
         int i = 0;
         for (PieChart.Data data : pieChartDistribucion.getData()) {
             String color = paleta[i++ % paleta.length];
             Node node = data.getNode();
-            if (node != null) node.setStyle("-fx-pie-color: " + color + "; -fx-background-color: " + color
-                    + "; -fx-border-color: #FFFFFF; -fx-border-width: 2px;");
+            if (node != null) {
+                node.setStyle("-fx-pie-color: " + color + "; -fx-background-color: " + color
+                        + "; -fx-border-color: #FFFFFF; -fx-border-width: 2px;");
+            }
         }
         Set<Node> symbols = pieChartDistribucion.lookupAll(".chart-legend-item-symbol");
         int sIdx = 0;
@@ -28,10 +31,14 @@ public class ReporteChartUiRenderer {
             String color = paleta[sIdx++ % paleta.length];
             symbol.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 6px;");
         }
-        if (!(pieChartDistribucion.lookup(".chart-content") instanceof Pane contentPane)) return;
+        if (!(pieChartDistribucion.lookup(".chart-content") instanceof Pane contentPane)) {
+            return;
+        }
         double w = contentPane.getWidth();
         double h = contentPane.getHeight();
-        if (w <= 20 || h <= 20) return;
+        if (w <= 20 || h <= 20) {
+            return;
+        }
         Circle hole = null;
         for (Node child : contentPane.getChildren()) {
             if (child instanceof Circle circle && "donut-hole".equals(circle.getId())) {

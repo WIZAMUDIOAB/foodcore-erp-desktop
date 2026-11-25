@@ -235,10 +235,18 @@ public class SolicitudesController {
                 pend++;
             }
         }
-        if (lblCountPendientes != null) lblCountPendientes.setText(String.valueOf(pend));
-        if (lblCountAprobadas != null) lblCountAprobadas.setText(String.valueOf(aprob));
-        if (lblCountRechazadas != null) lblCountRechazadas.setText(String.valueOf(rech));
-        if (lblEstadoTabla != null) lblEstadoTabla.setText(listaSolicitudes.size() + " registros");
+        if (lblCountPendientes != null) {
+            lblCountPendientes.setText(String.valueOf(pend));
+        }
+        if (lblCountAprobadas != null) {
+            lblCountAprobadas.setText(String.valueOf(aprob));
+        }
+        if (lblCountRechazadas != null) {
+            lblCountRechazadas.setText(String.valueOf(rech));
+        }
+        if (lblEstadoTabla != null) {
+            lblEstadoTabla.setText(listaSolicitudes.size() + " registros");
+        }
     }
 
     @FXML
@@ -312,7 +320,9 @@ public class SolicitudesController {
     }
 
     public void aprobarSolicitud(SolicitudAusencia sol) {
-        if (sol == null) return;
+        if (sol == null) {
+            return;
+        }
         try {
             Usuario aprobador = AuthService.getUsuarioSesionActual();
             Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;
@@ -327,7 +337,9 @@ public class SolicitudesController {
     }
 
     public void rechazarSolicitud(SolicitudAusencia sol) {
-        if (sol == null) return;
+        if (sol == null) {
+            return;
+        }
         try {
             Usuario aprobador = AuthService.getUsuarioSesionActual();
             Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;

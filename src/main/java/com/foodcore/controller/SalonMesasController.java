@@ -186,7 +186,9 @@ public class SalonMesasController {
                         tieneReserva = true;
                         horaRes = resOpt.get().getHoraTexto();
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "No se pudo consultar reserva próxima para mesa " + numMesa, ex);
+                }
 
                 if (tieneReserva) {
                     btnMesa.getStyleClass().add("mesa-card-reservada");

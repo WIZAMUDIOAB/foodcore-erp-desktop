@@ -3,7 +3,6 @@ package com.foodcore.controller;
 
 import com.foodcore.model.Insumo;
 import com.foodcore.model.KardexMovimiento;
-import com.foodcore.service.AuthService;
 import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.service.InventarioGestionService;
 
@@ -13,7 +12,6 @@ import com.foodcore.util.DialogService;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;

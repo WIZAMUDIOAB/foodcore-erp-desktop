@@ -38,6 +38,11 @@ public class AuditoriaConsultaService {
      */
     public record PaginaAuditoriaData(int total, List<RegistroAuditoria> items,
             List<String> usuarios, List<String> acciones) {
+        public PaginaAuditoriaData {
+            items = items != null ? List.copyOf(items) : List.of();
+            usuarios = usuarios != null ? List.copyOf(usuarios) : List.of();
+            acciones = acciones != null ? List.copyOf(acciones) : List.of();
+        }
     }
 
     /**

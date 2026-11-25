@@ -143,7 +143,9 @@ public class MermaDAOImpl implements MermaDAO {
     public Map<String, BigDecimal> obtenerMermasPorMes(Connection conn, int anio) throws SQLException {
         Map<String, BigDecimal> mapa = new LinkedHashMap<>();
         String[] meses = {"Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"};
-        for (String m : meses) mapa.put(m, BigDecimal.ZERO);
+        for (String m : meses) {
+            mapa.put(m, BigDecimal.ZERO);
+        }
 
         String sql = "SELECT MONTH(fecha_hora) AS mes, COALESCE(SUM(costo_total), 0) AS total "
                 + "FROM merma WHERE YEAR(fecha_hora) = ? GROUP BY MONTH(fecha_hora) ORDER BY mes ASC";
@@ -205,7 +207,9 @@ public class MermaDAOImpl implements MermaDAO {
             ps.setInt(2, anio);
             ps.setInt(3, mes);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         }
         return 0;
@@ -255,7 +259,9 @@ public class MermaDAOImpl implements MermaDAO {
         m.setCostoTotal(rs.getBigDecimal("costo_total"));
         m.setObservacion(rs.getString("observacion"));
         Timestamp ts = rs.getTimestamp("fecha_hora");
-        if (ts != null) m.setFechaHora(ts.toLocalDateTime());
+        if (ts != null) {
+            m.setFechaHora(ts.toLocalDateTime());
+        }
         return m;
     }
 }

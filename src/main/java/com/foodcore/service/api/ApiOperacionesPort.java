@@ -7,6 +7,7 @@ import com.foodcore.model.Producto;
 import com.foodcore.model.Venta;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,18 +18,43 @@ import java.util.Optional;
 public interface ApiOperacionesPort {
 
     record EstadoMesasSnapshot(Map<String, String> estadosPorMesa, Map<String, BigDecimal> totalesPorMesa) {
+        public EstadoMesasSnapshot {
+            estadosPorMesa = estadosPorMesa != null ? Map.copyOf(estadosPorMesa) : Map.of();
+            totalesPorMesa = totalesPorMesa != null ? Map.copyOf(totalesPorMesa) : Map.of();
+        }
     }
 
     record ItemSolicitudPedido(int idProducto, int cantidad, String notas) {
     }
 
     record ResultadoCreacionPedido(Pedido pedido, List<DetallePedido> detalles, boolean idempotente) {
+        public ResultadoCreacionPedido {
+            detalles = detalles != null ? List.copyOf(detalles) : List.of();
+        }
     }
 
     record PedidosActivosSnapshot(List<Pedido> pedidos, Map<Integer, List<DetallePedido>> detallesPorPedido) {
+        public PedidosActivosSnapshot {
+            pedidos = pedidos != null ? List.copyOf(pedidos) : List.of();
+            if (detallesPorPedido == null || detallesPorPedido.isEmpty()) {
+                detallesPorPedido = Map.of();
+            } else {
+                Map<Integer, List<DetallePedido>> copia = new LinkedHashMap<>();
+                for (Map.Entry<Integer, List<DetallePedido>> entry : detallesPorPedido.entrySet()) {
+                    if (entry.getKey() != null) {
+                        copia.put(entry.getKey(),
+                                entry.getValue() != null ? List.copyOf(entry.getValue()) : List.of());
+                    }
+                }
+                detallesPorPedido = Map.copyOf(copia);
+            }
+        }
     }
 
     record PedidoConDetalles(Pedido pedido, List<DetallePedido> detalles) {
+        public PedidoConDetalles {
+            detalles = detalles != null ? List.copyOf(detalles) : List.of();
+        }
     }
 
     record EstadoCajaSnapshot(boolean abierta, Caja caja, BigDecimal totalVentas,
@@ -41,6 +67,9 @@ public interface ApiOperacionesPort {
     record SolicitudCobroCaja(int idUsuario, int idPedido, String numeroMesa, String tipoComprobante,
                                     String medioPago, String idempotencyKey, BigDecimal montoRecibidoOpt,
                                     List<ItemSolicitudPedido> itemsDirectos) {
+        public SolicitudCobroCaja {
+            itemsDirectos = itemsDirectos != null ? List.copyOf(itemsDirectos) : List.of();
+        }
     }
 
     record ResultadoCobroCaja(Venta venta, Integer idPedidoPersistido, String numeroMesa, String tipoComprobante,

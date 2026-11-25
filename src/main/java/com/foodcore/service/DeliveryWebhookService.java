@@ -338,11 +338,13 @@ public class DeliveryWebhookService {
         }
         try {
             conn.setAutoCommit(autoCommitOriginal);
-        } catch (SQLException ignored) {
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "No se pudo restaurar autoCommit al cerrar conexión webhook", ex);
         }
         try {
             conn.close();
-        } catch (SQLException ignored) {
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "No se pudo cerrar conexión webhook", ex);
         }
     }
 

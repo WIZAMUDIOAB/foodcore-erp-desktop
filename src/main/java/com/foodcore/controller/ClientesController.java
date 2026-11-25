@@ -586,7 +586,9 @@ public class ClientesController {
 
     @FXML
     public void handleEditarSeleccionado() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         modoEdicion = true;
         lblModalTitulo.setText("Editar Cliente #" + clienteSeleccionado.getIdCliente());
         if (cbModalTipoCliente != null) {
@@ -718,7 +720,9 @@ public class ClientesController {
 
     @FXML
     public void handleCambiarEstado() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         final int idCli = clienteSeleccionado.getIdCliente();
         final boolean nuevoEstado = !clienteSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
@@ -730,7 +734,9 @@ public class ClientesController {
 
     @FXML
     public void handleGenerarEstadoCuentaPdf() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         final int idCli = clienteSeleccionado.getIdCliente();
         final String numDoc = clienteSeleccionado.getNumeroDocumento();
         Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(

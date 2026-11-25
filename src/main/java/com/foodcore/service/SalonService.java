@@ -28,14 +28,18 @@ public class SalonService {
 
     public List<Pedido> listarPedidosActivosConConexion() throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) return List.of();
+            if (conn == null) {
+                return List.of();
+            }
             return pedidoDAO.listarPedidosActivos(conn);
         }
     }
 
     public List<DetallePedido> listarDetallesPedido(int idPedido) throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) return List.of();
+            if (conn == null) {
+                return List.of();
+            }
             return pedidoDAO.listarDetallesPorPedido(conn, idPedido);
         }
     }

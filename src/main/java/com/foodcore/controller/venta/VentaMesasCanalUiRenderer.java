@@ -24,7 +24,9 @@ public class VentaMesasCanalUiRenderer {
     public void renderizarGridMesasPos(TilePane tileMesasPos, Label lblResumenMesasPos,
                                       Map<String, Pedido> pedidosPorMesa, int totalMesas,
                                       Consumer<String> onSeleccionarMesa) {
-        if (tileMesasPos == null) return;
+        if (tileMesasPos == null) {
+            return;
+        }
         tileMesasPos.getChildren().clear();
         int ocupadas = 0;
         LocalDateTime ahora = LocalDateTime.now(ZoneId.of("America/Lima"));
@@ -32,7 +34,9 @@ public class VentaMesasCanalUiRenderer {
             String mesa = String.format("%02d", i);
             Pedido pedido = pedidosPorMesa == null ? null : pedidosPorMesa.get(mesa);
             boolean ocupada = pedido != null;
-            if (ocupada) ocupadas++;
+            if (ocupada) {
+                ocupadas++;
+            }
             VBox card = new VBox(6.0);
             card.setPrefSize(158, 118);
             card.setMinSize(148, 110);
@@ -55,15 +59,23 @@ public class VentaMesasCanalUiRenderer {
             Label tiempo = new Label(ocupada ? minutos + " min" : "Disponible");
             tiempo.getStyleClass().add("text-caption-muted");
             card.getChildren().addAll(header, total, tiempo);
-            card.setOnMouseClicked(event -> { if (onSeleccionarMesa != null) onSeleccionarMesa.accept(mesa); });
+            card.setOnMouseClicked(event -> {
+                if (onSeleccionarMesa != null) {
+                    onSeleccionarMesa.accept(mesa);
+                }
+            });
             tileMesasPos.getChildren().add(card);
         }
-        if (lblResumenMesasPos != null) lblResumenMesasPos.setText(ocupadas + " Ocupadas · " + (totalMesas - ocupadas) + " Libres");
+        if (lblResumenMesasPos != null) {
+            lblResumenMesasPos.setText(ocupadas + " Ocupadas · " + (totalMesas - ocupadas) + " Libres");
+        }
     }
 
     public void renderizarPedidosMulticanal(FlowPane flowPedidosMulticanal, List<Pedido> externos,
                                             VentaMesasCanalCoordinator coord, Consumer<Pedido> onCargarPedido) {
-        if (flowPedidosMulticanal == null) return;
+        if (flowPedidosMulticanal == null) {
+            return;
+        }
         flowPedidosMulticanal.getChildren().clear();
         if (externos == null || externos.isEmpty()) {
             Label vacio = new Label("Sin pedidos de Kiosco o Delivery pendientes de cobro.");
@@ -87,7 +99,9 @@ public class VentaMesasCanalUiRenderer {
     public void renderizarBarraRapidaOrdenes(HBox boxOrdenesEntrantes, List<Pedido> activos,
                                              String mesaSeleccionadaActual, VentaMesasCanalCoordinator coord,
                                              Consumer<Pedido> onCargarPedido) {
-        if (boxOrdenesEntrantes == null) return;
+        if (boxOrdenesEntrantes == null) {
+            return;
+        }
         boxOrdenesEntrantes.getChildren().clear();
         if (activos == null || activos.isEmpty()) {
             Label info = new Label("Orden manual lista · Mesa " + mesaSeleccionadaActual);
@@ -112,8 +126,12 @@ public class VentaMesasCanalUiRenderer {
 
     public void actualizarCabeceraCanal(Label lblOrdenHeader, Label lblCanalBadge,
                                         VentaMesasCanalCoordinator.CabeceraCanalPos cabecera) {
-        if (cabecera == null) return;
-        if (lblOrdenHeader != null) lblOrdenHeader.setText(cabecera.headerTexto());
+        if (cabecera == null) {
+            return;
+        }
+        if (lblOrdenHeader != null) {
+            lblOrdenHeader.setText(cabecera.headerTexto());
+        }
         if (lblCanalBadge != null) {
             lblCanalBadge.setText(cabecera.badgeTexto());
             lblCanalBadge.getStyleClass().removeAll("badge-canal-mesa", "badge-canal-kiosco", "badge-canal-delivery");

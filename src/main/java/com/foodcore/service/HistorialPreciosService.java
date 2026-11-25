@@ -20,7 +20,12 @@ public class HistorialPreciosService {
     private final ProductoDAO productoDAO = new ProductoDAOImpl();
     private final InsumoDAO insumoDAO = new InsumoDAOImpl();
 
-    public record CatalogoPreciosData(List<Producto> productos, List<Insumo> insumos) { }
+    public record CatalogoPreciosData(List<Producto> productos, List<Insumo> insumos) {
+        public CatalogoPreciosData {
+            productos = productos != null ? List.copyOf(productos) : List.of();
+            insumos = insumos != null ? List.copyOf(insumos) : List.of();
+        }
+    }
 
     public List<HistorialPrecio> listarHistorial() throws SQLException {
         try (Connection conn = ConexionBD.getConnection()) {

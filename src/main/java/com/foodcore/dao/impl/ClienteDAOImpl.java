@@ -13,8 +13,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClienteDAOImpl implements ClienteDAO {
+
+    private static final Logger LOGGER = Logger.getLogger(ClienteDAOImpl.class.getName());
 
     @Override
     public List<Cliente> listarTodos(Connection conn) throws SQLException {
@@ -243,7 +247,8 @@ public class ClienteDAOImpl implements ClienteDAO {
             if (fn != null) {
                 c.setFechaNacimiento(fn.toLocalDate());
             }
-        } catch (SQLException ignored) {
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "Columna opcional fecha_nacimiento no disponible en ResultSet", ex);
         }
         c.setEstado(rs.getString("estado"));
         c.setActivo(rs.getBoolean("activo"));

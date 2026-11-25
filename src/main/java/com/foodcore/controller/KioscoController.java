@@ -120,7 +120,9 @@ public class KioscoController {
     }
 
     private void cargarCategorias() {
-        if (boxCategoriasKiosco == null) return;
+        if (boxCategoriasKiosco == null) {
+            return;
+        }
         boxCategoriasKiosco.getChildren().clear();
 
         Button btnTodos = new Button("Todos");
@@ -214,7 +216,9 @@ public class KioscoController {
     }
 
     private void renderizarMosaicoProductos() {
-        if (flowProductosKiosco == null) return;
+        if (flowProductosKiosco == null) {
+            return;
+        }
         flowProductosKiosco.getChildren().clear();
 
         for (Producto p : todosLosProductos) {
@@ -331,7 +335,9 @@ public class KioscoController {
 
     @FXML
     public void handleConfirmarPedido() {
-        if (carritoItems.isEmpty()) return;
+        if (carritoItems.isEmpty()) {
+            return;
+        }
 
         BigDecimal total = BigDecimal.ZERO;
         for (DetallePedido item : carritoItems) {

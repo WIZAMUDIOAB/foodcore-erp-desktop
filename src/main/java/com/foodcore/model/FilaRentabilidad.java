@@ -1,7 +1,6 @@
 package com.foodcore.model;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 /**
  * Fila de rentabilidad por receta para el Dashboard gerencial (v3.0.3 §4).

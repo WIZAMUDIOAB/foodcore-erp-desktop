@@ -37,7 +37,9 @@ public class VentaPosConsultaService {
 
     public List<Pedido> listarPedidosActivosConDetalles() {
         try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) return List.of();
+            if (conn == null) {
+                return List.of();
+            }
             List<Pedido> pedidos = pedidoDAO.listarPedidosActivos(conn);
             for (Pedido pedido : pedidos) {
                 if (pedido.getDetalles() == null || pedido.getDetalles().isEmpty()) {
@@ -82,9 +84,13 @@ public class VentaPosConsultaService {
     public Cliente buscarORegistrarClienteMinoristaRapido(String dni, String nombreCompleto, String telefono,
             LocalDate fechaNacimiento) {
         try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) return null;
+            if (conn == null) {
+                return null;
+            }
             Optional<Cliente> existente = clienteDAO.buscarPorDocumento(conn, dni);
-            if (existente.isPresent()) return existente.get();
+            if (existente.isPresent()) {
+                return existente.get();
+            }
             Cliente nuevo = new Cliente();
             nuevo.setTipoCliente("MINORISTA");
             nuevo.setTipoDocumento("DNI");

@@ -59,8 +59,12 @@ public class VentaCatalogoPresenter {
             List<Categoria> categorias = categoriasSupplier.get();
             return categorias == null ? List.of() : new ArrayList<>(categorias);
         } catch (RuntimeException ex) {
-            if (ex.getCause() instanceof SQLException sqlEx) throw sqlEx;
-            if (posConsultaService != null) throw new SQLException("No se pudieron cargar las categorías", ex);
+            if (ex.getCause() instanceof SQLException sqlEx) {
+                throw sqlEx;
+            }
+            if (posConsultaService != null) {
+                throw new SQLException("No se pudieron cargar las categorías", ex);
+            }
             return List.of();
         }
     }
@@ -68,7 +72,9 @@ public class VentaCatalogoPresenter {
     public List<Producto> cargarProductosConFallbackDemo() {
         try {
             List<Producto> productos = productosSupplier.get();
-            if (productos != null && !productos.isEmpty()) return new ArrayList<>(productos);
+            if (productos != null && !productos.isEmpty()) {
+                return new ArrayList<>(productos);
+            }
         } catch (RuntimeException ex) {
             return crearProductosDemostracion();
         }
@@ -91,19 +97,29 @@ public class VentaCatalogoPresenter {
     public List<Producto> filtrarProductos(List<Producto> todos, int categoriaFiltro, String filtroTexto) {
         String filtro = filtroTexto == null ? "" : filtroTexto.trim().toLowerCase(Locale.ROOT);
         List<Producto> filtrados = new ArrayList<>();
-        if (todos == null) return filtrados;
+        if (todos == null) {
+            return filtrados;
+        }
         for (Producto producto : todos) {
-            if (!producto.isDisponible() || (categoriaFiltro != 0 && producto.getIdCategoria() != categoriaFiltro)) continue;
+            if (!producto.isDisponible() || (categoriaFiltro != 0 && producto.getIdCategoria() != categoriaFiltro)) {
+                continue;
+            }
             String nombre = producto.getNombre() == null ? "" : producto.getNombre().toLowerCase(Locale.ROOT);
             String codigo = producto.getCodigo() == null ? "" : producto.getCodigo().toLowerCase(Locale.ROOT);
-            if (filtro.isEmpty() || nombre.contains(filtro) || codigo.contains(filtro)) filtrados.add(producto);
+            if (filtro.isEmpty() || nombre.contains(filtro) || codigo.contains(filtro)) {
+                filtrados.add(producto);
+            }
         }
         return filtrados;
     }
 
     public String construirDescripcionProducto(Producto p) {
-        if (p.isEsCombo()) return "COMBO · " + (p.getCodigo() == null ? "Paquete" : p.getCodigo());
-        if (p.tieneOpcionesPersonalizacion()) return FormatoPersonalizacionUtil.construirResumenOpciones(p);
+        if (p.isEsCombo()) {
+            return "COMBO · " + (p.getCodigo() == null ? "Paquete" : p.getCodigo());
+        }
+        if (p.tieneOpcionesPersonalizacion()) {
+            return FormatoPersonalizacionUtil.construirResumenOpciones(p);
+        }
         return p.getDescripcion() != null && !p.getDescripcion().isBlank()
                 ? p.getDescripcion() : (p.getCodigo() == null ? "Platillo" : p.getCodigo());
     }
@@ -113,14 +129,22 @@ public class VentaCatalogoPresenter {
         Button todos = new Button("Todos");
         todos.getStyleClass().addAll("category-chip", "category-chip-active");
         AnimationUtils.attachTactileFeedback(todos);
-        todos.setOnAction(event -> { activarChip(boxCategorias, todos); onSeleccionarCategoria.accept(0); });
+        todos.setOnAction(event -> {
+            activarChip(boxCategorias, todos);
+            onSeleccionarCategoria.accept(0);
+        });
         boxCategorias.getChildren().add(todos);
-        if (categorias == null) return;
+        if (categorias == null) {
+            return;
+        }
         for (Categoria categoria : categorias) {
             Button chip = new Button(categoria.getNombre());
             chip.getStyleClass().add("category-chip");
             AnimationUtils.attachTactileFeedback(chip);
-            chip.setOnAction(event -> { activarChip(boxCategorias, chip); onSeleccionarCategoria.accept(categoria.getIdCategoria()); });
+            chip.setOnAction(event -> {
+                activarChip(boxCategorias, chip);
+                onSeleccionarCategoria.accept(categoria.getIdCategoria());
+            });
             boxCategorias.getChildren().add(chip);
         }
     }
@@ -143,16 +167,26 @@ public class VentaCatalogoPresenter {
             HBox.setHgrow(content, Priority.ALWAYS);
             PathThumb.agregar(content, p.getImagenUrl());
             Label nombre = new Label(p.getNombre());
-            nombre.setMinWidth(0.0); nombre.setWrapText(true); nombre.getStyleClass().add("h3");
+            nombre.setMinWidth(0.0);
+            nombre.setWrapText(true);
+            nombre.getStyleClass().add("h3");
             Label descripcion = new Label(construirDescripcionProducto(p));
-            descripcion.setMinWidth(0.0); descripcion.setWrapText(true); descripcion.getStyleClass().add("text-secondary");
+            descripcion.setMinWidth(0.0);
+            descripcion.setWrapText(true);
+            descripcion.getStyleClass().add("text-secondary");
             Label precio = new Label("S/ " + p.getPrecioVenta());
-            precio.setMinWidth(Region.USE_PREF_SIZE); precio.getStyleClass().add("price");
+            precio.setMinWidth(Region.USE_PREF_SIZE);
+            precio.getStyleClass().add("price");
             content.getChildren().addAll(nombre, descripcion, precio);
             Button agregar = new Button("+ Agregar");
-            agregar.setMinWidth(Region.USE_PREF_SIZE); agregar.getStyleClass().add("btn-primary"); agregar.setGraphicTextGap(8.0);
+            agregar.setMinWidth(Region.USE_PREF_SIZE);
+            agregar.getStyleClass().add("btn-primary");
+            agregar.setGraphicTextGap(8.0);
             AnimationUtils.attachTactileFeedback(agregar);
-            agregar.setOnAction(event -> { event.consume(); onAgregarProducto.accept(p); });
+            agregar.setOnAction(event -> {
+                event.consume();
+                onAgregarProducto.accept(p);
+            });
             card.getChildren().addAll(content, agregar);
             AnimationUtils.attachTactileFeedback(card);
             card.setOnMouseClicked(event -> onAgregarProducto.accept(p));
@@ -164,19 +198,26 @@ public class VentaCatalogoPresenter {
         box.getChildren().forEach(node -> {
             if (node instanceof Button button) {
                 button.getStyleClass().remove("category-chip-active");
-                if (button == activo) button.getStyleClass().add("category-chip-active");
+                if (button == activo) {
+                    button.getStyleClass().add("category-chip-active");
+                }
             }
         });
     }
 
     private static final class PathThumb {
         private PathThumb() { }
+
         static void agregar(VBox content, String imagenUrl) {
-            if (imagenUrl == null || imagenUrl.isBlank()) return;
+            if (imagenUrl == null || imagenUrl.isBlank()) {
+                return;
+            }
             java.nio.file.Path ruta = MenuController.resolverImagenPlatilloSegura(imagenUrl);
             if (ruta != null && java.nio.file.Files.isRegularFile(ruta)) {
                 ImageView view = new ImageView(new Image(ruta.toUri().toString(), 42, 32, true, true));
-                view.setFitWidth(42); view.setFitHeight(32); view.setPreserveRatio(true);
+                view.setFitWidth(42);
+                view.setFitHeight(32);
+                view.setPreserveRatio(true);
                 content.getChildren().add(view);
             }
         }

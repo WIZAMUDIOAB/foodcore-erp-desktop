@@ -58,7 +58,9 @@ public class DefaultReporteExportCoordinator implements ReporteExportCoordinator
     @Override
     public void ejecutarExportacion(ExportFileChooserHelper.FormatoExportacion formato, String categoria,
             List<String> headers, List<List<String>> filas, File destino) throws Exception {
-        if (destino.getParentFile() != null) Files.createDirectories(destino.getParentFile().toPath());
+        if (destino.getParentFile() != null) {
+            Files.createDirectories(destino.getParentFile().toPath());
+        }
         ExportadorArchivoFn exportador = switch (formato) {
             case PDF -> pdfFn;
             case EXCEL -> excelFn;

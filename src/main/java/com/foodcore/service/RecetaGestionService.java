@@ -33,6 +33,10 @@ public class RecetaGestionService {
      * Catálogo necesario para la pantalla de recetas: platillos e insumos.
      */
     public record CatalogoRecetaData(List<Producto> productos, List<Insumo> insumos) {
+        public CatalogoRecetaData {
+            productos = productos != null ? List.copyOf(productos) : List.of();
+            insumos = insumos != null ? List.copyOf(insumos) : List.of();
+        }
     }
 
     public CatalogoRecetaData listarCatalogosReceta() throws SQLException {

@@ -27,6 +27,10 @@ public class ConfiguracionSistemaService {
 
     public record RuteoImpresorasData(Map<Integer, String> categorias,
             List<ConfiguracionImpresora> asignaciones) {
+        public RuteoImpresorasData {
+            categorias = categorias != null ? Map.copyOf(categorias) : Map.of();
+            asignaciones = asignaciones != null ? List.copyOf(asignaciones) : List.of();
+        }
     }
 
     public record DatosRestauranteConfig(String nombreRestaurante, String direccion, String telefono,

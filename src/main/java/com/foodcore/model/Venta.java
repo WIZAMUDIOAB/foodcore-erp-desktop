@@ -3,6 +3,7 @@ package com.foodcore.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -119,8 +120,8 @@ public class Venta {
             : idempotencyKey.trim();
     }
 
-    public List<DetalleVenta> getDetalles() { return detalles; }
-    public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles; }
+    public List<DetalleVenta> getDetalles() { return detalles != null ? Collections.unmodifiableList(detalles) : null; }
+    public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles != null ? new ArrayList<>(detalles) : null; }
 
     @Override
     public String toString() { return "Venta #" + idVenta + " - Total: S/ " + total; }

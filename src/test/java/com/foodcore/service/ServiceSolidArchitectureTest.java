@@ -115,9 +115,27 @@ class ServiceSolidArchitectureTest {
     @Test
     void pomDeclaresJacocoGatesForSolidServicePackages() throws IOException {
         String pom = Files.readString(Path.of("pom.xml"));
-        assertTrue(pom.contains("com/foodcore/service/venta"));
-        assertTrue(pom.contains("com/foodcore/service/finanzas"));
-        assertTrue(pom.contains("com/foodcore/service/caja"));
+        assertTrue(pom.contains("<maven.compiler.release>21</maven.compiler.release>"));
+        assertTrue(pom.contains("<release>${maven.compiler.release}</release>"));
+        assertFalse(pom.contains("<source>17</source>"));
+        assertFalse(pom.contains("<include>com/foodcore/"),
+                "Las reglas PACKAGE de JaCoCo deben usar puntos (com.foodcore.*) para evaluarse realmente");
+        assertTrue(pom.contains("<element>BUNDLE</element>"));
+        assertTrue(pom.contains("com.foodcore.service.venta"));
+        assertTrue(pom.contains("com.foodcore.service.finanzas"));
+        assertTrue(pom.contains("com.foodcore.service.caja"));
+        assertTrue(pom.contains("com.foodcore.service.impl"));
+        assertTrue(pom.contains("com.foodcore.dao.impl"));
+        assertTrue(pom.contains("com.foodcore.security"));
+        assertTrue(pom.contains("com.foodcore.tx.impl"));
+        assertTrue(pom.contains("com.foodcore.config"));
+        assertTrue(pom.contains("com.foodcore.api"));
+
+        String spotbugsExcludes = read(Path.of("config", "spotbugs-exclude.xml"));
+        assertFalse(spotbugsExcludes.contains("com.foodcore.api.KdsController"));
+        assertFalse(spotbugsExcludes.contains("com.foodcore.api.PedidoController"));
+        assertFalse(spotbugsExcludes.contains("com.foodcore.model.Pedido"));
+        assertFalse(spotbugsExcludes.contains("com.foodcore.model.Venta"));
     }
 
     @Test

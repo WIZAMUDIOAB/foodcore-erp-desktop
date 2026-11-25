@@ -5,6 +5,7 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -35,7 +36,7 @@ public class OfflineOrderPayloadDTO {
     }
 
     public List<DetallePedido> getDetalles() {
-        return detalles;
+        return Collections.unmodifiableList(detalles);
     }
 
     public void setDetalles(List<DetallePedido> detalles) {

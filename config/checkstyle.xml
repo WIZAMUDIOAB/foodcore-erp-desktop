@@ -23,8 +23,20 @@
             <property name="format" value="^com\.foodcore(\.[a-z][a-z0-9]*)*$"/>
         </module>
         <module name="OuterTypeFilename"/>
-        <module name="EmptyCatchBlock">
-            <property name="exceptionVariableName" value="expected|ignore|ignored"/>
-        </module>
+        <!-- Prohibir bloques catch vacíos silenciosos; cualquier catch debe loguear o documentar explícitamente -->
+        <module name="EmptyCatchBlock"/>
+
+        <!-- Higiene de imports -->
+        <module name="UnusedImports"/>
+        <module name="RedundantImport"/>
+        <module name="AvoidStarImport"/>
+
+        <!-- Consistencia estructural y prevención de errores -->
+        <module name="NeedBraces"/>
+        <module name="EqualsHashCode"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="OneStatementPerLine"/>
+        <module name="UpperEll"/>
     </module>
 </module>

@@ -92,10 +92,18 @@ public class ReportesController {
 
     private int obtenerDiasFiltro() {
         String seleccion = cmbPeriodo.getSelectionModel().getSelectedItem();
-        if (seleccion == null) return 7;
-        if (seleccion.contains("7")) return 7;
-        if (seleccion.contains("15")) return 15;
-        if (seleccion.contains("30")) return 30;
+        if (seleccion == null) {
+            return 7;
+        }
+        if (seleccion.contains("7")) {
+            return 7;
+        }
+        if (seleccion.contains("15")) {
+            return 15;
+        }
+        if (seleccion.contains("30")) {
+            return 30;
+        }
         return 0; // Histórico completo
     }
 

@@ -14,17 +14,29 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
-    <!-- Justificación: Controladores REST, servicios de negocio y despachador Outbox reciben DAOs/repositorios sin estado mediante inyección de dependencias en constructor; POJOs/DTOs de dominio (Pedido, Venta, EventoKdsDTO, OfflineOrderPayloadDTO) mantienen referencias directas de sus estructuras usadas por DAOs JDBC y mappers Jackson. Revisor: AppSec (Equipo Ingeniería FoodCore) Fecha: 2026-11-22 -->
+    <!-- Justificación: Servicios de negocio y despachador Outbox reciben DAOs, TransactionManager y repositorios sin estado mediante inyección de dependencias en constructores (EI_EXPOSE_REP permanece activo en toda la capa service). Revisor: AppSec (PR-13 Hardening) Fecha: 2026-11-25 -->
+    <Match>
+        <And>
+            <Or>
+                <Package name="~com\.foodcore\.service(\..*)?"/>
+                <Class name="com.foodcore.events.OutboxDispatcher"/>
+            </Or>
+            <Method name="&lt;init&gt;"/>
+        </And>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Justificación: Lista cerrada de 8 DTOs/records contenedores que transportan entidades de dominio JDBC mutables (Pedido, Venta, Caja, Usuario, Asistencia, Categoria) o JsonNode ObjectNode de protocolo HMAC (cuyo payload debe ser mutado in-place en tests de adulteración). Revisor: AppSec (PR-13 Hardening) Fecha: 2026-11-25 -->
     <Match>
         <Or>
-            <Class name="com.foodcore.api.KdsController"/>
-            <Class name="com.foodcore.api.PedidoController"/>
-            <Class name="com.foodcore.events.OutboxDispatcher"/>
-            <Package name="~com\.foodcore\.service(\..*)?"/>
-            <Class name="com.foodcore.model.Pedido"/>
-            <Class name="com.foodcore.model.Venta"/>
             <Class name="com.foodcore.model.dto.EventoKdsDTO"/>
             <Class name="com.foodcore.model.dto.OfflineOrderPayloadDTO"/>
+            <Class name="com.foodcore.service.AsistenciaService$ResultadoMarcaje"/>
+            <Class name="com.foodcore.service.MenuGestionService$CategoriaResultado"/>
+            <Class name="com.foodcore.service.api.ApiOperacionesPort$EstadoCajaSnapshot"/>
+            <Class name="com.foodcore.service.api.ApiOperacionesPort$PedidoConDetalles"/>
+            <Class name="com.foodcore.service.api.ApiOperacionesPort$ResultadoCobroCaja"/>
+            <Class name="com.foodcore.service.api.ApiOperacionesPort$ResultadoCreacionPedido"/>
         </Or>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
@@ -94,27 +106,10 @@
         <Bug pattern="SQL_INJECTION_JDBC"/>
     </Match>
 
-    <!-- Justificación FindSecBugs (Falso positivo): eliminarDocumento valida confinamiento con rutaDoc.startsWith(baseAbs) tras normalize() y sanitizarNombreArchivo extrae getFileName() con lista blanca [^a-zA-Z0-9._-]. Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
+    <!-- Justificación FindSecBugs (Falso positivo): eliminarDocumento valida confinamiento con rutaDoc.startsWith(baseAbs) tras normalize(). Revisor: AppSec (PR-13 Hardening) Fecha: 2026-11-25 -->
     <Match>
         <Class name="com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl"/>
-        <Or>
-            <Method name="eliminarDocumento"/>
-            <Method name="sanitizarNombreArchivo"/>
-        </Or>
-        <Bug pattern="PATH_TRAVERSAL_IN"/>
-    </Match>
-
-    <!-- Justificación FindSecBugs (Falso positivo): El destino proviene directamente del FileChooser nativo del usuario de escritorio JavaFX y solo añade la extensión de exportación (.pdf/.xlsx/.csv). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
-    <Match>
-        <Class name="com.foodcore.util.ExportFileChooserHelper"/>
-        <Method name="asegurarExtensionEnArchivo"/>
-        <Bug pattern="PATH_TRAVERSAL_IN"/>
-    </Match>
-
-    <!-- Justificación FindSecBugs (Falso positivo): La ruta por defecto del acta se construye únicamente con entero idCaja y timestamp LocalDateTime formateado (sin entrada textual de usuario). Revisor: AppSec (Hardening v5.7.1) Fecha: 2026-11-18 -->
-    <Match>
-        <Class name="com.foodcore.service.impl.CajaServiceImpl"/>
-        <Method name="cerrarTurnoConActaPdf"/>
+        <Method name="eliminarDocumento"/>
         <Bug pattern="PATH_TRAVERSAL_IN"/>
     </Match>
 

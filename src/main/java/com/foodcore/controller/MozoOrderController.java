@@ -12,7 +12,6 @@ import com.foodcore.service.MozoOrdenService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.DialogService;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.FormatoPersonalizacionUtil;
 import com.foodcore.util.ImpresoraTermicaService;

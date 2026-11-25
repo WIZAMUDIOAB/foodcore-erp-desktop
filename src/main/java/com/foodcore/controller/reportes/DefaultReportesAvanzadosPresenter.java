@@ -233,10 +233,16 @@ public class DefaultReportesAvanzadosPresenter implements ReportesAvanzadosPrese
 
     @Override
     public String resolverEstiloHeatmap(String item) {
-        if ("-".equals(item)) return "-fx-text-fill: #A39D94; -fx-font-weight: normal;";
+        if ("-".equals(item)) {
+            return "-fx-text-fill: #A39D94; -fx-font-weight: normal;";
+        }
         double val = parsePctSeguro(item);
-        if (val >= 50.0) return "-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: bold;";
-        if (val > 0.0) return "-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold;";
+        if (val >= 50.0) {
+            return "-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: bold;";
+        }
+        if (val > 0.0) {
+            return "-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold;";
+        }
         return "-fx-background-color: #F7F5F1; -fx-text-fill: #5C5650;";
     }
 }

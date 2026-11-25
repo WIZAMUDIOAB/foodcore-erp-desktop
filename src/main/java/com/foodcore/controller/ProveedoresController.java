@@ -172,7 +172,9 @@ public class ProveedoresController {
 
     @FXML
     public void handleEditarSeleccionado() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         modoEdicion = true;
         lblModalTitulo.setText("Editar Proveedor #" + proveedorSeleccionado.getIdProveedor());
         txtModalRuc.setText(proveedorSeleccionado.getRuc());
@@ -205,7 +207,9 @@ public class ProveedoresController {
         int dias = 15;
         try {
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
-        } catch (Exception ignored) {}
+        } catch (NumberFormatException ex) {
+            LOGGER.log(Level.FINE, "Días de crédito inválidos, usando valor por defecto 15", ex);
+        }
 
         final int diasFinal = dias;
         final String contacto = txtModalContacto.getText().trim();
@@ -246,7 +250,9 @@ public class ProveedoresController {
 
     @FXML
     public void handleCambiarEstado() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final boolean nuevoEstado = !proveedorSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
@@ -258,7 +264,9 @@ public class ProveedoresController {
 
     @FXML
     public void handleGenerarOrdenCompra() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final String ruc = proveedorSeleccionado.getRuc();
         Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(

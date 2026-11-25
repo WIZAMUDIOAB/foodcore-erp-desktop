@@ -255,10 +255,11 @@ public class ExpedienteEmpleadoServiceImpl implements ExpedienteEmpleadoService 
     }
 
     private String sanitizarNombreArchivo(String nombre) {
-        Path p = Paths.get(nombre).getFileName();
-        String base = (p != null) ? p.toString() : nombre;
+        String safe = nombre == null ? "" : nombre;
+        int lastSep = Math.max(safe.lastIndexOf('/'), safe.lastIndexOf('\\'));
+        String base = lastSep >= 0 ? safe.substring(lastSep + 1) : safe;
         String limpio = base.replaceAll("[^a-zA-Z0-9._-]", "_");
-        if (limpio.isBlank()) {
+        if (limpio.isBlank() || ".".equals(limpio) || "..".equals(limpio)) {
             return "documento.pdf";
         }
         return limpio;

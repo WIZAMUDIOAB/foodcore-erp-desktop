@@ -206,6 +206,10 @@ public class AnalisisMermasService {
     }
 
     public record DatosMermasCarga(List<Insumo> insumos, List<FilaMermaRegistro> filas) {
+        public DatosMermasCarga {
+            insumos = insumos != null ? List.copyOf(insumos) : List.of();
+            filas = filas != null ? List.copyOf(filas) : List.of();
+        }
     }
 
     public List<String> obtenerAlertasInsumosCriticos(int anio, int mes) throws SQLException {

@@ -161,7 +161,9 @@ public class CuentasPorPagarController {
     @FXML
     public void handleAbrirModalPago() {
         CuentaPorPagar sel = tblCuentasPorPagar.getSelectionModel().getSelectedItem();
-        if (sel == null) return;
+        if (sel == null) {
+            return;
+        }
         if ("PAGADA".equalsIgnoreCase(sel.getEstado())) {
             return;
         }
@@ -182,7 +184,9 @@ public class CuentasPorPagarController {
 
     @FXML
     public void handleConfirmarPago() {
-        if (cuentaSeleccionada == null) return;
+        if (cuentaSeleccionada == null) {
+            return;
+        }
         BigDecimal monto;
         try {
             String textoMonto = txtModalMontoAbonar.getText() != null

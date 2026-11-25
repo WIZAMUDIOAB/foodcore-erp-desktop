@@ -6,7 +6,6 @@ import com.foodcore.model.Insumo;
 import com.foodcore.model.KardexMovimiento;
 import com.foodcore.tx.TransactionManager;
 import com.foodcore.tx.impl.JdbcTransactionManager;
-import com.foodcore.service.AuthService;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.UnidadMedidaFormatter;
 

@@ -1,6 +1,5 @@
 package com.foodcore.controller;
 
-import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
@@ -15,10 +14,15 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 
 import java.math.BigDecimal;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

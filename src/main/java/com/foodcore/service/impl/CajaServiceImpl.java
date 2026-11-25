@@ -22,6 +22,7 @@ import com.foodcore.tx.impl.JdbcTransactionManager;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -144,8 +145,10 @@ public class CajaServiceImpl implements CajaService {
             throws NegocioException, SQLException {
         File destino = archivoActaPdf != null
                 ? archivoActaPdf
-                : new File("logs/actas_turno/Acta_Entrega_Turno_" + idCaja + "_"
-                        + LocalDateTime.now(ZONA_LIMA).format(FMT_ACTA_ARCHIVO) + ".pdf");
+                : Path.of("logs", "actas_turno")
+                        .resolve("Acta_Entrega_Turno_" + idCaja + "_"
+                                + LocalDateTime.now(ZONA_LIMA).format(FMT_ACTA_ARCHIVO) + ".pdf")
+                        .toFile();
         return arqueoCierreZUseCase.cerrarTurnoConActaPdf(
                 idCaja, idUsuarioCierre, efectivoFisicoContado,
                 responsableSalida, responsableEntrada, destino);

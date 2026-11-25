@@ -4,7 +4,6 @@ import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.impl.ComboDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
-import com.foodcore.model.Categoria;
 import com.foodcore.model.Producto;
 import com.foodcore.util.ConexionBD;
 import com.google.zxing.BarcodeFormat;
@@ -50,7 +49,9 @@ public class MenuQrService {
             java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
                 java.net.NetworkInterface iface = interfaces.nextElement();
-                if (iface.isLoopback() || !iface.isUp()) continue;
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
                 java.util.Enumeration<java.net.InetAddress> addresses = iface.getInetAddresses();
                 while (addresses.hasMoreElements()) {
                     java.net.InetAddress addr = addresses.nextElement();
@@ -554,7 +555,9 @@ public class MenuQrService {
     }
 
     private String escapeHtml(String text) {
-        if (text == null) return "";
+        if (text == null) {
+            return "";
+        }
         return text.replace("&", "&amp;")
                    .replace("<", "&lt;")
                    .replace(">", "&gt;")
