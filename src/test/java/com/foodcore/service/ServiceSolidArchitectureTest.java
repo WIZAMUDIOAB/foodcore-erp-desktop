@@ -33,6 +33,12 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class ServiceSolidArchitectureTest {
+    private static final int STATE_CODE = 0;
+    private static final int STATE_LINE_COMMENT = 1;
+    private static final int STATE_BLOCK_COMMENT = 2;
+    private static final int STATE_STRING = 3;
+    private static final int STATE_TEXT_BLOCK = 4;
+    private static final int STATE_CHAR = 5;
     private Path source(String relative) {
         return Path.of("src", "main", "java", "com", "foodcore", relative);
     }
@@ -322,8 +328,104 @@ class ServiceSolidArchitectureTest {
     }
 
     private static String limpiarComentariosYLiterales(String src) {
-        String sinBloques = src.replaceAll("(?s)/\\*.*?\\*/", " ");
-        String sinLineas = sinBloques.replaceAll("//[^\\r\\n]*", " ");
-        return sinLineas.replaceAll("\"(?:\\\\.|[^\"\\\\])*\"", "\"\"");
+        if (src == null || src.isEmpty()) {
+            return "";
+        }
+        int len = src.length();
+        StringBuilder sb = new StringBuilder(len);
+        int state = STATE_CODE;
+        for (int i = 0; i < len;) {
+            char c = src.charAt(i);
+            switch (state) {
+                case STATE_CODE -> {
+                    if (i + 1 < len && c == '/' && src.charAt(i + 1) == '/') {
+                        sb.append(' ');
+                        state = STATE_LINE_COMMENT;
+                        i += 2;
+                    } else if (i + 1 < len && c == '/' && src.charAt(i + 1) == '*') {
+                        sb.append(' ');
+                        state = STATE_BLOCK_COMMENT;
+                        i += 2;
+                    } else if (i + 2 < len && c == '"' && src.charAt(i + 1) == '"' && src.charAt(i + 2) == '"') {
+                        sb.append("\"\"");
+                        state = STATE_TEXT_BLOCK;
+                        i += 3;
+                    } else if (c == '"') {
+                        sb.append("\"\"");
+                        state = STATE_STRING;
+                        i++;
+                    } else if (c == '\'') {
+                        sb.append("''");
+                        state = STATE_CHAR;
+                        i++;
+                    } else {
+                        sb.append(c);
+                        i++;
+                    }
+                }
+                case STATE_LINE_COMMENT -> {
+                    if (c == '\n' || c == '\r') {
+                        sb.append(c);
+                        state = STATE_CODE;
+                    }
+                    i++;
+                }
+                case STATE_BLOCK_COMMENT -> {
+                    if (i + 1 < len && c == '*' && src.charAt(i + 1) == '/') {
+                        sb.append(' ');
+                        state = STATE_CODE;
+                        i += 2;
+                    } else {
+                        if (c == '\n' || c == '\r') {
+                            sb.append(c);
+                        }
+                        i++;
+                    }
+                }
+                case STATE_STRING -> {
+                    if (c == '\\') {
+                        i = Math.min(i + 2, len);
+                    } else if (c == '"') {
+                        state = STATE_CODE;
+                        i++;
+                    } else if (c == '\n' || c == '\r') {
+                        sb.append(c);
+                        state = STATE_CODE;
+                        i++;
+                    } else {
+                        i++;
+                    }
+                }
+                case STATE_TEXT_BLOCK -> {
+                    if (c == '\\') {
+                        i = Math.min(i + 2, len);
+                    } else if (i + 2 < len && c == '"' && src.charAt(i + 1) == '"' && src.charAt(i + 2) == '"') {
+                        state = STATE_CODE;
+                        i += 3;
+                    } else {
+                        if (c == '\n' || c == '\r') {
+                            sb.append(c);
+                        }
+                        i++;
+                    }
+                }
+                case STATE_CHAR -> {
+                    if (c == '\\') {
+                        i = Math.min(i + 2, len);
+                    } else if (c == '\'') {
+                        state = STATE_CODE;
+                        i++;
+                    } else if (c == '\n' || c == '\r') {
+                        sb.append(c);
+                        state = STATE_CODE;
+                        i++;
+                    } else {
+                        i++;
+                    }
+                }
+                default -> i++;
+            }
+        }
+        return sb.toString();
     }
 }
