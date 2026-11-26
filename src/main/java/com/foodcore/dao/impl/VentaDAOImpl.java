@@ -14,6 +14,8 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -24,6 +26,8 @@ import java.util.Optional;
  * según SPEC-FOODCORE-v1.0 (§15.4, R-01) y SPEC-FOODCORE-v4.3.0 (§1.1).
  */
 public class VentaDAOImpl implements VentaDAO {
+
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     @Override
     public int insertarVenta(Connection conn, Venta venta) throws SQLException {
@@ -46,9 +50,14 @@ public class VentaDAOImpl implements VentaDAO {
             }
         }
 
+        LocalDateTime fechaVenta = venta.getFechaHora() != null
+                ? venta.getFechaHora()
+                : LocalDateTime.now(ZONA_LIMA);
+        venta.setFechaHora(fechaVenta);
+
         String sql = "INSERT INTO venta (id_pedido, id_caja, id_usuario, id_cliente, subtotal, igv, descuento, descuento_puntos, total, "
-                + "metodo_pago, monto_recibido, vuelto, estado, idempotency_key) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "metodo_pago, monto_recibido, vuelto, estado, idempotency_key, fecha_hora) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             if (venta.getIdPedido() != null) {
                 ps.setInt(1, venta.getIdPedido());
@@ -72,6 +81,7 @@ public class VentaDAOImpl implements VentaDAO {
             ps.setBigDecimal(12, venta.getVuelto() != null ? venta.getVuelto() : BigDecimal.ZERO);
             ps.setString(13, venta.getEstado() != null ? venta.getEstado() : "COMPLETADA");
             ps.setString(14, idemKey != null ? idemKey.trim() : null);
+            ps.setTimestamp(15, Timestamp.valueOf(fechaVenta));
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -343,14 +353,18 @@ public class VentaDAOImpl implements VentaDAO {
     @Override
     public List<Venta> listarVentasDelDia(Connection conn) throws SQLException {
         List<Venta> lista = new ArrayList<>();
+        LocalDate hoyLima = LocalDate.now(ZONA_LIMA);
         String sql = "SELECT * FROM venta "
-                + "WHERE fecha_hora >= CURRENT_DATE() "
-                + "  AND fecha_hora < DATE_ADD(CURRENT_DATE(), INTERVAL 1 DAY) "
+                + "WHERE fecha_hora >= ? "
+                + "  AND fecha_hora < ? "
                 + "ORDER BY fecha_hora DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                lista.add(mapearVentaCompleta(rs));
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTimestamp(1, Timestamp.valueOf(hoyLima.atStartOfDay()));
+            ps.setTimestamp(2, Timestamp.valueOf(hoyLima.plusDays(1).atStartOfDay()));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapearVentaCompleta(rs));
+                }
             }
         }
         return lista;

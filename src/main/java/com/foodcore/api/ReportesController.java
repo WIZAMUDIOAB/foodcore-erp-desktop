@@ -12,6 +12,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
@@ -31,14 +34,36 @@ public class ReportesController {
 
     private final ApiState state;
     private final MenuQrService menuQrService;
+    private final Clock clock;
+
+    record RangoDia(LocalDateTime inicio, LocalDateTime finExclusivo) {
+        Timestamp inicioTimestamp() {
+            return Timestamp.valueOf(inicio);
+        }
+
+        Timestamp finExclusivoTimestamp() {
+            return Timestamp.valueOf(finExclusivo);
+        }
+    }
 
     public ReportesController(ApiState state) {
-        this(state, new MenuQrService());
+        this(state, new MenuQrService(), Clock.system(ZONA_LIMA));
     }
 
     public ReportesController(ApiState state, MenuQrService menuQrService) {
+        this(state, menuQrService, Clock.system(ZONA_LIMA));
+    }
+
+    ReportesController(ApiState state, MenuQrService menuQrService, Clock clock) {
         this.state = state;
         this.menuQrService = menuQrService != null ? menuQrService : new MenuQrService();
+        this.clock = clock != null ? clock : Clock.system(ZONA_LIMA);
+    }
+
+    static RangoDia calcularRangoDiaLima(Clock reloj) {
+        Clock clockEfectivo = reloj != null ? reloj : Clock.system(ZONA_LIMA);
+        LocalDate hoyLima = LocalDate.now(clockEfectivo.withZone(ZONA_LIMA));
+        return new RangoDia(hoyLima.atStartOfDay(), hoyLima.plusDays(1).atStartOfDay());
     }
 
     public void handleDashboardKpis(Context ctx) {
@@ -50,6 +75,9 @@ public class ReportesController {
         int mesasOcupadas = 0;
         int mesasTotales = 12;
         boolean bdConsultada = false;
+        RangoDia rango = calcularRangoDiaLima(clock);
+        Timestamp inicioDia = rango.inicioTimestamp();
+        Timestamp finDia = rango.finExclusivoTimestamp();
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
@@ -57,18 +85,21 @@ public class ReportesController {
                 String sqlKpi = "SELECT COALESCE(SUM(total), 0.00) AS suma, COUNT(*) AS tx, COALESCE(AVG(total), 0.00) AS prom "
                         + "FROM venta "
                         + "WHERE estado = 'COMPLETADA' "
-                        + "  AND fecha_hora >= CURDATE() "
-                        + "  AND fecha_hora < DATE_ADD(CURDATE(), INTERVAL 1 DAY)";
-                try (PreparedStatement ps = conn.prepareStatement(sqlKpi);
-                     ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        BigDecimal s = rs.getBigDecimal("suma");
-                        totalVentas = s != null ? s.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-                        transacciones = rs.getInt("tx");
-                        BigDecimal p = rs.getBigDecimal("prom");
-                        ticketPromedio = (transacciones > 0 && p != null)
-                                ? p.setScale(2, RoundingMode.HALF_UP)
-                                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                        + "  AND fecha_hora >= ? "
+                        + "  AND fecha_hora < ?";
+                try (PreparedStatement ps = conn.prepareStatement(sqlKpi)) {
+                    ps.setTimestamp(1, inicioDia);
+                    ps.setTimestamp(2, finDia);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            BigDecimal s = rs.getBigDecimal("suma");
+                            totalVentas = s != null ? s.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                            transacciones = rs.getInt("tx");
+                            BigDecimal p = rs.getBigDecimal("prom");
+                            ticketPromedio = (transacciones > 0 && p != null)
+                                    ? p.setScale(2, RoundingMode.HALF_UP)
+                                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                        }
                     }
                 }
 
@@ -77,15 +108,18 @@ public class ReportesController {
                         + "JOIN producto p ON dv.id_producto = p.id_producto "
                         + "JOIN venta v ON dv.id_venta = v.id_venta "
                         + "WHERE v.estado = 'COMPLETADA' "
-                        + "  AND v.fecha_hora >= CURDATE() "
-                        + "  AND v.fecha_hora < DATE_ADD(CURDATE(), INTERVAL 1 DAY) "
+                        + "  AND v.fecha_hora >= ? "
+                        + "  AND v.fecha_hora < ? "
                         + "GROUP BY p.id_producto, p.nombre "
                         + "ORDER BY unidades DESC LIMIT 1";
-                try (PreparedStatement ps = conn.prepareStatement(sqlTop);
-                     ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        platoTop = rs.getString("nombre");
-                        platoTopCant = rs.getInt("unidades");
+                try (PreparedStatement ps = conn.prepareStatement(sqlTop)) {
+                    ps.setTimestamp(1, inicioDia);
+                    ps.setTimestamp(2, finDia);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            platoTop = rs.getString("nombre");
+                            platoTopCant = rs.getInt("unidades");
+                        }
                     }
                 }
 
@@ -132,20 +166,24 @@ public class ReportesController {
     public void handleDashboardVentasPorHora(Context ctx) {
         ArrayNode root = state.mapper.createArrayNode();
         Map<String, BigDecimal> ventasPorHora = new TreeMap<>();
+        RangoDia rango = calcularRangoDiaLima(clock);
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
                 String sqlHora = "SELECT DATE_FORMAT(fecha_hora, '%H:00') AS hora, COALESCE(SUM(total), 0.00) AS monto "
                         + "FROM venta "
                         + "WHERE estado = 'COMPLETADA' "
-                        + "  AND fecha_hora >= CURDATE() "
-                        + "  AND fecha_hora < DATE_ADD(CURDATE(), INTERVAL 1 DAY) "
+                        + "  AND fecha_hora >= ? "
+                        + "  AND fecha_hora < ? "
                         + "GROUP BY DATE_FORMAT(fecha_hora, '%H:00') "
                         + "ORDER BY hora ASC";
-                try (PreparedStatement ps = conn.prepareStatement(sqlHora);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        ventasPorHora.put(rs.getString("hora"), rs.getBigDecimal("monto"));
+                try (PreparedStatement ps = conn.prepareStatement(sqlHora)) {
+                    ps.setTimestamp(1, rango.inicioTimestamp());
+                    ps.setTimestamp(2, rango.finExclusivoTimestamp());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            ventasPorHora.put(rs.getString("hora"), rs.getBigDecimal("monto"));
+                        }
                     }
                 }
             }
@@ -172,6 +210,7 @@ public class ReportesController {
 
     public void handleDashboardTopPlatos(Context ctx) {
         ArrayNode root = state.mapper.createArrayNode();
+        RangoDia rango = calcularRangoDiaLima(clock);
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
@@ -181,18 +220,21 @@ public class ReportesController {
                         + "JOIN producto p ON dv.id_producto = p.id_producto "
                         + "JOIN venta v ON dv.id_venta = v.id_venta "
                         + "WHERE v.estado = 'COMPLETADA' "
-                        + "  AND v.fecha_hora >= CURDATE() "
-                        + "  AND v.fecha_hora < DATE_ADD(CURDATE(), INTERVAL 1 DAY) "
+                        + "  AND v.fecha_hora >= ? "
+                        + "  AND v.fecha_hora < ? "
                         + "GROUP BY p.id_producto, p.nombre "
                         + "ORDER BY unidades DESC LIMIT 5";
-                try (PreparedStatement ps = conn.prepareStatement(sqlTop);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        ObjectNode item = root.addObject();
-                        item.put("id_producto", rs.getInt("id_producto"));
-                        item.put("nombre", rs.getString("nombre"));
-                        item.put("unidades", rs.getInt("unidades"));
-                        item.put("ingresos", rs.getBigDecimal("ingresos").doubleValue());
+                try (PreparedStatement ps = conn.prepareStatement(sqlTop)) {
+                    ps.setTimestamp(1, rango.inicioTimestamp());
+                    ps.setTimestamp(2, rango.finExclusivoTimestamp());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            ObjectNode item = root.addObject();
+                            item.put("id_producto", rs.getInt("id_producto"));
+                            item.put("nombre", rs.getString("nombre"));
+                            item.put("unidades", rs.getInt("unidades"));
+                            item.put("ingresos", rs.getBigDecimal("ingresos").doubleValue());
+                        }
                     }
                 }
             }
@@ -213,6 +255,7 @@ public class ReportesController {
 
     public void handleDashboardVentasRecientes(Context ctx) {
         ArrayNode root = state.mapper.createArrayNode();
+        RangoDia rango = calcularRangoDiaLima(clock);
 
         try (Connection conn = ConexionBD.getConnection()) {
             if (conn != null) {
@@ -227,20 +270,23 @@ public class ReportesController {
                         + "LEFT JOIN comprobante_pago cp ON cp.id_venta = v.id_venta "
                         + "LEFT JOIN usuario u ON v.id_usuario = u.id_usuario "
                         + "WHERE v.estado = 'COMPLETADA' "
-                        + "  AND v.fecha_hora >= CURDATE() "
-                        + "  AND v.fecha_hora < DATE_ADD(CURDATE(), INTERVAL 1 DAY) "
+                        + "  AND v.fecha_hora >= ? "
+                        + "  AND v.fecha_hora < ? "
                         + "ORDER BY v.id_venta DESC LIMIT 10";
-                try (PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        ObjectNode item = root.addObject();
-                        item.put("id_venta", rs.getInt("id_venta"));
-                        item.put("numero_comprobante", rs.getString("numero_comprobante"));
-                        item.put("tipo_comprobante", rs.getString("tipo_comprobante"));
-                        item.put("total", rs.getBigDecimal("total").doubleValue());
-                        item.put("medio_pago", rs.getString("medio_pago"));
-                        item.put("fecha_hora", rs.getString("fecha_hora"));
-                        item.put("mozo", rs.getString("mozo"));
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setTimestamp(1, rango.inicioTimestamp());
+                    ps.setTimestamp(2, rango.finExclusivoTimestamp());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            ObjectNode item = root.addObject();
+                            item.put("id_venta", rs.getInt("id_venta"));
+                            item.put("numero_comprobante", rs.getString("numero_comprobante"));
+                            item.put("tipo_comprobante", rs.getString("tipo_comprobante"));
+                            item.put("total", rs.getBigDecimal("total").doubleValue());
+                            item.put("medio_pago", rs.getString("medio_pago"));
+                            item.put("fecha_hora", rs.getString("fecha_hora"));
+                            item.put("mozo", rs.getString("mozo"));
+                        }
                     }
                 }
             }
@@ -255,7 +301,7 @@ public class ReportesController {
             demo.put("tipo_comprobante", "BOLETA");
             demo.put("total", 62.50);
             demo.put("medio_pago", "EFECTIVO");
-            demo.put("fecha_hora", LocalDateTime.now(ZONA_LIMA).minusMinutes(12).toString());
+            demo.put("fecha_hora", LocalDateTime.now(clock.withZone(ZONA_LIMA)).minusMinutes(12).toString());
             demo.put("mozo", "demo");
         }
 

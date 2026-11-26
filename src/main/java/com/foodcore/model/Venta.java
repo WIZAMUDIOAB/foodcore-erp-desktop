@@ -2,12 +2,14 @@ package com.foodcore.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 public class Venta {
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private int idVenta;
     private Integer idPedido;
     private int idCaja;
@@ -44,7 +46,7 @@ public class Venta {
         this.montoRecibido = montoRecibido;
         this.vuelto = vuelto;
         this.estado = "COMPLETADA";
-        this.fechaHora = LocalDateTime.now();
+        this.fechaHora = LocalDateTime.now(ZONA_LIMA);
         this.idempotencyKey = UUID.randomUUID().toString();
     }
 
