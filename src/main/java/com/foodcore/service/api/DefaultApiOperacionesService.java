@@ -55,6 +55,12 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
     private final PedidoService pedidoService;
     private final CajaService cajaService;
     private final VentaService ventaService;
+    private final ConnectionProvider connectionProvider;
+
+    @FunctionalInterface
+    interface ConnectionProvider {
+        Connection getConnection() throws SQLException;
+    }
 
     public DefaultApiOperacionesService(ProductoDAO productoDAO,
                                         MesaDAO mesaDAO,
@@ -63,6 +69,18 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
                                         PedidoService pedidoService,
                                         CajaService cajaService,
                                         VentaService ventaService) {
+        this(productoDAO, mesaDAO, pedidoDAO, ventaDAO, pedidoService, cajaService, ventaService,
+                ConexionBD::getConnection);
+    }
+
+    DefaultApiOperacionesService(ProductoDAO productoDAO,
+                                 MesaDAO mesaDAO,
+                                 PedidoDAO pedidoDAO,
+                                 VentaDAO ventaDAO,
+                                 PedidoService pedidoService,
+                                 CajaService cajaService,
+                                 VentaService ventaService,
+                                 ConnectionProvider connectionProvider) {
         this.productoDAO = Objects.requireNonNull(productoDAO);
         this.mesaDAO = Objects.requireNonNull(mesaDAO);
         this.pedidoDAO = Objects.requireNonNull(pedidoDAO);
@@ -70,12 +88,13 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
         this.pedidoService = Objects.requireNonNull(pedidoService);
         this.cajaService = Objects.requireNonNull(cajaService);
         this.ventaService = Objects.requireNonNull(ventaService);
+        this.connectionProvider = Objects.requireNonNull(connectionProvider);
     }
 
     @Override
     public List<Producto> listarCatalogoProductos(boolean soloDisponibles) {
         List<Producto> productos = new ArrayList<>();
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn != null) {
                 productos = soloDisponibles
                         ? productoDAO.listarProductosDisponibles(conn)
@@ -92,7 +111,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
     @Override
     public void actualizarDisponibilidadProducto(int idProducto, boolean disponible) throws ApiOperacionException {
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Servicio de base de datos no disponible.");
             }
@@ -105,7 +124,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
     @Override
     public Optional<String> obtenerImagenUrlProducto(int idProducto) {
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn != null) {
                 return productoDAO.obtenerImagenUrlPorId(conn, idProducto);
             }
@@ -119,7 +138,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
     public EstadoMesasSnapshot obtenerEstadoMesas() {
         Map<String, String> estadosPorMesa = new LinkedHashMap<>();
         Map<String, BigDecimal> totalesPorMesa = new LinkedHashMap<>();
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn != null) {
                 Map<String, String> dbEstados = mesaDAO.obtenerEstadoTodasMesas(conn);
                 estadosPorMesa.putAll(dbEstados);
@@ -142,7 +161,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
         List<DetallePedido> detalles = new ArrayList<>();
         BigDecimal totalCalculado = BigDecimal.ZERO;
 
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Base de datos no disponible para registrar pedidos.");
             }
@@ -200,7 +219,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
             throw new ApiOperacionException(503, "No se pudo persistir el pedido en base de datos.", exDb);
         }
 
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn != null) {
                 mesaDAO.actualizarEstadoMesaPorNumero(conn, numeroMesa, "OCUPADA", guardado.getIdPedido());
             }
@@ -212,7 +231,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
     @Override
     public PedidosActivosSnapshot listarPedidosActivosConDetalles() throws ApiOperacionException {
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Base de datos no disponible.");
             }
@@ -227,7 +246,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
     @Override
     public Optional<PedidoConDetalles> buscarPedidoPorUuid(String uuid) throws ApiOperacionException {
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Base de datos no disponible.");
             }
@@ -246,7 +265,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
     @Override
     public void actualizarEstadoPedido(int idPedido, String nuevoEstado) throws ApiOperacionException {
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Base de datos no disponible.");
             }
@@ -348,7 +367,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
         String numeroMesa = solicitud.numeroMesa() != null ? solicitud.numeroMesa() : "";
         int siguienteCorrelativo;
 
-        try (Connection conn = ConexionBD.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             if (conn == null) {
                 throw new ApiOperacionException(503, "Base de datos no disponible para procesar cobro.");
             }
@@ -402,7 +421,7 @@ public class DefaultApiOperacionesService implements ApiOperacionesPort {
 
         boolean mesaLiberada = false;
         if (!numeroMesa.isBlank()) {
-            try (Connection conn = ConexionBD.getConnection()) {
+            try (Connection conn = connectionProvider.getConnection()) {
                 if (conn != null) {
                     mesaLiberada = mesaDAO.actualizarEstadoMesaPorNumero(conn, numeroMesa, "LIBRE", null);
                 }
