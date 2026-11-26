@@ -259,8 +259,7 @@ public class ExportFileChooserHelper {
         if (nombreLower.endsWith(extRequerida.toLowerCase(Locale.ROOT))) {
             return archivo;
         }
-        File parent = archivo.getParentFile();
         String nombreConExt = archivo.getName() + extRequerida;
-        return parent != null ? new File(parent, nombreConExt) : new File(nombreConExt);
+        return archivo.toPath().resolveSibling(nombreConExt).toFile();
     }
 }

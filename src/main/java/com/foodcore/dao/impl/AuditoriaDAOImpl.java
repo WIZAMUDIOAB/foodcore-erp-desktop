@@ -248,6 +248,7 @@ public class AuditoriaDAOImpl implements AuditoriaDAO {
      * Registra un evento de auditoría usando una conexión existente sin propagar errores
      * que puedan interrumpir flujos de autenticación o respuestas HTTP.
      */
+    @Override
     public void registrarEventoSeguro(Connection conn, int idUsuario, String accion, String entidadAfectada,
             String datosAnteriores, String datosNuevos) {
         if (conn == null) {

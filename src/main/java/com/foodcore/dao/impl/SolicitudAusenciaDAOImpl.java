@@ -133,9 +133,13 @@ public class SolicitudAusenciaDAOImpl implements SolicitudAusenciaDAO {
         s.setNombreUsuario(rs.getString("nombre_emp"));
         s.setTipo(rs.getString("tipo"));
         Date fIni = rs.getDate("fecha_inicio");
-        if (fIni != null) s.setFechaInicio(fIni.toLocalDate());
+        if (fIni != null) {
+            s.setFechaInicio(fIni.toLocalDate());
+        }
         Date fFin = rs.getDate("fecha_fin");
-        if (fFin != null) s.setFechaFin(fFin.toLocalDate());
+        if (fFin != null) {
+            s.setFechaFin(fFin.toLocalDate());
+        }
         s.setDiasSolicitados(rs.getInt("dias_solicitados"));
         s.setMotivo(rs.getString("motivo"));
         s.setEstado(rs.getString("estado"));
@@ -145,9 +149,13 @@ public class SolicitudAusenciaDAOImpl implements SolicitudAusenciaDAO {
             s.setAprobadoPor(apr);
         }
         Timestamp tsResp = rs.getTimestamp("fecha_respuesta");
-        if (tsResp != null) s.setFechaRespuesta(tsResp.toLocalDateTime());
+        if (tsResp != null) {
+            s.setFechaRespuesta(tsResp.toLocalDateTime());
+        }
         Timestamp ts = rs.getTimestamp("fecha_solicitud");
-        if (ts != null) s.setFechaSolicitud(ts.toLocalDateTime());
+        if (ts != null) {
+            s.setFechaSolicitud(ts.toLocalDateTime());
+        }
         return s;
     }
 }

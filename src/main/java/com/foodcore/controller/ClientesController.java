@@ -1,12 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.ClienteDAO;
-import com.foodcore.dao.impl.ClienteDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.CompraClienteResumen;
+import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ConfiguracionFidelizacion;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
@@ -32,11 +31,12 @@ import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
-import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -119,9 +119,9 @@ public class ClientesController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
-    private final FinanzasService finanzasService = new FinanzasService();
-    private final FidelizacionService fidelizacionService = new FidelizacionService();
+    private final ClienteGestionService clienteGestionService;
+    private final FinanzasService finanzasService;
+    private final FidelizacionService fidelizacionService;
 
     private final ObservableList<Cliente> listaTodosClientes = FXCollections.observableArrayList();
     private final ObservableList<Cliente> listaCorporativos = FXCollections.observableArrayList();
@@ -133,6 +133,21 @@ public class ClientesController {
     private PaginadorTablaHelper<Cliente> paginadorMinoristas;
     private Cliente clienteSeleccionado = null;
     private boolean modoEdicion = false;
+
+    public ClientesController() {
+        this(AppContainer.getDefault().resolve(ClienteGestionService.class),
+                AppContainer.getDefault().finanzasService(),
+                AppContainer.getDefault().fidelizacionService());
+    }
+
+    public ClientesController(ClienteGestionService clienteGestionService,
+                              FinanzasService finanzasService,
+                              FidelizacionService fidelizacionService) {
+        this.clienteGestionService =
+                java.util.Objects.requireNonNull(clienteGestionService, "clienteGestionService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+        this.fidelizacionService = java.util.Objects.requireNonNull(fidelizacionService, "fidelizacionService");
+    }
 
     @FXML
     public void initialize() {
@@ -166,8 +181,8 @@ public class ClientesController {
         colRazonSocial.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getRazonSocial()));
         colContacto.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getContacto() != null ? c.getValue().getContacto() : "-"));
         colTelefono.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getTelefono() != null ? c.getValue().getTelefono() : "-"));
-        colLimiteCredito.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getLimiteCredito())));
-        colSaldoDeudor.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getSaldoDeudor())));
+        colLimiteCredito.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getLimiteCredito())));
+        colSaldoDeudor.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getSaldoDeudor())));
         colPuntos.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getPuntosAcumulados() + " pts"));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActivo() ? "ACTIVO" : "INACTIVO"));
         tblClientes.setItems(listaCorporativosPagina);
@@ -343,11 +358,7 @@ public class ClientesController {
 
     public void cargarClientesAsync() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return clienteDAO.listarTodos(conn);
-                }
-            },
+            clienteGestionService::listarTodos,
             todos -> {
                 listaTodosClientes.setAll(todos);
                 aplicarListasDesdeMaestro(todos);
@@ -360,8 +371,8 @@ public class ClientesController {
      * Carga síncrona determinística de clientes para pruebas de integración y capturas (v5.0.0).
      */
     public void cargarDatosSincrono() {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<Cliente> todos = clienteDAO.listarTodos(conn);
+        try {
+            List<Cliente> todos = clienteGestionService.listarTodos();
             listaTodosClientes.setAll(todos);
             aplicarListasDesdeMaestro(todos);
         } catch (Exception ex) {
@@ -505,9 +516,9 @@ public class ClientesController {
         }
         lblDetalleLimite.setText(esMin
                 ? "Minorista (Sin línea de crédito)"
-                : "S/ " + String.format("%.2f", c.getLimiteCredito()) + " (" + c.getDiasCredito() + " días)");
+                : "S/ " + String.format(Locale.US, "%.2f", c.getLimiteCredito()) + " (" + c.getDiasCredito() + " días)");
         lblDetallePuntos.setText(c.getPuntosAcumulados() + " Puntos Acumulados");
-        lblDetalleSaldoDeudor.setText(String.format("S/ %.2f", c.getSaldoDeudor()));
+        lblDetalleSaldoDeudor.setText(String.format(Locale.US, "S/ %.2f", c.getSaldoDeudor()));
         lblDetalleComprobantes.setText(c.getComprobantesPendientes() + " facturas pendientes de cobro");
         cargarHistorialComprasAsync(c.getIdCliente());
     }
@@ -575,7 +586,9 @@ public class ClientesController {
 
     @FXML
     public void handleEditarSeleccionado() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         modoEdicion = true;
         lblModalTitulo.setText("Editar Cliente #" + clienteSeleccionado.getIdCliente());
         if (cbModalTipoCliente != null) {
@@ -590,7 +603,9 @@ public class ClientesController {
         if (dpModalFechaNacimiento != null) {
             dpModalFechaNacimiento.setValue(clienteSeleccionado.getFechaNacimiento());
         }
-        txtModalLimite.setText(String.valueOf(clienteSeleccionado.getLimiteCredito()));
+        txtModalLimite.setText(clienteSeleccionado.getLimiteCredito() != null
+                ? clienteSeleccionado.getLimiteCredito().toPlainString()
+                : "0.00");
         txtModalDiasCredito.setText(String.valueOf(clienteSeleccionado.getDiasCredito()));
         if (boxModalCredito != null) {
             boolean esMin = clienteSeleccionado.isMinorista();
@@ -627,52 +642,56 @@ public class ClientesController {
             lblModalError.setText("La razón social o nombre completo es obligatorio");
             return;
         }
-        double lim = 0.0;
+        BigDecimal lim = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         int dias = "MINORISTA".equalsIgnoreCase(segmento) ? 0 : 30;
         try {
-            lim = Double.parseDouble(txtModalLimite.getText().trim());
+            String limTexto = txtModalLimite.getText() != null
+                    ? txtModalLimite.getText().trim().replace(',', '.')
+                    : "";
+            if (!limTexto.isEmpty()) {
+                lim = new BigDecimal(limTexto).setScale(2, RoundingMode.HALF_UP);
+            }
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
-        } catch (Exception ignored) {
+        } catch (NumberFormatException ex) {
+            LOGGER.log(Level.FINE, "Valor de crédito inválido en modal de cliente; usando valores por defecto", ex);
         }
 
         final String contacto = txtModalContacto.getText() != null ? txtModalContacto.getText().trim() : "";
         final String telefono = txtModalTelefono.getText() != null ? txtModalTelefono.getText().trim() : "";
         final String email = txtModalEmail.getText() != null ? txtModalEmail.getText().trim() : "";
         final LocalDate fechaNacimiento = dpModalFechaNacimiento != null ? dpModalFechaNacimiento.getValue() : null;
-        final double limFinal = lim;
+        final BigDecimal limFinal = lim;
         final int diasFinal = dias;
         final boolean edicion = modoEdicion && clienteSeleccionado != null;
         final Cliente objEdicion = clienteSeleccionado;
 
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (edicion) {
-                        objEdicion.setTipoCliente(segmento);
-                        objEdicion.setTipoDocumento(tipoDoc);
-                        objEdicion.setNumeroDocumento(num);
-                        objEdicion.setRazonSocial(razon);
-                        objEdicion.setContacto(contacto.isEmpty() ? razon : contacto);
-                        objEdicion.setTelefono(telefono);
-                        objEdicion.setEmail(email);
-                        objEdicion.setFechaNacimiento(fechaNacimiento);
-                        objEdicion.setLimiteCredito(limFinal);
-                        objEdicion.setDiasCredito(diasFinal);
-                        clienteDAO.actualizar(conn, objEdicion);
-                    } else {
-                        Cliente nuevo = new Cliente();
-                        nuevo.setTipoCliente(segmento);
-                        nuevo.setTipoDocumento(tipoDoc);
-                        nuevo.setNumeroDocumento(num);
-                        nuevo.setRazonSocial(razon);
-                        nuevo.setContacto(contacto.isEmpty() ? razon : contacto);
-                        nuevo.setTelefono(telefono);
-                        nuevo.setEmail(email);
-                        nuevo.setFechaNacimiento(fechaNacimiento);
-                        nuevo.setLimiteCredito(limFinal);
-                        nuevo.setDiasCredito(diasFinal);
-                        clienteDAO.insertar(conn, nuevo);
-                    }
+                if (edicion) {
+                    objEdicion.setTipoCliente(segmento);
+                    objEdicion.setTipoDocumento(tipoDoc);
+                    objEdicion.setNumeroDocumento(num);
+                    objEdicion.setRazonSocial(razon);
+                    objEdicion.setContacto(contacto.isEmpty() ? razon : contacto);
+                    objEdicion.setTelefono(telefono);
+                    objEdicion.setEmail(email);
+                    objEdicion.setFechaNacimiento(fechaNacimiento);
+                    objEdicion.setLimiteCredito(limFinal);
+                    objEdicion.setDiasCredito(diasFinal);
+                    clienteGestionService.actualizarCliente(objEdicion);
+                } else {
+                    Cliente nuevo = new Cliente();
+                    nuevo.setTipoCliente(segmento);
+                    nuevo.setTipoDocumento(tipoDoc);
+                    nuevo.setNumeroDocumento(num);
+                    nuevo.setRazonSocial(razon);
+                    nuevo.setContacto(contacto.isEmpty() ? razon : contacto);
+                    nuevo.setTelefono(telefono);
+                    nuevo.setEmail(email);
+                    nuevo.setFechaNacimiento(fechaNacimiento);
+                    nuevo.setLimiteCredito(limFinal);
+                    nuevo.setDiasCredito(diasFinal);
+                    clienteGestionService.insertarCliente(nuevo);
                 }
             },
             () -> {
@@ -701,15 +720,13 @@ public class ClientesController {
 
     @FXML
     public void handleCambiarEstado() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         final int idCli = clienteSeleccionado.getIdCliente();
         final boolean nuevoEstado = !clienteSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    clienteDAO.cambiarEstado(conn, idCli, nuevoEstado);
-                }
-            },
+            () -> clienteGestionService.cambiarEstado(idCli, nuevoEstado),
             this::cargarClientesAsync,
             ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado", ex)
         );
@@ -717,7 +734,9 @@ public class ClientesController {
 
     @FXML
     public void handleGenerarEstadoCuentaPdf() {
-        if (clienteSeleccionado == null) return;
+        if (clienteSeleccionado == null) {
+            return;
+        }
         final int idCli = clienteSeleccionado.getIdCliente();
         final String numDoc = clienteSeleccionado.getNumeroDocumento();
         Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(

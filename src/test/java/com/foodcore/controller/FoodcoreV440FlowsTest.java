@@ -4,7 +4,7 @@ import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.api.ApiServer;
 import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.SolicitudAusenciaDAO;
@@ -20,9 +20,11 @@ import com.foodcore.model.enums.Permiso;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.CajaService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.support.TestSecuritySupport;
@@ -56,7 +58,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
@@ -158,7 +159,7 @@ class FoodcoreV440FlowsTest {
         });
 
         // Verificar que PedidoDAOImpl.listarItemsPendientesCocina incluye ítems en estado LISTO
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
         Pedido p = new Pedido();
         p.setIdUsuario(1);
         p.setNumeroMesa("05");
@@ -182,7 +183,7 @@ class FoodcoreV440FlowsTest {
     @Test
     @DisplayName("v4.4.0 §2: POS muestra 12 mesas, badges [MESA 04]/[KIOSCO]/[DELIVERY] y preserva Split 35/65")
     void debeRenderizar12MesasYBadgesMulticanalEnPOS() throws Exception {
-        PedidoService pedidoService = new PedidoService();
+        PedidoService pedidoService = new PedidoServiceImpl();
 
         Pedido pMesa = new Pedido();
         pMesa.setIdUsuario(1);
@@ -310,7 +311,7 @@ class FoodcoreV440FlowsTest {
         admin.setNombreEmpleado("Administrador General");
         admin.setNombreRol("ADMIN");
         admin.setDni("70000001");
-        admin.setSueldoBase(3500.00);
+        admin.setSueldoBase(new BigDecimal("3500.00"));
         AuthService.setUsuarioSesionActual(admin);
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
@@ -340,6 +341,7 @@ class FoodcoreV440FlowsTest {
 
         // 2. Portal del Empleado (3 Tabs + Descarga Boleta PDF con OpenPDF)
         Path tempPdf = Files.createTempFile("foodcore_boleta_v44_", ".pdf");
+        AtomicReference<MiHorarioController> miHorarioCtrlRef = new AtomicReference<>();
         try {
             JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 try {
@@ -347,16 +349,30 @@ class FoodcoreV440FlowsTest {
                     Parent root = loader.load();
                     Scene sc = new Scene(root, 1080, 720);
                     App.applyStylesheets(sc);
+                    miHorarioCtrlRef.set(loader.getController());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                    MiHorarioController ctrl = loader.getController();
-                    assertEquals(3, ctrl.getTabPaneMiPortal().getTabs().size());
-                    assertEquals("Mi Horario", ctrl.getTabPaneMiPortal().getTabs().get(0).getText());
-                    assertEquals("Mis Asistencias", ctrl.getTabPaneMiPortal().getTabs().get(1).getText());
-                    assertEquals("Mis Boletas", ctrl.getTabPaneMiPortal().getTabs().get(2).getText());
-                    assertFalse(ctrl.getListaBoletas().isEmpty());
+            MiHorarioController miHorarioCtrl = miHorarioCtrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> !miHorarioCtrl.getListaBoletas().isEmpty(),
+                    10L,
+                    "MiHorarioController debe poblar boletas de forma asíncrona");
 
-                    File out = ctrl.generarBoletaPdf(ctrl.getListaBoletas().get(0), admin, tempPdf.toFile());
-                    assertTrue(out.exists() && out.length() > 800, "El PDF de la boleta debe generarse con contenido válido");
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    assertEquals(3, miHorarioCtrl.getTabPaneMiPortal().getTabs().size());
+                    assertEquals("Mi Horario", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(0).getText());
+                    assertEquals("Mis Asistencias", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(1).getText());
+                    assertEquals("Mis Boletas", miHorarioCtrl.getTabPaneMiPortal().getTabs().get(2).getText());
+                    assertFalse(miHorarioCtrl.getListaBoletas().isEmpty());
+
+                    File out = miHorarioCtrl.generarBoletaPdf(
+                            miHorarioCtrl.getListaBoletas().get(0), admin, tempPdf.toFile());
+                    assertTrue(out.exists() && out.length() > 800,
+                            "El PDF de la boleta debe generarse con contenido válido");
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -366,6 +382,9 @@ class FoodcoreV440FlowsTest {
             String header = new String(pdfBytes, 0, Math.min(5, pdfBytes.length), StandardCharsets.US_ASCII);
             assertEquals("%PDF-", header, "El archivo generado debe tener cabecera PDF válida");
         } finally {
+            if (miHorarioCtrlRef.get() != null) {
+                miHorarioCtrlRef.get().detenerRecursos();
+            }
             Files.deleteIfExists(tempPdf);
         }
 
@@ -585,8 +604,8 @@ class FoodcoreV440FlowsTest {
         assertTrue(authz.tienePermiso(sesionAdmin, Permiso.VENTA_ANULAR));
         assertTrue(authz.tienePermiso(sesionAdmin, Permiso.VENTA_DESCUENTO));
 
-        new CajaService().abrirTurnoCaja(1, "Caja RBAC Test", new BigDecimal("100.00"));
-        VentaService ventaService = new VentaService();
+        new CajaServiceImpl().abrirTurnoCaja(1, "Caja RBAC Test", new BigDecimal("100.00"));
+        VentaService ventaService = new VentaServiceImpl();
 
         NegocioException exDescCajero = assertThrows(NegocioException.class, () ->
                 ventaService.calcularDescuentoAutorizado(new BigDecimal("100.00"), new BigDecimal("10"), true, sesionCajero));
@@ -602,22 +621,7 @@ class FoodcoreV440FlowsTest {
     }
 
     private static void esperarHastaEnFx(BooleanSupplier condicion, long timeoutMs, String mensaje) throws Exception {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            AtomicBoolean cumplida = new AtomicBoolean(false);
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicion.getAsBoolean()));
-            if (cumplida.get()) {
-                return;
-            }
-            try {
-                Thread.sleep(25);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        AtomicBoolean cumplidaFinal = new AtomicBoolean(false);
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplidaFinal.set(condicion.getAsBoolean()));
-        assertTrue(cumplidaFinal.get(), mensaje);
+        long timeoutSeconds = Math.max(1L, (long) Math.ceil(timeoutMs / 1000.0));
+        JavaFxTestSupport.awaitCondition(condicion, timeoutSeconds, mensaje);
     }
 }

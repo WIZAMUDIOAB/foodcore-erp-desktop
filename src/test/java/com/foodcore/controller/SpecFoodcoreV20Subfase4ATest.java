@@ -3,14 +3,14 @@ package com.foodcore.controller;
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.dao.CajaDAO;
-import com.foodcore.dao.CajaDAOImpl;
+import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.ClienteDAO;
 import com.foodcore.dao.CompraDAO;
 import com.foodcore.dao.CuentaPorCobrarDAO;
 import com.foodcore.dao.CuentaPorPagarDAO;
 import com.foodcore.dao.HistorialPrecioDAO;
 import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.ProveedorDAO;
@@ -138,28 +138,28 @@ class SpecFoodcoreV20Subfase4ATest {
             cxp.setNumeroDocumento("F001-0005521");
             cxp.setFechaEmision(LocalDate.now());
             cxp.setFechaVencimiento(LocalDate.now().plusDays(15));
-            cxp.setMontoTotal(850.00);
-            cxp.setMontoPagado(0.00);
+            cxp.setMontoTotal(new BigDecimal("850.00"));
+            cxp.setMontoPagado(BigDecimal.ZERO);
             cxp.setEstado("PENDIENTE");
             cxp.setObservaciones("Lote de gaseosas y cervezas artesanales");
             int idCxp = cuentaPorPagarDAO.insertar(conn, cxp);
             assertTrue(idCxp > 0, "Cuenta por pagar debe insertarse");
 
             // Abonar S/ 350.00
-            boolean pagoOk = finanzasService.registrarPagoProveedor(idCxp, 350.00, "TRANSFERENCIA", null, 1, "Primer abono");
+            boolean pagoOk = finanzasService.registrarPagoProveedor(idCxp, new BigDecimal("350.00"), "TRANSFERENCIA", null, 1, "Primer abono");
             assertTrue(pagoOk, "El abono a proveedor debe procesarse con éxito");
 
             Optional<CuentaPorPagar> cxpActual = cuentaPorPagarDAO.buscarPorId(conn, idCxp);
             assertTrue(cxpActual.isPresent());
-            assertEquals(350.00, cxpActual.get().getMontoPagado(), 0.01);
-            assertEquals(500.00, cxpActual.get().getSaldo(), 0.01);
+            assertEquals(0, new BigDecimal("350.00").compareTo(cxpActual.get().getMontoPagado()));
+            assertEquals(0, new BigDecimal("500.00").compareTo(cxpActual.get().getSaldo()));
             assertEquals("PENDIENTE", cxpActual.get().getEstado());
 
             // Liquidar saldo restante S/ 500.00
-            finanzasService.registrarPagoProveedor(idCxp, 500.00, "TRANSFERENCIA", null, 1, "Liquidación final");
+            finanzasService.registrarPagoProveedor(idCxp, new BigDecimal("500.00"), "TRANSFERENCIA", null, 1, "Liquidación final");
             Optional<CuentaPorPagar> cxpLiquidada = cuentaPorPagarDAO.buscarPorId(conn, idCxp);
             assertTrue(cxpLiquidada.isPresent());
-            assertEquals(850.00, cxpLiquidada.get().getMontoPagado(), 0.01);
+            assertEquals(0, new BigDecimal("850.00").compareTo(cxpLiquidada.get().getMontoPagado()));
             assertEquals("PAGADA", cxpLiquidada.get().getEstado());
 
             // Orden de Compra PDF
@@ -181,7 +181,7 @@ class SpecFoodcoreV20Subfase4ATest {
             cli.setContacto("Mirella Paredes");
             cli.setTelefono("955667788");
             cli.setEmail("turismo@losandes.pe");
-            cli.setLimiteCredito(4000.00);
+            cli.setLimiteCredito(new BigDecimal("4000.00"));
             cli.setDiasCredito(30);
             int idCli = clienteDAO.insertar(conn, cli);
             assertTrue(idCli > 0, "Cliente corporativo registrado");
@@ -202,18 +202,18 @@ class SpecFoodcoreV20Subfase4ATest {
             List<CuentaPorCobrar> facturas = cuentaPorCobrarDAO.listarPorCliente(conn, idCli);
             assertFalse(facturas.isEmpty(), "Debe haberse generado la cuenta por cobrar asociada");
             CuentaPorCobrar cxc = facturas.get(0);
-            assertEquals(354.00, cxc.getMontoTotal(), 0.01);
-            assertEquals(354.00, cxc.getSaldo(), 0.01);
+            assertEquals(0, new BigDecimal("354.00").compareTo(cxc.getMontoTotal()));
+            assertEquals(0, new BigDecimal("354.00").compareTo(cxc.getSaldo()));
             assertEquals("PENDIENTE", cxc.getEstado());
 
             // Cobro de abono S/ 200.00
-            boolean cobroOk = finanzasService.registrarCobroCliente(cxc.getIdCuentaCobrar(), 200.00, "TRANSFERENCIA", null, 1, "Abono cliente");
+            boolean cobroOk = finanzasService.registrarCobroCliente(cxc.getIdCuentaCobrar(), new BigDecimal("200.00"), "TRANSFERENCIA", null, 1, "Abono cliente");
             assertTrue(cobroOk, "Cobro a cuenta corporativa registrado");
 
             Optional<CuentaPorCobrar> cxcPost = cuentaPorCobrarDAO.buscarPorId(conn, cxc.getIdCuentaCobrar());
             assertTrue(cxcPost.isPresent());
-            assertEquals(200.00, cxcPost.get().getMontoCobrado(), 0.01);
-            assertEquals(154.00, cxcPost.get().getSaldo(), 0.01);
+            assertEquals(0, new BigDecimal("200.00").compareTo(cxcPost.get().getMontoCobrado()));
+            assertEquals(0, new BigDecimal("154.00").compareTo(cxcPost.get().getSaldo()));
 
             // Estado de cuenta en PDF
             File doc = new File("target/test-estado-cuenta-cliente.pdf");
@@ -227,7 +227,7 @@ class SpecFoodcoreV20Subfase4ATest {
     void testHistorialPreciosConMotivoObligatorio() throws Exception {
         try (Connection conn = ConexionBD.getConnection()) {
             boolean cambioOk = finanzasService.registrarCambioPrecioConMotivo(
-                    "PRODUCTO", 1, "Hamburguesa Clásica", 20.00, 22.00, 1, "admin", "Incremento de costo de insumo carne de res"
+                    "PRODUCTO", 1, "Hamburguesa Clásica", new BigDecimal("20.0000"), new BigDecimal("22.0000"), 1, "admin", "Incremento de costo de insumo carne de res"
             );
             assertTrue(cambioOk, "El cambio de precio debe registrarse");
 
@@ -237,7 +237,7 @@ class SpecFoodcoreV20Subfase4ATest {
             // Validar que motivo corto lance excepción
             assertThrows(IllegalArgumentException.class, () -> {
                 finanzasService.registrarCambioPrecioConMotivo(
-                        "PRODUCTO", 1, "Hamburguesa Clásica", 22.00, 25.00, 1, "admin", "n/a"
+                        "PRODUCTO", 1, "Hamburguesa Clásica", new BigDecimal("22.0000"), new BigDecimal("25.0000"), 1, "admin", "n/a"
                 );
             }, "Motivo inferior a 5 caracteres debe ser rechazado");
         }

@@ -1,13 +1,15 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.MovimientoPago;
 import com.foodcore.model.PlanillaConsolidada;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PlanillaService;
-import com.foodcore.service.impl.PlanillaServiceImpl;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -30,13 +32,25 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Controlador JavaFX para gestión administrativa de pagos, movimientos y planilla consolidada.
  * Consolida {@code Sueldo Base + Bonos/Comisiones - Adelantos/Descuentos = Neto a Pagar}.
  */
-public class PlanillaController {
+public class PlanillaController implements LifecycleAwareController {
+
+    private static final Logger LOGGER = Logger.getLogger(PlanillaController.class.getName());
+
+    private record DatosPlanillaPeriodo(
+            List<MovimientoPago> movimientos,
+            List<PlanillaConsolidada> consolidado) {
+    }
 
     @FXML private StackPane rootPlanillaStack;
     @FXML private ComboBox<String> cbPeriodo;
@@ -74,21 +88,34 @@ public class PlanillaController {
     private final PlanillaService planillaService;
     private final ObservableList<MovimientoPago> listaMovimientos = FXCollections.observableArrayList();
     private final ObservableList<PlanillaConsolidada> listaPlanilla = FXCollections.observableArrayList();
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicLong cargaColabSeq = new AtomicLong(0L);
+    private final AtomicLong cargaPeriodoSeq = new AtomicLong(0L);
+    private final AtomicBoolean registrarEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean eliminarEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean exportExcelEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean exportPdfEnCurso = new AtomicBoolean(false);
 
     public PlanillaController() {
-        this(new PlanillaServiceImpl());
+        this(AppContainer.getDefault().planillaService());
     }
 
     public PlanillaController(PlanillaService planillaService) {
-        this.planillaService = planillaService;
+        this.planillaService = Objects.requireNonNull(planillaService, "planillaService no puede ser nulo");
     }
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         configurarCombos();
         configurarTablas();
         cargarColaboradores();
         cargarPlanillaPeriodo();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
     }
 
     private void configurarCombos() {
@@ -158,15 +185,28 @@ public class PlanillaController {
     }
 
     private void cargarColaboradores() {
-        try {
-            List<Usuario> lista = planillaService.listarColaboradoresActivos();
-            cbColaborador.setItems(FXCollections.observableArrayList(lista));
-            if (!lista.isEmpty()) {
-                cbColaborador.getSelectionModel().selectFirst();
+        long seq = cargaColabSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            planillaService::listarColaboradoresActivos,
+            lista -> {
+                if (!vistaActiva.get() || seq != cargaColabSeq.get()) {
+                    return;
+                }
+                List<Usuario> colaboradores = lista != null ? lista : List.of();
+                if (cbColaborador != null) {
+                    cbColaborador.setItems(FXCollections.observableArrayList(colaboradores));
+                    if (!colaboradores.isEmpty()) {
+                        cbColaborador.getSelectionModel().selectFirst();
+                    }
+                }
+            },
+            e -> {
+                LOGGER.log(Level.WARNING, "Error cargando colaboradores en planilla", e);
+                if (vistaActiva.get()) {
+                    mostrarError("No se pudieron cargar los colaboradores: " + e.getMessage());
+                }
             }
-        } catch (Exception e) {
-            mostrarError("No se pudieron cargar los colaboradores: " + e.getMessage());
-        }
+        );
     }
 
     @FXML
@@ -176,84 +216,169 @@ public class PlanillaController {
 
     public void cargarPlanillaPeriodo() {
         String periodo = obtenerPeriodoSeleccionado();
-        lblBadgePeriodo.setText(periodo);
-        try {
-            List<MovimientoPago> movs = planillaService.listarMovimientosPorPeriodo(periodo);
-            listaMovimientos.setAll(movs);
+        if (lblBadgePeriodo != null) {
+            lblBadgePeriodo.setText(periodo);
+        }
+        long seq = cargaPeriodoSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> new DatosPlanillaPeriodo(
+                    planillaService.listarMovimientosPorPeriodo(periodo),
+                    planillaService.calcularPlanillaConsolidada(periodo)),
+            datos -> {
+                if (!vistaActiva.get() || seq != cargaPeriodoSeq.get()) {
+                    return;
+                }
+                aplicarDatosPeriodoEnUi(datos);
+            },
+            e -> {
+                LOGGER.log(Level.WARNING, "Error consolidando planilla", e);
+                if (vistaActiva.get()) {
+                    mostrarError("Error al consolidar planilla: " + e.getMessage());
+                }
+            }
+        );
+    }
 
-            List<PlanillaConsolidada> consolidado = planillaService.calcularPlanillaConsolidada(periodo);
-            listaPlanilla.setAll(consolidado);
+    private void aplicarDatosPeriodoEnUi(DatosPlanillaPeriodo datos) {
+        List<MovimientoPago> movs = datos != null && datos.movimientos() != null ? datos.movimientos() : List.of();
+        List<PlanillaConsolidada> consolidado = datos != null && datos.consolidado() != null
+                ? datos.consolidado() : List.of();
+        listaMovimientos.setAll(movs);
+        listaPlanilla.setAll(consolidado);
 
-            BigDecimal totalBase = consolidado.stream()
-                    .map(PlanillaConsolidada::sueldoBase)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal totalIng = consolidado.stream()
-                    .map(PlanillaConsolidada::totalIngresosAdicionales)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal totalEgr = consolidado.stream()
-                    .map(PlanillaConsolidada::totalEgresos)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal totalNeto = consolidado.stream()
-                    .map(PlanillaConsolidada::netoPagar)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalBase = consolidado.stream()
+                .map(PlanillaConsolidada::sueldoBase)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalIng = consolidado.stream()
+                .map(PlanillaConsolidada::totalIngresosAdicionales)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalEgr = consolidado.stream()
+                .map(PlanillaConsolidada::totalEgresos)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalNeto = consolidado.stream()
+                .map(PlanillaConsolidada::netoPagar)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        if (lblKpiSueldoBase != null) {
             lblKpiSueldoBase.setText(formatearMoneda(totalBase));
+        }
+        if (lblKpiIngresos != null) {
             lblKpiIngresos.setText(formatearMoneda(totalIng));
+        }
+        if (lblKpiEgresos != null) {
             lblKpiEgresos.setText(formatearMoneda(totalEgr));
+        }
+        if (lblKpiNetoPagar != null) {
             lblKpiNetoPagar.setText(formatearMoneda(totalNeto));
-        } catch (Exception e) {
-            mostrarError("Error al consolidar planilla: " + e.getMessage());
         }
     }
 
     @FXML
     public void handleRegistrarMovimiento() {
-        Usuario colab = cbColaborador.getValue();
+        Usuario colab = cbColaborador != null ? cbColaborador.getValue() : null;
         if (colab == null) {
             mostrarError("Seleccione un colaborador.");
             return;
         }
+        BigDecimal monto;
         try {
-            BigDecimal monto = new BigDecimal(txtMonto.getText().trim().replace(',', '.'));
-            LocalDate fecha = dpFechaMovimiento.getValue() != null ? dpFechaMovimiento.getValue() : LocalDate.now();
-            Usuario sesion = AuthService.getUsuarioSesionActual();
-            Integer regPor = sesion != null && sesion.getIdUsuario() > 0 ? sesion.getIdUsuario() : null;
-
-            MovimientoPago mov = planillaService.registrarMovimiento(
-                    colab.getIdUsuario(),
-                    cbTipoMovimiento.getValue(),
-                    txtConcepto.getText(),
-                    monto,
-                    fecha,
-                    regPor,
-                    null);
-
-            txtConcepto.clear();
-            txtMonto.clear();
-            cbPeriodo.setValue(mov.getPeriodoMes());
-            cargarPlanillaPeriodo();
-            mostrarOk("Movimiento " + mov.getTipoMovimiento() + " registrado correctamente.");
+            String montoTxt = txtMonto != null && txtMonto.getText() != null ? txtMonto.getText().trim() : "";
+            monto = new BigDecimal(montoTxt.replace(',', '.'));
         } catch (NumberFormatException e) {
             mostrarError("Ingrese un monto numérico válido mayor a 0.");
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+            return;
         }
+        if (!registrarEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        int idColab = colab.getIdUsuario();
+        String tipoMov = cbTipoMovimiento != null ? cbTipoMovimiento.getValue() : "BONO";
+        String concepto = txtConcepto != null ? txtConcepto.getText() : "";
+        LocalDate fecha = dpFechaMovimiento != null && dpFechaMovimiento.getValue() != null
+                ? dpFechaMovimiento.getValue() : LocalDate.now();
+        Usuario sesion = AuthService.getUsuarioSesionActual();
+        Integer regPor = sesion != null && sesion.getIdUsuario() > 0 ? sesion.getIdUsuario() : null;
+
+        if (btnRegistrarMovimiento != null) {
+            btnRegistrarMovimiento.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> planillaService.registrarMovimiento(idColab, tipoMov, concepto, monto, fecha, regPor, null),
+            mov -> {
+                registrarEnCurso.set(false);
+                if (btnRegistrarMovimiento != null) {
+                    btnRegistrarMovimiento.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (txtConcepto != null) {
+                    txtConcepto.clear();
+                }
+                if (txtMonto != null) {
+                    txtMonto.clear();
+                }
+                String periodoMov = mov.getPeriodoMes();
+                if (cbPeriodo != null && !Objects.equals(cbPeriodo.getValue(), periodoMov)) {
+                    cbPeriodo.setValue(periodoMov);
+                } else {
+                    cargarPlanillaPeriodo();
+                }
+                mostrarOk("Movimiento " + mov.getTipoMovimiento() + " registrado correctamente.");
+            },
+            e -> {
+                registrarEnCurso.set(false);
+                if (btnRegistrarMovimiento != null) {
+                    btnRegistrarMovimiento.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error registrando movimiento de planilla", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
     public void handleEliminarMovimiento() {
-        MovimientoPago sel = tblMovimientos.getSelectionModel().getSelectedItem();
+        MovimientoPago sel = tblMovimientos != null ? tblMovimientos.getSelectionModel().getSelectedItem() : null;
         if (sel == null) {
             mostrarError("Seleccione un movimiento de la lista para eliminarlo.");
             return;
         }
-        try {
-            planillaService.eliminarMovimiento(sel.getIdMovimiento());
-            cargarPlanillaPeriodo();
-            mostrarOk("Movimiento eliminado correctamente.");
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+        if (!eliminarEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        long idMovimiento = sel.getIdMovimiento();
+        if (btnEliminarMovimiento != null) {
+            btnEliminarMovimiento.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> planillaService.eliminarMovimiento(idMovimiento),
+            () -> {
+                eliminarEnCurso.set(false);
+                if (btnEliminarMovimiento != null) {
+                    btnEliminarMovimiento.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                cargarPlanillaPeriodo();
+                mostrarOk("Movimiento eliminado correctamente.");
+            },
+            e -> {
+                eliminarEnCurso.set(false);
+                if (btnEliminarMovimiento != null) {
+                    btnEliminarMovimiento.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error eliminando movimiento de planilla", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
@@ -267,12 +392,8 @@ public class PlanillaController {
         if (destino.isEmpty()) {
             return;
         }
-        try {
-            File out = planillaService.exportarPlanillaExcel(listaPlanilla, periodo, destino.get());
-            mostrarOk("Excel exportado en: " + out.getName());
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
-        }
+        exportarPlanillaAsync(btnExportarExcel, exportExcelEnCurso, true, periodo,
+                List.copyOf(listaPlanilla), destino.get());
     }
 
     @FXML
@@ -286,16 +407,47 @@ public class PlanillaController {
         if (destino.isEmpty()) {
             return;
         }
-        try {
-            File out = planillaService.exportarPlanillaPdf(listaPlanilla, periodo, destino.get());
-            mostrarOk("PDF exportado en: " + out.getName());
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+        exportarPlanillaAsync(btnExportarPdf, exportPdfEnCurso, false, periodo,
+                List.copyOf(listaPlanilla), destino.get());
+    }
+
+    private void exportarPlanillaAsync(Button trigger, AtomicBoolean flag, boolean esExcel,
+                                       String periodo, List<PlanillaConsolidada> snapshot, File destino) {
+        if (!flag.compareAndSet(false, true)) {
+            return;
         }
+        if (trigger != null) {
+            trigger.setDisable(true);
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            () -> esExcel
+                    ? planillaService.exportarPlanillaExcel(snapshot, periodo, destino)
+                    : planillaService.exportarPlanillaPdf(snapshot, periodo, destino),
+            out -> {
+                flag.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                mostrarOk((esExcel ? "Excel" : "PDF") + " exportado en: " + out.getName());
+            },
+            e -> {
+                flag.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error exportando planilla", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     private String obtenerPeriodoSeleccionado() {
-        return cbPeriodo.getValue() != null && !cbPeriodo.getValue().isBlank()
+        return cbPeriodo != null && cbPeriodo.getValue() != null && !cbPeriodo.getValue().isBlank()
                 ? cbPeriodo.getValue()
                 : YearMonth.now().toString();
     }
@@ -306,13 +458,19 @@ public class PlanillaController {
     }
 
     private void mostrarOk(String msg) {
-        lblEstadoPlanilla.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
-        lblEstadoPlanilla.setText("✅ " + msg);
+        if (lblEstadoPlanilla != null) {
+            lblEstadoPlanilla.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+            lblEstadoPlanilla.getStyleClass().add("fc-status-msg-ok");
+            lblEstadoPlanilla.setText("✅ " + msg);
+        }
     }
 
     private void mostrarError(String msg) {
-        lblEstadoPlanilla.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
-        lblEstadoPlanilla.setText("⚠️ " + msg);
+        if (lblEstadoPlanilla != null) {
+            lblEstadoPlanilla.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+            lblEstadoPlanilla.getStyleClass().add("fc-status-msg-error");
+            lblEstadoPlanilla.setText("⚠️ " + msg);
+        }
     }
 
     public ObservableList<PlanillaConsolidada> getListaPlanilla() {
@@ -345,5 +503,21 @@ public class PlanillaController {
 
     public Label getLblEstadoPlanilla() {
         return lblEstadoPlanilla;
+    }
+
+    public Button getBtnRegistrarMovimiento() {
+        return btnRegistrarMovimiento;
+    }
+
+    public Button getBtnEliminarMovimiento() {
+        return btnEliminarMovimiento;
+    }
+
+    public Button getBtnExportarExcel() {
+        return btnExportarExcel;
+    }
+
+    public Button getBtnExportarPdf() {
+        return btnExportarPdf;
     }
 }

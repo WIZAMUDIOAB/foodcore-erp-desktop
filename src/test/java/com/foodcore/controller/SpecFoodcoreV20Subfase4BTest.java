@@ -47,6 +47,7 @@ import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -87,8 +88,9 @@ class SpecFoodcoreV20Subfase4BTest {
     @DisplayName("4B-1: Marcaje Kiosco - Entrada puntual y detección de colaborador por DNI/PIN")
     void testMarcajeKioscoEntrada() throws Exception {
         // Limpiar asistencias abiertas de hoy (reloj JVM) y asegurar entrada programada en el futuro (puntual)
-        LocalDate hoy = LocalDate.now();
-        LocalTime ahora = LocalTime.now();
+        ZoneId zonaLima = ZoneId.of("America/Lima");
+        LocalDate hoy = LocalDate.now(zonaLima);
+        LocalTime ahora = LocalTime.now(zonaLima);
         LocalTime entradaProgramada = !ahora.isBefore(LocalTime.of(22, 55))
                 ? LocalTime.of(23, 59, 59)
                 : ahora.plusHours(1);
@@ -115,7 +117,7 @@ class SpecFoodcoreV20Subfase4BTest {
 
         // Verificar en BD que el registro está abierto (hora_salida IS NULL)
         try (Connection conn = ConexionBD.getConnection()) {
-            Optional<Asistencia> abierta = asistenciaDAO.buscarMarcajeAbierto(conn, 1, LocalDate.now());
+            Optional<Asistencia> abierta = asistenciaDAO.buscarMarcajeAbierto(conn, 1, hoy);
             assertTrue(abierta.isPresent(), "Debe existir marcaje abierto en BD");
             assertEquals("PRESENTE", abierta.get().getEstado());
         }

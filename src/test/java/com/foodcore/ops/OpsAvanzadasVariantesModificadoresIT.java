@@ -9,7 +9,7 @@ import com.foodcore.controller.MozoOrderController;
 import com.foodcore.controller.PersonalizacionProductoController;
 import com.foodcore.controller.VentaController;
 import com.foodcore.controller.KitchenDisplayController;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.impl.ProductoPersonalizacionDAOImpl;
@@ -26,7 +26,9 @@ import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.MenuQrService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -48,11 +50,9 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
+import org.testfx.util.WaitForAsyncUtils;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -63,6 +63,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -82,7 +83,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Suite de integración end-to-end para Operaciones Avanzadas v4.8.0 (Módulo 1 Variantes y Módulo 2 Modificadores):
  * persistencia MySQL + Backoffice MenuView + Selector POS/Mozo + KDS + Tickets térmicos 48 columnas + capturas PNG.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class OpsAvanzadasVariantesModificadoresIT {
 
     private static final Path SCREENSHOT_DIR = Path.of("target", "v480-screenshots");
@@ -101,11 +101,10 @@ class OpsAvanzadasVariantesModificadoresIT {
         personalizacionService = new PersonalizacionProductoServiceImpl();
         productoDAO = new ProductoDAOImpl();
         pedidoDAO = new PedidoDAOImpl();
-        pedidoService = new PedidoService();
+        pedidoService = new PedidoServiceImpl();
     }
 
     @Test
-    @Order(1)
     @DisplayName("Módulos 1 y 2: DAO/Service CRUD de variantes y modificadores globales + validaciones y copias defensivas")
     void testPersonalizacionDaoServiceCrudYValidaciones() throws Exception {
         List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
@@ -183,7 +182,6 @@ class OpsAvanzadasVariantesModificadoresIT {
     }
 
     @Test
-    @Order(2)
     @DisplayName("Backoffice MenuView: Tabs de Tamaños y Extras con capturas v4.8.0")
     void testBackofficeMenuViewTabsTamanosYExtrasYCapturas() throws Exception {
         AtomicReference<MenuController> ctrlRef = new AtomicReference<>();
@@ -244,7 +242,15 @@ class OpsAvanzadasVariantesModificadoresIT {
             }
         });
 
-        Thread.sleep(250);
+        JavaFxTestSupport.awaitCondition(
+                () -> ctrlRef.get().getListaVariantesEnEdicion().stream()
+                        .anyMatch(v -> "Mediana".equals(v.getNombreVariante()))
+                        && ctrlRef.get().getListaVariantesEnEdicion().stream()
+                                .anyMatch(v -> "Familiar".equals(v.getNombreVariante())),
+                5L,
+                "Deben cargarse las variantes Mediana y Familiar de PIZ-ART"
+        );
+        WaitForAsyncUtils.waitForFxEvents();
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 Parent root = rootRef.get();
@@ -284,7 +290,12 @@ class OpsAvanzadasVariantesModificadoresIT {
             }
         });
 
-        Thread.sleep(250);
+        JavaFxTestSupport.awaitCondition(
+                () -> !ctrlRef.get().getListaModificadoresGlobales().isEmpty(),
+                5L,
+                "Deben cargarse los modificadores globales para HAM-ESP"
+        );
+        WaitForAsyncUtils.waitForFxEvents();
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {
                 Parent root = rootRef.get();
@@ -302,7 +313,6 @@ class OpsAvanzadasVariantesModificadoresIT {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Modal Selector POS: Variante + Checkboxes de Extras actualizan precio en vivo + captura")
     void testModalPersonalizacionPosCalculoEnVivoYCaptura() throws Exception {
         List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
@@ -359,7 +369,6 @@ class OpsAvanzadasVariantesModificadoresIT {
     }
 
     @Test
-    @Order(4)
     @DisplayName("POS, Mozo, BD y Menú QR: Líneas personalizadas separadas, suma de montos y persistencia en MySQL")
     void testPosCarritoYMozoFlujoCompletoSinColapsarLineas() throws Exception {
         List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
@@ -583,7 +592,6 @@ class OpsAvanzadasVariantesModificadoresIT {
     }
 
     @Test
-    @Order(5)
     @DisplayName("KDS Kanban, API REST /api/kds/items y Tickets 48 cols imprimen variante + modificadores + captura")
     void testKdsTicketsComandasYApiRestConModificadoresYCaptura(@TempDir Path tempDir) throws Exception {
         List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
@@ -616,6 +624,7 @@ class OpsAvanzadasVariantesModificadoresIT {
         Pedido ped = new Pedido(0, 1, null, "05", "REGISTRADO", new BigDecimal("101.00"));
         Pedido guardado = pedidoService.registrarPedidoYEnviarComanda(ped, List.of(itHam, itPizza));
 
+        AtomicReference<KitchenDisplayController> kdsCtrlRef = new AtomicReference<>();
         try {
             // 1. Verificar consulta KDS en BD y renderizado visual en KitchenDisplayView.fxml
             List<DetallePedido> pendientesKds;
@@ -637,14 +646,30 @@ class OpsAvanzadasVariantesModificadoresIT {
                     App.applyStylesheets(scene);
 
                     kdsCtrl.renderizarItemsKds(pendientesKds, LocalDateTime.now(ZONA_LIMA));
+                    root.applyCss();
+                    root.layout();
                     kdsRootRef.set(root);
+                    kdsCtrlRef.set(kdsCtrl);
                     return null;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             });
 
-            Thread.sleep(450);
+            JavaFxTestSupport.awaitCondition(() -> {
+                Parent root = kdsRootRef.get();
+                root.applyCss();
+                root.layout();
+                Set<Node> labels = root.lookupAll("Label");
+                boolean vioHam = labels.stream().filter(Label.class::isInstance)
+                        .map(n -> ((Label) n).getText())
+                        .anyMatch(t -> t != null && t.contains("Hamburguesa Gourmet Custom + Tocino + Extra Queso"));
+                boolean vioPiz = labels.stream().filter(Label.class::isInstance)
+                        .map(n -> ((Label) n).getText())
+                        .anyMatch(t -> t != null && t.contains("Pizza Artesanal (Familiar) + Extra Queso"));
+                return vioHam && vioPiz;
+            }, 5L, "KDS debe renderizar tarjetas personalizadas de Hamburguesa y Pizza");
+            WaitForAsyncUtils.waitForFxEvents();
 
             JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 try {
@@ -711,6 +736,12 @@ class OpsAvanzadasVariantesModificadoresIT {
             KdsController kdsApi = new KdsController(new ApiState(), pedidoDAO);
             assertNotNull(kdsApi);
         } finally {
+            if (kdsCtrlRef.get() != null) {
+                JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                    kdsCtrlRef.get().stopTimers();
+                    return null;
+                });
+            }
             limpiarPedidoDePrueba(guardado.getIdPedido());
         }
     }
@@ -752,14 +783,12 @@ class OpsAvanzadasVariantesModificadoresIT {
         App.cargarFuentesSistema();
     }
 
-    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs) throws InterruptedException {
-        long limite = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < limite) {
-            if (condicion.getAsBoolean()) {
-                return;
-            }
-            Thread.sleep(100);
-        }
+    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs) {
+        AsyncTestSupport.awaitUntilQuiet(
+                condicion,
+                Duration.ofMillis(timeoutMs),
+                Duration.ofMillis(50)
+        );
     }
 
     private static void limpiarPedidoDePrueba(int idPedido) throws Exception {

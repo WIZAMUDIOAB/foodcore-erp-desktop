@@ -185,7 +185,8 @@ public class PlanillaServiceImpl implements PlanillaService {
 
             List<PlanillaConsolidada> resultado = new ArrayList<>();
             for (Usuario u : colaboradores) {
-                BigDecimal sueldoBase = BigDecimal.valueOf(u.getSueldoBase()).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal sueldoBase = (u.getSueldoBase() != null ? u.getSueldoBase() : BigDecimal.ZERO)
+                        .setScale(2, RoundingMode.HALF_UP);
                 List<MovimientoPago> movsUsr = porUsuario.getOrDefault(u.getIdUsuario(), List.of());
 
                 BigDecimal bonos = sumarPorTipo(movsUsr, "BONO");

@@ -1,17 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.KardexMovimiento;
-import com.foodcore.service.AuthService;
-import com.foodcore.tx.TransactionManager;
-import com.foodcore.tx.impl.JdbcTransactionManager;
+import com.foodcore.service.AnalisisMermasService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.UiAsyncExecutor;
-import com.foodcore.util.UnidadMedidaFormatter;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,9 +20,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -59,8 +50,7 @@ public class MermasController {
     @FXML private TableColumn<FilaMerma, String> colSaldo;
     @FXML private TableColumn<FilaMerma, String> colMotivo;
 
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
-    private final TransactionManager tx = new JdbcTransactionManager();
+    private final AnalisisMermasService mermasService = new AnalisisMermasService();
     private final ObservableList<Insumo> listaInsumos = FXCollections.observableArrayList();
     private final ObservableList<FilaMerma> listaMermas = FXCollections.observableArrayList();
 
@@ -87,27 +77,11 @@ public class MermasController {
     public void cargarDatosMermas() {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<Insumo> ins = new ArrayList<>();
+                AnalisisMermasService.DatosMermasCarga datos = mermasService.consultarDatosMermas();
+                List<Insumo> ins = new ArrayList<>(datos.insumos());
                 List<FilaMerma> filas = new ArrayList<>();
-                String sql = "SELECT k.created_at, i.nombre, i.unidad_medida, k.cantidad, k.saldo_posterior, k.observacion "
-                    + "FROM kardex_movimiento k JOIN insumo i ON k.id_insumo = i.id_insumo "
-                    + "WHERE k.tipo_movimiento LIKE 'MERMA%' ORDER BY k.id_kardex DESC LIMIT 100";
-                try (Connection conn = ConexionBD.getConnection()) {
-                    ins = insumoDAO.listarTodos(conn);
-                    try (PreparedStatement ps = conn.prepareStatement(sql);
-                         ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            String fecha = String.valueOf(rs.getTimestamp("created_at")).substring(0, 16);
-                            String nom = rs.getString("nombre");
-                            String um = rs.getString("unidad_medida");
-                            String cant = UnidadMedidaFormatter.formatear(rs.getBigDecimal("cantidad"), um, true);
-                            String saldo = UnidadMedidaFormatter.formatear(rs.getBigDecimal("saldo_posterior"), um, false);
-                            String obs = rs.getString("observacion");
-                            filas.add(new FilaMerma(fecha, nom, cant, saldo, obs != null ? obs : "Merma de cocina"));
-                        }
-                    }
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    LOGGER.log(Level.FINE, "Error cargando mermas", e);
+                for (AnalisisMermasService.FilaMermaRegistro f : datos.filas()) {
+                    filas.add(new FilaMerma(f.fecha(), f.insumo(), f.cantidad(), f.saldo(), f.motivo()));
                 }
                 return new DatosMermasCarga(ins, filas);
             },
@@ -126,17 +100,7 @@ public class MermasController {
      * Registra una merma transaccional descontando el stock del insumo y creando el movimiento {@code MERMA} en el Kardex (§3.3).
      */
     public KardexMovimiento registrarMermaTransaccional(long idInsumo, BigDecimal cantidad, String motivo) throws Exception {
-        if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("La cantidad de merma debe ser mayor a cero.");
-        }
-        String obs = (motivo != null && !motivo.isBlank()) ? motivo.trim() : "Merma operativa de cocina";
-        long idUsuario = AuthService.getUsuarioSesionActual() != null
-            ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1L;
-
-        return tx.executeChecked(conn -> {
-            insumoDAO.registrarMovimientoInventario(conn, idInsumo, "MERMA", cantidad, obs, null);
-            return insumoDAO.registrarMovimientoKardexAtomico(conn, idInsumo, "MERMA", cantidad, idUsuario, obs);
-        });
+        return mermasService.registrarMermaKardexDirecto(idInsumo, cantidad, motivo);
     }
 
     @FXML

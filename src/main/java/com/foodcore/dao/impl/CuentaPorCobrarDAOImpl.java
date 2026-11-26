@@ -128,8 +128,8 @@ public class CuentaPorCobrarDAOImpl implements CuentaPorCobrarDAO {
             ps.setString(3, cxc.getNumeroComprobante());
             ps.setDate(4, Date.valueOf(cxc.getFechaEmision()));
             ps.setDate(5, Date.valueOf(cxc.getFechaVencimiento()));
-            ps.setBigDecimal(6, BigDecimal.valueOf(cxc.getMontoTotal()).setScale(2, RoundingMode.HALF_UP));
-            ps.setBigDecimal(7, BigDecimal.valueOf(cxc.getMontoCobrado()).setScale(2, RoundingMode.HALF_UP));
+            ps.setBigDecimal(6, normalizarMoneda(cxc.getMontoTotal()));
+            ps.setBigDecimal(7, normalizarMoneda(cxc.getMontoCobrado()));
             ps.setString(8, cxc.getEstado());
             ps.setString(9, cxc.getObservaciones());
             ps.executeUpdate();
@@ -145,10 +145,10 @@ public class CuentaPorCobrarDAOImpl implements CuentaPorCobrarDAO {
 
     @Override
     public boolean registrarCobro(Connection conn, CobroCliente cobro) throws SQLException {
-        if (cobro == null || Double.isNaN(cobro.getMonto()) || Double.isInfinite(cobro.getMonto()) || cobro.getMonto() <= 0.0) {
+        if (cobro == null || cobro.getMonto() == null || cobro.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
-        BigDecimal montoCobro = BigDecimal.valueOf(cobro.getMonto()).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal montoCobro = cobro.getMonto().setScale(2, RoundingMode.HALF_UP);
 
         // 1. Actualizar monto_cobrado y estado atómicamente con guarda anti-sobrecobro.
         // En MySQL SET evalúa de izquierda a derecha: CASE lee el monto_cobrado ya actualizado.
@@ -226,13 +226,23 @@ public class CuentaPorCobrarDAOImpl implements CuentaPorCobrarDAO {
         if (rs.getDate("fecha_vencimiento") != null) {
             c.setFechaVencimiento(rs.getDate("fecha_vencimiento").toLocalDate());
         }
-        c.setMontoTotal(rs.getDouble("monto_total"));
-        c.setMontoCobrado(rs.getDouble("monto_cobrado"));
+        c.setMontoTotal(leerMoneda(rs, "monto_total"));
+        c.setMontoCobrado(leerMoneda(rs, "monto_cobrado"));
         c.setEstado(rs.getString("estado"));
         c.setObservaciones(rs.getString("observaciones"));
         if (rs.getTimestamp("fecha_registro") != null) {
             c.setFechaRegistro(rs.getTimestamp("fecha_registro").toLocalDateTime());
         }
         return c;
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        return normalizarMoneda(rs.getBigDecimal(columna));
     }
 }

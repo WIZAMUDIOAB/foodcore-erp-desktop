@@ -1,12 +1,9 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Merma;
 import com.foodcore.service.AnalisisMermasService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.EmptyStateHelper;
 import com.foodcore.util.UiAsyncExecutor;
 import com.foodcore.util.UnidadMedidaFormatter;
@@ -47,7 +44,6 @@ import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -99,7 +95,6 @@ public class AnalisisMermasController {
     @FXML private TextField txtModalObservacion;
 
     private final AnalisisMermasService mermasService = new AnalisisMermasService();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
 
     private final ObservableList<Merma> listaTopInsumos = FXCollections.observableArrayList();
     private final ObservableList<Merma> listaDetalleMermas = FXCollections.observableArrayList();
@@ -167,7 +162,7 @@ public class AnalisisMermasController {
                 UnidadMedidaFormatter.formatear(c.getValue().getCantidad(), c.getValue().getUnidadMedida(), true)));
         colTopPerdida.setCellValueFactory(c -> new SimpleStringProperty(
                 String.format("S/ %.2f", c.getValue().getCostoTotal())));
-        colTopPerdida.setStyle("-fx-text-fill: -fc-danger; -fx-font-weight: bold; -fx-alignment: CENTER-RIGHT;");
+        colTopPerdida.getStyleClass().add("fc-col-danger-right-bold");
         tblTopInsumos.setItems(listaTopInsumos);
 
         colDetFecha.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaTexto()));
@@ -200,7 +195,7 @@ public class AnalisisMermasController {
 
         colDetCosto.setCellValueFactory(c -> new SimpleStringProperty(
                 String.format("S/ %.2f", c.getValue().getCostoTotal())));
-        colDetCosto.setStyle("-fx-text-fill: -fc-danger; -fx-alignment: CENTER-RIGHT;");
+        colDetCosto.getStyleClass().add("fc-col-danger-right");
 
         colDetObservacion.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getObservacion() != null ? c.getValue().getObservacion() : "-"));
@@ -269,9 +264,7 @@ public class AnalisisMermasController {
                 }
             }
             alertas = mermasService.obtenerAlertasInsumosCriticos(anio, mes);
-            try (Connection conn = ConexionBD.getConnection()) {
-                insumos = insumoDAO.listarTodos(conn);
-            }
+            insumos = mermasService.listarTodosInsumos();
         } catch (java.sql.SQLException | RuntimeException ex) {
             LOGGER.log(Level.WARNING, "Error al cargar datos de mermas", ex);
         }

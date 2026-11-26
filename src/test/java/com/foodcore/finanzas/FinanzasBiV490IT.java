@@ -6,8 +6,8 @@ import com.foodcore.controller.ArqueoCajaController;
 import com.foodcore.controller.DashboardController;
 import com.foodcore.controller.EstadoResultadosController;
 import com.foodcore.controller.ReportesAvanzadosController;
-import com.foodcore.controller.ReportesAvanzadosController.FilaReporteAvanzado;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.controller.reportes.FilaReporteAvanzado;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.ClienteDAOImpl;
@@ -29,6 +29,9 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.FinanzasBiService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
@@ -51,10 +54,7 @@ import javafx.scene.image.WritableImage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
@@ -67,6 +67,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -89,7 +90,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Fase 2 (Comparativas automáticas en Dashboard/Reportes + Márgenes por Categoría) y
  * Fase 3 (Análisis de Cohortes y Retención de Clientes).
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class FinanzasBiV490IT {
 
     private static final Path SCREENSHOT_DIR = Path.of("target", "v490-screenshots");
@@ -109,8 +109,8 @@ class FinanzasBiV490IT {
         Files.createDirectories(SCREENSHOT_DIR);
         JavaFxTestSupport.iniciarToolkit();
 
-        cajaService = new CajaService();
-        ventaService = new VentaService();
+        cajaService = new CajaServiceImpl();
+        ventaService = new VentaServiceImpl();
         finanzasBiService = new FinanzasBiService();
         productoDAO = new ProductoDAOImpl();
         insumoDAO = new InsumoDAOImpl();
@@ -125,7 +125,6 @@ class FinanzasBiV490IT {
     }
 
     @Test
-    @Order(1)
     @DisplayName("Fase 1: Gasto categorizado en Caja ('Pago de Luz') y Estado de Resultados P&L exacto")
     void test01CajaGastoCategorizadoYEstadoResultadosPnl(@TempDir Path tempExportDir) throws Exception {
         limpiarDatosTransaccionales();
@@ -362,7 +361,6 @@ class FinanzasBiV490IT {
     }
 
     @Test
-    @Order(2)
     @DisplayName("Fase 2: Comparativas automáticas (Dashboard + Reportes) y Márgenes por Categoría ordenados")
     void test02ComparativasPeriodosYMargenesPorCategoria() throws Exception {
         limpiarDatosTransaccionales();
@@ -505,7 +503,6 @@ class FinanzasBiV490IT {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Fase 3: Análisis de Cohortes (aviso datos insuficientes, matriz mensual y retención/perdidos)")
     void test03CohortesYRetencionClientes(@TempDir Path tempExportDir) throws Exception {
         limpiarDatosTransaccionales();
@@ -877,7 +874,7 @@ class FinanzasBiV490IT {
             cli.setContacto(nombre);
             cli.setTelefono("999000111");
             cli.setEmail(doc.toLowerCase() + "@test.pe");
-            cli.setLimiteCredito(0.0);
+            cli.setLimiteCredito(BigDecimal.ZERO);
             cli.setDiasCredito(0);
             cli.setPuntosFidelidad(10);
             cli.setEstado("ACTIVO");
@@ -917,15 +914,12 @@ class FinanzasBiV490IT {
         App.cargarFuentesSistema();
     }
 
-    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs)
-            throws InterruptedException {
-        long limite = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < limite) {
-            if (condicion.getAsBoolean()) {
-                return;
-            }
-            Thread.sleep(100);
-        }
+    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs) {
+        AsyncTestSupport.awaitUntilQuiet(
+                condicion,
+                Duration.ofMillis(timeoutMs),
+                Duration.ofMillis(50)
+        );
     }
 
     private static void guardarSnapshot(Parent root, String filename) throws Exception {

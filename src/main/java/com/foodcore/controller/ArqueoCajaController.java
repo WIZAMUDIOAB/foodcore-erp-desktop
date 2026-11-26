@@ -1,18 +1,18 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Caja;
 import com.foodcore.model.CategoriaGasto;
 import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.InsumoCriticoTurno;
 import com.foodcore.model.MovimientoCaja;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.ResultadoCierreConActa;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -33,9 +33,6 @@ import javafx.scene.layout.VBox;
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,12 +83,20 @@ public class ArqueoCajaController {
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritMinimo;
     @FXML private TableColumn<InsumoCriticoTurno, String> colCritEstado;
 
-    private final CajaService cajaService = new CajaService();
+    private final CajaService cajaService;
     private final ObservableList<FilaCierreZ> itemsCierreZ = FXCollections.observableArrayList();
     private final ObservableList<InsumoCriticoTurno> itemsStockCritico = FXCollections.observableArrayList();
     private volatile List<CategoriaGasto> categoriasGastoCache = List.of();
     private Caja cajaActual;
     private BigDecimal totalEsperado = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+    public ArqueoCajaController() {
+        this(AppContainer.getDefault().cajaService());
+    }
+
+    public ArqueoCajaController(CajaService cajaService) {
+        this.cajaService = java.util.Objects.requireNonNull(cajaService, "cajaService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
@@ -244,19 +249,14 @@ public class ArqueoCajaController {
             montoPorMedio.put(medio, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         }
 
-        String sql = "SELECT metodo_pago, COUNT(*) AS ops, COALESCE(SUM(total), 0) AS monto "
-            + "FROM venta WHERE id_caja = ? AND estado = 'COMPLETADA' GROUP BY metodo_pago";
-        try (Connection conn = ConexionBD.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idCaja);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String m = rs.getString("metodo_pago");
-                    int ops = rs.getInt("ops");
-                    BigDecimal monto = rs.getBigDecimal("monto").setScale(2, RoundingMode.HALF_UP);
-                    conteoPorMedio.put(m, ops);
-                    montoPorMedio.put(m, monto);
-                }
+        try {
+            Map<String, Object[]> resumen = cajaService.obtenerResumenVentasCierreZ(idCaja);
+            for (Map.Entry<String, Object[]> entry : resumen.entrySet()) {
+                Object[] valores = entry.getValue();
+                int ops = ((Number) valores[0]).intValue();
+                BigDecimal monto = ((BigDecimal) valores[1]).setScale(2, RoundingMode.HALF_UP);
+                conteoPorMedio.put(entry.getKey(), ops);
+                montoPorMedio.put(entry.getKey(), monto);
             }
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Sin ventas registradas en Cierre Z", e);
@@ -602,7 +602,7 @@ public class ArqueoCajaController {
     }
 
     /** Ejecuta cierre síncrono con ruta PDF explícita para pruebas integrales del Acta de Entrega. */
-    public CajaService.ResultadoCierreConActa ejecutarCierreConActaArchivoSync(
+    public ResultadoCierreConActa ejecutarCierreConActaArchivoSync(
             BigDecimal fisico, String respEntrante, File destinoPdf) throws Exception {
         Usuario usr = AuthService.getUsuarioSesionActual();
         int idUsuario = usr != null ? usr.getIdUsuario() : 1;

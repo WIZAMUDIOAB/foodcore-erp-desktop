@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -75,7 +76,8 @@ public final class CorsPolicy {
             if (is != null) {
                 target.load(is);
             }
-        } catch (java.io.IOException ignored) {
+        } catch (java.io.IOException ex) {
+            LOGGER.log(Level.FINE, "No se pudo leer recurso CORS opcional: " + path, ex);
         }
     }
 

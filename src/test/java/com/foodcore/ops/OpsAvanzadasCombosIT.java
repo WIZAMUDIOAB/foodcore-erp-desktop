@@ -7,8 +7,8 @@ import com.foodcore.api.KdsController;
 import com.foodcore.controller.KitchenDisplayController;
 import com.foodcore.controller.MenuController;
 import com.foodcore.controller.VentaController;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.exception.StockInsuficienteException;
@@ -32,7 +32,10 @@ import com.foodcore.service.PedidoService;
 import com.foodcore.service.PersonalizacionProductoService;
 import com.foodcore.service.VentaService;
 import com.foodcore.service.impl.ComboServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -54,11 +57,9 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
+import org.testfx.util.WaitForAsyncUtils;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -69,6 +70,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -89,7 +91,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * migración V19 + ComboService + Backoffice MenuView + POS tarjeta/línea única + explosión de stock/Kárdex +
  * reversión en anulación + desglose en KDS / Ticket 48 cols + capturas PNG.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class OpsAvanzadasCombosIT {
 
     private static final Path SCREENSHOT_DIR = Path.of("target", "v480-screenshots");
@@ -115,8 +116,8 @@ class OpsAvanzadasCombosIT {
         productoDAO = new ProductoDAOImpl();
         insumoDAO = new InsumoDAOImpl();
         pedidoDAO = new PedidoDAOImpl();
-        pedidoService = new PedidoService(new JdbcTransactionManager(), pedidoDAO, new AutorizacionService());
-        ventaService = new VentaService();
+        pedidoService = new PedidoServiceImpl(new JdbcTransactionManager(), pedidoDAO, new AutorizacionService());
+        ventaService = new VentaServiceImpl();
 
         Usuario admin = new Usuario();
         admin.setIdUsuario(1);
@@ -127,7 +128,6 @@ class OpsAvanzadasCombosIT {
     }
 
     @Test
-    @Order(1)
     @DisplayName("M3.1 V19 Combo Duo Burger sembrado + validaciones anti-ciclo/precio/componentes")
     void testV19SemillaYValidacionesCombo() throws Exception {
         List<Combo> combos = comboService.listarCombosActivos();
@@ -161,7 +161,6 @@ class OpsAvanzadasCombosIT {
     }
 
     @Test
-    @Order(2)
     @DisplayName("M3.2 Backoffice MenuView: crear Combo Familiar con Pizza + 4 Gaseosas + Papas y capturar PNG")
     void testBackofficeCrearComboFamiliarYCapturaPng() throws Exception {
         prepararInsumosYRecetasEscenarioFamiliar();
@@ -246,8 +245,14 @@ class OpsAvanzadasCombosIT {
                 assertEquals(3, ctrl.getListaComboComponentesEnEdicion().size());
 
                 List<ComboDetalle> componentes = new ArrayList<>(ctrl.getListaComboComponentesEnEdicion());
+                Producto existente = buscarPorCodigo(ctrl.getListaProductos(), "CMB-FAM");
+                Integer existingComboId = existente != null && existente.getIdCombo() != null
+                        ? existente.getIdCombo()
+                        : null;
+                Integer existingProdId = existente != null ? existente.getIdProducto() : null;
                 Combo guardado = ctrl.guardarComboEnBD(
-                        null, null, "CMB-FAM", "Combo Familiar", new BigDecimal("49.90"), true, componentes);
+                        existingComboId, existingProdId, "CMB-FAM", "Combo Familiar",
+                        new BigDecimal("49.90"), true, componentes);
                 assertTrue(guardado.getIdCombo() > 0);
                 assertEquals(3, guardado.getDetalles().size());
                 return null;
@@ -303,9 +308,9 @@ class OpsAvanzadasCombosIT {
     }
 
     @Test
-    @Order(3)
     @DisplayName("M3.3 POS línea única + VentaService explosión de Kardex en Pizza/Gaseosas/Papas y anulación + PNG")
     void testPosComboYExplosionKardex() throws Exception {
+        asegurarComboFamiliarParaPrueba();
         asegurarCajaAbierta();
 
         AtomicReference<Parent> rootRef = new AtomicReference<>();
@@ -454,9 +459,9 @@ class OpsAvanzadasCombosIT {
     }
 
     @Test
-    @Order(4)
     @DisplayName("M3.4 KDS & Ticket Térmico 48 cols: mostrar nombre Combo Familiar y desglose debajo + PNG")
     void testKdsYTicketDesgloseComboCapturaPng(@TempDir Path tempDir) throws Exception {
+        asegurarComboFamiliarParaPrueba();
         List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
         Producto comboFam = buscarPorCodigo(catalogo, "CMB-FAM");
         assertNotNull(comboFam);
@@ -527,6 +532,8 @@ class OpsAvanzadasCombosIT {
                     Scene scene = new Scene(root, 1280, 760);
                     App.applyStylesheets(scene);
                     kdsCtrl.renderizarItemsKds(detallesBd, LocalDateTime.now(ZONA_LIMA));
+                    root.applyCss();
+                    root.layout();
                     rootRef.set(root);
                     kdsRef.set(kdsCtrl);
                     return null;
@@ -535,7 +542,16 @@ class OpsAvanzadasCombosIT {
                 }
             });
 
-            Thread.sleep(350);
+            JavaFxTestSupport.awaitCondition(() -> {
+                Parent root = rootRef.get();
+                root.applyCss();
+                root.layout();
+                return buscarLabelConTexto(root, "Combo Familiar")
+                        && buscarLabelConTexto(root, "1x Pizza Artesanal")
+                        && buscarLabelConTexto(root, "4x Gaseosa Personal")
+                        && buscarLabelConTexto(root, "1x Porción de Papas");
+            }, 5L, "KDS debe renderizar el desglose completo de Combo Familiar");
+            WaitForAsyncUtils.waitForFxEvents();
 
             JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 try {
@@ -566,6 +582,39 @@ class OpsAvanzadasCombosIT {
             }
             limpiarPedidoDePrueba(guardado.getIdPedido());
         }
+    }
+
+    private void asegurarComboFamiliarParaPrueba() throws Exception {
+        prepararInsumosYRecetasEscenarioFamiliar();
+        List<Producto> catalogo = personalizacionService.listarProductosDisponiblesConOpciones();
+        Producto existente = buscarPorCodigo(catalogo, "CMB-FAM");
+        if (existente != null && existente.isEsCombo()
+                && existente.getComboComponentes() != null
+                && existente.getComboComponentes().size() == 3) {
+            return;
+        }
+
+        Producto pizza = buscarPorCodigo(catalogo, "PIZ-ART");
+        Producto gaseosa = buscarPorCodigo(catalogo, "BEB-01");
+        Producto papas = buscarPorCodigo(catalogo, "PAP-01");
+        assertNotNull(pizza, "Debe existir PIZ-ART para construir Combo Familiar");
+        assertNotNull(gaseosa, "Debe existir BEB-01 para construir Combo Familiar");
+        assertNotNull(papas, "Debe existir PAP-01 para construir Combo Familiar");
+
+        int idCombo = existente != null && existente.getIdCombo() != null ? existente.getIdCombo() : 0;
+        Combo combo = new Combo(idCombo, null, "Combo Familiar", new BigDecimal("49.90"), true);
+        combo.setCodigo("CMB-FAM");
+        if (existente != null) {
+            combo.setIdProducto(existente.getIdProducto());
+        }
+        combo.setDetalles(List.of(
+                new ComboDetalle(0, idCombo, pizza.getIdProducto(), 1),
+                new ComboDetalle(0, idCombo, gaseosa.getIdProducto(), 4),
+                new ComboDetalle(0, idCombo, papas.getIdProducto(), 1)
+        ));
+        Combo guardado = comboService.guardarCombo(combo);
+        assertTrue(guardado.getIdCombo() > 0);
+        assertEquals(3, guardado.getDetalles().size());
     }
 
     private void prepararInsumosYRecetasEscenarioFamiliar() throws Exception {
@@ -693,14 +742,12 @@ class OpsAvanzadasCombosIT {
         App.cargarFuentesSistema();
     }
 
-    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs) throws InterruptedException {
-        long limite = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < limite) {
-            if (condicion.getAsBoolean()) {
-                return;
-            }
-            Thread.sleep(100);
-        }
+    private static void esperarHasta(java.util.function.BooleanSupplier condicion, long timeoutMs) {
+        AsyncTestSupport.awaitUntilQuiet(
+                condicion,
+                Duration.ofMillis(timeoutMs),
+                Duration.ofMillis(50)
+        );
     }
 
     private static void limpiarPedidoDePrueba(int idPedido) throws Exception {

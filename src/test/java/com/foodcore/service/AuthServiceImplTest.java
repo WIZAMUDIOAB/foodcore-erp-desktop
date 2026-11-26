@@ -5,6 +5,8 @@ import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.EncriptadorPassword;
+import com.foodcore.security.SesionManager;
+import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
@@ -17,12 +19,23 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AuthServiceImplTest {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
-    private AuthServiceImpl authService;
+    private AuthService authService;
 
     @BeforeEach
     void setUp() {
@@ -53,7 +66,7 @@ class AuthServiceImplTest {
             ps.executeUpdate();
         }
 
-        AuthServiceImpl defaultAuth = new AuthServiceImpl();
+        AuthService defaultAuth = new AuthServiceImpl();
         NegocioException ex = assertThrows(
                 NegocioException.class,
                 () -> defaultAuth.login("mozo", "Admin#2026!")
@@ -117,7 +130,10 @@ class AuthServiceImplTest {
         assertNotNull(autenticado);
         assertEquals(0, autenticado.getIntentosFallidos());
         assertNull(autenticado.getBloqueadoHasta());
-        assertNotNull(AuthService.getUsuarioSesionActual());
+        assertNotNull(SesionManager.getUsuarioActual());
+        assertSame(autenticado, SesionManager.getUsuarioActual());
+        assertSame(autenticado, AuthService.getUsuarioSesionActual());
+        assertEquals(autenticado.getIdUsuario(), SesionManager.getSesionActiva().getIdUsuario());
 
         try (Connection conn = ConexionBD.getConnection();
              PreparedStatement ps = conn.prepareStatement(
@@ -236,5 +252,97 @@ class AuthServiceImplTest {
             assertFalse(EncriptadorPassword.needsUpgrade(dbHash));
             assertTrue(EncriptadorPassword.verificarPassword(passwordPlano, dbHash));
         }
+    }
+
+    @Test
+    @DisplayName("F-CONC-001: Visibilidad entre hilos, contención concurrente y logout limpio en SesionManager")
+    void testSesionManagerConcurrenciaVisibilidadYLogoutLimpio() throws Exception {
+        final int hilos = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(hilos);
+        try {
+            Usuario uVisible = new Usuario(99, 99, 2, "conc_user", "hash", true);
+            uVisible.setNombreRol("CAJERO");
+            SesionUsuario sesionVisible = new SesionUsuario(
+                    99L, "Usuario Concurrencia", "CAJERO", Set.of(), "POS-CONC", LocalDateTime.now(ZONA_LIMA));
+
+            CountDownLatch sesionIniciadaLatch = new CountDownLatch(1);
+            CountDownLatch lectoresListosLatch = new CountDownLatch(hilos);
+            CountDownLatch logoutEjecutadoLatch = new CountDownLatch(1);
+
+            List<Future<Void>> lectores = new ArrayList<>();
+            for (int i = 0; i < hilos; i++) {
+                Callable<Void> tarea = () -> {
+                    assertTrue(sesionIniciadaLatch.await(5, TimeUnit.SECONDS));
+                    assertNotNull(SesionManager.getSesionActiva());
+                    assertEquals(99L, SesionManager.getSesionActiva().getIdUsuario());
+                    assertSame(uVisible, SesionManager.getUsuarioActual());
+                    assertSame(uVisible, AuthService.getUsuarioSesionActual());
+                    assertTrue(SesionManager.isCambioPasswordPendiente());
+
+                    lectoresListosLatch.countDown();
+                    assertTrue(logoutEjecutadoLatch.await(5, TimeUnit.SECONDS));
+
+                    assertNull(SesionManager.getSesionActiva());
+                    assertNull(SesionManager.getUsuarioActual());
+                    assertNull(AuthService.getUsuarioSesionActual());
+                    assertFalse(SesionManager.isCambioPasswordPendiente());
+                    return null;
+                };
+                lectores.add(pool.submit(tarea));
+            }
+
+            SesionManager.iniciarSesion(sesionVisible, uVisible, true);
+            sesionIniciadaLatch.countDown();
+            assertTrue(lectoresListosLatch.await(5, TimeUnit.SECONDS));
+
+            AuthService.logout();
+            logoutEjecutadoLatch.countDown();
+            for (Future<Void> futuro : lectores) {
+                futuro.get(5, TimeUnit.SECONDS);
+            }
+
+            CyclicBarrier barrera = new CyclicBarrier(hilos);
+            List<Future<Void>> estres = new ArrayList<>();
+            for (int t = 0; t < hilos; t++) {
+                final int threadIdx = t;
+                Callable<Void> tareaEstres = () -> {
+                    barrera.await(5, TimeUnit.SECONDS);
+                    int uid = 500 + threadIdx;
+                    Usuario usr = new Usuario(uid, uid, 2, "hilo_" + threadIdx, "hash-init", true);
+                    usr.setNombreRol("CAJERO");
+                    for (int iter = 0; iter < 200; iter++) {
+                        SesionUsuario sesion = new SesionUsuario(
+                                uid, "Hilo " + threadIdx, "CAJERO", Set.of(), "POS-" + threadIdx,
+                                LocalDateTime.now(ZONA_LIMA));
+                        SesionManager.iniciarSesion(sesion, usr, (iter & 1) == 0);
+                        SesionManager.setUsuarioActual(usr);
+                        SesionManager.completarCambioPassword(uid, "hash-" + iter);
+                        SesionManager.completarCambioPassword();
+                        try {
+                            SesionManager.verificarSesionActiva(LocalDateTime.now(ZONA_LIMA));
+                        } catch (NegocioException ex) {
+                            assertNotNull(ex.getCodigoError());
+                        }
+                        if (iter % 10 == 0) {
+                            AuthService.logout();
+                        }
+                    }
+                    return null;
+                };
+                estres.add(pool.submit(tareaEstres));
+            }
+            for (Future<Void> futuro : estres) {
+                futuro.get(15, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+            pool.awaitTermination(5, TimeUnit.SECONDS);
+            AuthService.logout();
+        }
+
+        assertNull(SesionManager.getSesionActiva());
+        assertNull(SesionManager.getUsuarioActual());
+        assertNull(AuthService.getUsuarioSesionActual());
+        assertFalse(SesionManager.isCambioPasswordPendiente());
     }
 }

@@ -1,9 +1,14 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class CuentaPorCobrar {
+    private static final int ESCALA_MONETARIA = 2;
+    private static final BigDecimal CERO = BigDecimal.ZERO.setScale(ESCALA_MONETARIA, RoundingMode.HALF_UP);
+
     private int idCuentaCobrar;
     private int idCliente;
     private String razonSocialCliente;
@@ -12,8 +17,8 @@ public class CuentaPorCobrar {
     private String numeroComprobante;
     private LocalDate fechaEmision;
     private LocalDate fechaVencimiento;
-    private double montoTotal;
-    private double montoCobrado;
+    private BigDecimal montoTotal = CERO;
+    private BigDecimal montoCobrado = CERO;
     private String estado; // PENDIENTE, COBRADA, VENCIDA
     private String observaciones;
     private LocalDateTime fechaRegistro;
@@ -22,8 +27,14 @@ public class CuentaPorCobrar {
         this.estado = "PENDIENTE";
     }
 
-    public double getSaldo() {
-        return Math.max(0.0, montoTotal - montoCobrado);
+    public BigDecimal getSaldo() {
+        BigDecimal saldo = getMontoTotal().subtract(getMontoCobrado())
+                .setScale(ESCALA_MONETARIA, RoundingMode.HALF_UP);
+        return saldo.compareTo(BigDecimal.ZERO) < 0 ? CERO : saldo;
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null ? valor.setScale(ESCALA_MONETARIA, RoundingMode.HALF_UP) : CERO;
     }
 
     public int getIdCuentaCobrar() {
@@ -90,20 +101,20 @@ public class CuentaPorCobrar {
         this.fechaVencimiento = fechaVencimiento;
     }
 
-    public double getMontoTotal() {
+    public BigDecimal getMontoTotal() {
         return montoTotal;
     }
 
-    public void setMontoTotal(double montoTotal) {
-        this.montoTotal = montoTotal;
+    public void setMontoTotal(BigDecimal montoTotal) {
+        this.montoTotal = normalizarMoneda(montoTotal);
     }
 
-    public double getMontoCobrado() {
+    public BigDecimal getMontoCobrado() {
         return montoCobrado;
     }
 
-    public void setMontoCobrado(double montoCobrado) {
-        this.montoCobrado = montoCobrado;
+    public void setMontoCobrado(BigDecimal montoCobrado) {
+        this.montoCobrado = normalizarMoneda(montoCobrado);
     }
 
     public String getEstado() {

@@ -1,10 +1,12 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.DocumentoEmpleado;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.ExpedienteEmpleadoService;
-import com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl;
 import com.foodcore.util.ExportFileChooserHelper;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -21,6 +23,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -29,16 +33,27 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Controlador JavaFX para gestión administrativa de expedientes y legajos PDF de colaboradores.
  */
-public class ExpedienteEmpleadoController {
+public class ExpedienteEmpleadoController implements LifecycleAwareController {
 
+    private static final Logger LOGGER = Logger.getLogger(ExpedienteEmpleadoController.class.getName());
     private static final DateTimeFormatter FECHA_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA_FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
+
+    private record DatosExpedientes(
+            List<Usuario> colaboradores,
+            List<DocumentoEmpleado> porVencer) {
+    }
 
     @FXML private StackPane rootExpedienteStack;
     @FXML private Label lblKpiTotalPersonal;
@@ -97,22 +112,36 @@ public class ExpedienteEmpleadoController {
     private final ObservableList<Usuario> todosColaboradores = FXCollections.observableArrayList();
     private final ObservableList<Usuario> colaboradoresFiltrados = FXCollections.observableArrayList();
     private final ObservableList<DocumentoEmpleado> documentosActuales = FXCollections.observableArrayList();
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicLong cargaExpedientesSeq = new AtomicLong(0L);
+    private final AtomicLong cargaDocsSeq = new AtomicLong(0L);
+    private final AtomicBoolean guardarPersonalesEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean guardarLaboralesEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean subirPdfEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean eliminarDocEnCurso = new AtomicBoolean(false);
 
     private Usuario colaboradorActual;
 
     public ExpedienteEmpleadoController() {
-        this(new ExpedienteEmpleadoServiceImpl());
+        this(AppContainer.getDefault().expedienteEmpleadoService());
     }
 
     public ExpedienteEmpleadoController(ExpedienteEmpleadoService expedienteService) {
-        this.expedienteService = expedienteService;
+        this.expedienteService = Objects.requireNonNull(
+                expedienteService, "expedienteService no puede ser nulo");
     }
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         configurarCombos();
         configurarTablas();
         cargarExpedientes(null);
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
     }
 
     private void configurarCombos() {
@@ -172,25 +201,42 @@ public class ExpedienteEmpleadoController {
     }
 
     public void cargarExpedientes(Integer idPreferido) {
-        try {
-            List<Usuario> lista = expedienteService.listarExpedientes(true);
-            todosColaboradores.setAll(lista);
-            lblKpiTotalPersonal.setText(String.valueOf(lista.size()));
-
-            List<DocumentoEmpleado> porVencer = expedienteService.listarDocumentosProximosAVencer(30);
-            lblKpiDocsPorVencer.setText(String.valueOf(porVencer.size()));
-
-            aplicarFiltroColaboradores();
-            seleccionarColaborador(idPreferido);
-        } catch (Exception e) {
-            mostrarError("No se pudieron cargar los expedientes: " + e.getMessage());
-        }
+        long seq = cargaExpedientesSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> new DatosExpedientes(
+                    expedienteService.listarExpedientes(true),
+                    expedienteService.listarDocumentosProximosAVencer(30)),
+            datos -> {
+                if (!vistaActiva.get() || seq != cargaExpedientesSeq.get()) {
+                    return;
+                }
+                List<Usuario> lista = datos != null && datos.colaboradores() != null
+                        ? datos.colaboradores() : List.of();
+                List<DocumentoEmpleado> porVencer = datos != null && datos.porVencer() != null
+                        ? datos.porVencer() : List.of();
+                todosColaboradores.setAll(lista);
+                if (lblKpiTotalPersonal != null) {
+                    lblKpiTotalPersonal.setText(String.valueOf(lista.size()));
+                }
+                if (lblKpiDocsPorVencer != null) {
+                    lblKpiDocsPorVencer.setText(String.valueOf(porVencer.size()));
+                }
+                aplicarFiltroColaboradores();
+                seleccionarColaborador(idPreferido);
+            },
+            e -> {
+                LOGGER.log(Level.WARNING, "No se pudieron cargar los expedientes", e);
+                if (vistaActiva.get()) {
+                    mostrarError("No se pudieron cargar los expedientes: " + e.getMessage());
+                }
+            }
+        );
     }
 
     private void aplicarFiltroColaboradores() {
-        String filtro = txtBuscarColaborador.getText() == null
-                ? ""
-                : txtBuscarColaborador.getText().trim().toLowerCase(Locale.ROOT);
+        String filtro = txtBuscarColaborador != null && txtBuscarColaborador.getText() != null
+                ? txtBuscarColaborador.getText().trim().toLowerCase(Locale.ROOT)
+                : "";
         if (filtro.isBlank()) {
             colaboradoresFiltrados.setAll(todosColaboradores);
         } else {
@@ -207,9 +253,15 @@ public class ExpedienteEmpleadoController {
         if (colaboradoresFiltrados.isEmpty()) {
             colaboradorActual = null;
             documentosActuales.clear();
-            lblKpiDocsEmpleado.setText("0");
-            lblEmpleadoSeleccionado.setText("Sin colaboradores disponibles");
-            lblRolSeleccionado.setText("-");
+            if (lblKpiDocsEmpleado != null) {
+                lblKpiDocsEmpleado.setText("0");
+            }
+            if (lblEmpleadoSeleccionado != null) {
+                lblEmpleadoSeleccionado.setText("Sin colaboradores disponibles");
+            }
+            if (lblRolSeleccionado != null) {
+                lblRolSeleccionado.setText("-");
+            }
             return;
         }
         Usuario objetivo = colaboradoresFiltrados.get(0);
@@ -219,7 +271,9 @@ public class ExpedienteEmpleadoController {
                     .findFirst()
                     .orElse(objetivo);
         }
-        tblColaboradores.getSelectionModel().select(objetivo);
+        if (tblColaboradores != null) {
+            tblColaboradores.getSelectionModel().select(objetivo);
+        }
         mostrarDetalleColaborador(objetivo);
     }
 
@@ -228,8 +282,12 @@ public class ExpedienteEmpleadoController {
         String nombre = usuario.getNombreEmpleado() != null && !usuario.getNombreEmpleado().isBlank()
                 ? usuario.getNombreEmpleado()
                 : usuario.getUsername();
-        lblEmpleadoSeleccionado.setText(nombre);
-        lblRolSeleccionado.setText(Optional.ofNullable(usuario.getNombreRol()).orElse("PERSONAL"));
+        if (lblEmpleadoSeleccionado != null) {
+            lblEmpleadoSeleccionado.setText(nombre);
+        }
+        if (lblRolSeleccionado != null) {
+            lblRolSeleccionado.setText(Optional.ofNullable(usuario.getNombreRol()).orElse("PERSONAL"));
+        }
 
         cbTipoDocumento.setValue(
                 usuario.getTipoDocumento() != null && !usuario.getTipoDocumento().isBlank()
@@ -249,7 +307,8 @@ public class ExpedienteEmpleadoController {
                         ? usuario.getTipoContrato()
                         : "PLAZO_FIJO");
         dpFechaIngreso.setValue(usuario.getFechaIngreso());
-        txtSueldoBase.setText(String.format(Locale.US, "%.2f", usuario.getSueldoBase()));
+        BigDecimal sueldoMostrar = usuario.getSueldoBase() != null ? usuario.getSueldoBase() : BigDecimal.ZERO;
+        txtSueldoBase.setText(String.format(Locale.US, "%.2f", sueldoMostrar));
         txtHorarioLaboral.setText(nvl(usuario.getHorarioLaboral()));
         txtHoraEntrada.setText(usuario.getHoraEntradaProgramada() != null
                 ? usuario.getHoraEntradaProgramada().format(HORA_FMT)
@@ -264,9 +323,26 @@ public class ExpedienteEmpleadoController {
     }
 
     private void cargarDocumentosColaborador(int idUsuario) {
-        List<DocumentoEmpleado> docs = expedienteService.listarDocumentos(idUsuario);
-        documentosActuales.setAll(docs);
-        lblKpiDocsEmpleado.setText(String.valueOf(docs.size()));
+        long seq = cargaDocsSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> expedienteService.listarDocumentos(idUsuario),
+            docs -> {
+                if (!vistaActiva.get() || seq != cargaDocsSeq.get()) {
+                    return;
+                }
+                List<DocumentoEmpleado> seguros = docs != null ? docs : List.of();
+                documentosActuales.setAll(seguros);
+                if (lblKpiDocsEmpleado != null) {
+                    lblKpiDocsEmpleado.setText(String.valueOf(seguros.size()));
+                }
+            },
+            e -> {
+                LOGGER.log(Level.WARNING, "Error cargando documentos del colaborador", e);
+                if (vistaActiva.get()) {
+                    mostrarError("No se pudieron cargar los documentos: " + e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
@@ -275,23 +351,47 @@ public class ExpedienteEmpleadoController {
             mostrarError("Seleccione primero un colaborador.");
             return;
         }
-        try {
-            colaboradorActual.setTipoDocumento(cbTipoDocumento.getValue());
-            colaboradorActual.setDni(txtDni.getText());
-            colaboradorActual.setNombreEmpleado(txtNombreCompleto.getText());
-            colaboradorActual.setFechaNacimiento(dpFechaNacimiento.getValue());
-            colaboradorActual.setTelefono(txtTelefono.getText());
-            colaboradorActual.setDireccion(txtDireccion.getText());
-            colaboradorActual.setContactoEmergencia(txtContactoEmergencia.getText());
-            colaboradorActual.setTelefonoEmergencia(txtTelefonoEmergencia.getText());
-
-            expedienteService.guardarDatosPersonales(colaboradorActual);
-            int id = colaboradorActual.getIdUsuario();
-            cargarExpedientes(id);
-            mostrarOk("Datos personales guardados correctamente.");
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+        if (!guardarPersonalesEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        Usuario snapshot = copiarUsuario(colaboradorActual);
+        snapshot.setTipoDocumento(cbTipoDocumento != null ? cbTipoDocumento.getValue() : null);
+        snapshot.setDni(txtDni != null ? txtDni.getText() : null);
+        snapshot.setNombreEmpleado(txtNombreCompleto != null ? txtNombreCompleto.getText() : null);
+        snapshot.setFechaNacimiento(dpFechaNacimiento != null ? dpFechaNacimiento.getValue() : null);
+        snapshot.setTelefono(txtTelefono != null ? txtTelefono.getText() : null);
+        snapshot.setDireccion(txtDireccion != null ? txtDireccion.getText() : null);
+        snapshot.setContactoEmergencia(txtContactoEmergencia != null ? txtContactoEmergencia.getText() : null);
+        snapshot.setTelefonoEmergencia(txtTelefonoEmergencia != null ? txtTelefonoEmergencia.getText() : null);
+
+        if (btnGuardarPersonales != null) {
+            btnGuardarPersonales.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> expedienteService.guardarDatosPersonales(snapshot),
+            () -> {
+                guardarPersonalesEnCurso.set(false);
+                if (btnGuardarPersonales != null) {
+                    btnGuardarPersonales.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                cargarExpedientes(snapshot.getIdUsuario());
+                mostrarOk("Datos personales guardados correctamente.");
+            },
+            e -> {
+                guardarPersonalesEnCurso.set(false);
+                if (btnGuardarPersonales != null) {
+                    btnGuardarPersonales.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error guardando datos personales", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
@@ -300,32 +400,65 @@ public class ExpedienteEmpleadoController {
             mostrarError("Seleccione primero un colaborador.");
             return;
         }
+        BigDecimal sueldo;
+        LocalTime entrada;
+        LocalTime salida;
         try {
-            double sueldo = Double.parseDouble(txtSueldoBase.getText().trim().replace(',', '.'));
-            LocalTime entrada = parsearHoraOpcional(txtHoraEntrada.getText());
-            LocalTime salida = parsearHoraOpcional(txtHoraSalida.getText());
-
-            colaboradorActual.setCargo(txtCargo.getText());
-            colaboradorActual.setTipoContrato(cbTipoContrato.getValue());
-            colaboradorActual.setFechaIngreso(dpFechaIngreso.getValue());
-            colaboradorActual.setSueldoBase(sueldo);
-            colaboradorActual.setHorarioLaboral(txtHorarioLaboral.getText());
-            colaboradorActual.setHoraEntradaProgramada(entrada);
-            colaboradorActual.setHoraSalidaProgramada(salida);
-            colaboradorActual.setFechaVencimientoContrato(dpVencContrato.getValue());
-            colaboradorActual.setFechaVencimientoCarnetSanidad(dpVencCarnet.getValue());
-
-            expedienteService.guardarDatosLaborales(colaboradorActual);
-            int id = colaboradorActual.getIdUsuario();
-            cargarExpedientes(id);
-            mostrarOk("Datos laborales actualizados correctamente.");
+            String rawSueldo = txtSueldoBase != null && txtSueldoBase.getText() != null
+                    ? txtSueldoBase.getText().trim() : "";
+            sueldo = new BigDecimal(rawSueldo.replace(',', '.')).setScale(2, RoundingMode.HALF_UP);
+            entrada = parsearHoraOpcional(txtHoraEntrada != null ? txtHoraEntrada.getText() : null);
+            salida = parsearHoraOpcional(txtHoraSalida != null ? txtHoraSalida.getText() : null);
         } catch (NumberFormatException e) {
             mostrarError("Ingrese un monto numérico válido para el Sueldo Base.");
+            return;
         } catch (DateTimeParseException e) {
             mostrarError("Formato de hora inválido. Use HH:mm (ejemplo 09:00).");
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+            return;
         }
+        if (!guardarLaboralesEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+
+        Usuario snapshot = copiarUsuario(colaboradorActual);
+        snapshot.setCargo(txtCargo != null ? txtCargo.getText() : null);
+        snapshot.setTipoContrato(cbTipoContrato != null ? cbTipoContrato.getValue() : null);
+        snapshot.setFechaIngreso(dpFechaIngreso != null ? dpFechaIngreso.getValue() : null);
+        snapshot.setSueldoBase(sueldo);
+        snapshot.setHorarioLaboral(txtHorarioLaboral != null ? txtHorarioLaboral.getText() : null);
+        snapshot.setHoraEntradaProgramada(entrada);
+        snapshot.setHoraSalidaProgramada(salida);
+        snapshot.setFechaVencimientoContrato(dpVencContrato != null ? dpVencContrato.getValue() : null);
+        snapshot.setFechaVencimientoCarnetSanidad(dpVencCarnet != null ? dpVencCarnet.getValue() : null);
+
+        if (btnGuardarLaborales != null) {
+            btnGuardarLaborales.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> expedienteService.guardarDatosLaborales(snapshot),
+            () -> {
+                guardarLaboralesEnCurso.set(false);
+                if (btnGuardarLaborales != null) {
+                    btnGuardarLaborales.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                cargarExpedientes(snapshot.getIdUsuario());
+                mostrarOk("Datos laborales actualizados correctamente.");
+            },
+            e -> {
+                guardarLaboralesEnCurso.set(false);
+                if (btnGuardarLaborales != null) {
+                    btnGuardarLaborales.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error guardando datos laborales", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
@@ -339,38 +472,120 @@ public class ExpedienteEmpleadoController {
         if (seleccionado.isEmpty()) {
             return;
         }
-        try {
-            DocumentoEmpleado guardado = expedienteService.subirDocumentoPdf(
-                    colaboradorActual.getIdUsuario(),
-                    cbTipoDocPdf.getValue(),
-                    seleccionado.get(),
-                    dpDocEmision.getValue(),
-                    dpDocVencimiento.getValue(),
-                    txtDocObservaciones.getText());
-            txtDocObservaciones.clear();
-            cargarExpedientes(colaboradorActual.getIdUsuario());
-            mostrarOk("PDF adjuntado correctamente: " + guardado.getNombreArchivo());
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+        if (!subirPdfEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        int idUsuario = colaboradorActual.getIdUsuario();
+        String tipoDoc = cbTipoDocPdf != null ? cbTipoDocPdf.getValue() : null;
+        File archivoOrigen = seleccionado.get();
+        LocalDate emision = dpDocEmision != null ? dpDocEmision.getValue() : null;
+        LocalDate vencimiento = dpDocVencimiento != null ? dpDocVencimiento.getValue() : null;
+        String observaciones = txtDocObservaciones != null ? txtDocObservaciones.getText() : null;
+
+        if (btnSubirPdf != null) {
+            btnSubirPdf.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> expedienteService.subirDocumentoPdf(
+                    idUsuario, tipoDoc, archivoOrigen, emision, vencimiento, observaciones),
+            guardado -> {
+                subirPdfEnCurso.set(false);
+                if (btnSubirPdf != null) {
+                    btnSubirPdf.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (txtDocObservaciones != null) {
+                    txtDocObservaciones.clear();
+                }
+                cargarExpedientes(idUsuario);
+                mostrarOk("PDF adjuntado correctamente: " + guardado.getNombreArchivo());
+            },
+            e -> {
+                subirPdfEnCurso.set(false);
+                if (btnSubirPdf != null) {
+                    btnSubirPdf.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error subiendo PDF al expediente", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
     public void handleEliminarDocumento() {
-        DocumentoEmpleado doc = tblDocumentos.getSelectionModel().getSelectedItem();
+        DocumentoEmpleado doc = tblDocumentos != null ? tblDocumentos.getSelectionModel().getSelectedItem() : null;
         if (doc == null) {
             mostrarError("Seleccione un documento de la tabla para eliminarlo.");
             return;
         }
-        try {
-            expedienteService.eliminarDocumento(doc.getIdDocumento());
-            if (colaboradorActual != null) {
-                cargarExpedientes(colaboradorActual.getIdUsuario());
-            }
-            mostrarOk("Documento eliminado del expediente.");
-        } catch (Exception e) {
-            mostrarError(e.getMessage());
+        if (!eliminarDocEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        long idDocumento = doc.getIdDocumento();
+        Integer idColab = colaboradorActual != null ? colaboradorActual.getIdUsuario() : null;
+        if (btnEliminarDoc != null) {
+            btnEliminarDoc.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> expedienteService.eliminarDocumento(idDocumento),
+            () -> {
+                eliminarDocEnCurso.set(false);
+                if (btnEliminarDoc != null) {
+                    btnEliminarDoc.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (idColab != null) {
+                    cargarExpedientes(idColab);
+                }
+                mostrarOk("Documento eliminado del expediente.");
+            },
+            e -> {
+                eliminarDocEnCurso.set(false);
+                if (btnEliminarDoc != null) {
+                    btnEliminarDoc.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error eliminando documento del expediente", e);
+                if (vistaActiva.get()) {
+                    mostrarError(e.getMessage());
+                }
+            }
+        );
+    }
+
+    private static Usuario copiarUsuario(Usuario src) {
+        Usuario copy = new Usuario();
+        copy.setIdUsuario(src.getIdUsuario());
+        copy.setIdEmpleado(src.getIdEmpleado());
+        copy.setIdRol(src.getIdRol());
+        copy.setUsername(src.getUsername());
+        copy.setNombreRol(src.getNombreRol());
+        copy.setActivo(src.isActivo());
+        copy.setNombreEmpleado(src.getNombreEmpleado());
+        copy.setTipoDocumento(src.getTipoDocumento());
+        copy.setDni(src.getDni());
+        copy.setFechaNacimiento(src.getFechaNacimiento());
+        copy.setTelefono(src.getTelefono());
+        copy.setDireccion(src.getDireccion());
+        copy.setContactoEmergencia(src.getContactoEmergencia());
+        copy.setTelefonoEmergencia(src.getTelefonoEmergencia());
+        copy.setCargo(src.getCargo());
+        copy.setTipoContrato(src.getTipoContrato());
+        copy.setFechaIngreso(src.getFechaIngreso());
+        copy.setSueldoBase(src.getSueldoBase());
+        copy.setHorarioLaboral(src.getHorarioLaboral());
+        copy.setHoraEntradaProgramada(src.getHoraEntradaProgramada());
+        copy.setHoraSalidaProgramada(src.getHoraSalidaProgramada());
+        copy.setFechaVencimientoContrato(src.getFechaVencimientoContrato());
+        copy.setFechaVencimientoCarnetSanidad(src.getFechaVencimientoCarnetSanidad());
+        return copy;
     }
 
     private String calcularEtiquetaVigencia(LocalDate vencimiento) {
@@ -406,13 +621,19 @@ public class ExpedienteEmpleadoController {
     }
 
     private void mostrarOk(String mensaje) {
-        lblMensajeEstado.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
-        lblMensajeEstado.setText("✅ " + mensaje);
+        if (lblMensajeEstado != null) {
+            lblMensajeEstado.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+            lblMensajeEstado.getStyleClass().add("fc-status-msg-ok");
+            lblMensajeEstado.setText("✅ " + mensaje);
+        }
     }
 
     private void mostrarError(String mensaje) {
-        lblMensajeEstado.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
-        lblMensajeEstado.setText("⚠️ " + mensaje);
+        if (lblMensajeEstado != null) {
+            lblMensajeEstado.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+            lblMensajeEstado.getStyleClass().add("fc-status-msg-error");
+            lblMensajeEstado.setText("⚠️ " + mensaje);
+        }
     }
 
     public TabPane getTabPaneExpediente() {
@@ -429,5 +650,21 @@ public class ExpedienteEmpleadoController {
 
     public Label getLblMensajeEstado() {
         return lblMensajeEstado;
+    }
+
+    public Button getBtnGuardarPersonales() {
+        return btnGuardarPersonales;
+    }
+
+    public Button getBtnGuardarLaborales() {
+        return btnGuardarLaborales;
+    }
+
+    public Button getBtnSubirPdf() {
+        return btnSubirPdf;
+    }
+
+    public Button getBtnEliminarDoc() {
+        return btnEliminarDoc;
     }
 }

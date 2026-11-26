@@ -1,9 +1,13 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class Cliente {
+    private static final BigDecimal CERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
     private int idCliente;
     private String tipoDocumento; // RUC, DNI
     private String tipoCliente; // CORPORATIVO, MINORISTA
@@ -12,7 +16,7 @@ public class Cliente {
     private String contacto;
     private String telefono;
     private String email;
-    private double limiteCredito;
+    private BigDecimal limiteCredito = CERO;
     private int diasCredito;
     private int puntosFidelidad;
     private int puntosAcumulados;
@@ -22,7 +26,7 @@ public class Cliente {
     private LocalDateTime fechaRegistro;
 
     // Métricas auxiliares para UI
-    private double saldoDeudor;
+    private BigDecimal saldoDeudor = CERO;
     private int comprobantesPendientes;
 
     public Cliente() {
@@ -89,12 +93,14 @@ public class Cliente {
         this.email = email;
     }
 
-    public double getLimiteCredito() {
+    public BigDecimal getLimiteCredito() {
         return limiteCredito;
     }
 
-    public void setLimiteCredito(double limiteCredito) {
-        this.limiteCredito = limiteCredito;
+    public void setLimiteCredito(BigDecimal limiteCredito) {
+        this.limiteCredito = limiteCredito != null
+                ? limiteCredito.setScale(2, RoundingMode.HALF_UP)
+                : CERO;
     }
 
     public int getDiasCredito() {
@@ -137,12 +143,14 @@ public class Cliente {
         this.fechaRegistro = fechaRegistro;
     }
 
-    public double getSaldoDeudor() {
+    public BigDecimal getSaldoDeudor() {
         return saldoDeudor;
     }
 
-    public void setSaldoDeudor(double saldoDeudor) {
-        this.saldoDeudor = saldoDeudor;
+    public void setSaldoDeudor(BigDecimal saldoDeudor) {
+        this.saldoDeudor = saldoDeudor != null
+                ? saldoDeudor.setScale(2, RoundingMode.HALF_UP)
+                : CERO;
     }
 
     public int getComprobantesPendientes() {

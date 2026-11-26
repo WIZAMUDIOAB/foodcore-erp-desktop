@@ -1,6 +1,6 @@
 package com.foodcore.perf;
 
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.impl.VentaDAOImpl;
@@ -13,6 +13,7 @@ import com.foodcore.model.Venta;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -78,7 +79,7 @@ public final class SoakTestSimulado {
         PedidoDAOImpl pedidoDAO = new PedidoDAOImpl();
         InsumoDAOImpl insumoDAO = new InsumoDAOImpl();
         CajaDAOImpl cajaDAO = new CajaDAOImpl();
-        PedidoService pedidoService = new PedidoService(tx, pedidoDAO, new AutorizacionService());
+        PedidoService pedidoService = new PedidoServiceImpl(tx, pedidoDAO, new AutorizacionService());
         VentaServiceImpl ventaService = new VentaServiceImpl(tx, new VentaDAOImpl(), cajaDAO, insumoDAO, pedidoDAO);
         CajaServiceImpl cajaService = new CajaServiceImpl(tx, cajaDAO);
 

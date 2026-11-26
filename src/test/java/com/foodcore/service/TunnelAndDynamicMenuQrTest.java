@@ -4,6 +4,7 @@ import com.foodcore.api.ApiServer;
 import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
+import com.foodcore.support.AsyncTestSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -93,15 +95,16 @@ class TunnelAndDynamicMenuQrTest {
         TunnelService.iniciarMonitorSoloLectura(logVivo);
         assertFalse(TunnelService.tieneUrlActiva());
 
-        Thread.sleep(150);
         Files.writeString(logVivo,
                 "INF Arrancando cloudflared...\nINF | https://live-tail-menu.trycloudflare.com |\n",
                 StandardCharsets.UTF_8);
 
-        long limite = System.currentTimeMillis() + 3000L;
-        while (!TunnelService.tieneUrlActiva() && System.currentTimeMillis() < limite) {
-            Thread.sleep(50);
-        }
+        AsyncTestSupport.awaitUntil(
+                TunnelService::tieneUrlActiva,
+                Duration.ofSeconds(3),
+                Duration.ofMillis(25),
+                "El monitor debe detectar la URL escrita en tunnel.log"
+        );
 
         assertTrue(TunnelService.tieneUrlActiva(), "El monitor debe detectar la URL escrita en tunnel.log");
         assertEquals("https://live-tail-menu.trycloudflare.com", TunnelService.obtenerUrlPublicaActiva());

@@ -1,18 +1,19 @@
 package com.foodcore.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
 import com.foodcore.util.ConexionBD;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
+import com.foodcore.util.JsonMapperProvider;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -55,7 +56,7 @@ import java.util.logging.Logger;
 public class DeliveryWebhookService {
 
     private static final Logger LOGGER = Logger.getLogger(DeliveryWebhookService.class.getName());
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = JsonMapperProvider.getMapper();
     public static final int MAX_BODY_BYTES = 65_536; // 64 KB
     public static final String ENV_WEBHOOK_SECRET = "FOODCORE_DELIVERY_WEBHOOK_SECRET";
     public static final String HEADER_SIGNATURE = "X-FoodCore-Signature";
@@ -192,34 +193,36 @@ public class DeliveryWebhookService {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("El payload JSON del webhook no puede estar vacío.");
         }
-        JsonObject root;
+        JsonNode root;
         try {
-            root = GSON.fromJson(json, JsonObject.class);
-        } catch (JsonParseException ex) {
+            root = MAPPER.readTree(json);
+        } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("JSON malformado en webhook de delivery.", ex);
         }
-        if (root == null) {
+        if (root == null || !root.isObject()) {
             throw new IllegalArgumentException("JSON malformado en webhook de delivery.");
         }
 
-        String plataforma = root.has("plataforma") && !root.get("plataforma").isJsonNull()
-                ? root.get("plataforma").getAsString().trim() : "RAPPI";
-        String ordenId = root.has("orden_id") && !root.get("orden_id").isJsonNull()
-                ? root.get("orden_id").getAsString().trim() : "ORD-" + System.currentTimeMillis();
+        String plataforma = root.hasNonNull("plataforma")
+                ? root.get("plataforma").asText().trim() : "RAPPI";
+        String ordenId = root.hasNonNull("orden_id")
+                ? root.get("orden_id").asText().trim() : "ORD-" + System.currentTimeMillis();
 
-        JsonObject clienteObj = root.has("cliente") && root.get("cliente").isJsonObject()
-                ? root.getAsJsonObject("cliente") : new JsonObject();
-        String nombreCliente = clienteObj.has("nombre") && !clienteObj.get("nombre").isJsonNull()
-                ? clienteObj.get("nombre").getAsString().trim() : "Cliente Delivery";
-        String telefonoCliente = clienteObj.has("telefono") && !clienteObj.get("telefono").isJsonNull()
-                ? clienteObj.get("telefono").getAsString().trim() : "";
-        String direccionCliente = clienteObj.has("direccion") && !clienteObj.get("direccion").isJsonNull()
-                ? clienteObj.get("direccion").getAsString().trim() : "Entrega Delivery";
+        JsonNode clienteNode = root.get("cliente");
+        JsonNode clienteObj = clienteNode != null && clienteNode.isObject()
+                ? clienteNode : MAPPER.createObjectNode();
+        String nombreCliente = clienteObj.hasNonNull("nombre")
+                ? clienteObj.get("nombre").asText().trim() : "Cliente Delivery";
+        String telefonoCliente = clienteObj.hasNonNull("telefono")
+                ? clienteObj.get("telefono").asText().trim() : "";
+        String direccionCliente = clienteObj.hasNonNull("direccion")
+                ? clienteObj.get("direccion").asText().trim() : "Entrega Delivery";
 
-        if (!root.has("items") || !root.get("items").isJsonArray() || root.getAsJsonArray("items").isEmpty()) {
+        JsonNode itemsNode = root.get("items");
+        if (itemsNode == null || !itemsNode.isArray() || itemsNode.isEmpty()) {
             throw new IllegalArgumentException("El pedido de delivery debe contener al menos un ítem.");
         }
-        JsonArray itemsArray = root.getAsJsonArray("items");
+        ArrayNode itemsArray = (ArrayNode) itemsNode;
 
         Pedido pedido = new Pedido();
         pedido.setTipoPedido("DELIVERY");
@@ -257,15 +260,15 @@ public class DeliveryWebhookService {
             List<DetallePedido> detalles = new ArrayList<>();
             BigDecimal totalAutoritativo = BigDecimal.ZERO;
 
-            for (JsonElement el : itemsArray) {
-                if (!el.isJsonObject()) {
+            for (JsonNode el : itemsArray) {
+                if (!el.isObject()) {
                     throw new IllegalArgumentException("Cada ítem del webhook debe ser un objeto JSON.");
                 }
-                JsonObject item = el.getAsJsonObject();
-                int idProd = item.has("id_producto") && !item.get("id_producto").isJsonNull()
-                        ? item.get("id_producto").getAsInt() : 0;
-                int cantidad = item.has("cantidad") && !item.get("cantidad").isJsonNull()
-                        ? item.get("cantidad").getAsInt() : 0;
+                JsonNode item = el;
+                int idProd = item.hasNonNull("id_producto")
+                        ? item.get("id_producto").asInt() : 0;
+                int cantidad = item.hasNonNull("cantidad")
+                        ? item.get("cantidad").asInt() : 0;
                 if (idProd <= 0 || cantidad <= 0) {
                     throw new IllegalArgumentException("Cada ítem requiere id_producto > 0 y cantidad > 0.");
                 }
@@ -283,8 +286,8 @@ public class DeliveryWebhookService {
 
                 BigDecimal precioUnit = precioAutoritativo.setScale(2, RoundingMode.HALF_UP);
                 BigDecimal subtotal = precioUnit.multiply(BigDecimal.valueOf(cantidad)).setScale(2, RoundingMode.HALF_UP);
-                String notas = item.has("notas") && !item.get("notas").isJsonNull()
-                        ? item.get("notas").getAsString() : "";
+                String notas = item.hasNonNull("notas")
+                        ? item.get("notas").asText() : "";
 
                 DetallePedido d = new DetallePedido(0, 0, idProd, prodAutoritativo.getNombre(),
                         cantidad, precioUnit, subtotal, notas);
@@ -335,11 +338,13 @@ public class DeliveryWebhookService {
         }
         try {
             conn.setAutoCommit(autoCommitOriginal);
-        } catch (SQLException ignored) {
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "No se pudo restaurar autoCommit al cerrar conexión webhook", ex);
         }
         try {
             conn.close();
-        } catch (SQLException ignored) {
+        } catch (SQLException ex) {
+            LOGGER.log(Level.FINE, "No se pudo cerrar conexión webhook", ex);
         }
     }
 
@@ -421,11 +426,11 @@ public class DeliveryWebhookService {
 
                 Pedido pedidoProcesado = procesarPayloadJson(body);
 
-                JsonObject resp = new JsonObject();
-                resp.addProperty("status", "SUCCESS");
-                resp.addProperty("mensaje", "Orden " + pedidoProcesado.getNumeroMesa() + " ingresada a cocina");
-                resp.addProperty("id_pedido", pedidoProcesado.getIdPedido());
-                resp.addProperty("total", pedidoProcesado.getTotal());
+                ObjectNode resp = MAPPER.createObjectNode();
+                resp.put("status", "SUCCESS");
+                resp.put("mensaje", "Orden " + pedidoProcesado.getNumeroMesa() + " ingresada a cocina");
+                resp.put("id_pedido", pedidoProcesado.getIdPedido());
+                resp.put("total", pedidoProcesado.getTotal());
 
                 enviarJson(exchange, 200, resp);
             } catch (PayloadTooLargeException ptle) {
@@ -457,13 +462,13 @@ public class DeliveryWebhookService {
         }
 
         private void enviarJsonError(HttpExchange exchange, int status, String mensaje) throws IOException {
-            JsonObject err = new JsonObject();
-            err.addProperty("status", "ERROR");
-            err.addProperty("error", mensaje);
+            ObjectNode err = MAPPER.createObjectNode();
+            err.put("status", "ERROR");
+            err.put("error", mensaje);
             enviarJson(exchange, status, err);
         }
 
-        private void enviarJson(HttpExchange exchange, int status, JsonObject payload) throws IOException {
+        private void enviarJson(HttpExchange exchange, int status, ObjectNode payload) throws IOException {
             byte[] bytes = payload.toString().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
             exchange.sendResponseHeaders(status, bytes.length);

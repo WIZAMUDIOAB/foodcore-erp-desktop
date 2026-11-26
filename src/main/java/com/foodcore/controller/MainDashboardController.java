@@ -1,10 +1,18 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Usuario;
-import com.foodcore.model.enums.Permiso;
+import com.foodcore.controller.dashboard.DashboardNavigationCatalog;
+import com.foodcore.controller.dashboard.DashboardRbacPolicy;
+import com.foodcore.controller.dashboard.DashboardSyncIndicatorPresenter;
+import com.foodcore.controller.dashboard.DashboardViewLifecycleHelper;
+import com.foodcore.controller.dashboard.DefaultDashboardRbacPolicy;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
+import com.foodcore.controller.dashboard.NavDestination;
+import com.foodcore.controller.dashboard.NavSection;
 import com.foodcore.offline.SyncWorker;
-import com.foodcore.security.AutorizacionService;
+
 import com.foodcore.service.AuthService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ToastService;
@@ -26,9 +34,7 @@ import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.IOException;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.EnumMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -42,49 +48,9 @@ import java.util.logging.Logger;
  *   <li>{@code COCINERO}: KDS, Mi Portal y Solicitudes.</li>
  * </ul>
  */
-public class MainDashboardController {
+public class MainDashboardController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(MainDashboardController.class.getName());
-    private static final Map<String, String> RUTAS_BREADCRUMBS = Map.ofEntries(
-            Map.entry("/com/foodcore/view/DashboardView.fxml", "Inicio > Operaciones > Dashboard Gerencial"),
-            Map.entry("/com/foodcore/view/SalonMesasView.fxml", "Inicio > Salón > Mesas"),
-            Map.entry("/com/foodcore/view/ReservasView.fxml", "Inicio > Operaciones > Libro de Reservas"),
-            Map.entry("/com/foodcore/view/DeliveryView.fxml", "Inicio > Operaciones > Delivery y Envíos"),
-            Map.entry("/com/foodcore/view/VentaPOSView.fxml", "Inicio > Operaciones > Punto de Venta (POS)"),
-            Map.entry("/com/foodcore/view/KitchenDisplayView.fxml", "Inicio > Operaciones > Cocina (KDS)"),
-            Map.entry("/com/foodcore/view/CajaView.fxml", "Inicio > Operaciones > Caja y Turnos"),
-            Map.entry("/com/foodcore/view/HistorialVentasView.fxml", "Inicio > Operaciones > Historial y Devoluciones"),
-            Map.entry("/com/foodcore/view/PromocionesView.fxml", "Inicio > Comercial > Promociones y Descuentos"),
-            Map.entry("/com/foodcore/view/KioscoView.fxml", "Inicio > Comercial > Kiosco Autoservicio"),
-            Map.entry("/com/foodcore/view/MenuQrModalView.fxml", "Inicio > Comercial > Menú Digital QR"),
-            Map.entry("/com/foodcore/view/EstadoResultadosView.fxml", "Inicio > Finanzas > Estado de Resultados (P&L)"),
-            Map.entry("/com/foodcore/view/ReportesContablesView.fxml", "Inicio > Finanzas > Reportes Contables"),
-            Map.entry("/com/foodcore/view/ProveedoresView.fxml", "Inicio > Finanzas > Proveedores y CxP"),
-            Map.entry("/com/foodcore/view/ClientesView.fxml", "Inicio > Finanzas > Clientes y CxC"),
-            Map.entry("/com/foodcore/view/HistorialPreciosView.fxml", "Inicio > Finanzas > Historial de Precios"),
-            Map.entry("/com/foodcore/view/ReportesAvanzadosView.fxml", "Inicio > Finanzas > Reportes Avanzados"),
-            Map.entry("/com/foodcore/view/AsistenciaView.fxml", "Inicio > Recursos Humanos > Control de Asistencia"),
-            Map.entry("/com/foodcore/view/RelojAsistenciaView.fxml", "Inicio > Recursos Humanos > Reloj Marcador"),
-            Map.entry("/com/foodcore/view/HorariosView.fxml", "Inicio > Recursos Humanos > Turnos y Horarios"),
-            Map.entry("/com/foodcore/view/MiHorarioView.fxml", "Inicio > Recursos Humanos > Mi Portal y Horario"),
-            Map.entry("/com/foodcore/view/SolicitudesView.fxml", "Inicio > Recursos Humanos > Solicitudes y Ausencias"),
-            Map.entry("/com/foodcore/view/ExpedienteEmpleadoView.fxml", "Inicio > Recursos Humanos > Expedientes y Legajos"),
-            Map.entry("/com/foodcore/view/PlanillaView.fxml", "Inicio > Recursos Humanos > Pagos y Planilla"),
-            Map.entry("/com/foodcore/view/InventarioView.fxml", "Inicio > Backoffice > Inventario de Insumos"),
-            Map.entry("/com/foodcore/view/InventarioFisicoView.fxml", "Inicio > Backoffice > Toma de Inventario Físico"),
-            Map.entry("/com/foodcore/view/MenuView.fxml", "Inicio > Backoffice > Menú y Platillos"),
-            Map.entry("/com/foodcore/view/RecetasView.fxml", "Inicio > Backoffice > Recetas y Escandallo"),
-            Map.entry("/com/foodcore/view/MermasView.fxml", "Inicio > Backoffice > Registro de Mermas"),
-            Map.entry("/com/foodcore/view/AnalisisMermasView.fxml", "Inicio > Backoffice > Análisis de Mermas"),
-            Map.entry("/com/foodcore/view/KardexView.fxml", "Inicio > Backoffice > Auditoría Kardex"),
-            Map.entry("/com/foodcore/view/AuditoriaView.fxml", "Inicio > Backoffice > Bitácora de Auditoría"),
-            Map.entry("/com/foodcore/view/UsuariosView.fxml", "Inicio > Sistema > Gestión de Usuarios"),
-            Map.entry("/com/foodcore/view/RolesView.fxml", "Inicio > Sistema > Roles y Permisos"),
-            Map.entry("/com/foodcore/view/ConfiguracionView.fxml", "Inicio > Sistema > Configuración del Sistema"),
-            Map.entry("/com/foodcore/view/EstadoSistemaView.fxml", "Inicio > Sistema > Estado del Sistema"),
-            Map.entry("/com/foodcore/view/MantenimientoBDView.fxml", "Inicio > Sistema > Mantenimiento BD")
-    );
-
     @FXML private StackPane rootDashboardStack;
     @FXML private BorderPane mainBorderPane;
     @FXML private VBox sidebarBox;
@@ -155,14 +121,94 @@ public class MainDashboardController {
     @FXML private Button btnCerrarSesion;
 
     private Parent dialogoPasswordActivo;
+    private final DashboardRbacPolicy rbacPolicy;
+    private final DashboardNavigationCatalog navigationCatalog;
+    private final DashboardSyncIndicatorPresenter syncIndicatorPresenter;
+    private final DashboardViewLifecycleHelper lifecycleHelper;
+    private final AppContainer appContainer;
+    private final EnumMap<NavSection, Node> nodosSeccion = new EnumMap<>(NavSection.class);
+    private final EnumMap<NavDestination, Button> botonesDestino = new EnumMap<>(NavDestination.class);
     private boolean sidebarColapsado = false;
     private Object controladorActivo;
     private Usuario usuarioAccesoActual;
     private SyncWorker.SyncStatusListener syncStatusListener;
     private String rutaBreadcrumbsActual = "Inicio > Operaciones > Dashboard Gerencial";
 
+    public MainDashboardController() {
+        this(AppContainer.getDefault());
+    }
+
+    public MainDashboardController(AppContainer appContainer) {
+        this(new DefaultDashboardRbacPolicy(), new DashboardNavigationCatalog(),
+                new DashboardSyncIndicatorPresenter(), new DashboardViewLifecycleHelper(), appContainer);
+    }
+
+    public MainDashboardController(DashboardRbacPolicy rbacPolicy, DashboardNavigationCatalog navigationCatalog,
+            DashboardSyncIndicatorPresenter syncIndicatorPresenter, DashboardViewLifecycleHelper lifecycleHelper) {
+        this(rbacPolicy, navigationCatalog, syncIndicatorPresenter, lifecycleHelper, AppContainer.getDefault());
+    }
+
+    public MainDashboardController(DashboardRbacPolicy rbacPolicy, DashboardNavigationCatalog navigationCatalog,
+            DashboardSyncIndicatorPresenter syncIndicatorPresenter, DashboardViewLifecycleHelper lifecycleHelper,
+            AppContainer appContainer) {
+        this.rbacPolicy = rbacPolicy != null ? rbacPolicy : new DefaultDashboardRbacPolicy();
+        this.navigationCatalog = navigationCatalog != null ? navigationCatalog : new DashboardNavigationCatalog();
+        this.syncIndicatorPresenter = syncIndicatorPresenter != null
+                ? syncIndicatorPresenter : new DashboardSyncIndicatorPresenter();
+        this.lifecycleHelper = lifecycleHelper != null ? lifecycleHelper : new DashboardViewLifecycleHelper();
+        this.appContainer = appContainer != null ? appContainer : AppContainer.getDefault();
+    }
+
+    private void inicializarMapasNavegacion() {
+        nodosSeccion.put(NavSection.OPERACIONES, lblSecOperaciones);
+        nodosSeccion.put(NavSection.COMERCIAL, lblSecComercial);
+        nodosSeccion.put(NavSection.FINANZAS, lblSecFinanzas);
+        nodosSeccion.put(NavSection.RRHH, lblSecRrhh);
+        nodosSeccion.put(NavSection.BACKOFFICE, lblSecBackoffice);
+        nodosSeccion.put(NavSection.SISTEMA, lblSecSistema);
+        botonesDestino.put(NavDestination.DASHBOARD, btnNavDashboard);
+        botonesDestino.put(NavDestination.REPORTES, btnNavReportes);
+        botonesDestino.put(NavDestination.SALON, btnNavSalon);
+        botonesDestino.put(NavDestination.RESERVAS, btnNavReservas);
+        botonesDestino.put(NavDestination.DELIVERY, btnNavDelivery);
+        botonesDestino.put(NavDestination.POS, btnNavPOS);
+        botonesDestino.put(NavDestination.KDS, btnNavKDS);
+        botonesDestino.put(NavDestination.CAJA, btnNavCaja);
+        botonesDestino.put(NavDestination.HISTORIAL_VENTAS, btnNavHistorialVentas);
+        botonesDestino.put(NavDestination.PROMOCIONES, btnNavPromociones);
+        botonesDestino.put(NavDestination.KIOSCO, btnNavKiosco);
+        botonesDestino.put(NavDestination.MENU_QR, btnNavMenuQr);
+        botonesDestino.put(NavDestination.ESTADO_RESULTADOS, btnNavEstadoResultados);
+        botonesDestino.put(NavDestination.REPORTES_CONTABLES, btnNavReportesContables);
+        botonesDestino.put(NavDestination.PROVEEDORES, btnNavProveedores);
+        botonesDestino.put(NavDestination.CLIENTES, btnNavClientes);
+        botonesDestino.put(NavDestination.HISTORIAL_PRECIOS, btnNavHistorialPrecios);
+        botonesDestino.put(NavDestination.REPORTES_AVANZADOS, btnNavReportesAvanzados);
+        botonesDestino.put(NavDestination.ASISTENCIA, btnNavAsistencia);
+        botonesDestino.put(NavDestination.RELOJ, btnNavReloj);
+        botonesDestino.put(NavDestination.HORARIOS, btnNavHorarios);
+        botonesDestino.put(NavDestination.MI_HORARIO, btnNavMiHorario);
+        botonesDestino.put(NavDestination.SOLICITUDES, btnNavSolicitudes);
+        botonesDestino.put(NavDestination.EXPEDIENTES, btnNavExpedientes);
+        botonesDestino.put(NavDestination.PLANILLA, btnNavPlanilla);
+        botonesDestino.put(NavDestination.INVENTARIO, btnNavInventario);
+        botonesDestino.put(NavDestination.INVENTARIO_FISICO, btnNavInventarioFisico);
+        botonesDestino.put(NavDestination.MENU, btnNavMenu);
+        botonesDestino.put(NavDestination.RECETAS, btnNavRecetas);
+        botonesDestino.put(NavDestination.MERMAS, btnNavMermas);
+        botonesDestino.put(NavDestination.ANALISIS_MERMAS, btnNavAnalisisMermas);
+        botonesDestino.put(NavDestination.KARDEX, btnNavKardex);
+        botonesDestino.put(NavDestination.AUDITORIA, btnNavAuditoria);
+        botonesDestino.put(NavDestination.USUARIOS, btnNavUsuarios);
+        botonesDestino.put(NavDestination.ROLES, btnNavRoles);
+        botonesDestino.put(NavDestination.CONFIGURACION, btnNavConfiguracion);
+        botonesDestino.put(NavDestination.ESTADO_SISTEMA, btnNavEstadoSistema);
+        botonesDestino.put(NavDestination.MANTENIMIENTO, btnNavMantenimiento);
+    }
+
     @FXML
     public void initialize() {
+        inicializarMapasNavegacion();
         ToastService.registrarHostPane(rootDashboardStack);
         Button[] buttons = {
             btnToggleTheme, btnToggleSidebar, btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery,
@@ -202,30 +248,7 @@ public class MainDashboardController {
         desregistrarSyncWorkerListener();
         SyncWorker syncWorker = SyncWorker.getInstancia();
         syncStatusListener = (online, pendientes, alerta) -> Platform.runLater(() -> {
-            if (lblNetworkStatus == null || dotNetworkStatus == null) {
-                return;
-            }
-            if (online) {
-                dotNetworkStatus.getStyleClass().removeAll("status-dot-danger", "status-dot-warning");
-                if (!dotNetworkStatus.getStyleClass().contains("status-dot-online")) {
-                    dotNetworkStatus.getStyleClass().add("status-dot-online");
-                }
-                lblNetworkStatus.getStyleClass().removeAll("badge-pill-danger", "badge-pill-warning");
-                if (!lblNetworkStatus.getStyleClass().contains("badge-pill-success")) {
-                    lblNetworkStatus.getStyleClass().add("badge-pill-success");
-                }
-                lblNetworkStatus.setText(pendientes > 0 ? "ONLINE (" + pendientes + ")" : "ONLINE");
-            } else {
-                dotNetworkStatus.getStyleClass().removeAll("status-dot-online", "status-dot-warning");
-                if (!dotNetworkStatus.getStyleClass().contains("status-dot-danger")) {
-                    dotNetworkStatus.getStyleClass().add("status-dot-danger");
-                }
-                lblNetworkStatus.getStyleClass().removeAll("badge-pill-success", "badge-pill-warning");
-                if (!lblNetworkStatus.getStyleClass().contains("badge-pill-danger")) {
-                    lblNetworkStatus.getStyleClass().add("badge-pill-danger");
-                }
-                lblNetworkStatus.setText(pendientes > 0 ? "OFFLINE (" + pendientes + " pend)" : "OFFLINE");
-            }
+            syncIndicatorPresenter.aplicarEstado(dotNetworkStatus, lblNetworkStatus, online, pendientes);
         });
         syncWorker.addListener(syncStatusListener);
     }
@@ -243,6 +266,9 @@ public class MainDashboardController {
      */
     public void aplicarControlAcceso(Usuario user) {
         this.usuarioAccesoActual = user;
+        if (botonesDestino.isEmpty() || botonesDestino.get(NavDestination.DASHBOARD) == null) {
+            inicializarMapasNavegacion();
+        }
         ocultarTodosLosNodos();
 
         if (user == null || user.getNombreRol() == null || user.getNombreRol().isBlank()) {
@@ -253,146 +279,34 @@ public class MainDashboardController {
             return;
         }
 
-        String rol = user.getNombreRol().trim().toUpperCase(Locale.ROOT);
-
-        if (rol.equals("ADMIN") || rol.equals("ADMINISTRADOR") || rol.contains("ADMIN")) {
-            mostrarNodos(
-                    lblSecOperaciones, lblSecComercial, lblSecFinanzas, lblSecRrhh, lblSecBackoffice, lblSecSistema,
-                    btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS,
-                    btnNavCaja, btnNavHistorialVentas,
-                    btnNavPromociones, btnNavKiosco, btnNavMenuQr,
-                    btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes,
-                    btnNavHistorialPrecios, btnNavReportesAvanzados, btnNavReportes,
-                    btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
-                    btnNavExpedientes, btnNavPlanilla,
-                    btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas,
-                    btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
-                    btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavEstadoSistema, btnNavMantenimiento
-            );
-            cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
-        } else if (rol.contains("SUPERVISOR")) {
-            mostrarNodos(
-                    lblSecOperaciones, lblSecComercial, lblSecFinanzas, lblSecRrhh, lblSecBackoffice,
-                    btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS,
-                    btnNavCaja, btnNavHistorialVentas,
-                    btnNavPromociones, btnNavKiosco, btnNavMenuQr,
-                    btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes,
-                    btnNavHistorialPrecios, btnNavReportesAvanzados, btnNavReportes,
-                    btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
-                    btnNavExpedientes, btnNavPlanilla,
-                    btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas,
-                    btnNavAnalisisMermas, btnNavKardex
-            );
-            cargarVista("/com/foodcore/view/DashboardView.fxml", btnNavDashboard);
-        } else if (rol.contains("CAJERO")) {
-            mostrarNodos(
-                    lblSecOperaciones, lblSecRrhh,
-                    btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavCaja, btnNavHistorialVentas,
-                    btnNavReloj, btnNavMiHorario, btnNavSolicitudes
-            );
-            cargarVista("/com/foodcore/view/VentaPOSView.fxml", btnNavPOS);
-        } else if (rol.contains("MOZO") || rol.contains("MESERO")) {
-            mostrarNodos(
-                    lblSecOperaciones, lblSecRrhh,
-                    btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS,
-                    btnNavReloj, btnNavMiHorario, btnNavSolicitudes
-            );
-            cargarVista("/com/foodcore/view/SalonMesasView.fxml", btnNavSalon);
-        } else if (rol.contains("COCIN")) {
-            mostrarNodos(
-                    lblSecOperaciones, lblSecRrhh,
-                    btnNavKDS,
-                    btnNavReloj, btnNavMiHorario, btnNavSolicitudes
-            );
-            cargarVista("/com/foodcore/view/KitchenDisplayView.fxml", btnNavKDS);
-        } else if (rol.contains("ALMACEN")) {
-            mostrarNodos(
-                    lblSecBackoffice, lblSecRrhh,
-                    btnNavInventario, btnNavInventarioFisico, btnNavMermas, btnNavAnalisisMermas, btnNavKardex,
-                    btnNavReloj, btnNavMiHorario, btnNavSolicitudes
-            );
-            cargarVista("/com/foodcore/view/InventarioView.fxml", btnNavInventario);
-        } else {
-            aplicarControlAccesoPorPermisos(rol);
-        }
-    }
-
-    private void aplicarControlAccesoPorPermisos(String rolNormalizado) {
-        Set<Permiso> permisos = AutorizacionService.permisosPorDefectoParaRol(rolNormalizado);
-        if (permisos == null || permisos.isEmpty()) {
+        DashboardRbacPolicy.PoliticaAccesoDashboard politica = rbacPolicy.evaluarAcceso(user);
+        if (politica == null || !politica.autorizado()) {
             detenerControladorActivo();
             if (contentArea != null) {
                 contentArea.getChildren().clear();
             }
             return;
         }
-        String vistaInicial = null;
-        Button btnInicial = null;
+        mostrarPolitica(politica);
+        NavDestination inicial = politica.destinoInicial();
+        Button botonInicial = inicial != null ? botonesDestino.get(inicial) : null;
+        if (inicial != null) {
+            cargarVista(inicial.getFxmlPath(), botonInicial);
+        }
+    }
 
-        if (permisos.contains(Permiso.PEDIDO_CREAR) || permisos.contains(Permiso.PEDIDO_ADICIONAR)) {
-            mostrarNodos(lblSecOperaciones, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS);
-            vistaInicial = "/com/foodcore/view/SalonMesasView.fxml";
-            btnInicial = btnNavSalon;
+    private void mostrarPolitica(DashboardRbacPolicy.PoliticaAccesoDashboard politica) {
+        for (NavSection seccion : politica.seccionesVisibles()) {
+            mostrarNodos(nodosSeccion.get(seccion));
         }
-        if (permisos.contains(Permiso.VENTA_COBRAR) || permisos.contains(Permiso.CAJA_APERTURA)
-                || permisos.contains(Permiso.CAJA_CIERRE)) {
-            mostrarNodos(lblSecOperaciones, btnNavPOS, btnNavCaja, btnNavHistorialVentas);
-            if (vistaInicial == null) {
-                vistaInicial = "/com/foodcore/view/VentaPOSView.fxml";
-                btnInicial = btnNavPOS;
-            }
-        }
-        if (permisos.contains(Permiso.KDS_OPERAR)) {
-            mostrarNodos(lblSecOperaciones, btnNavKDS);
-            if (vistaInicial == null) {
-                vistaInicial = "/com/foodcore/view/KitchenDisplayView.fxml";
-                btnInicial = btnNavKDS;
-            }
-        }
-        if (permisos.contains(Permiso.INSUMO_GESTIONAR)) {
-            mostrarNodos(lblSecBackoffice, btnNavInventario, btnNavInventarioFisico, btnNavMenu,
-                    btnNavRecetas, btnNavMermas, btnNavAnalisisMermas);
-            if (vistaInicial == null) {
-                vistaInicial = "/com/foodcore/view/InventarioView.fxml";
-                btnInicial = btnNavInventario;
-            }
-        }
-        if (permisos.contains(Permiso.KARDEX_CONSULTAR)) {
-            mostrarNodos(lblSecBackoffice, btnNavKardex);
-            if (vistaInicial == null) {
-                vistaInicial = "/com/foodcore/view/KardexView.fxml";
-                btnInicial = btnNavKardex;
-            }
-        }
-        if (permisos.contains(Permiso.USUARIO_GESTIONAR)) {
-            mostrarNodos(lblSecSistema, btnNavUsuarios, btnNavRoles);
-        }
-        if (permisos.contains(Permiso.CONFIG_RED)) {
-            mostrarNodos(lblSecSistema, btnNavConfiguracion);
-        }
-        mostrarNodos(lblSecRrhh, btnNavReloj, btnNavMiHorario, btnNavSolicitudes);
-        if (vistaInicial != null) {
-            cargarVista(vistaInicial, btnInicial);
+        for (NavDestination destino : politica.destinosVisibles()) {
+            mostrarNodos(botonesDestino.get(destino));
         }
     }
 
     private void ocultarTodosLosNodos() {
-        Node[] nodes = {
-            lblSecOperaciones, lblSecComercial, lblSecFinanzas, lblSecRrhh, lblSecBackoffice, lblSecSistema,
-            btnNavDashboard, btnNavSalon, btnNavReservas, btnNavDelivery, btnNavPOS, btnNavKDS,
-            btnNavCaja, btnNavHistorialVentas,
-            btnNavPromociones, btnNavKiosco, btnNavMenuQr,
-            btnNavEstadoResultados, btnNavReportesContables, btnNavProveedores, btnNavClientes,
-            btnNavHistorialPrecios, btnNavReportesAvanzados, btnNavReportes,
-            btnNavAsistencia, btnNavReloj, btnNavHorarios, btnNavMiHorario, btnNavSolicitudes,
-            btnNavExpedientes, btnNavPlanilla,
-            btnNavInventario, btnNavInventarioFisico, btnNavMenu, btnNavRecetas, btnNavMermas,
-            btnNavAnalisisMermas, btnNavKardex, btnNavAuditoria,
-            btnNavUsuarios, btnNavRoles, btnNavConfiguracion, btnNavEstadoSistema, btnNavMantenimiento
-        };
-        for (Node n : nodes) {
-            ocultarNodo(n);
-        }
+        nodosSeccion.values().forEach(this::ocultarNodo);
+        botonesDestino.values().forEach(this::ocultarNodo);
     }
 
     private void mostrarNodos(Node... nodes) {
@@ -536,7 +450,7 @@ public class MainDashboardController {
         Usuario act = AuthService.getUsuarioSesionActual() != null
                 ? AuthService.getUsuarioSesionActual()
                 : usuarioAccesoActual;
-        if (!AuditoriaController.esUsuarioAdmin(act)) {
+        if (!rbacPolicy.puedeAccederAuditoria(act)) {
             AnimationUtils.mostrarToast(rootDashboardStack,
                     "Acceso restringido: Bitácora de Auditoría es exclusiva para ADMIN.", true);
             return;
@@ -644,7 +558,8 @@ public class MainDashboardController {
             return;
         }
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
+            FXMLLoader loader = appContainer.createLoader(
+                    getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
             Parent dialogRoot = loader.load();
             PasswordChangeDialogController ctrl = loader.getController();
             this.dialogoPasswordActivo = dialogRoot;
@@ -679,16 +594,14 @@ public class MainDashboardController {
         return controladorActivo;
     }
 
+    @Override
+    public void detenerRecursos() {
+        desregistrarSyncWorkerListener();
+        detenerControladorActivo();
+    }
+
     private void detenerControladorActivo() {
-        if (controladorActivo instanceof RelojAsistenciaController rac) {
-            rac.stopTimeline();
-        } else if (controladorActivo instanceof VentaController vc) {
-            vc.stopTimeline();
-        } else if (controladorActivo instanceof KitchenDisplayController kdc) {
-            kdc.stopTimers();
-        } else if (controladorActivo instanceof EstadoSistemaController esc) {
-            esc.stopTimeline();
-        }
+        lifecycleHelper.detenerControladorActivo(controladorActivo);
         controladorActivo = null;
     }
 
@@ -700,7 +613,7 @@ public class MainDashboardController {
                 contentArea.getChildren().clear();
             }
 
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
+            FXMLLoader loader = appContainer.createLoader(getClass().getResource(fxmlPath));
             Parent view = loader.load();
             controladorActivo = loader.getController();
 
@@ -741,17 +654,9 @@ public class MainDashboardController {
         }
     }
 
-    private static String resolverRutaBreadcrumbs(String fxmlPath, Button navBtnActivo) {
-        if (fxmlPath != null) {
-            String mapped = RUTAS_BREADCRUMBS.get(fxmlPath);
-            if (mapped != null) {
-                return mapped;
-            }
-        }
-        if (navBtnActivo != null && navBtnActivo.getText() != null && !navBtnActivo.getText().isBlank()) {
-            return "Inicio > " + navBtnActivo.getText().trim();
-        }
-        return "Inicio > Operaciones > Dashboard Gerencial";
+    private String resolverRutaBreadcrumbs(String fxmlPath, Button navBtnActivo) {
+        return navigationCatalog.resolverRutaBreadcrumbs(fxmlPath,
+                navBtnActivo != null ? navBtnActivo.getText() : null);
     }
 
     public HBox getBreadcrumbBar() {
@@ -787,12 +692,12 @@ public class MainDashboardController {
 
     @FXML
     public void handleCerrarSesion(ActionEvent event) {
-        desregistrarSyncWorkerListener();
-        detenerControladorActivo();
+        detenerRecursos();
         this.usuarioAccesoActual = null;
         AuthService.logout();
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/LoginView.fxml"));
+            FXMLLoader loader = appContainer.createLoader(
+                    getClass().getResource("/com/foodcore/view/LoginView.fxml"));
             Parent loginRoot = loader.load();
             Scene currentScene = rootDashboardStack != null ? rootDashboardStack.getScene() : null;
             if (currentScene != null && currentScene.getWindow() instanceof Stage stage) {
@@ -901,8 +806,7 @@ public class MainDashboardController {
         Usuario act = AuthService.getUsuarioSesionActual() != null
                 ? AuthService.getUsuarioSesionActual()
                 : usuarioAccesoActual;
-        if (act == null || act.getNombreRol() == null
-                || !act.getNombreRol().toUpperCase(Locale.ROOT).contains("ADMIN")) {
+        if (!rbacPolicy.puedeAccederEstadoSistema(act)) {
             AnimationUtils.mostrarToast(rootDashboardStack,
                     "Acceso restringido: Estado del Sistema es exclusivo para ADMIN.", true);
             return;

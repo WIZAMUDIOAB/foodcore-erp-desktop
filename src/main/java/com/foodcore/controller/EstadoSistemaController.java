@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.service.AlertaService;
 import com.foodcore.service.SistemaMonitorService;
 import com.foodcore.service.SistemaMonitorService.EstadoSistemaSnapshot;
@@ -27,7 +28,7 @@ import java.util.logging.Logger;
  * muestra el estado de servicios críticos y métricas de rendimiento cada 5 segundos usando
  * {@link Timeline} y {@link UiAsyncExecutor}.
  */
-public class EstadoSistemaController {
+public class EstadoSistemaController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(EstadoSistemaController.class.getName());
     private static final DateTimeFormatter HORA_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -90,10 +91,14 @@ public class EstadoSistemaController {
         refreshTimeline.play();
     }
 
+    @Override
+    public void detenerRecursos() {
+        stopTimeline();
+    }
+
     public void stopTimeline() {
         if (refreshTimeline != null) {
             refreshTimeline.stop();
-            refreshTimeline = null;
         }
     }
 

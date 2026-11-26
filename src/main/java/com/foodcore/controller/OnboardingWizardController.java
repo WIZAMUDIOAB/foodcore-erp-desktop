@@ -1,11 +1,13 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ToastService;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -22,10 +24,9 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,7 +34,7 @@ import java.util.logging.Logger;
  * Controlador del Wizard de Configuración Inicial (Onboarding v5.5.0 Sub-Fase E2).
  * Guía en 4 pasos: 1 Restaurante -> 2 Primer Platillo -> 3 Primera Mesa -> 4 Resumen y arranque.
  */
-public class OnboardingWizardController {
+public class OnboardingWizardController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(OnboardingWizardController.class.getName());
 
@@ -72,53 +73,159 @@ public class OnboardingWizardController {
     @FXML private Button btnEmpezarOperar;
 
     private final OnboardingService onboardingService;
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicBoolean operacionEnCurso = new AtomicBoolean(false);
     private int pasoActual = 1;
     private int platilloCreadoId = 0;
 
     public OnboardingWizardController() {
-        this(new OnboardingService());
+        this(AppContainer.getDefault().resolve(OnboardingService.class));
     }
 
-    OnboardingWizardController(OnboardingService onboardingService) {
+    public OnboardingWizardController(OnboardingService onboardingService) {
         this.onboardingService = Objects.requireNonNull(onboardingService, "onboardingService obligatorio");
     }
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         ToastService.registrarHostPane(rootOnboardingStack);
         AnimationUtils.attachTactileFeedback(btnPasoAnterior);
         AnimationUtils.attachTactileFeedback(btnPasoSiguiente);
         AnimationUtils.attachTactileFeedback(btnEmpezarOperar);
 
-        if (cmbCategoriaPlatillo != null) {
-            List<String> cats = onboardingService.listarCategoriasSugeridas();
-            cmbCategoriaPlatillo.setItems(FXCollections.observableArrayList(cats));
-            if (!cats.isEmpty()) {
-                cmbCategoriaPlatillo.getSelectionModel().selectFirst();
-            }
-        }
         mostrarPaso(1);
+        cargarCategoriasSugeridasAsync();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
+    }
+
+    private void cargarCategoriasSugeridasAsync() {
+        if (cmbCategoriaPlatillo == null) {
+            return;
+        }
+        UiAsyncExecutor.ejecutarAsync(
+            onboardingService::listarCategoriasSugeridas,
+            cats -> {
+                if (!vistaActiva.get() || cmbCategoriaPlatillo == null || cats == null) {
+                    return;
+                }
+                String seleccionActual = cmbCategoriaPlatillo.getValue();
+                String textoEditor = cmbCategoriaPlatillo.getEditor() != null
+                        ? cmbCategoriaPlatillo.getEditor().getText() : null;
+                cmbCategoriaPlatillo.setItems(FXCollections.observableArrayList(cats));
+                if (seleccionActual != null && !seleccionActual.isBlank()) {
+                    cmbCategoriaPlatillo.setValue(seleccionActual);
+                } else if (textoEditor != null && !textoEditor.isBlank()) {
+                    cmbCategoriaPlatillo.setValue(textoEditor);
+                } else if (!cats.isEmpty()) {
+                    cmbCategoriaPlatillo.getSelectionModel().selectFirst();
+                }
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error cargando categorías sugeridas en onboarding", ex);
+                if (vistaActiva.get()) {
+                    ToastService.mostrarError(
+                            rootOnboardingStack,
+                            "No se pudieron cargar las categorías sugeridas: " + ex.getMessage());
+                }
+            }
+        );
     }
 
     @FXML
     public void handleSiguiente(ActionEvent event) {
         ocultarError();
-        try {
-            if (pasoActual == 1) {
+        if (pasoActual == 1) {
+            try {
                 avanzarDesdePaso1();
-            } else if (pasoActual == 2) {
-                avanzarDesdePaso2();
-            } else if (pasoActual == 3) {
-                avanzarDesdePaso3();
+            } catch (IllegalArgumentException ex) {
+                mostrarError(ex.getMessage());
             }
+            return;
+        }
+        if (pasoActual == 2) {
+            ejecutarPaso2Async();
+            return;
+        }
+        if (pasoActual == 3) {
+            ejecutarPaso3Async();
+        }
+    }
+
+    private void ejecutarPaso2Async() {
+        String nombre = texto(txtNombrePlatillo);
+        String precioStr = texto(txtPrecioPlatillo);
+        String categoria = resolverCategoriaSeleccionada();
+        BigDecimal precio;
+        try {
+            precio = OnboardingService.validarPasoPlatillo(nombre, precioStr, categoria);
         } catch (IllegalArgumentException ex) {
             mostrarError(ex.getMessage());
-        } catch (SQLException ex) {
-            LOGGER.log(Level.WARNING, "Error guardando paso de onboarding en BD", ex);
-            ToastService.mostrarError(
-                    rootOnboardingStack,
-                    "No se pudo guardar el paso " + pasoActual + " en la base de datos: " + ex.getMessage());
+            return;
         }
+        if (!operacionEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        int idExistente = this.platilloCreadoId;
+        setControlesWizardDeshabilitados(true);
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> onboardingService.guardarPrimerPlatillo(idExistente, nombre, precio, categoria),
+            nuevoId -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (nuevoId != null) {
+                    this.platilloCreadoId = nuevoId;
+                }
+                mostrarPaso(3);
+            },
+            ex -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                reportarErrorBdPaso(2, ex);
+            }
+        );
+    }
+
+    private void ejecutarPaso3Async() {
+        String numeroMesa = texto(txtNumeroMesa);
+        String capacidadStr = texto(txtCapacidadMesa);
+        int capacidad;
+        try {
+            capacidad = OnboardingService.validarPasoMesa(numeroMesa, capacidadStr);
+        } catch (IllegalArgumentException ex) {
+            mostrarError(ex.getMessage());
+            return;
+        }
+        if (!operacionEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        setControlesWizardDeshabilitados(true);
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> onboardingService.guardarPrimeraMesa(numeroMesa, capacidad),
+            () -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                actualizarResumenPaso4();
+                mostrarPaso(4);
+            },
+            ex -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                reportarErrorBdPaso(3, ex);
+            }
+        );
     }
 
     /**
@@ -142,13 +249,8 @@ public class OnboardingWizardController {
         String precioStr = texto(txtPrecioPlatillo);
         String categoria = resolverCategoriaSeleccionada();
         BigDecimal precio = OnboardingService.validarPasoPlatillo(nombre, precioStr, categoria);
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) {
-                throw new SQLException("Sin conexión activa a base de datos.");
-            }
-            this.platilloCreadoId = onboardingService.guardarPrimerPlatillo(
-                    conn, platilloCreadoId, nombre, precio, categoria);
-        }
+        this.platilloCreadoId = onboardingService.guardarPrimerPlatillo(
+                platilloCreadoId, nombre, precio, categoria);
         mostrarPaso(3);
         return true;
     }
@@ -160,12 +262,7 @@ public class OnboardingWizardController {
         String numeroMesa = texto(txtNumeroMesa);
         String capacidadStr = texto(txtCapacidadMesa);
         int capacidad = OnboardingService.validarPasoMesa(numeroMesa, capacidadStr);
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn == null) {
-                throw new SQLException("Sin conexión activa a base de datos.");
-            }
-            onboardingService.guardarPrimeraMesa(conn, numeroMesa, capacidad);
-        }
+        onboardingService.guardarPrimeraMesa(numeroMesa, capacidad);
         actualizarResumenPaso4();
         mostrarPaso(4);
         return true;
@@ -185,30 +282,76 @@ public class OnboardingWizardController {
     @FXML
     public void handleEmpezarOperar(ActionEvent event) {
         ocultarError();
+        String nombre = texto(txtNombreRestaurante);
+        String ruc = texto(txtRuc);
+        String direccion = texto(txtDireccion);
+        String telefono = texto(txtTelefono);
         try {
-            String nombre = texto(txtNombreRestaurante);
-            String ruc = texto(txtRuc);
-            String direccion = texto(txtDireccion);
-            String telefono = texto(txtTelefono);
-            try (Connection conn = ConexionBD.getConnection()) {
-                if (conn == null) {
-                    throw new SQLException("Sin conexión activa a base de datos.");
-                }
-                onboardingService.finalizarOnboarding(conn, nombre, ruc, direccion, telefono);
-            }
-            redirigirAlDashboard();
+            OnboardingService.validarPasoRestaurante(nombre, ruc, direccion, telefono);
         } catch (IllegalArgumentException ex) {
             mostrarError(ex.getMessage());
-        } catch (SQLException | IOException ex) {
-            LOGGER.log(Level.SEVERE, "Error finalizando configuración inicial", ex);
-            ToastService.mostrarError(
-                    rootOnboardingStack,
-                    "No se pudo completar la configuración inicial: " + ex.getMessage());
+            return;
+        }
+        if (!operacionEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        setControlesWizardDeshabilitados(true);
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> onboardingService.finalizarOnboarding(nombre, ruc, direccion, telefono),
+            () -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                try {
+                    redirigirAlDashboard();
+                } catch (IOException ex) {
+                    LOGGER.log(Level.SEVERE, "Error redirigiendo tras configuración inicial", ex);
+                    ToastService.mostrarError(
+                            rootOnboardingStack,
+                            "No se pudo completar la configuración inicial: " + ex.getMessage());
+                }
+            },
+            ex -> {
+                operacionEnCurso.set(false);
+                setControlesWizardDeshabilitados(false);
+                LOGGER.log(Level.SEVERE, "Error finalizando configuración inicial", ex);
+                ToastService.mostrarError(
+                        rootOnboardingStack,
+                        "No se pudo completar la configuración inicial: " + ex.getMessage());
+                mostrarError("No se pudo completar la configuración inicial: " + ex.getMessage());
+            }
+        );
+    }
+
+    private void setControlesWizardDeshabilitados(boolean disabled) {
+        if (btnPasoSiguiente != null) {
+            btnPasoSiguiente.setDisable(disabled);
+        }
+        if (btnEmpezarOperar != null) {
+            btnEmpezarOperar.setDisable(disabled);
+        }
+        if (btnPasoAnterior != null) {
+            btnPasoAnterior.setDisable(disabled || this.pasoActual <= 1);
         }
     }
 
+    private void reportarErrorBdPaso(int paso, Throwable ex) {
+        if (ex instanceof IllegalArgumentException) {
+            mostrarError(ex.getMessage());
+            return;
+        }
+        LOGGER.log(Level.WARNING, "Error guardando paso de onboarding en BD", ex);
+        String mensaje = "No se pudo guardar el paso " + paso + " en la base de datos: " + ex.getMessage();
+        ToastService.mostrarError(rootOnboardingStack, mensaje);
+        mostrarError(mensaje);
+    }
+
     protected void redirigirAlDashboard() throws IOException {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
+        FXMLLoader loader = AppContainer.getDefault().createLoader(
+                getClass().getResource("/com/foodcore/view/MainLayout.fxml"));
         Parent root = loader.load();
         Scene currentScene = rootOnboardingStack != null ? rootOnboardingStack.getScene() : null;
         if (currentScene != null && currentScene.getWindow() instanceof Stage stage) {

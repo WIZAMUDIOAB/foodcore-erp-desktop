@@ -20,16 +20,19 @@ import com.foodcore.service.AuthService;
 import com.foodcore.service.DeliveryWebhookService;
 import com.foodcore.service.TunnelService;
 import com.foodcore.service.impl.AuthServiceImpl;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ServidorSockets;
-import com.google.gson.JsonObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.reflect.Proxy;
 import java.net.ServerSocket;
@@ -223,7 +226,7 @@ class HardeningAuthApiSecurityTest {
         admin.setNombreRol("ADMIN");
 
         UsuarioDAO dao = crearUsuarioDaoEnMemoria(List.of(admin, cajero, mozo));
-        AuthService fakeAuth = new AuthService(dao, new EncriptadorPassword()) {
+        AuthService fakeAuth = new AuthServiceImpl(dao, new EncriptadorPassword()) {
             @Override
             public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) {
                 if ("admin".equals(username) && "9999".equals(pin)) {
@@ -369,6 +372,7 @@ class HardeningAuthApiSecurityTest {
     @Test
     @DisplayName("Aislamiento Cloudflare Tunnel: bloquea rutas no públicas por header CF-* y aísla conector loopback 127.0.0.1")
     void testAislamientoCloudflareYConectorMenuPublico() throws Exception {
+        asegurarBdPruebasLimpiaParaAislamiento();
         int mainPort = puertoLibre();
         int publicMenuPort = puertoLibre();
         JwtService jwt = new JwtService(TEST_SECRET);
@@ -601,24 +605,28 @@ class HardeningAuthApiSecurityTest {
         ServidorSockets servidor = ServidorSockets.getInstance();
         servidor.detener();
         servidor.cerrarSesionesActivas();
-        AtomicReference<JsonObject> recibidoListener = new AtomicReference<>();
-        servidor.setMensajeListener(recibidoListener::set);
+        AtomicReference<ObjectNode> recibidoListener = new AtomicReference<>();
+                servidor.setMensajeListener(recibidoListener::set);
 
-        JsonObject desconocida = servidor.procesarTramaProtocolo("{\"accion\":\"HACKEO\"}", null);
-        assertEquals("ERROR", desconocida.get("type").getAsString());
-        assertEquals("FRAME_NO_AUTORIZADO", desconocida.get("code").getAsString());
+                ObjectNode desconocida = servidor.procesarTramaProtocolo("{\"accion\":\"HACKEO\"}", null);
+                assertEquals("ERROR", desconocida.get("type").asText());
+                assertEquals("FRAME_NO_AUTORIZADO", desconocida.get("code").asText());
         assertNull(recibidoListener.get(), "Trama no autenticada nunca debe invocar mensajeListener");
 
         servidor.emitirMensajeInterno("{\"accion\":\"NUEVA_COMANDA\",\"idPedido\":42}");
         assertNotNull(recibidoListener.get());
-        assertEquals(42, recibidoListener.get().get("idPedido").getAsInt());
+        assertEquals(42, recibidoListener.get().get("idPedido").asInt());
 
         int tcpPort = puertoLibre();
         servidor.iniciar(tcpPort);
         try (Socket rawClient = new Socket("127.0.0.1", tcpPort)) {
+            rawClient.setSoTimeout(3000);
             PrintWriter pw = new PrintWriter(rawClient.getOutputStream(), true, StandardCharsets.UTF_8);
+            BufferedReader br = new BufferedReader(new InputStreamReader(rawClient.getInputStream(), StandardCharsets.UTF_8));
             pw.println("{\"accion\":\"SIN_HELLO\"}");
-            Thread.sleep(100);
+            String respuestaRaw = br.readLine();
+            assertNotNull(respuestaRaw, "El servidor debe responder rechazo explícito a trama sin autenticación");
+            assertTrue(respuestaRaw.contains("FRAME_NO_AUTORIZADO") || respuestaRaw.contains("ERROR"));
             assertEquals(0, servidor.getCantidadClientesConectados(),
                     "Cliente TCP sin HELLO/AUTH_TERMINAL válido no debe registrarse en clientesConectados");
         } finally {
@@ -778,5 +786,27 @@ class HardeningAuthApiSecurityTest {
                 Connection.class.getClassLoader(),
                 new Class<?>[]{Connection.class},
                 (proxy, method, args) -> "prepareStatement".equals(method.getName()) ? ps : null);
+    }
+
+    private static void asegurarBdPruebasLimpiaParaAislamiento() {
+        String activeJdbcUrl = MySqlIntegrationTestSupport.getActiveJdbcUrl();
+        if (activeJdbcUrl != null && !activeJdbcUrl.isBlank()) {
+            MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
+            return;
+        }
+        if (tieneVariableConfigurada("FOODCORE_DB_PASS") && tieneVariableConfigurada("FOODCORE_MIGRATOR_PASS")) {
+            MySqlIntegrationTestSupport.inicializarEntornoMySql();
+        } else {
+            ConexionBD.closePool();
+        }
+    }
+
+    private static boolean tieneVariableConfigurada(String nombre) {
+        String prop = System.getProperty(nombre);
+        if (prop != null && !prop.isBlank()) {
+            return true;
+        }
+        String env = System.getenv(nombre);
+        return env != null && !env.isBlank();
     }
 }

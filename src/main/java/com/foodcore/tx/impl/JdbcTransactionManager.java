@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,13 +37,19 @@ public class JdbcTransactionManager implements TransactionManager {
     }
 
     private final ConnectionSupplier connectionSupplier;
+    private final LongConsumer backoffSleeper;
 
     public JdbcTransactionManager() {
         this(ConexionBD::getConnection);
     }
 
     public JdbcTransactionManager(ConnectionSupplier connectionSupplier) {
+        this(connectionSupplier, JdbcTransactionManager::dormirBackoffPorDefecto);
+    }
+
+    JdbcTransactionManager(ConnectionSupplier connectionSupplier, LongConsumer backoffSleeper) {
         this.connectionSupplier = Objects.requireNonNull(connectionSupplier, "El proveedor de conexiones no puede ser nulo.");
+        this.backoffSleeper = Objects.requireNonNull(backoffSleeper, "La estrategia de backoff no puede ser nula.");
     }
 
     @Override
@@ -148,6 +155,10 @@ public class JdbcTransactionManager implements TransactionManager {
     }
 
     private void dormirBackoff(long esperaMs) {
+        backoffSleeper.accept(esperaMs);
+    }
+
+    private static void dormirBackoffPorDefecto(long esperaMs) {
         try {
             Thread.sleep(esperaMs);
         } catch (InterruptedException ie) {

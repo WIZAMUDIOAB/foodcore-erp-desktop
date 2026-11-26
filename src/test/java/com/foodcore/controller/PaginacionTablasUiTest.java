@@ -15,6 +15,7 @@ import javafx.scene.control.TableView;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -87,9 +88,9 @@ class PaginacionTablasUiTest {
                     v.serie = "B001";
                     v.fechaEmision = "2026-11-12";
                     v.nombreCliente = "Cliente Paginado #" + i;
-                    v.subtotal = 100.0;
-                    v.igv = 18.0;
-                    v.total = 118.0;
+                    v.subtotal = new BigDecimal("100.00");
+                    v.igv = new BigDecimal("18.00");
+                    v.total = new BigDecimal("118.00");
                     v.medioPago = "YAPE";
                     v.estado = "1";
                     ventas.add(v);

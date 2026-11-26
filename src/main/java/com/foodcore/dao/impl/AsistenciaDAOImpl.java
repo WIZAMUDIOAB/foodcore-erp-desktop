@@ -4,6 +4,8 @@ import com.foodcore.dao.AsistenciaDAO;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.FilaPlanilla;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -177,31 +179,44 @@ public class AsistenciaDAOImpl implements AsistenciaDAO {
                     p.setDni(rs.getString("dni") != null ? rs.getString("dni") : "-");
                     p.setRol(rs.getString("rol_nombre") != null ? rs.getString("rol_nombre") : "PERSONAL");
                     p.setDiasTrabajados(rs.getInt("dias_trabajados"));
-                    p.setHorasTotales(rs.getDouble("horas_totales"));
-                    p.setHorasExtra(rs.getDouble("horas_extra"));
+                    p.setHorasTotales(leerDecimal(rs, "horas_totales"));
+                    p.setHorasExtra(leerDecimal(rs, "horas_extra"));
                     p.setTardanzaMinutos(rs.getInt("tardanza_minutos"));
-                    double sueldoBase = rs.getDouble("sueldo_base");
-                    p.setSueldoBase(sueldoBase > 0 ? sueldoBase : 1200.00);
+                    BigDecimal sueldoBase = leerDecimal(rs, "sueldo_base");
+                    p.setSueldoBase(sueldoBase.compareTo(BigDecimal.ZERO) > 0 ? sueldoBase : new BigDecimal("1200.00"));
 
                     // Fórmulas de cálculo de nómina:
-                    // Valor por minuto = sueldoBase / 30 días / 8 horas / 60 minutos
-                    double valorMinuto = p.getSueldoBase() / (30.0 * 8.0 * 60.0);
-                    double descTardanza = Math.round(p.getTardanzaMinutos() * valorMinuto * 100.0) / 100.0;
+                    // Valor por minuto = sueldoBase / (30 días * 8 horas * 60 minutos) = sueldoBase / 14400
+                    BigDecimal descTardanza = p.getSueldoBase()
+                            .multiply(BigDecimal.valueOf(p.getTardanzaMinutos()))
+                            .divide(new BigDecimal("14400"), 2, RoundingMode.HALF_UP);
                     p.setDescuentoTardanza(descTardanza);
 
-                    // Hora extra con sobretasa legal 50%
-                    double valorHoraExtra = (p.getSueldoBase() / (30.0 * 8.0)) * 1.5;
-                    double bonoExtra = Math.round(p.getHorasExtra() * valorHoraExtra * 100.0) / 100.0;
+                    // Hora extra con sobretasa legal 50%: (sueldoBase / 240) * 1.5
+                    BigDecimal bonoExtra = p.getSueldoBase()
+                            .multiply(p.getHorasExtra())
+                            .multiply(new BigDecimal("1.5"))
+                            .divide(new BigDecimal("240"), 2, RoundingMode.HALF_UP);
                     p.setBonoHorasExtra(bonoExtra);
 
-                    double neto = p.getSueldoBase() - descTardanza + bonoExtra;
-                    p.setTotalNetoPagar(Math.round(neto * 100.0) / 100.0);
+                    BigDecimal neto = p.getSueldoBase()
+                            .subtract(descTardanza)
+                            .add(bonoExtra)
+                            .setScale(2, RoundingMode.HALF_UP);
+                    p.setTotalNetoPagar(neto);
 
                     lista.add(p);
                 }
             }
         }
         return lista;
+    }
+
+    private static BigDecimal leerDecimal(ResultSet rs, String columna) throws SQLException {
+        BigDecimal valor = rs.getBigDecimal(columna);
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     private Asistencia mapearAsistencia(ResultSet rs) throws SQLException {

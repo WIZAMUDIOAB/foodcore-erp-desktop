@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,7 +52,7 @@ class ExpedienteEmpleadoServiceTest {
         Usuario admin = service.buscarExpediente(1).orElseThrow();
         String direccionOrig = admin.getDireccion();
         String telEmergOrig = admin.getTelefonoEmergencia();
-        double sueldoOrig = admin.getSueldoBase();
+        BigDecimal sueldoOrig = admin.getSueldoBase();
         String cargoOrig = admin.getCargo();
 
         try {
@@ -73,10 +74,10 @@ class ExpedienteEmpleadoServiceTest {
             assertEquals("Av. Arequipa 2450, Lince", actualizado.getDireccion());
             assertEquals("999888777", actualizado.getTelefonoEmergencia());
 
-            actualizado.setSueldoBase(-10.0);
+            actualizado.setSueldoBase(new BigDecimal("-10.00"));
             assertThrows(IllegalArgumentException.class, () -> service.guardarDatosLaborales(actualizado));
 
-            actualizado.setSueldoBase(3200.00);
+            actualizado.setSueldoBase(new BigDecimal("3200.00"));
             actualizado.setFechaIngreso(LocalDate.now().minusMonths(6));
             actualizado.setFechaVencimientoContrato(LocalDate.now().minusMonths(12));
             assertThrows(IllegalArgumentException.class, () -> service.guardarDatosLaborales(actualizado));
@@ -90,7 +91,7 @@ class ExpedienteEmpleadoServiceTest {
 
             Usuario laboralActualizado = service.buscarExpediente(1).orElseThrow();
             assertEquals("Gerente General", laboralActualizado.getCargo());
-            assertEquals(3200.00, laboralActualizado.getSueldoBase(), 0.01);
+            assertEquals(0, new BigDecimal("3200.00").compareTo(laboralActualizado.getSueldoBase()));
         } finally {
             admin.setDireccion(direccionOrig);
             admin.setTelefonoEmergencia(telEmergOrig);

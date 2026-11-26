@@ -1,10 +1,15 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 public class Usuario {
+    private static final BigDecimal CERO_SUELDO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static final BigDecimal SUELDO_DEFAULT = new BigDecimal("1200.00");
+
     private int idUsuario;
     private int idEmpleado;
     private int idRol;
@@ -25,7 +30,7 @@ public class Usuario {
     private String dni;
     private String pin;
     private String pinHash;
-    private double sueldoBase = 1200.00;
+    private BigDecimal sueldoBase = SUELDO_DEFAULT;
     private String horarioLaboral = "08:00-16:00";
     private LocalTime horaEntradaProgramada = LocalTime.of(8, 0);
     private LocalTime horaSalidaProgramada = LocalTime.of(16, 0);
@@ -169,9 +174,13 @@ public class Usuario {
         return (pinHash != null && !pinHash.isBlank()) || (pin != null && !pin.isBlank());
     }
 
-    public double getSueldoBase() { return sueldoBase; }
+    public BigDecimal getSueldoBase() { return sueldoBase; }
 
-    public void setSueldoBase(double sueldoBase) { this.sueldoBase = sueldoBase; }
+    public void setSueldoBase(BigDecimal sueldoBase) {
+        this.sueldoBase = sueldoBase != null
+                ? sueldoBase.setScale(2, RoundingMode.HALF_UP)
+                : CERO_SUELDO;
+    }
 
     public String getHorarioLaboral() { return horarioLaboral; }
 

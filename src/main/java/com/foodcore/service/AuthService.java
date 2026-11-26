@@ -1,107 +1,71 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.UsuarioDAO;
-import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
-import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.security.SesionManager;
-import com.foodcore.service.impl.AuthServiceImpl;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Optional;
 
 /**
- * Contrato base y gestor de sesión activa de Autenticación, Bloqueo por Fuerza Bruta (5 intentos / 15 min)
+ * Contrato de Autenticación, Bloqueo por Fuerza Bruta (5 intentos / 15 min)
  * y Seguridad PIN según SPEC-FOODCORE-v1.0 (§10.1, §10.2) y SPEC-FOODCORE-v4.3.0 (§1.2).
- * La lógica de negocio reside íntegramente en {@link AuthServiceImpl}.
+ * La gestión thread-safe de la sesión activa reside exclusivamente en {@link SesionManager}.
  */
-public class AuthService {
+public interface AuthService {
 
-    public static final int MAX_INTENTOS_FALLIDOS = 5;
+    int MAX_INTENTOS_FALLIDOS = UsuarioDAO.MAX_INTENTOS_FALLIDOS;
 
-    protected final UsuarioDAO usuarioDAO;
-    protected final EncriptadorPassword encriptador;
-    private static Usuario usuarioSesionActual;
+    Usuario login(String username, String password) throws NegocioException, SQLException;
 
-    public AuthService() {
-        this(new UsuarioDAOImpl(), new EncriptadorPassword());
-    }
-
-    public AuthService(UsuarioDAO usuarioDAO, EncriptadorPassword encriptador) {
-        this.usuarioDAO = usuarioDAO;
-        this.encriptador = encriptador;
-    }
-
-    public Usuario login(String username, String password) throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).login(username, password);
-    }
-
-    public Usuario login(Connection conn, String username, String password) throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).login(conn, username, password);
-    }
+    Usuario login(Connection conn, String username, String password) throws NegocioException, SQLException;
 
     /**
-     * Valida credenciales, estado activo y bloqueo SIN mutar {@link SesionManager} ni {@code usuarioSesionActual}.
+     * Valida credenciales, estado activo y bloqueo SIN mutar {@link SesionManager}.
      * Requerido por API REST stateless y flujo Desktop 2FA previo a verificación TOTP.
      */
-    public Usuario autenticarSoloCredenciales(String username, String password) throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarSoloCredenciales(username, password);
-    }
+    Usuario autenticarSoloCredenciales(String username, String password) throws NegocioException, SQLException;
 
-    public Usuario autenticarSoloCredenciales(Connection conn, String username, String password)
-            throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarSoloCredenciales(conn, username, password);
-    }
+    Usuario autenticarSoloCredenciales(Connection conn, String username, String password)
+            throws NegocioException, SQLException;
 
-    public Optional<Usuario> autenticarPorPin(int idUsuario, String username, String pin) throws SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPin(idUsuario, username, pin);
-    }
+    Optional<Usuario> autenticarPorPin(int idUsuario, String username, String pin) throws SQLException;
+
+    Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String username, String pin)
+            throws SQLException;
 
     /**
-     * Valida PIN por BCrypt SIN mutar {@link SesionManager} ni {@code usuarioSesionActual}.
+     * Valida PIN por BCrypt SIN mutar {@link SesionManager}.
      * Bloquea usuarios con 2FA habilitado, roles ADMIN/SUPERVISOR, cuentas inactivas o bloqueadas.
      */
-    public Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) throws SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPinStateless(idUsuario, username, pin);
-    }
+    Optional<Usuario> autenticarPorPinStateless(int idUsuario, String username, String pin) throws SQLException;
 
-    public Optional<Usuario> autenticarPorPinStateless(Connection conn, int idUsuario, String username, String pin)
-            throws SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).autenticarPorPinStateless(conn, idUsuario, username, pin);
-    }
+    Optional<Usuario> autenticarPorPinStateless(Connection conn, int idUsuario, String username, String pin)
+            throws SQLException;
 
     /**
-     * Establece la sesión global Desktop en {@link SesionManager} y {@link #usuarioSesionActual}
+     * Establece la sesión global Desktop en {@link SesionManager}
      * tras completar todos los factores de autenticación (contraseña + 2FA TOTP si aplica).
      */
-    public void establecerSesionActiva(Usuario usuario) {
-        new AuthServiceImpl(usuarioDAO, encriptador).establecerSesionActiva(usuario);
+    void establecerSesionActiva(Usuario usuario);
+
+    boolean actualizarPinUsuario(int idUsuario, String nuevoPin) throws NegocioException, SQLException;
+
+    void cambiarPasswordObligatorio(int idUsuario, String nuevoPassword) throws NegocioException, SQLException;
+
+    String marcarAsistenciaInteligente(String dni) throws NegocioException, SQLException;
+
+    static void setUsuarioSesionActual(Usuario usuario) {
+        SesionManager.setUsuarioActual(usuario);
     }
 
-    public boolean actualizarPinUsuario(int idUsuario, String nuevoPin) throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).actualizarPinUsuario(idUsuario, nuevoPin);
+    static Usuario getUsuarioSesionActual() {
+        return SesionManager.getUsuarioActual();
     }
 
-    public void cambiarPasswordObligatorio(int idUsuario, String nuevoPassword) throws NegocioException, SQLException {
-        new AuthServiceImpl(usuarioDAO, encriptador).cambiarPasswordObligatorio(idUsuario, nuevoPassword);
-    }
-
-    public String marcarAsistenciaInteligente(String dni) throws NegocioException, SQLException {
-        return new AuthServiceImpl(usuarioDAO, encriptador).marcarAsistenciaInteligente(dni);
-    }
-
-    public static void setUsuarioSesionActual(Usuario usuario) {
-        usuarioSesionActual = usuario;
-    }
-
-    public static Usuario getUsuarioSesionActual() {
-        return usuarioSesionActual;
-    }
-
-    public static void logout() {
-        usuarioSesionActual = null;
+    static void logout() {
         SesionManager.cerrarSesion();
     }
 }

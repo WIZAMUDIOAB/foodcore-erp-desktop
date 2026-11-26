@@ -3,14 +3,11 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.ProveedorDAO;
-import com.foodcore.dao.impl.ProveedorDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Proveedor;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.ProveedorGestionService;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.UiAsyncExecutor;
@@ -27,8 +24,8 @@ import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.sql.Connection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -69,13 +66,23 @@ public class ProveedoresController {
     @FXML private TextField txtModalDiasCredito;
     @FXML private Label lblModalError;
 
-    private final ProveedorDAO proveedorDAO = new ProveedorDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
-    private final FinanzasService finanzasService = new FinanzasService();
+    private final ProveedorGestionService proveedorGestionService;
+    private final FinanzasService finanzasService;
 
     private final ObservableList<Proveedor> listaProveedores = FXCollections.observableArrayList();
     private Proveedor proveedorSeleccionado = null;
     private boolean modoEdicion = false;
+
+    public ProveedoresController() {
+        this(AppContainer.getDefault().resolve(ProveedorGestionService.class),
+                AppContainer.getDefault().finanzasService());
+    }
+
+    public ProveedoresController(ProveedorGestionService proveedorGestionService, FinanzasService finanzasService) {
+        this.proveedorGestionService =
+                java.util.Objects.requireNonNull(proveedorGestionService, "proveedorGestionService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+    }
 
     @FXML
     public void initialize() {
@@ -91,7 +98,7 @@ public class ProveedoresController {
         colContacto.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getContacto() != null ? p.getValue().getContacto() : "-"));
         colTelefono.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getTelefono() != null ? p.getValue().getTelefono() : "-"));
         colDiasCredito.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().getDiasCredito() + " d"));
-        colDeudaActual.setCellValueFactory(p -> new SimpleStringProperty(String.format("S/ %.2f", p.getValue().getDeudaActual())));
+        colDeudaActual.setCellValueFactory(p -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", p.getValue().getDeudaActual())));
         colEstado.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().isActivo() ? "ACTIVO" : "INACTIVO"));
         tblProveedores.setItems(listaProveedores);
     }
@@ -120,11 +127,7 @@ public class ProveedoresController {
 
     public void cargarProveedoresAsync() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return proveedorDAO.listarTodos(conn);
-                }
-            },
+            () -> proveedorGestionService.listarTodos(),
             todos -> {
                 listaProveedores.setAll(todos);
                 tblProveedores.setItems(listaProveedores);
@@ -149,7 +152,7 @@ public class ProveedoresController {
         lblDetalleContacto.setText((p.getContacto() != null ? p.getContacto() : "-") + " (" + (p.getTelefono() != null ? p.getTelefono() : "-") + ")");
         lblDetalleEmail.setText(p.getEmail() != null ? p.getEmail() : "-");
         lblDetalleDias.setText(p.getDiasCredito() + " días calendario");
-        lblDetalleDeuda.setText(String.format("S/ %.2f", p.getDeudaActual()));
+        lblDetalleDeuda.setText(String.format(Locale.US, "S/ %.2f", p.getDeudaActual()));
         lblDetalleFacturas.setText(p.getFacturasPendientes() + " facturas pendientes de pago");
     }
 
@@ -169,7 +172,9 @@ public class ProveedoresController {
 
     @FXML
     public void handleEditarSeleccionado() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         modoEdicion = true;
         lblModalTitulo.setText("Editar Proveedor #" + proveedorSeleccionado.getIdProveedor());
         txtModalRuc.setText(proveedorSeleccionado.getRuc());
@@ -202,7 +207,9 @@ public class ProveedoresController {
         int dias = 15;
         try {
             dias = Integer.parseInt(txtModalDiasCredito.getText().trim());
-        } catch (Exception ignored) {}
+        } catch (NumberFormatException ex) {
+            LOGGER.log(Level.FINE, "Días de crédito inválidos, usando valor por defecto 15", ex);
+        }
 
         final int diasFinal = dias;
         final String contacto = txtModalContacto.getText().trim();
@@ -214,25 +221,23 @@ public class ProveedoresController {
         lblModalError.setText("");
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (editarFinal) {
-                        sel.setRuc(ruc);
-                        sel.setRazonSocial(razon);
-                        sel.setContacto(contacto);
-                        sel.setTelefono(telefono);
-                        sel.setEmail(email);
-                        sel.setDiasCredito(diasFinal);
-                        proveedorDAO.actualizar(conn, sel);
-                    } else {
-                        Proveedor nuevo = new Proveedor();
-                        nuevo.setRuc(ruc);
-                        nuevo.setRazonSocial(razon);
-                        nuevo.setContacto(contacto);
-                        nuevo.setTelefono(telefono);
-                        nuevo.setEmail(email);
-                        nuevo.setDiasCredito(diasFinal);
-                        proveedorDAO.insertar(conn, nuevo);
-                    }
+                if (editarFinal) {
+                    sel.setRuc(ruc);
+                    sel.setRazonSocial(razon);
+                    sel.setContacto(contacto);
+                    sel.setTelefono(telefono);
+                    sel.setEmail(email);
+                    sel.setDiasCredito(diasFinal);
+                    proveedorGestionService.actualizar(sel);
+                } else {
+                    Proveedor nuevo = new Proveedor();
+                    nuevo.setRuc(ruc);
+                    nuevo.setRazonSocial(razon);
+                    nuevo.setContacto(contacto);
+                    nuevo.setTelefono(telefono);
+                    nuevo.setEmail(email);
+                    nuevo.setDiasCredito(diasFinal);
+                    proveedorGestionService.insertar(nuevo);
                 }
             },
             () -> {
@@ -245,15 +250,13 @@ public class ProveedoresController {
 
     @FXML
     public void handleCambiarEstado() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final boolean nuevoEstado = !proveedorSeleccionado.isActivo();
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    proveedorDAO.cambiarEstado(conn, idProveedor, nuevoEstado);
-                }
-            },
+            () -> proveedorGestionService.cambiarEstado(idProveedor, nuevoEstado),
             this::cargarProveedoresAsync,
             ex -> LOGGER.log(Level.WARNING, "Error al cambiar estado de proveedor", ex)
         );
@@ -261,7 +264,9 @@ public class ProveedoresController {
 
     @FXML
     public void handleGenerarOrdenCompra() {
-        if (proveedorSeleccionado == null) return;
+        if (proveedorSeleccionado == null) {
+            return;
+        }
         final int idProveedor = proveedorSeleccionado.getIdProveedor();
         final String ruc = proveedorSeleccionado.getRuc();
         Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
@@ -278,16 +283,7 @@ public class ProveedoresController {
         final File doc = elegidoOpt.get();
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                List<Insumo> insumosBajos;
-                try (Connection conn = ConexionBD.getConnection()) {
-                    insumosBajos = insumoDAO.listarTodos(conn).stream()
-                            .filter(i -> i.getStockActualDisponible() != null && i.getStockMinimo() != null
-                                    && i.getStockActualDisponible().compareTo(i.getStockMinimo()) <= 0)
-                            .collect(Collectors.toList());
-                    if (insumosBajos.isEmpty()) {
-                        insumosBajos = insumoDAO.listarTodos(conn).stream().limit(3).collect(Collectors.toList());
-                    }
-                }
+                List<Insumo> insumosBajos = proveedorGestionService.listarInsumosStockBajo(3);
                 if (doc.getParentFile() != null) {
                     Files.createDirectories(doc.getParentFile().toPath());
                 }

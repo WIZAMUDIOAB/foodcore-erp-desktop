@@ -1,14 +1,14 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.SolicitudAusenciaDAO;
-import com.foodcore.dao.impl.SolicitudAusenciaDAOImpl;
+
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.Usuario;
 import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
+import com.foodcore.service.SolicitudAusenciaConsultaService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -28,7 +28,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 
-import java.sql.Connection;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -65,9 +65,21 @@ public class SolicitudesController {
     @FXML private TableColumn<SolicitudAusencia, String> colEstado;
     @FXML private TableColumn<SolicitudAusencia, Void> colAcciones;
 
-    private final SolicitudAusenciaDAO solicitudDAO = new SolicitudAusenciaDAOImpl();
-    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
+    private final SolicitudAusenciaConsultaService solicitudConsultaService;
+    private final AusenciasVacacionesService ausenciasService;
     private final ObservableList<SolicitudAusencia> listaSolicitudes = FXCollections.observableArrayList();
+
+    public SolicitudesController() {
+        this(AppContainer.getDefault().resolve(SolicitudAusenciaConsultaService.class),
+                AppContainer.getDefault().ausenciasVacacionesService());
+    }
+
+    public SolicitudesController(SolicitudAusenciaConsultaService solicitudConsultaService,
+                                 AusenciasVacacionesService ausenciasService) {
+        this.solicitudConsultaService =
+                java.util.Objects.requireNonNull(solicitudConsultaService, "solicitudConsultaService");
+        this.ausenciasService = java.util.Objects.requireNonNull(ausenciasService, "ausenciasService");
+    }
 
     @FXML
     public void initialize() {
@@ -145,8 +157,8 @@ public class SolicitudesController {
 
             {
                 box.setAlignment(Pos.CENTER);
-                btnAprobar.setStyle("-fx-background-color: #059669; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4 10; -fx-background-radius: 6; -fx-cursor: hand;");
-                btnRechazar.setStyle("-fx-background-color: #DC2626; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 4 10; -fx-background-radius: 6; -fx-cursor: hand;");
+                btnAprobar.getStyleClass().add("fc-btn-approve-xs");
+                btnRechazar.getStyleClass().add("fc-btn-reject-xs");
                 AnimationUtils.attachTactileFeedback(btnAprobar);
                 AnimationUtils.attachTactileFeedback(btnRechazar);
             }
@@ -189,11 +201,7 @@ public class SolicitudesController {
         final Usuario u = AuthService.getUsuarioSesionActual();
         final int idUsr = u != null ? u.getIdUsuario() : 1;
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return esGerente ? solicitudDAO.listarTodas(conn) : solicitudDAO.listarPorUsuario(conn, idUsr);
-                }
-            },
+            () -> solicitudConsultaService.listarSolicitudes(esGerente, idUsr),
             data -> {
                 listaSolicitudes.setAll(data);
                 actualizarContadores();
@@ -203,15 +211,10 @@ public class SolicitudesController {
     }
 
     public void cargarSolicitudesSincrono() {
-        try (Connection conn = ConexionBD.getConnection()) {
-            List<SolicitudAusencia> data;
-            if (usuarioEsGerente()) {
-                data = solicitudDAO.listarTodas(conn);
-            } else {
-                Usuario u = AuthService.getUsuarioSesionActual();
-                int idUsr = u != null ? u.getIdUsuario() : 1;
-                data = solicitudDAO.listarPorUsuario(conn, idUsr);
-            }
+        try {
+            Usuario u = AuthService.getUsuarioSesionActual();
+            int idUsr = u != null ? u.getIdUsuario() : 1;
+            List<SolicitudAusencia> data = solicitudConsultaService.listarSolicitudes(usuarioEsGerente(), idUsr);
             listaSolicitudes.setAll(data);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Aviso al cargar solicitudes de ausencia", e);
@@ -232,10 +235,18 @@ public class SolicitudesController {
                 pend++;
             }
         }
-        if (lblCountPendientes != null) lblCountPendientes.setText(String.valueOf(pend));
-        if (lblCountAprobadas != null) lblCountAprobadas.setText(String.valueOf(aprob));
-        if (lblCountRechazadas != null) lblCountRechazadas.setText(String.valueOf(rech));
-        if (lblEstadoTabla != null) lblEstadoTabla.setText(listaSolicitudes.size() + " registros");
+        if (lblCountPendientes != null) {
+            lblCountPendientes.setText(String.valueOf(pend));
+        }
+        if (lblCountAprobadas != null) {
+            lblCountAprobadas.setText(String.valueOf(aprob));
+        }
+        if (lblCountRechazadas != null) {
+            lblCountRechazadas.setText(String.valueOf(rech));
+        }
+        if (lblEstadoTabla != null) {
+            lblEstadoTabla.setText(listaSolicitudes.size() + " registros");
+        }
     }
 
     @FXML
@@ -309,7 +320,9 @@ public class SolicitudesController {
     }
 
     public void aprobarSolicitud(SolicitudAusencia sol) {
-        if (sol == null) return;
+        if (sol == null) {
+            return;
+        }
         try {
             Usuario aprobador = AuthService.getUsuarioSesionActual();
             Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;
@@ -324,7 +337,9 @@ public class SolicitudesController {
     }
 
     public void rechazarSolicitud(SolicitudAusencia sol) {
-        if (sol == null) return;
+        if (sol == null) {
+            return;
+        }
         try {
             Usuario aprobador = AuthService.getUsuarioSesionActual();
             Integer idAprobador = aprobador != null && aprobador.getIdUsuario() > 0 ? aprobador.getIdUsuario() : null;

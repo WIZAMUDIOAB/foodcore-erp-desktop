@@ -9,7 +9,6 @@ import com.foodcore.service.ExpedienteEmpleadoService;
 import com.foodcore.service.impl.ExpedienteEmpleadoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -29,7 +28,6 @@ import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -96,7 +94,20 @@ class ModuloAExpedienteUiTest {
                     new Scene(root, 1280, 820);
                     root.applyCss();
                     root.layout();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
+            ExpedienteEmpleadoController ctrl = ctrlRef.get();
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getTblColaboradores().getItems().isEmpty(),
+                    10L,
+                    "ExpedienteEmpleadoView debe poblar colaboradores de forma asíncrona");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
                     assertEquals(3, ctrl.getTabPaneExpediente().getTabs().size());
                     ctrl.getTabPaneExpediente().getSelectionModel().select(0);
                     root.layout();
@@ -108,6 +119,22 @@ class ModuloAExpedienteUiTest {
 
                     ctrl.getTabPaneExpediente().getSelectionModel().select(2);
                     ctrl.handleSubirPdf();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            JavaFxTestSupport.awaitCondition(
+                    () -> !ctrl.getBtnSubirPdf().isDisabled()
+                            && ctrl.getTblDocumentos().getItems().stream()
+                                    .anyMatch(d -> "contrato_temporal_ui.pdf".equals(d.getNombreArchivo()))
+                            && ctrl.getLblMensajeEstado().getText().contains("PDF adjuntado correctamente"),
+                    10L,
+                    "El PDF adjuntado de forma asíncrona debe listarse en tblDocumentos");
+
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Parent root = rootRef.get();
                     List<DocumentoEmpleado> docs = ctrl.getTblDocumentos().getItems();
                     docs.stream()
                             .filter(d -> "contrato_temporal_ui.pdf".equals(d.getNombreArchivo()))
@@ -119,8 +146,6 @@ class ModuloAExpedienteUiTest {
                     throw new RuntimeException(e);
                 }
             });
-
-            ExpedienteEmpleadoController ctrl = ctrlRef.get();
             assertEquals("Datos Personales", ctrl.getTabPaneExpediente().getTabs().get(0).getText());
             assertEquals("Datos Laborales", ctrl.getTabPaneExpediente().getTabs().get(1).getText());
             assertEquals("Documentos", ctrl.getTabPaneExpediente().getTabs().get(2).getText());
@@ -129,6 +154,9 @@ class ModuloAExpedienteUiTest {
                     "El PDF seleccionado desde ExportFileChooserHelper debe quedar registrado");
             assertTrue(ctrl.getLblMensajeEstado().getText().contains("PDF adjuntado correctamente"));
         } finally {
+            if (ctrlRef.get() != null) {
+                ctrlRef.get().detenerRecursos();
+            }
             if (docSubidoId.get() != null) {
                 serviceTemp.eliminarDocumento(docSubidoId.get());
             }
@@ -150,9 +178,7 @@ class ModuloAExpedienteUiTest {
                 DashboardController ctrl = loader.getController();
                 rootRef.set(root);
 
-                try (Connection conn = ConexionBD.getConnection()) {
-                    alertasRef.set(ctrl.obtenerAlertasVencimiento30Dias(conn));
-                }
+                alertasRef.set(ctrl.obtenerAlertasVencimiento30Dias());
 
                 new Scene(root, 1280, 820);
                 root.applyCss();
@@ -162,20 +188,11 @@ class ModuloAExpedienteUiTest {
             }
         });
 
-        for (int i = 0; i < 30; i++) {
-            AtomicReference<String> badgeText = new AtomicReference<>("");
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-                javafx.scene.control.Label lbl = (javafx.scene.control.Label) rootRef.get()
-                        .lookup("#lblCountAlertasPersonal");
-                if (lbl != null) {
-                    badgeText.set(lbl.getText());
-                }
-            });
-            if (!badgeText.get().startsWith("0 ")) {
-                break;
-            }
-            Thread.sleep(150);
-        }
+        JavaFxTestSupport.awaitCondition(() -> {
+            javafx.scene.control.Label lbl = (javafx.scene.control.Label) rootRef.get()
+                    .lookup("#lblCountAlertasPersonal");
+            return lbl != null && lbl.getText() != null && !lbl.getText().startsWith("0 ");
+        }, 5L, "El contador de alertas de personal debe actualizarse desde BD");
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

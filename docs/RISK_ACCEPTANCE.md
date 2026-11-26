@@ -1,10 +1,10 @@
-# REGISTRO FORMAL DE ACEPTACION DE RIESGOS — FoodCore ERP `v5.7.1-GA`
+# REGISTRO FORMAL DE ACEPTACION DE RIESGOS — FoodCore ERP `v5.8.0-GA`
 
-> **Alcance:** Riesgos residuales operativos y de arquitectura evaluados para el lanzamiento endurecido **FoodCore ERP `v5.7.1-GA`**. Cada riesgo listado cuenta con controles compensatorios obligatorios, condiciones de revocacion automatica y criterios de verificacion previos a produccion.
+> **Alcance:** Riesgos residuales operativos y de arquitectura evaluados para el lanzamiento **`FoodCore ERP v5.8.0-GA`**. Cada riesgo listado cuenta con controles compensatorios obligatorios, condiciones de revocacion automatica y criterios de verificacion previos a produccion.
 
 ---
 
-## Matriz de Riesgos Aceptados (`v5.7.1-GA`)
+## Matriz de Riesgos Aceptados (`v5.8.0-GA`)
 
 ### R1 (`R-KDS-TLS-01`) — Canal Interno KDS TCP `9090` sin TLS en LAN Aislada
 - **Estado:** Aceptado condicionalmente para despliegue LAN cableada aislada (`v5.7.1-GA`)
@@ -39,7 +39,7 @@
   - `scripts/package-release.ps1`, `scripts/build-deb.sh` y `pom.xml` **excluyen** el certificado de laboratorio `foodcore.cer` y `seed_full_operational.sql` de los artefactos de distribucion de produccion.
   - `.gitignore` bloquea nuevos archivos `*.cer`, `*.jks`, `*.p12` y `*.keystore`.
   - `ApiServer` exige `FOODCORE_KEYSTORE_PASS` (>= 8 caracteres, fail-fast) y soporta `FOODCORE_KEYSTORE_PATH` / `FOODCORE_CERT_PATH` propios por sede, documentados en `keystore.jks.example`.
-  - **Obligatorio:** Cada restaurante debe generar su propio par de claves y certificado (`keytool`) con SAN correspondiente a su IP/hostname LAN antes de distribuir `foodcore.cer` a las tablets PWA.
+  - **Obligatorio:** Cada restaurante debe generar su propio par de claves y certificado ejecutando `scripts/init-client-keystore.ps1` (con SAN correspondiente a su IP/hostname LAN) antes de distribuir `foodcore.cer` a las tablets PWA.
 - **Condicion de revocacion:** Desplegar el certificado de laboratorio (`CN=localhost`) en produccion revoca esta aceptacion.
 
 ---
@@ -82,15 +82,15 @@ stat -c "%a %U:%G %n" scripts backups
 
 ---
 
-## Bloque de Aprobacion Formal y Firma (`v5.7.1-GA`)
+## Bloque de Aprobacion Formal y Firma (`v5.8.0-GA`)
 
 | Campo | Detalle |
 |---|---|
-| **Version cubierta** | `FoodCore ERP v5.7.1-GA` |
+| **Version cubierta** | `FoodCore ERP v5.8.0-GA` |
 | **Riesgos cubiertos** | `R1 (R-KDS-TLS-01)`, `R2 (R-BACKUP-ENC-02)`, `R4 (R-TLS-LABCERT-04)`, `R5 (R-TUNNEL-PUBMENU-05)` |
-| **Fecha de evaluacion** | `2026-11-18` |
-| **Proxima revision obligatoria** | `2027-02-18` (90 dias o ante cambio de arquitectura de red) |
-| **Estado de firma** | `[ ] PENDIENTE DE FIRMA` / `[ ] APROBADO` |
+| **Fecha de evaluacion** | `2026-11-19` |
+| **Proxima revision obligatoria** | `2027-02-19` (90 dias o ante cambio de arquitectura de red) |
+| **Estado de firma** | `[X] PENDIENTE DE FIRMA DEL CLIENTE` / `[ ] APROBADO` |
 
 ### Firmas de Aceptacion Requeridas para Go-Live
 

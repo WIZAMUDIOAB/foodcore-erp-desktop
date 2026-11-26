@@ -14,17 +14,18 @@ import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Usuario;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.offline.LocalDatabaseManager;
 import com.foodcore.offline.OfflineCryptoService;
 import com.foodcore.offline.SyncWorker;
 import com.foodcore.security.SesionManager;
 import com.foodcore.service.AuthService;
-import com.foodcore.service.PedidoService;
-import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
-import com.google.gson.JsonObject;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -367,8 +368,8 @@ class HardeningOfflineAndUiTest {
                 ctrl.stopTimers();
 
                 // Emitir un mensaje tras stopTimers(): no debe llegar a ningún listener retenido
-                JsonObject msg = new JsonObject();
-                msg.addProperty("evento", "TEST_CLEANUP");
+                ObjectNode msg = JsonMapperProvider.getMapper().createObjectNode();
+                msg.put("evento", "TEST_CLEANUP");
                 ServidorSockets.getInstance().emitirMensaje(msg);
                 assertEquals(0, recibidos.get(), "Tras stopTimers() no debe quedar listener activo en ServidorSockets");
             } catch (Exception ex) {
@@ -386,19 +387,19 @@ class HardeningOfflineAndUiTest {
         List<DetalleVenta> items = List.of(d1, d2);
         BigDecimal total = new BigDecimal("100.00");
 
-        List<VentaService.PagoSplit> split2 = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> split2 = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_2, total, items);
         assertEquals(2, split2.size());
         assertEquals(new BigDecimal("50.00"), split2.get(0).monto());
         assertEquals(new BigDecimal("50.00"), split2.get(1).monto());
 
-        List<VentaService.PagoSplit> split4 = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> split4 = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_4, new BigDecimal("100.01"), items);
         assertEquals(4, split4.size(), "Modalidad 4 partes debe producir 4 pagos");
-        BigDecimal suma4 = split4.stream().map(VentaService.PagoSplit::monto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal suma4 = split4.stream().map(PagoSplit::monto).reduce(BigDecimal.ZERO, BigDecimal::add);
         assertEquals(new BigDecimal("100.01"), suma4, "La suma del split de 4 partes debe ser exacta al centavo");
 
-        List<VentaService.PagoSplit> splitItems = VentaController.construirPagosPorModalidad(
+        List<PagoSplit> splitItems = VentaController.construirPagosPorModalidad(
                 VentaController.MODALIDAD_SPLIT_ITEMS, total, items);
         assertEquals(2, splitItems.size());
         assertEquals(new BigDecimal("60.00"), splitItems.get(0).monto(), "Subcuenta A debe reflejar ítem 1 (60.00)");
@@ -419,7 +420,7 @@ class HardeningOfflineAndUiTest {
                 assertFalse(ctrl.isAtajoTecladoRegistrado(), "stopTimeline() debe remover el filtro KeyEvent");
 
                 // Inyectar PedidoService que falla siempre -> NO debe mostrar "Comanda Enviada"
-                ctrl.setPedidoService(new PedidoService() {
+                ctrl.setPedidoService(new PedidoServiceImpl() {
                     @Override
                     public Pedido registrarPedidoYEnviarComanda(Pedido pedido, List<DetallePedido> detalles)
                             throws SQLException {
@@ -429,17 +430,26 @@ class HardeningOfflineAndUiTest {
                 DetalleVenta itemPrueba = new DetalleVenta(0, 0, 1, 1, new BigDecimal("25.00"), new BigDecimal("25.00"));
                 itemPrueba.setNombreProducto("Lomo Saltado");
                 ctrl.getItemsVenta().setAll(itemPrueba);
-                ctrl.handleEnviarComanda(null);
+                com.foodcore.model.Usuario sesionPrev = com.foodcore.service.AuthService.getUsuarioSesionActual();
+                com.foodcore.model.Usuario usrTest = new com.foodcore.model.Usuario();
+                usrTest.setIdUsuario(1);
+                com.foodcore.service.AuthService.setUsuarioSesionActual(usrTest);
+                try {
+                    ctrl.handleEnviarComanda(null);
+                } finally {
+                    com.foodcore.service.AuthService.setUsuarioSesionActual(sesionPrev);
+                }
                 ctrlRef.set(ctrl);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
         });
 
-        long deadline = System.currentTimeMillis() + 5000L;
-        while (ctrlRef.get().getUltimaAlertaTitulo() == null && System.currentTimeMillis() < deadline) {
-            Thread.sleep(50);
-        }
+        JavaFxTestSupport.awaitCondition(
+                () -> ctrlRef.get().getUltimaAlertaTitulo() != null,
+                5L,
+                "Debe mostrar alerta de error al fallar el envío de comanda"
+        );
         assertEquals("Error al Enviar Comanda", ctrlRef.get().getUltimaAlertaTitulo(),
                 "Si registrarPedidoYEnviarComanda falla, debe mostrar error y nunca 'Comanda Enviada'");
         assertNull(ctrlRef.get().getPedidoActivoId(), "No debe asignar pedidoActivoId cuando falla el envío");
@@ -556,10 +566,13 @@ class HardeningOfflineAndUiTest {
         String srcUsuarios = Files.readString(
                 Path.of("src", "main", "java", "com", "foodcore", "controller", "UsuariosController.java"),
                 StandardCharsets.UTF_8);
-        assertFalse(srcUsuarios.contains("Temporal#2026!"),
-                "UsuariosController no debe contener contraseña fallback hardcodeada");
-        assertTrue(srcUsuarios.contains("SET pin = NULL, pin_hash = ?"),
-                "actualizarPinUsuario debe limpiar la columna pin y guardar solo pin_hash");
+        String srcUsuarioService = Files.readString(
+                Path.of("src", "main", "java", "com", "foodcore", "service", "UsuarioGestionService.java"),
+                StandardCharsets.UTF_8);
+        assertFalse(srcUsuarios.contains("Temporal#2026!") || srcUsuarioService.contains("Temporal#2026!"),
+                "UsuariosController y UsuarioGestionService no deben contener contraseña fallback hardcodeada");
+        assertTrue(srcUsuarioService.contains("SET pin = NULL, pin_hash = ?"),
+                "actualizarPinUsuario en UsuarioGestionService debe limpiar la columna pin y guardar solo pin_hash");
 
         // 6. PasswordChangeDialogController: sin comparación directa en texto plano
         String srcPassDialog = Files.readString(

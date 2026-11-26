@@ -1,14 +1,21 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 public class HistorialPrecio {
+    private static final int ESCALA_PRECIO = 4;
+    private static final int ESCALA_VARIACION = 2;
+    private static final BigDecimal CERO_PRECIO = BigDecimal.ZERO.setScale(ESCALA_PRECIO, RoundingMode.HALF_UP);
+    private static final BigDecimal CIEN = new BigDecimal("100");
+
     private int idHistorial;
     private String tipoEntidad; // PRODUCTO o INSUMO
     private int idEntidad;
     private String nombreEntidad;
-    private double precioAnterior;
-    private double precioNuevo;
+    private BigDecimal precioAnterior = CERO_PRECIO;
+    private BigDecimal precioNuevo = CERO_PRECIO;
     private int idUsuario;
     private String nombreUsuario;
     private String motivo;
@@ -17,11 +24,18 @@ public class HistorialPrecio {
     public HistorialPrecio() {
     }
 
-    public double getVariacionPorcentual() {
-        if (precioAnterior <= 0) {
-            return 0.0;
+    public BigDecimal getVariacionPorcentual() {
+        if (precioAnterior == null || precioAnterior.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(ESCALA_VARIACION, RoundingMode.HALF_UP);
         }
-        return ((precioNuevo - precioAnterior) / precioAnterior) * 100.0;
+        return getPrecioNuevo()
+                .subtract(precioAnterior)
+                .multiply(CIEN)
+                .divide(precioAnterior, ESCALA_VARIACION, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal normalizarPrecio(BigDecimal valor) {
+        return valor != null ? valor.setScale(ESCALA_PRECIO, RoundingMode.HALF_UP) : CERO_PRECIO;
     }
 
     public int getIdHistorial() {
@@ -56,20 +70,20 @@ public class HistorialPrecio {
         this.nombreEntidad = nombreEntidad;
     }
 
-    public double getPrecioAnterior() {
+    public BigDecimal getPrecioAnterior() {
         return precioAnterior;
     }
 
-    public void setPrecioAnterior(double precioAnterior) {
-        this.precioAnterior = precioAnterior;
+    public void setPrecioAnterior(BigDecimal precioAnterior) {
+        this.precioAnterior = normalizarPrecio(precioAnterior);
     }
 
-    public double getPrecioNuevo() {
+    public BigDecimal getPrecioNuevo() {
         return precioNuevo;
     }
 
-    public void setPrecioNuevo(double precioNuevo) {
-        this.precioNuevo = precioNuevo;
+    public void setPrecioNuevo(BigDecimal precioNuevo) {
+        this.precioNuevo = normalizarPrecio(precioNuevo);
     }
 
     public int getIdUsuario() {

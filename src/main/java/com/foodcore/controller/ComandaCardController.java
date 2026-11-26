@@ -1,13 +1,15 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.DetallePedido;
+import com.foodcore.service.PedidoService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
 import com.foodcore.util.UiAsyncExecutor;
-import com.google.gson.JsonObject;
+import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.event.ActionEvent;
@@ -22,7 +24,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
-import java.sql.Connection;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -36,7 +37,7 @@ import java.util.logging.Logger;
  * (<5m verde, 5-10m ámbar, >10m rojo con pulso suave de 1.5s) y botones de 44px
  * según UI-REDESIGN-SPEC-FOODCORE-v1.1 (§7) y SPEC-FOODCORE-v1.0 (§8.5).
  */
-public class ComandaCardController {
+public class ComandaCardController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(ComandaCardController.class.getName());
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
@@ -62,7 +63,15 @@ public class ComandaCardController {
     private Consumer<ComandaCardController> onDespachadoListener;
     private BiConsumer<ComandaCardController, String> onEstadoCambiadoListener;
     private BiConsumer<Integer, Integer> onDragReordenarListener;
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final PedidoService pedidoService;
+
+    public ComandaCardController() {
+        this(AppContainer.getDefault().pedidoService());
+    }
+
+    public ComandaCardController(PedidoService pedidoService) {
+        this.pedidoService = java.util.Objects.requireNonNull(pedidoService, "pedidoService no puede ser nulo");
+    }
 
     public static String determinarColorPorSegundos(long segundos) {
         long min = Math.max(0L, segundos) / 60L;
@@ -278,6 +287,15 @@ public class ComandaCardController {
         return colorUmbral;
     }
 
+    @Override
+    public void detenerRecursos() {
+        stopTimer();
+    }
+
+    public Animation.Status getTimerStatus() {
+        return timer != null ? timer.getStatus() : Animation.Status.STOPPED;
+    }
+
     public void stopTimer() {
         if (timer != null) {
             timer.stop();
@@ -304,8 +322,7 @@ public class ComandaCardController {
         boolean esCombo = componentesCombo != null && !componentesCombo.isEmpty();
         if (esCombo) {
             Label badgeCombo = new Label("COMBO");
-            badgeCombo.setStyle("-fx-background-color: #4F46E5; -fx-text-fill: #FFFFFF; -fx-font-size: 10px; "
-                    + "-fx-font-weight: 800; -fx-padding: 2 7; -fx-background-radius: 6;");
+            badgeCombo.getStyleClass().add("fc-kds-combo-badge");
             itemBox.getChildren().add(badgeCombo);
         }
 
@@ -318,17 +335,15 @@ public class ComandaCardController {
         if (esCombo) {
             VBox boxDesglose = new VBox(3);
             boxDesglose.setMaxWidth(275);
-            boxDesglose.setStyle("-fx-background-color: rgba(255, 255, 255, 0.08); "
-                    + "-fx-border-color: rgba(234, 88, 12, 0.35); -fx-border-radius: 6; -fx-background-radius: 6; "
-                    + "-fx-padding: 6 9;");
+            boxDesglose.getStyleClass().add("fc-kds-combo-box");
             Label lblCabeceraDesglose = new Label("Desglose de empaquetado:");
-            lblCabeceraDesglose.setStyle("-fx-text-fill: #EA580C; -fx-font-size: 11px; -fx-font-weight: 700;");
+            lblCabeceraDesglose.getStyleClass().add("fc-kds-combo-header");
             boxDesglose.getChildren().add(lblCabeceraDesglose);
             for (String comp : componentesCombo) {
                 Label lblComp = new Label("•  " + comp);
                 lblComp.setWrapText(true);
                 lblComp.setMaxWidth(252);
-                lblComp.setStyle("-fx-text-fill: #FAF9F6; -fx-font-size: 12.5px; -fx-font-weight: 600;");
+                lblComp.getStyleClass().add("fc-kds-combo-item");
                 boxDesglose.getChildren().add(lblComp);
             }
             itemBox.getChildren().add(boxDesglose);
@@ -345,6 +360,9 @@ public class ComandaCardController {
     }
 
     private void iniciarTemporizador() {
+        if (timer != null) {
+            timer.stop();
+        }
         actualizarEstiloTiempo();
         timer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             segundosTranscurridos++;
@@ -389,16 +407,7 @@ public class ComandaCardController {
 
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "EN_PREPARACION");
-                        }
-                        if (idPedido > 0) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "EN_PREPARACION");
-                        }
-                    }
-                },
+                () -> pedidoService.marcarItemEnPreparacionKds(idDetallePedido, idPedido),
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado EN_PREPARACION en KDS", ex)
             );
@@ -416,20 +425,12 @@ public class ComandaCardController {
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
                 () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "LISTO");
-                        }
-                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "LISTO");
-                        }
-
-                        JsonObject json = new JsonObject();
-                        json.addProperty("accion", "PLATO_DESPACHADO");
-                        json.addProperty("idPedido", idPedido);
-                        json.addProperty("idDetallePedido", idDetallePedido);
-                        ServidorSockets.getInstance().emitirMensaje(json);
-                    }
+                    pedidoService.marcarItemEstadoYActualizarPedidoKds(idDetallePedido, idPedido, "LISTO");
+                    ObjectNode json = JsonMapperProvider.getMapper().createObjectNode();
+                    json.put("accion", "PLATO_DESPACHADO");
+                    json.put("idPedido", idPedido);
+                    json.put("idDetallePedido", idDetallePedido);
+                    ServidorSockets.getInstance().emitirMensaje(json);
                 },
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado LISTO en KDS", ex)
@@ -451,16 +452,7 @@ public class ComandaCardController {
 
         if (idDetallePedido > 0 || idPedido > 0) {
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        if (idDetallePedido > 0) {
-                            pedidoDAO.actualizarEstadoDetalleCocina(conn, idDetallePedido, "ENTREGADO");
-                        }
-                        if (idPedido > 0 && !pedidoDAO.tieneItemsPendientesCocina(conn, idPedido)) {
-                            pedidoDAO.actualizarEstadoPedido(conn, idPedido, "ENTREGADO");
-                        }
-                    }
-                },
+                () -> pedidoService.marcarItemEstadoYActualizarPedidoKds(idDetallePedido, idPedido, "ENTREGADO"),
                 null,
                 ex -> LOGGER.log(Level.WARNING, "Error actualizando estado ENTREGADO en KDS", ex)
             );

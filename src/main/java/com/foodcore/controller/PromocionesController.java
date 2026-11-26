@@ -1,9 +1,13 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.Promocion;
 import com.foodcore.service.PromocionService;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
+import com.foodcore.util.ToastService;
+import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -11,6 +15,7 @@ import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
@@ -25,12 +30,14 @@ import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.List;
-import java.util.Optional;
 
-public class PromocionesController {
+public class PromocionesController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(PromocionesController.class.getName());
 
@@ -54,15 +61,32 @@ public class PromocionesController {
     @FXML private TableColumn<Promocion, String> colEstado;
     @FXML private TableColumn<Promocion, Void> colAcciones;
 
-    private final PromocionService promocionService = new PromocionService();
+    private final PromocionService promocionService;
     private final ObservableList<Promocion> masterData = FXCollections.observableArrayList();
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicLong cargaSeq = new AtomicLong(0L);
+    private final AtomicBoolean mutacionEnCurso = new AtomicBoolean(false);
     private FilteredList<Promocion> filteredData;
+
+    public PromocionesController() {
+        this(AppContainer.getDefault().resolve(PromocionService.class));
+    }
+
+    public PromocionesController(PromocionService promocionService) {
+        this.promocionService = Objects.requireNonNull(promocionService, "promocionService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         configurarColumnas();
         configurarFiltros();
         cargarDatos();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
     }
 
     private void configurarColumnas() {
@@ -84,12 +108,14 @@ public class PromocionesController {
                 } else {
                     Label badge = new Label(item);
                     badge.getStyleClass().add("badge-pill-accent");
+                    badge.getStyleClass().removeAll(
+                            "fc-promo-badge-combo", "fc-promo-badge-pct", "fc-promo-badge-fixed");
                     if (item.contains("2x1") || item.contains("3x2")) {
-                        badge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-combo");
                     } else if (item.contains("%")) {
-                        badge.setStyle("-fx-background-color: #ECFDF5; -fx-text-fill: #059669; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-pct");
                     } else {
-                        badge.setStyle("-fx-background-color: #F7F5F1; -fx-text-fill: #EA580C; -fx-font-weight: 700;");
+                        badge.getStyleClass().add("fc-promo-badge-fixed");
                     }
                     HBox box = new HBox(badge);
                     box.setAlignment(Pos.CENTER_LEFT);
@@ -177,7 +203,7 @@ public class PromocionesController {
                     btnToggle.setText(p.isActivo() ? "Desactivar" : "Activar");
                     btnToggle.getStyleClass().clear();
                     btnToggle.getStyleClass().add(p.isActivo() ? "btn-secondary" : "btn-primary");
-                    btnToggle.setOnAction(e -> toggleEstado(p));
+                    btnToggle.setOnAction(e -> toggleEstado(p, btnToggle));
                     setGraphic(pane);
                 }
             }
@@ -200,17 +226,31 @@ public class PromocionesController {
     }
 
     public void cargarDatos() {
-        masterData.clear();
-        List<Promocion> lista = promocionService.listarTodas();
-
-        if (lista.isEmpty()) {
-            poblarPromocionesDemo();
-        } else {
-            masterData.addAll(lista);
-        }
-
-        actualizarMetricas();
-        aplicarFiltros();
+        long seq = cargaSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            promocionService::listarTodas,
+            lista -> {
+                if (!vistaActiva.get() || seq != cargaSeq.get()) {
+                    return;
+                }
+                masterData.clear();
+                if (lista == null || lista.isEmpty()) {
+                    poblarPromocionesDemo();
+                } else {
+                    masterData.addAll(lista);
+                }
+                actualizarMetricas();
+                aplicarFiltros();
+            },
+            ex -> {
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                LOGGER.log(Level.WARNING, "Error al cargar promociones", ex);
+                ToastService.mostrarPorAlertType(
+                        Alert.AlertType.ERROR, "No se pudieron cargar las promociones: " + ex.getMessage());
+            }
+        );
     }
 
     private void poblarPromocionesDemo() {
@@ -224,51 +264,95 @@ public class PromocionesController {
         long total = masterData.size();
         long activas = masterData.stream().filter(Promocion::isActivo).count();
 
-        lblTotalPromos.setText(String.valueOf(total));
-        lblPromosActivas.setText(String.valueOf(activas));
-        lblTipoPopular.setText("2x1 y 20% OFF");
-        lblReglaFidelizacion.setText("S/ 1 = 1 Pto");
+        if (lblTotalPromos != null) {
+            lblTotalPromos.setText(String.valueOf(total));
+        }
+        if (lblPromosActivas != null) {
+            lblPromosActivas.setText(String.valueOf(activas));
+        }
+        if (lblTipoPopular != null) {
+            lblTipoPopular.setText("2x1 y 20% OFF");
+        }
+        if (lblReglaFidelizacion != null) {
+            lblReglaFidelizacion.setText("S/ 1 = 1 Pto");
+        }
     }
 
     private void aplicarFiltros() {
-        String texto = txtBuscar.getText() != null ? txtBuscar.getText().trim().toLowerCase() : "";
-        String filtroTipo = cmbFiltroTipo.getValue();
-        String filtroEstado = cmbFiltroEstado.getValue();
+        String texto = txtBuscar != null && txtBuscar.getText() != null
+                ? txtBuscar.getText().trim().toLowerCase() : "";
+        String filtroTipo = cmbFiltroTipo != null ? cmbFiltroTipo.getValue() : null;
+        String filtroEstado = cmbFiltroEstado != null ? cmbFiltroEstado.getValue() : null;
 
-        filteredData.setPredicate(p -> {
-            boolean coincideTexto = texto.isEmpty()
-                    || p.getCodigo().toLowerCase().contains(texto)
-                    || p.getNombre().toLowerCase().contains(texto)
-                    || (p.getDescripcion() != null && p.getDescripcion().toLowerCase().contains(texto));
+        if (filteredData != null) {
+            filteredData.setPredicate(p -> {
+                boolean coincideTexto = texto.isEmpty()
+                        || p.getCodigo().toLowerCase().contains(texto)
+                        || p.getNombre().toLowerCase().contains(texto)
+                        || (p.getDescripcion() != null && p.getDescripcion().toLowerCase().contains(texto));
 
-            boolean coincideTipo = filtroTipo == null || "Todos los Tipos".equals(filtroTipo)
-                    || ("2x1".equals(filtroTipo) && "DOS_POR_UNO".equalsIgnoreCase(p.getTipoPromocion()))
-                    || ("3x2".equals(filtroTipo) && "TRES_POR_DOS".equalsIgnoreCase(p.getTipoPromocion()))
-                    || ("Porcentaje".equals(filtroTipo) && "PORCENTAJE".equalsIgnoreCase(p.getTipoPromocion()))
-                    || ("Monto Fijo".equals(filtroTipo) && "MONTO_FIJO".equalsIgnoreCase(p.getTipoPromocion()));
+                boolean coincideTipo = filtroTipo == null || "Todos los Tipos".equals(filtroTipo)
+                        || ("2x1".equals(filtroTipo) && "DOS_POR_UNO".equalsIgnoreCase(p.getTipoPromocion()))
+                        || ("3x2".equals(filtroTipo) && "TRES_POR_DOS".equalsIgnoreCase(p.getTipoPromocion()))
+                        || ("Porcentaje".equals(filtroTipo) && "PORCENTAJE".equalsIgnoreCase(p.getTipoPromocion()))
+                        || ("Monto Fijo".equals(filtroTipo) && "MONTO_FIJO".equalsIgnoreCase(p.getTipoPromocion()));
 
-            boolean coincideEstado = filtroEstado == null || "Todos".equals(filtroEstado)
-                    || ("Activas".equals(filtroEstado) && p.isActivo())
-                    || ("Inactivas".equals(filtroEstado) && !p.isActivo());
+                boolean coincideEstado = filtroEstado == null || "Todos".equals(filtroEstado)
+                        || ("Activas".equals(filtroEstado) && p.isActivo())
+                        || ("Inactivas".equals(filtroEstado) && !p.isActivo());
 
-            return coincideTexto && coincideTipo && coincideEstado;
-        });
-
-        lblConteoRegistros.setText("Mostrando " + filteredData.size() + " de " + masterData.size() + " promociones");
+                return coincideTexto && coincideTipo && coincideEstado;
+            });
+            if (lblConteoRegistros != null) {
+                lblConteoRegistros.setText("Mostrando " + filteredData.size() + " de " + masterData.size() + " promociones");
+            }
+        }
     }
 
-    private void toggleEstado(Promocion p) {
-        boolean nuevo = !p.isActivo();
-        try {
-            promocionService.cambiarEstado(p.getIdPromocion(), nuevo);
-            p.setActivo(nuevo);
-            tblPromociones.refresh();
-            actualizarMetricas();
-        } catch (Exception e) {
-            p.setActivo(nuevo);
-            tblPromociones.refresh();
-            actualizarMetricas();
+    void toggleEstadoPromocion(Promocion p, Button trigger) {
+        toggleEstado(p, trigger);
+    }
+
+    private void toggleEstado(Promocion p, Button trigger) {
+        if (p == null) {
+            return;
         }
+        if (!mutacionEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        int idPromocion = p.getIdPromocion();
+        boolean nuevo = !p.isActivo();
+        if (trigger != null) {
+            trigger.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> promocionService.cambiarEstado(idPromocion, nuevo),
+            () -> {
+                mutacionEnCurso.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                p.setActivo(nuevo);
+                if (tblPromociones != null) {
+                    tblPromociones.refresh();
+                }
+                actualizarMetricas();
+                aplicarFiltros();
+            },
+            ex -> {
+                mutacionEnCurso.set(false);
+                if (trigger != null) {
+                    trigger.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error al cambiar estado de promoción", ex);
+                ToastService.mostrarPorAlertType(
+                        Alert.AlertType.ERROR, "Error al actualizar promoción: " + ex.getMessage());
+            }
+        );
     }
 
     @FXML
@@ -320,13 +404,15 @@ public class PromocionesController {
                 nueva.setTipoPromocion(rawTipo);
                 try {
                     nueva.setValorDescuento(new BigDecimal(txtValor.getText().trim()));
-                } catch (Exception ignored) {
+                } catch (NumberFormatException ex) {
+                    LOGGER.log(Level.FINE, "Valor de descuento no numérico, usando 0.00", ex);
                     nueva.setValorDescuento(BigDecimal.ZERO);
                 }
                 nueva.setAplicaA(cmbAplica.getValue());
                 try {
                     nueva.setMontoMinimo(new BigDecimal(txtMinimo.getText().trim()));
-                } catch (Exception ignored) {
+                } catch (NumberFormatException ex) {
+                    LOGGER.log(Level.FINE, "Monto mínimo no numérico, usando 0.00", ex);
                     nueva.setMontoMinimo(BigDecimal.ZERO);
                 }
                 nueva.setDiasSemana("LUN,MAR,MIE,JUE,VIE,SAB,DOM");
@@ -338,12 +424,46 @@ public class PromocionesController {
 
         Optional<Promocion> res = dialog.showAndWait();
         res.ifPresent(p -> {
-            try {
-                promocionService.crearPromocion(p);
-            } catch (Exception ex) { LOGGER.log(Level.WARNING, "Error al crear promocion: {0}", ex.getMessage()); }
-            masterData.add(p);
-            actualizarMetricas();
-            aplicarFiltros();
+            if (!mutacionEnCurso.compareAndSet(false, true)) {
+                return;
+            }
+            UiAsyncExecutor.ejecutarAsync(
+                () -> promocionService.crearPromocion(p),
+                idCreado -> {
+                    mutacionEnCurso.set(false);
+                    if (!vistaActiva.get()) {
+                        return;
+                    }
+                    if (idCreado != null && idCreado > 0) {
+                        p.setIdPromocion(idCreado);
+                    }
+                    masterData.add(p);
+                    actualizarMetricas();
+                    aplicarFiltros();
+                },
+                ex -> {
+                    mutacionEnCurso.set(false);
+                    LOGGER.log(Level.WARNING, "Error al crear promocion: {0}", ex.getMessage());
+                    ToastService.mostrarPorAlertType(
+                            Alert.AlertType.ERROR, "No se pudo crear la promoción: " + ex.getMessage());
+                }
+            );
         });
+    }
+
+    public TableView<Promocion> getTblPromociones() {
+        return tblPromociones;
+    }
+
+    public Label getLblTotalPromos() {
+        return lblTotalPromos;
+    }
+
+    public Label getLblPromosActivas() {
+        return lblPromosActivas;
+    }
+
+    public Label getLblConteoRegistros() {
+        return lblConteoRegistros;
     }
 }

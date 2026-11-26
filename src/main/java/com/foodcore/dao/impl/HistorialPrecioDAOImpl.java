@@ -3,6 +3,8 @@ package com.foodcore.dao.impl;
 import com.foodcore.dao.HistorialPrecioDAO;
 import com.foodcore.model.HistorialPrecio;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -68,8 +70,8 @@ public class HistorialPrecioDAOImpl implements HistorialPrecioDAO {
             ps.setString(1, historial.getTipoEntidad());
             ps.setInt(2, historial.getIdEntidad());
             ps.setString(3, historial.getNombreEntidad());
-            ps.setDouble(4, historial.getPrecioAnterior());
-            ps.setDouble(5, historial.getPrecioNuevo());
+            ps.setBigDecimal(4, normalizarPrecio(historial.getPrecioAnterior()));
+            ps.setBigDecimal(5, normalizarPrecio(historial.getPrecioNuevo()));
             ps.setInt(6, historial.getIdUsuario());
             ps.setString(7, historial.getNombreUsuario());
             ps.setString(8, historial.getMotivo());
@@ -85,20 +87,20 @@ public class HistorialPrecioDAOImpl implements HistorialPrecioDAO {
     }
 
     @Override
-    public double obtenerPrecioPromedioInsumo(Connection conn, int idInsumo) throws SQLException {
+    public BigDecimal obtenerPrecioPromedioInsumo(Connection conn, int idInsumo) throws SQLException {
         String sql = "SELECT AVG(precio_nuevo) FROM historial_precios WHERE tipo_entidad = 'INSUMO' AND id_entidad = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idInsumo);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    double prom = rs.getDouble(1);
-                    if (!rs.wasNull()) {
-                        return prom;
+                    BigDecimal prom = rs.getBigDecimal(1);
+                    if (prom != null) {
+                        return prom.setScale(4, RoundingMode.HALF_UP);
                     }
                 }
             }
         }
-        return 0.0;
+        return BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 
     private HistorialPrecio mapearHistorial(ResultSet rs) throws SQLException {
@@ -107,8 +109,8 @@ public class HistorialPrecioDAOImpl implements HistorialPrecioDAO {
         h.setTipoEntidad(rs.getString("tipo_entidad"));
         h.setIdEntidad(rs.getInt("id_entidad"));
         h.setNombreEntidad(rs.getString("nombre_entidad"));
-        h.setPrecioAnterior(rs.getDouble("precio_anterior"));
-        h.setPrecioNuevo(rs.getDouble("precio_nuevo"));
+        h.setPrecioAnterior(leerPrecio(rs, "precio_anterior"));
+        h.setPrecioNuevo(leerPrecio(rs, "precio_nuevo"));
         h.setIdUsuario(rs.getInt("id_usuario"));
         h.setNombreUsuario(rs.getString("nombre_usuario"));
         h.setMotivo(rs.getString("motivo"));
@@ -116,5 +118,15 @@ public class HistorialPrecioDAOImpl implements HistorialPrecioDAO {
             h.setFechaCambio(rs.getTimestamp("fecha_cambio").toLocalDateTime());
         }
         return h;
+    }
+
+    private static BigDecimal normalizarPrecio(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal leerPrecio(ResultSet rs, String columna) throws SQLException {
+        return normalizarPrecio(rs.getBigDecimal(columna));
     }
 }

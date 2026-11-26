@@ -3,6 +3,8 @@ package com.foodcore.dao.impl;
 import com.foodcore.dao.ProveedorDAO;
 import com.foodcore.model.Proveedor;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -157,8 +159,15 @@ public class ProveedorDAOImpl implements ProveedorDAO {
         if (rs.getTimestamp("fecha_registro") != null) {
             p.setFechaRegistro(rs.getTimestamp("fecha_registro").toLocalDateTime());
         }
-        p.setDeudaActual(rs.getDouble("deuda_actual"));
+        p.setDeudaActual(leerMoneda(rs, "deuda_actual"));
         p.setFacturasPendientes(rs.getInt("facturas_pendientes"));
         return p;
+    }
+
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        BigDecimal valor = rs.getBigDecimal(columna);
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 }

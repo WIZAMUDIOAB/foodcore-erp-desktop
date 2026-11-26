@@ -4,12 +4,9 @@ import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.CompraDAO;
-import com.foodcore.dao.impl.CompraDAOImpl;
-import com.foodcore.model.Compra;
 import com.foodcore.service.ExportacionContableService;
+import com.foodcore.service.ExportacionContableService.PeriodoContableResumen;
 import com.foodcore.service.ExportacionContableService.VentaRegistroSunat;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.PaginadorTablaHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -26,11 +23,9 @@ import javafx.scene.control.TableView;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -72,7 +67,6 @@ public class ReportesContablesController {
     @FXML private TableColumn<VentaRegistroSunat, String> colEstado;
 
     private final ExportacionContableService exportacionService = new ExportacionContableService();
-    private final CompraDAO compraDAO = new CompraDAOImpl();
     private final ObservableList<VentaRegistroSunat> listaVentas = FXCollections.observableArrayList();
     private PaginadorTablaHelper<VentaRegistroSunat> paginadorVentas;
 
@@ -95,9 +89,9 @@ public class ReportesContablesController {
         colFecha.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().fechaEmision));
         colComprobante.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().serie + "-" + String.format("%08d", d.getValue().idVenta)));
         colCliente.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().nombreCliente));
-        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().subtotal)));
-        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().igv)));
-        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", d.getValue().total)));
+        colBaseImponible.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().subtotal))));
+        colIgv.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().igv))));
+        colTotal.setCellValueFactory(d -> new SimpleStringProperty(String.format(Locale.US, "S/ %,.2f", normalizarMoneda(d.getValue().total))));
         colMedioPago.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().medioPago));
         colEstado.setCellValueFactory(d -> new SimpleStringProperty("1".equals(d.getValue().estado) ? "VÁLIDO" : "ANULADO"));
         tblVentasSunat.setItems(listaVentas);
@@ -148,61 +142,15 @@ public class ReportesContablesController {
     public void cargarDatosPeriodoSincrono() {
         LocalDate ini = dpInicio.getValue() != null ? dpInicio.getValue() : LocalDate.now().withDayOfMonth(1);
         LocalDate fin = dpFin.getValue() != null ? dpFin.getValue() : LocalDate.now();
-        ResultadoPeriodoContable resultado = consultarDatosPeriodo(ini, fin);
+        PeriodoContableResumen resultado = consultarDatosPeriodo(ini, fin);
         aplicarResultadoPeriodo(resultado, ini, fin);
     }
 
-    private ResultadoPeriodoContable consultarDatosPeriodo(LocalDate ini, LocalDate fin) {
-        List<VentaRegistroSunat> ventas = new java.util.ArrayList<>();
-        double sumTotal = 0.0;
-        double sumBase = 0.0;
-        double sumIgv = 0.0;
-        double sumCompras = 0.0;
-
-        try (Connection conn = ConexionBD.getConnection()) {
-            String sqlVentas = "SELECT v.*, p.cliente_nombre "
-                    + "FROM venta v "
-                    + "LEFT JOIN pedido p ON v.id_pedido = p.id_pedido "
-                    + "WHERE DATE(v.fecha_hora) BETWEEN ? AND ? "
-                    + "ORDER BY v.fecha_hora DESC";
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlVentas)) {
-                ps.setDate(1, Date.valueOf(ini));
-                ps.setDate(2, Date.valueOf(fin));
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        VentaRegistroSunat r = new VentaRegistroSunat();
-                        r.idVenta = rs.getInt("id_venta");
-                        r.fechaEmision = rs.getTimestamp("fecha_hora").toLocalDateTime().toLocalDate().toString();
-                        r.serie = "B001";
-                        String cli = rs.getString("cliente_nombre");
-                        r.nombreCliente = (cli != null && !cli.isBlank()) ? cli : "CLIENTES VARIOS";
-                        r.subtotal = rs.getDouble("subtotal");
-                        r.igv = rs.getDouble("igv");
-                        r.total = rs.getDouble("total");
-                        r.medioPago = rs.getString("metodo_pago");
-                        r.estado = "COMPLETADA".equalsIgnoreCase(rs.getString("estado")) ? "1" : "2";
-
-                        ventas.add(r);
-                        sumTotal += r.total;
-                        sumBase += r.subtotal;
-                        sumIgv += r.igv;
-                    }
-                }
-            }
-
-            List<Compra> compras = compraDAO.listarPorRangoFecha(conn, ini, fin);
-            for (Compra c : compras) {
-                sumCompras += c.getTotal();
-            }
-        } catch (java.sql.SQLException | RuntimeException ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
-        }
-
-        return new ResultadoPeriodoContable(ventas, sumTotal, sumBase, sumIgv, sumCompras);
+    private PeriodoContableResumen consultarDatosPeriodo(LocalDate ini, LocalDate fin) {
+        return exportacionService.consultarResumenPeriodoContable(ini, fin);
     }
 
-    private void aplicarResultadoPeriodo(ResultadoPeriodoContable res, LocalDate ini, LocalDate fin) {
+    private void aplicarResultadoPeriodo(PeriodoContableResumen res, LocalDate ini, LocalDate fin) {
         if (paginadorVentas != null) {
             paginadorVentas.setDatos(res.ventas());
         } else {
@@ -242,25 +190,28 @@ public class ReportesContablesController {
      * @param ventas Lista completa de ventas a paginar.
      */
     public void cargarVentasDirectoParaPaginacion(List<VentaRegistroSunat> ventas) {
-        double sumTotal = 0.0;
-        double sumBase = 0.0;
-        double sumIgv = 0.0;
+        BigDecimal sumTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumBase = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumIgv = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         if (ventas != null) {
             for (VentaRegistroSunat v : ventas) {
-                sumTotal += v.total;
-                sumBase += v.subtotal;
-                sumIgv += v.igv;
+                sumTotal = sumTotal.add(normalizarMoneda(v.total)).setScale(2, RoundingMode.HALF_UP);
+                sumBase = sumBase.add(normalizarMoneda(v.subtotal)).setScale(2, RoundingMode.HALF_UP);
+                sumIgv = sumIgv.add(normalizarMoneda(v.igv)).setScale(2, RoundingMode.HALF_UP);
             }
         }
         LocalDate hoy = LocalDate.now();
         aplicarResultadoPeriodo(
-                new ResultadoPeriodoContable(ventas != null ? ventas : List.of(), sumTotal, sumBase, sumIgv, 0.0),
+                new PeriodoContableResumen(ventas != null ? ventas : List.of(),
+                        sumTotal, sumBase, sumIgv, BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)),
                 hoy.withDayOfMonth(1),
                 hoy);
     }
 
-    private record ResultadoPeriodoContable(
-            List<VentaRegistroSunat> ventas, double sumTotal, double sumBase, double sumIgv, double sumCompras) {
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 
     @FXML

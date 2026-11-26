@@ -143,7 +143,9 @@ public class MermaDAOImpl implements MermaDAO {
     public Map<String, BigDecimal> obtenerMermasPorMes(Connection conn, int anio) throws SQLException {
         Map<String, BigDecimal> mapa = new LinkedHashMap<>();
         String[] meses = {"Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"};
-        for (String m : meses) mapa.put(m, BigDecimal.ZERO);
+        for (String m : meses) {
+            mapa.put(m, BigDecimal.ZERO);
+        }
 
         String sql = "SELECT MONTH(fecha_hora) AS mes, COALESCE(SUM(costo_total), 0) AS total "
                 + "FROM merma WHERE YEAR(fecha_hora) = ? GROUP BY MONTH(fecha_hora) ORDER BY mes ASC";
@@ -205,10 +207,42 @@ public class MermaDAOImpl implements MermaDAO {
             ps.setInt(2, anio);
             ps.setInt(3, mes);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
         }
         return 0;
+    }
+
+    @Override
+    public List<Merma> listarMovimientosMermaRecientes(Connection conn, int limite) throws SQLException {
+        String sql = "SELECT k.created_at, i.nombre AS insumo_nombre, i.unidad_medida, "
+                + "k.cantidad, k.saldo_posterior, k.observacion "
+                + "FROM kardex_movimiento k JOIN insumo i ON k.id_insumo = i.id_insumo "
+                + "WHERE k.tipo_movimiento LIKE 'MERMA%' ORDER BY k.id_kardex DESC LIMIT ?";
+        List<Merma> lista = new ArrayList<>();
+        int lim = limite > 0 ? limite : 100;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, lim);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Merma m = new Merma();
+                    m.setNombreInsumo(rs.getString("insumo_nombre"));
+                    m.setUnidadMedida(rs.getString("unidad_medida"));
+                    m.setCantidad(rs.getBigDecimal("cantidad"));
+                    m.setObservacion(rs.getString("observacion"));
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    if (ts != null) {
+                        m.setFechaHora(ts.toLocalDateTime());
+                    }
+                    // {@code saldo_posterior} no existe en el modelo {@link Merma}: se conserva la
+                    // observación del movimiento de Kárdex y la cantidad como magnitud de la merma.
+                    lista.add(m);
+                }
+            }
+        }
+        return lista;
     }
 
     private Merma mapearMerma(ResultSet rs) throws SQLException {
@@ -225,7 +259,9 @@ public class MermaDAOImpl implements MermaDAO {
         m.setCostoTotal(rs.getBigDecimal("costo_total"));
         m.setObservacion(rs.getString("observacion"));
         Timestamp ts = rs.getTimestamp("fecha_hora");
-        if (ts != null) m.setFechaHora(ts.toLocalDateTime());
+        if (ts != null) {
+            m.setFechaHora(ts.toLocalDateTime());
+        }
         return m;
     }
 }

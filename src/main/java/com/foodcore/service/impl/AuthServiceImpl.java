@@ -32,17 +32,20 @@ import java.util.Set;
  * Contiene la lógica real de login, aislamiento de sesión Desktop/API, bloqueo atómico por fuerza bruta,
  * autenticación PIN endurecida, cambio obligatorio de contraseña y marcación de asistencia.
  */
-public class AuthServiceImpl extends AuthService {
+public class AuthServiceImpl implements AuthService {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
     private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+    private final UsuarioDAO usuarioDAO;
+    private final EncriptadorPassword encriptador;
 
     public AuthServiceImpl() {
-        super(new UsuarioDAOImpl(), new EncriptadorPassword());
+        this(new UsuarioDAOImpl(), new EncriptadorPassword());
     }
 
     public AuthServiceImpl(UsuarioDAO usuarioDAO, EncriptadorPassword encriptador) {
-        super(usuarioDAO, encriptador);
+        this.usuarioDAO = usuarioDAO;
+        this.encriptador = encriptador;
     }
 
     @Override
@@ -156,6 +159,7 @@ public class AuthServiceImpl extends AuthService {
         return encontrado;
     }
 
+    @Override
     public Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String username, String pin)
             throws SQLException {
         Optional<Usuario> encontrado = autenticarPorPinStateless(conn, idUsuario, username, pin);
@@ -290,12 +294,7 @@ public class AuthServiceImpl extends AuthService {
         try (Connection conn = ConexionBD.getConnection()) {
             String nuevoHash = encriptador.hashear(nuevoPassword.trim());
             usuarioDAO.actualizarPasswordObligatorio(conn, idUsuario, nuevoHash);
-            Usuario actual = getUsuarioSesionActual();
-            if (actual != null && actual.getIdUsuario() == idUsuario) {
-                actual.setCambioPasswordRequerido(false);
-                actual.setPasswordHash(nuevoHash);
-            }
-            SesionManager.completarCambioPassword();
+            SesionManager.completarCambioPassword(idUsuario, nuevoHash);
         }
     }
 
@@ -345,7 +344,6 @@ public class AuthServiceImpl extends AuthService {
                 "POS-01",
                 ahora
         );
-        SesionManager.iniciarSesion(sesion, usuario.isCambioPasswordRequerido());
-        setUsuarioSesionActual(usuario);
+        SesionManager.iniciarSesion(sesion, usuario, usuario.isCambioPasswordRequerido());
     }
 }

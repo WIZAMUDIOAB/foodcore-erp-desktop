@@ -227,7 +227,7 @@ public class PromocionService {
         public ResultadoEvaluacion(BigDecimal descuentoTotal, BigDecimal totalFinal, List<String> promocionesAplicadas) {
             this.descuentoTotal = descuentoTotal;
             this.totalFinal = totalFinal;
-            this.promocionesAplicadas = promocionesAplicadas;
+            this.promocionesAplicadas = promocionesAplicadas != null ? List.copyOf(promocionesAplicadas) : List.of();
         }
 
         public BigDecimal getDescuentoTotal() {
@@ -265,7 +265,9 @@ public class PromocionService {
             for (com.foodcore.model.Producto p : dao.listarTodos(conn)) {
                 map.put(p.getIdProducto(), p.getIdCategoria());
             }
-        } catch (SQLException | RuntimeException ignored) {}
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Usando categorías base de respaldo al cargar mapa producto-categoría", ex);
+        }
         return map;
     }
 

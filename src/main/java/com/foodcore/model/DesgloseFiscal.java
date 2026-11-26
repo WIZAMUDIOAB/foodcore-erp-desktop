@@ -128,8 +128,12 @@ public final class DesgloseFiscal {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof DesgloseFiscal that)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DesgloseFiscal that)) {
+            return false;
+        }
         return subtotalGravado.compareTo(that.subtotalGravado) == 0
             && igv.compareTo(that.igv) == 0
             && total.compareTo(that.total) == 0;

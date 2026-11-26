@@ -2,7 +2,7 @@ package com.foodcore.api.security;
 
 import com.foodcore.dao.AuditoriaDAO;
 import com.foodcore.dao.UsuarioDAO;
-import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.util.ConexionBD;
 

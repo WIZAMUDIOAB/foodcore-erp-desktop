@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class ProductoDAOImpl implements ProductoDAO {
 
@@ -258,5 +259,19 @@ public class ProductoDAOImpl implements ProductoDAO {
         }
         p.setNombreCategoria(rs.getString("nombre_cat"));
         return p;
+    }
+
+    @Override
+    public Optional<String> obtenerImagenUrlPorId(Connection conn, int idProducto) throws SQLException {
+        String sql = "SELECT imagen_url FROM producto WHERE id_producto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idProducto);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.ofNullable(rs.getString("imagen_url"));
+                }
+            }
+        }
+        return Optional.empty();
     }
 }

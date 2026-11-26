@@ -1,5 +1,7 @@
 package com.foodcore.controller;
 
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.model.Asistencia;
 import com.foodcore.model.SolicitudAusencia;
 import com.foodcore.model.TurnoProgramado;
@@ -9,10 +11,11 @@ import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AusenciasVacacionesService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.HorariosService;
-import com.foodcore.service.impl.AusenciasVacacionesServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
+import com.foodcore.util.ToastService;
+import com.foodcore.util.UiAsyncExecutor;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
@@ -58,7 +61,10 @@ import java.time.format.TextStyle;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -66,10 +72,20 @@ import java.util.stream.Collectors;
 /**
  * Controlador del Portal del Empleado ("Mi Horario", "Mis Asistencias", "Mis Boletas") según FoodCore v4.4.0 (§4).
  */
-public class MiHorarioController {
+public class MiHorarioController implements LifecycleAwareController {
 
     private static final Logger LOGGER = Logger.getLogger(MiHorarioController.class.getName());
     private static final Locale LOCALE_ES = Locale.forLanguageTag("es-PE");
+
+    private record DatosEmpleadoPortal(
+            List<TurnoProgramado> turnos,
+            List<Asistencia> asistencias) {
+    }
+
+    private record DatosVacacionesPortal(
+            Vacaciones saldo,
+            List<SolicitudAusencia> solicitudes) {
+    }
 
     public record BoletaPago(
             String periodo,
@@ -135,17 +151,37 @@ public class MiHorarioController {
     @FXML private TableColumn<SolicitudAusencia, String> colMisVacMotivo;
     @FXML private TableColumn<SolicitudAusencia, String> colMisVacEstado;
 
-    private final HorariosService horariosService = new HorariosService();
-    private final AsistenciaService asistenciaService = new AsistenciaService();
-    private final AusenciasVacacionesService ausenciasService = new AusenciasVacacionesServiceImpl();
+    private final HorariosService horariosService;
+    private final AsistenciaService asistenciaService;
+    private final AusenciasVacacionesService ausenciasService;
     private final ObservableList<Asistencia> listaAsistencias = FXCollections.observableArrayList();
     private final ObservableList<BoletaPago> listaBoletas = FXCollections.observableArrayList();
     private final ObservableList<SolicitudAusencia> listaMisVacaciones = FXCollections.observableArrayList();
+    private final AtomicBoolean vistaActiva = new AtomicBoolean(true);
+    private final AtomicLong cargaDatosSeq = new AtomicLong(0L);
+    private final AtomicLong cargaVacSeq = new AtomicLong(0L);
+    private final AtomicBoolean solicitarVacEnCurso = new AtomicBoolean(false);
+    private final AtomicBoolean exportarBoletaEnCurso = new AtomicBoolean(false);
+
+    public MiHorarioController() {
+        this(AppContainer.getDefault().resolve(HorariosService.class),
+                AppContainer.getDefault().resolve(AsistenciaService.class),
+                AppContainer.getDefault().ausenciasVacacionesService());
+    }
+
+    public MiHorarioController(HorariosService horariosService,
+                               AsistenciaService asistenciaService,
+                               AusenciasVacacionesService ausenciasService) {
+        this.horariosService = Objects.requireNonNull(horariosService, "horariosService");
+        this.asistenciaService = Objects.requireNonNull(asistenciaService, "asistenciaService");
+        this.ausenciasService = Objects.requireNonNull(ausenciasService, "ausenciasService");
+    }
 
     private static final String[] DIAS_SEMANA = {"LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"};
 
     @FXML
     public void initialize() {
+        vistaActiva.set(true);
         if (btnDescargarBoletaPdf != null) {
             AnimationUtils.attachTactileFeedback(btnDescargarBoletaPdf);
         }
@@ -153,6 +189,11 @@ public class MiHorarioController {
         configurarTablaBoletas();
         configurarVacacionesPortal();
         cargarDatosEmpleado();
+    }
+
+    @Override
+    public void detenerRecursos() {
+        vistaActiva.set(false);
     }
 
     private void configurarTablaAsistencias() {
@@ -197,15 +238,16 @@ public class MiHorarioController {
                 if (empty || estado == null) {
                     setText(null);
                     setGraphic(null);
-                    setStyle("");
+                    getStyleClass().removeAll("fc-status-ok", "fc-status-warning", "fc-status-neutral");
                 } else {
                     setText(estado);
+                    getStyleClass().removeAll("fc-status-ok", "fc-status-warning", "fc-status-neutral");
                     if ("PRESENTE".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #E8F6EE; -fx-text-fill: #1F9D55; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-ok");
                     } else if ("TARDE".equalsIgnoreCase(estado)) {
-                        setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #D97706; -fx-alignment: CENTER; -fx-font-weight: bold; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-warning");
                     } else {
-                        setStyle("-fx-background-color: #EEF0F3; -fx-text-fill: #5C6470; -fx-alignment: CENTER; -fx-background-radius: 12;");
+                        getStyleClass().add("fc-status-neutral");
                     }
                 }
             }
@@ -250,8 +292,7 @@ public class MiHorarioController {
             private final Button btnPdf = new Button("PDF");
 
             {
-                btnPdf.getStyleClass().add("btn-secondary");
-                btnPdf.setStyle("-fx-font-size: 11px; -fx-padding: 4 10;");
+                btnPdf.getStyleClass().add("fc-btn-compact");
                 AnimationUtils.attachTactileFeedback(btnPdf);
             }
 
@@ -262,7 +303,7 @@ public class MiHorarioController {
                     setGraphic(null);
                 } else {
                     BoletaPago boleta = getTableRow().getItem();
-                    btnPdf.setOnAction(ev -> exportarBoletaConFeedback(boleta));
+                    btnPdf.setOnAction(ev -> exportarBoletaConFeedback(boleta, btnPdf));
                     setGraphic(btnPdf);
                     setAlignment(Pos.CENTER);
                 }
@@ -279,53 +320,90 @@ public class MiHorarioController {
                 ? usuario.getNombreEmpleado() : "Colaborador FoodCore";
         String rol = (usuario != null && usuario.getNombreRol() != null) ? usuario.getNombreRol() : "PERSONAL";
 
-        lblMiRolBadge.setText(rol);
-        lblBienvenida.setText("Bienvenido/a, " + nombre + ". Aquí puede consultar su horario, asistencias y boletas.");
-
-        double sueldo = usuario != null && usuario.getSueldoBase() > 0 ? usuario.getSueldoBase() : 1350.00;
-        lblMiSueldoBase.setText(String.format(Locale.US, "S/ %.2f", sueldo));
-
-        double horasExtrasMes = 0.0;
-        try {
-            List<TurnoProgramado> misTurnos = horariosService.listarPorUsuario(idUser);
-            Map<String, TurnoProgramado> mapaTurnos = misTurnos.stream()
-                    .collect(Collectors.toMap(t -> t.getDiaSemana().toUpperCase(), t -> t, (a, b) -> a));
-
-            renderizarTarjetasSemana(mapaTurnos);
-
-            LocalDate hoy = LocalDate.now();
-            List<Asistencia> asistencias = asistenciaService.listarAsistenciaPorFecha(hoy);
-            List<Asistencia> propias = asistencias.stream()
-                    .filter(a -> a.getIdUsuario() == idUser)
-                    .collect(Collectors.toList());
-
-            listaAsistencias.setAll(propias);
-
-            double horasTotales = propias.stream().mapToDouble(Asistencia::getHorasTrabajadas).sum();
-            horasExtrasMes = propias.stream().mapToDouble(Asistencia::getHorasExtra).sum();
-            int tardanzasTotales = propias.stream().mapToInt(Asistencia::getTardanzaMinutos).sum();
-
-            lblMisHorasMes.setText(String.format(Locale.US, "%.1f hrs", horasTotales > 0 ? horasTotales : 8.0));
-            lblMisDiasTrabajados.setText(String.valueOf(propias.isEmpty() ? 1 : propias.size()));
-            lblMisTardanzasMin.setText(tardanzasTotales + " min");
-        } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Error al cargar portal de empleado", ex);
+        if (lblMiRolBadge != null) {
+            lblMiRolBadge.setText(rol);
+        }
+        if (lblBienvenida != null) {
+            lblBienvenida.setText("Bienvenido/a, " + nombre + ". Aquí puede consultar su horario, asistencias y boletas.");
         }
 
-        cargarBoletasMensuales(sueldo, horasExtrasMes);
+        BigDecimal sueldo = (usuario != null && usuario.getSueldoBase() != null
+                && usuario.getSueldoBase().compareTo(BigDecimal.ZERO) > 0)
+                ? usuario.getSueldoBase().setScale(2, RoundingMode.HALF_UP)
+                : new BigDecimal("1350.00");
+        if (lblMiSueldoBase != null) {
+            lblMiSueldoBase.setText(String.format(Locale.US, "S/ %.2f", sueldo));
+        }
+
+        LocalDate hoy = LocalDate.now();
+        long seq = cargaDatosSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> new DatosEmpleadoPortal(
+                    horariosService.listarPorUsuario(idUser),
+                    asistenciaService.listarAsistenciaPorFecha(hoy)),
+            datos -> {
+                if (!vistaActiva.get() || seq != cargaDatosSeq.get()) {
+                    return;
+                }
+                List<TurnoProgramado> misTurnos = datos != null && datos.turnos() != null
+                        ? datos.turnos() : List.of();
+                Map<String, TurnoProgramado> mapaTurnos = misTurnos.stream()
+                        .collect(Collectors.toMap(
+                                t -> t.getDiaSemana().toUpperCase(Locale.ROOT),
+                                t -> t,
+                                (a, b) -> a));
+                if (boxDiasSemana != null) {
+                    renderizarTarjetasSemana(mapaTurnos);
+                }
+
+                List<Asistencia> asistencias = datos != null && datos.asistencias() != null
+                        ? datos.asistencias() : List.of();
+                List<Asistencia> propias = asistencias.stream()
+                        .filter(a -> a.getIdUsuario() == idUser)
+                        .collect(Collectors.toList());
+
+                listaAsistencias.setAll(propias);
+
+                double horasTotales = propias.stream().mapToDouble(Asistencia::getHorasTrabajadas).sum();
+                double horasExtrasMes = propias.stream().mapToDouble(Asistencia::getHorasExtra).sum();
+                int tardanzasTotales = propias.stream().mapToInt(Asistencia::getTardanzaMinutos).sum();
+
+                if (lblMisHorasMes != null) {
+                    lblMisHorasMes.setText(String.format(Locale.US, "%.1f hrs",
+                            horasTotales > 0 ? horasTotales : 8.0));
+                }
+                if (lblMisDiasTrabajados != null) {
+                    lblMisDiasTrabajados.setText(String.valueOf(propias.isEmpty() ? 1 : propias.size()));
+                }
+                if (lblMisTardanzasMin != null) {
+                    lblMisTardanzasMin.setText(tardanzasTotales + " min");
+                }
+                cargarBoletasMensuales(sueldo, horasExtrasMes);
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error al cargar portal de empleado", ex);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                cargarBoletasMensuales(sueldo, 0.0);
+                mostrarToastSeguro("Error al cargar portal de empleado: " + ex.getMessage(), true);
+            }
+        );
+
         cargarSaldoYSolicitudesVacaciones(idUser);
     }
 
-    private void cargarBoletasMensuales(double sueldoBaseDouble, double horasExtrasMes) {
+    private void cargarBoletasMensuales(BigDecimal sueldoBase, double horasExtrasMes) {
         listaBoletas.clear();
-        BigDecimal base = BigDecimal.valueOf(sueldoBaseDouble).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal base = (sueldoBase != null ? sueldoBase : new BigDecimal("1350.00"))
+                .setScale(2, RoundingMode.HALF_UP);
         YearMonth mesActual = YearMonth.now();
 
         for (int i = 0; i < 4; i++) {
             YearMonth ym = mesActual.minusMonths(i);
             String periodo = ym.getMonth().getDisplayName(TextStyle.FULL, LOCALE_ES).toUpperCase(LOCALE_ES) + " " + ym.getYear();
             BigDecimal bonoExtras = (i == 0 && horasExtrasMes > 0)
-                    ? BigDecimal.valueOf(horasExtrasMes * 9.50).setScale(2, RoundingMode.HALF_UP)
+                    ? BigDecimal.valueOf(horasExtrasMes).multiply(new BigDecimal("9.50")).setScale(2, RoundingMode.HALF_UP)
                     : ((i % 2) != 0 ? new BigDecimal("65.00") : new BigDecimal("42.50"));
             BigDecimal bruto = base.add(bonoExtras);
             BigDecimal descuentoLey = bruto.multiply(new BigDecimal("0.13")).setScale(2, RoundingMode.HALF_UP);
@@ -348,42 +426,89 @@ public class MiHorarioController {
         if (seleccionada == null) {
             return;
         }
-        exportarBoletaConFeedback(seleccionada);
+        exportarBoletaConFeedback(seleccionada, btnDescargarBoletaPdf);
     }
 
-    private void exportarBoletaConFeedback(BoletaPago boleta) {
-        try {
-            Usuario usr = AuthService.getUsuarioSesionActual();
-            String username = usr != null && usr.getUsername() != null ? usr.getUsername() : "colaborador";
-            String slugPeriodo = boleta.periodo().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
-            Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
-                    btnDescargarBoletaPdf != null ? btnDescargarBoletaPdf : rootMiHorarioStack,
-                    "Guardar Boleta de Pago en PDF",
-                    "boleta_" + username + "_" + slugPeriodo + ".pdf",
-                    FormatoExportacion.PDF);
-            if (elegidoOpt.isEmpty()) {
-                if (lblEstadoBoleta != null) {
-                    lblEstadoBoleta.setText("Exportación de boleta cancelada.");
-                }
-                return;
-            }
-            File pdfFile = elegidoOpt.get();
-            if (pdfFile.getParentFile() != null) {
-                Files.createDirectories(pdfFile.getParentFile().toPath());
-            }
-
-            generarBoletaPdf(boleta, usr, pdfFile);
+    private void exportarBoletaConFeedback(BoletaPago boleta, Button trigger) {
+        Usuario usr = AuthService.getUsuarioSesionActual();
+        String username = usr != null && usr.getUsername() != null ? usr.getUsername() : "colaborador";
+        String slugPeriodo = boleta.periodo().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+        Optional<File> elegidoOpt = ExportFileChooserHelper.elegirDestinoExportacion(
+                btnDescargarBoletaPdf != null ? btnDescargarBoletaPdf : rootMiHorarioStack,
+                "Guardar Boleta de Pago en PDF",
+                "boleta_" + username + "_" + slugPeriodo + ".pdf",
+                FormatoExportacion.PDF);
+        if (elegidoOpt.isEmpty()) {
             if (lblEstadoBoleta != null) {
-                lblEstadoBoleta.setText("Boleta PDF exportada: " + pdfFile.getPath());
+                lblEstadoBoleta.setText("Exportación de boleta cancelada.");
             }
-            if (rootMiHorarioStack != null && rootMiHorarioStack.getScene() != null) {
-                AnimationUtils.mostrarToast(rootMiHorarioStack, "Boleta PDF descargada en " + pdfFile.getPath(), false);
+            return;
+        }
+        if (!exportarBoletaEnCurso.compareAndSet(false, true)) {
+            return;
+        }
+        File pdfFile = elegidoOpt.get();
+        Usuario usuarioSnapshot = copiarUsuarioBoleta(usr);
+        setBotonesExportBoletaDisabled(trigger, true);
+
+        UiAsyncExecutor.ejecutarAsync(
+            () -> generarBoletaPdf(boleta, usuarioSnapshot, pdfFile),
+            out -> {
+                exportarBoletaEnCurso.set(false);
+                setBotonesExportBoletaDisabled(trigger, false);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (lblEstadoBoleta != null) {
+                    lblEstadoBoleta.setText("Boleta PDF exportada: " + out.getPath());
+                }
+                mostrarToastSeguro("Boleta PDF descargada en " + out.getPath(), false);
+            },
+            e -> {
+                exportarBoletaEnCurso.set(false);
+                setBotonesExportBoletaDisabled(trigger, false);
+                LOGGER.log(Level.WARNING, "No se pudo generar PDF de boleta", e);
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (lblEstadoBoleta != null) {
+                    lblEstadoBoleta.setText("Error generando boleta PDF: " + e.getMessage());
+                }
+                mostrarToastSeguro("Error generando boleta PDF: " + e.getMessage(), true);
             }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "No se pudo generar PDF de boleta", e);
-            if (rootMiHorarioStack != null && rootMiHorarioStack.getScene() != null) {
-                AnimationUtils.mostrarToast(rootMiHorarioStack, "Error generando boleta PDF: " + e.getMessage(), true);
-            }
+        );
+    }
+
+    private void setBotonesExportBoletaDisabled(Button trigger, boolean disabled) {
+        if (trigger != null) {
+            trigger.setDisable(disabled);
+        }
+        if (btnDescargarBoletaPdf != null && btnDescargarBoletaPdf != trigger) {
+            btnDescargarBoletaPdf.setDisable(disabled);
+        }
+    }
+
+    private static Usuario copiarUsuarioBoleta(Usuario usr) {
+        if (usr == null) {
+            return null;
+        }
+        Usuario copy = new Usuario();
+        copy.setIdUsuario(usr.getIdUsuario());
+        copy.setUsername(usr.getUsername());
+        copy.setNombreEmpleado(usr.getNombreEmpleado());
+        copy.setNombreRol(usr.getNombreRol());
+        copy.setDni(usr.getDni());
+        return copy;
+    }
+
+    private void mostrarToastSeguro(String mensaje, boolean esError) {
+        if (rootMiHorarioStack != null && rootMiHorarioStack.getScene() != null) {
+            AnimationUtils.mostrarToast(rootMiHorarioStack, mensaje, esError);
+        } else {
+            ToastService.mostrarToast(
+                    null,
+                    mensaje,
+                    esError ? ToastService.TipoToast.ERROR : ToastService.TipoToast.EXITO);
         }
     }
 
@@ -480,24 +605,24 @@ public class MiHorarioController {
             HBox.setHgrow(card, Priority.ALWAYS);
 
             Label lblDia = new Label(dia);
-            lblDia.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: -fc-text-primary;");
+            lblDia.getStyleClass().add("fc-schedule-day-title");
 
             TurnoProgramado tp = mapaTurnos.get(dia);
             if (tp != null) {
-                card.setStyle("-fx-background-color: white; -fx-border-color: -fc-accent; -fx-border-width: 1.5; -fx-border-radius: 8; -fx-background-radius: 8;");
+                card.getStyleClass().add("fc-my-schedule-card-active");
                 Label lblTurno = new Label(tp.getTurno());
-                lblTurno.setStyle("-fx-background-color: #FEF3C7; -fx-text-fill: #92400E; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+                lblTurno.getStyleClass().add("fc-shift-badge-morning");
 
                 Label lblHorario = new Label(tp.getHorarioTexto());
-                lblHorario.setStyle("-fx-font-size: 11px; -fx-text-fill: -fc-text-secondary; -fx-font-family: 'JetBrains Mono', monospace;");
+                lblHorario.getStyleClass().add("fc-my-schedule-time-mono");
 
                 card.getChildren().addAll(lblDia, lblTurno, lblHorario);
             } else {
-                card.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+                card.getStyleClass().add("fc-my-schedule-card-off");
                 Label lblDescanso = new Label("DESCANSO");
-                lblDescanso.setStyle("-fx-background-color: #E2E8F0; -fx-text-fill: #64748B; -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 2 6; -fx-background-radius: 6;");
+                lblDescanso.getStyleClass().add("fc-shift-badge-off");
                 Label lblLibre = new Label("Día libre");
-                lblLibre.setStyle("-fx-font-size: 11px; -fx-text-fill: #94A3B8;");
+                lblLibre.getStyleClass().add("fc-my-schedule-free-day");
                 card.getChildren().addAll(lblDia, lblDescanso, lblLibre);
             }
 
@@ -551,22 +676,38 @@ public class MiHorarioController {
     }
 
     public void cargarSaldoYSolicitudesVacaciones(int idUser) {
-        try {
-            Vacaciones saldo = ausenciasService.obtenerSaldoVacaciones(idUser, LocalDate.now().getYear());
-            if (lblVacDisponibles != null) {
-                lblVacDisponibles.setText(String.format(
-                        "Disponibles: %d días (Gozados: %d / %d)",
-                        saldo.getDiasDisponibles(), saldo.getDiasGozados(), saldo.getDiasAsignados()));
+        int anio = LocalDate.now().getYear();
+        long seq = cargaVacSeq.incrementAndGet();
+        UiAsyncExecutor.ejecutarAsync(
+            () -> new DatosVacacionesPortal(
+                    ausenciasService.obtenerSaldoVacaciones(idUser, anio),
+                    ausenciasService.listarPorUsuario(idUser)),
+            datos -> {
+                if (!vistaActiva.get() || seq != cargaVacSeq.get()) {
+                    return;
+                }
+                if (datos != null && datos.saldo() != null) {
+                    Vacaciones saldo = datos.saldo();
+                    if (lblVacDisponibles != null) {
+                        lblVacDisponibles.setText(String.format(
+                                "Disponibles: %d días (Gozados: %d / %d)",
+                                saldo.getDiasDisponibles(), saldo.getDiasGozados(), saldo.getDiasAsignados()));
+                    }
+                    if (lblVacEnRevision != null) {
+                        lblVacEnRevision.setText("En revisión: " + saldo.getDiasPendientesAprobacion() + " días");
+                    }
+                }
+                if (tblMisVacaciones != null && datos != null && datos.solicitudes() != null) {
+                    listaMisVacaciones.setAll(datos.solicitudes());
+                }
+            },
+            ex -> {
+                LOGGER.log(Level.WARNING, "Error cargando saldo y solicitudes de vacaciones", ex);
+                if (vistaActiva.get()) {
+                    aplicarEstadoVacaciones(false, "Error al consultar vacaciones: " + ex.getMessage());
+                }
             }
-            if (lblVacEnRevision != null) {
-                lblVacEnRevision.setText("En revisión: " + saldo.getDiasPendientesAprobacion() + " días");
-            }
-            if (tblMisVacaciones != null) {
-                listaMisVacaciones.setAll(ausenciasService.listarPorUsuario(idUser));
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.FINE, "Aviso al cargar saldo de vacaciones del portal", ex);
-        }
+        );
     }
 
     @FXML
@@ -578,22 +719,49 @@ public class MiHorarioController {
         LocalDate fin = dpVacFin != null ? dpVacFin.getValue() : null;
         String motivo = txtVacMotivo != null ? txtVacMotivo.getText() : "";
 
-        try {
-            ausenciasService.registrarSolicitud(idUser, tipo, ini, fin, motivo);
-            if (txtVacMotivo != null) {
-                txtVacMotivo.clear();
-            }
-            cargarSaldoYSolicitudesVacaciones(idUser);
-            if (lblVacEstadoMsg != null) {
-                lblVacEstadoMsg.setStyle("-fx-text-fill: #15803d; -fx-font-weight: bold;");
-                lblVacEstadoMsg.setText("✅ Solicitud registrada para aprobación gerencial.");
-            }
-        } catch (Exception e) {
-            if (lblVacEstadoMsg != null) {
-                lblVacEstadoMsg.setStyle("-fx-text-fill: #b91c1c; -fx-font-weight: bold;");
-                lblVacEstadoMsg.setText("⚠️ " + e.getMessage());
-            }
+        if (!solicitarVacEnCurso.compareAndSet(false, true)) {
+            return;
         }
+        if (btnSolicitarVacaciones != null) {
+            btnSolicitarVacaciones.setDisable(true);
+        }
+
+        UiAsyncExecutor.ejecutarVoidAsync(
+            () -> ausenciasService.registrarSolicitud(idUser, tipo, ini, fin, motivo),
+            () -> {
+                solicitarVacEnCurso.set(false);
+                if (btnSolicitarVacaciones != null) {
+                    btnSolicitarVacaciones.setDisable(false);
+                }
+                if (!vistaActiva.get()) {
+                    return;
+                }
+                if (txtVacMotivo != null) {
+                    txtVacMotivo.clear();
+                }
+                cargarSaldoYSolicitudesVacaciones(idUser);
+                aplicarEstadoVacaciones(true, "Solicitud registrada para aprobación gerencial.");
+            },
+            e -> {
+                solicitarVacEnCurso.set(false);
+                if (btnSolicitarVacaciones != null) {
+                    btnSolicitarVacaciones.setDisable(false);
+                }
+                LOGGER.log(Level.WARNING, "Error registrando solicitud de vacaciones", e);
+                if (vistaActiva.get()) {
+                    aplicarEstadoVacaciones(false, e.getMessage());
+                }
+            }
+        );
+    }
+
+    private void aplicarEstadoVacaciones(boolean ok, String mensaje) {
+        if (lblVacEstadoMsg == null) {
+            return;
+        }
+        lblVacEstadoMsg.getStyleClass().removeAll("fc-status-msg-ok", "fc-status-msg-error");
+        lblVacEstadoMsg.getStyleClass().add(ok ? "fc-status-msg-ok" : "fc-status-msg-error");
+        lblVacEstadoMsg.setText((ok ? "✅ " : "⚠️ ") + mensaje);
     }
 
     public TabPane getTabPaneMiPortal() {
@@ -638,5 +806,21 @@ public class MiHorarioController {
 
     public ObservableList<SolicitudAusencia> getListaMisVacaciones() {
         return listaMisVacaciones;
+    }
+
+    public Button getBtnSolicitarVacaciones() {
+        return btnSolicitarVacaciones;
+    }
+
+    public Button getBtnDescargarBoletaPdf() {
+        return btnDescargarBoletaPdf;
+    }
+
+    public ObservableList<Asistencia> getListaAsistencias() {
+        return listaAsistencias;
+    }
+
+    public Label getLblEstadoBoleta() {
+        return lblEstadoBoleta;
     }
 }

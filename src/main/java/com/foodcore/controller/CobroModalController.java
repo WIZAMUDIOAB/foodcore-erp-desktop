@@ -3,8 +3,7 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.ClienteDAO;
-import com.foodcore.dao.impl.ClienteDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.ComprobantePago;
@@ -12,15 +11,20 @@ import com.foodcore.model.DesgloseFiscal;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Venta;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.ClienteGestionService;
 import com.foodcore.service.VentaService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 
 import java.math.BigDecimal;
@@ -51,8 +55,19 @@ public class CobroModalController {
     private Cliente clienteAsociado = null;
     private List<DetalleVenta> itemsVenta;
     private Runnable onVentaExitosa;
-    private final VentaService ventaService = new VentaService();
-    private final ClienteDAO clienteDAO = new ClienteDAOImpl();
+    private final VentaService ventaService;
+    private final ClienteGestionService clienteGestionService;
+
+    public CobroModalController() {
+        this(AppContainer.getDefault().ventaService(),
+                AppContainer.getDefault().resolve(ClienteGestionService.class));
+    }
+
+    public CobroModalController(VentaService ventaService, ClienteGestionService clienteGestionService) {
+        this.ventaService = java.util.Objects.requireNonNull(ventaService, "ventaService no puede ser nulo");
+        this.clienteGestionService =
+                java.util.Objects.requireNonNull(clienteGestionService, "clienteGestionService no puede ser nulo");
+    }
 
     @FXML
     public void initialize() {
@@ -64,7 +79,10 @@ public class CobroModalController {
             if (!"EFECTIVO".equals(sel)) {
                 txtMontoRecibido.setText(totalVenta.toString());
                 lblVuelto.setText("S/ 0.00");
-                lblVuelto.setStyle("-fx-text-fill: #2a9d8f; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-danger-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-success-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-success-bold");
+                }
             }
         });
 
@@ -160,9 +178,15 @@ public class CobroModalController {
 
             lblVuelto.setText("S/ " + vuelto);
             if (vuelto.compareTo(BigDecimal.ZERO) < 0) {
-                lblVuelto.setStyle("-fx-text-fill: #e63946; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-success-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-danger-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-danger-bold");
+                }
             } else {
-                lblVuelto.setStyle("-fx-text-fill: #2a9d8f; -fx-font-weight: bold;");
+                lblVuelto.getStyleClass().remove("fc-text-danger-bold");
+                if (!lblVuelto.getStyleClass().contains("fc-text-success-bold")) {
+                    lblVuelto.getStyleClass().add("fc-text-success-bold");
+                }
             }
         } catch (NumberFormatException e) {
             lblVuelto.setText("Inválido");
@@ -241,10 +265,10 @@ public class CobroModalController {
                                 venta, itemsCopia, comprobante, docCliente, nombreCliente);
                     } else {
                         if (venta.getIdCliente() == null && !docCliente.isBlank() && !"00000000".equals(docCliente)) {
-                            try (java.sql.Connection connCli = ConexionBD.getConnection()) {
-                                java.util.Optional<Cliente> optCli = clienteDAO.buscarPorDniOTelefono(connCli, docCliente);
-                                optCli.ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
-                            } catch (java.sql.SQLException ex) {
+                            try {
+                                clienteGestionService.buscarPorDniOTelefono(docCliente)
+                                        .ifPresent(c -> venta.setIdCliente(c.getIdCliente()));
+                            } catch (Exception ex) {
                                 LOGGER.log(Level.FINE, "No se pudo resolver cliente por documento", ex);
                             }
                         }
@@ -326,7 +350,7 @@ public class CobroModalController {
         TextArea textArea = new TextArea(sb.toString());
         textArea.setEditable(false);
         textArea.setWrapText(true);
-        textArea.setStyle("-fx-font-family: 'Consolas', monospace; -fx-font-size: 12px;");
+        textArea.getStyleClass().add("fc-ticket-preview-mono");
         textArea.setPrefWidth(420);
         textArea.setPrefHeight(380);
 

@@ -11,6 +11,7 @@ import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -33,7 +34,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -56,7 +56,7 @@ class LoginControllerDbErrorTest {
     @Test
     @DisplayName("Simulación UI Login con Unknown column -> mensaje amigable sin detalles SQL, log SLF4J ERROR y captura PNG")
     void loginUiMuestraMensajeAmigableAnteEsquemaDesactualizadoYLogueaErrorRealSlf4j() throws Exception {
-        AuthService failingAuthService = new AuthService(new UsuarioDAOImpl(), new EncriptadorPassword()) {
+        AuthService failingAuthService = new AuthServiceImpl(new UsuarioDAOImpl(), new EncriptadorPassword()) {
             @Override
             public Usuario login(String username, String password) throws SQLException {
                 throw new SQLException("Unknown column 'intentos_fallidos' in 'field list'", "42S22", 1054);
@@ -98,17 +98,11 @@ class LoginControllerDbErrorTest {
                 }
             });
 
-            long deadline = System.currentTimeMillis() + Duration.ofSeconds(6).toMillis();
-            while (System.currentTimeMillis() < deadline) {
-                AtomicBoolean done = new AtomicBoolean(false);
-                JavaFxTestSupport.runOnFxThreadAndWait(() -> done.set(
-                        !btnRef.get().isDisable() && lblRef.get().isVisible()
-                ));
-                if (done.get()) {
-                    break;
-                }
-                Thread.sleep(25);
-            }
+            JavaFxTestSupport.awaitCondition(
+                    () -> !btnRef.get().isDisable() && lblRef.get().isVisible(),
+                    6L,
+                    "El botón de login debe reactivarse y mostrar mensaje amigable de error"
+            );
 
             AtomicReference<String> uiMsgRef = new AtomicReference<>();
             AtomicBoolean visibleRef = new AtomicBoolean(false);

@@ -3,6 +3,8 @@ package com.foodcore.dao.impl;
 import com.foodcore.dao.CompraDAO;
 import com.foodcore.model.Compra;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -62,9 +64,9 @@ public class CompraDAOImpl implements CompraDAO {
             ps.setString(2, compra.getSerie());
             ps.setString(3, compra.getNumero());
             ps.setDate(4, Date.valueOf(compra.getFechaEmision()));
-            ps.setDouble(5, compra.getBaseImponible());
-            ps.setDouble(6, compra.getIgv());
-            ps.setDouble(7, compra.getTotal());
+            ps.setBigDecimal(5, normalizarMoneda(compra.getBaseImponible()));
+            ps.setBigDecimal(6, normalizarMoneda(compra.getIgv()));
+            ps.setBigDecimal(7, normalizarMoneda(compra.getTotal()));
             ps.setString(8, compra.getEstado());
             ps.setInt(9, compra.getIdUsuario());
             ps.executeUpdate();
@@ -89,14 +91,24 @@ public class CompraDAOImpl implements CompraDAO {
         if (rs.getDate("fecha_emision") != null) {
             c.setFechaEmision(rs.getDate("fecha_emision").toLocalDate());
         }
-        c.setBaseImponible(rs.getDouble("base_imponible"));
-        c.setIgv(rs.getDouble("igv"));
-        c.setTotal(rs.getDouble("total"));
+        c.setBaseImponible(leerMoneda(rs, "base_imponible"));
+        c.setIgv(leerMoneda(rs, "igv"));
+        c.setTotal(leerMoneda(rs, "total"));
         c.setEstado(rs.getString("estado"));
         c.setIdUsuario(rs.getInt("id_usuario"));
         if (rs.getTimestamp("fecha_registro") != null) {
             c.setFechaRegistro(rs.getTimestamp("fecha_registro").toLocalDateTime());
         }
         return c;
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal leerMoneda(ResultSet rs, String columna) throws SQLException {
+        return normalizarMoneda(rs.getBigDecimal(columna));
     }
 }

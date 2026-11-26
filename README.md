@@ -1,4 +1,4 @@
-# FoodCore ERP Desktop v5.7.0 - Fast Food S.A.C.
+# FoodCore ERP Desktop v5.8.0 - Fast Food S.A.C.
 Sistema ERP de escritorio, POS LAN/PWA, KDS, Finanzas BI, RRHH y CRM Minorista bajo arquitectura de **Costo Cero ($0.00) en Red Local (LAN)**.
 
 ---
@@ -24,11 +24,11 @@ Consulta `keystore.jks.example` para generar `keystore.jks` y `foodcore.cer` par
 
 ---
 
-## Empaquetado e Instalador (v5.7.0)
+## Empaquetado e Instalador (v5.8.0)
 
-El paquete de distribución incluye todos los módulos (Operaciones, Inventario, Finanzas BI, RRHH, CRM Minorista), el runtime Java embebido y los recursos auxiliares (`pwa/`, `keystore.jks.example`, `scripts/`, `foodcore.cer`, `application.properties.example`).
+El paquete de distribución incluye todos los módulos (Operaciones, Inventario, Finanzas BI, RRHH, CRM Minorista), el runtime Java embebido y los recursos auxiliares (`pwa/`, `keystore.jks.example`, `scripts/`, `application.properties.example`). Genere el TLS propio de sede con `scripts/init-client-keystore.ps1`.
 
-### Windows (`dist/FoodCoreERP-5.7.0.msi`)
+### Windows (`dist/FoodCoreERP-5.8.0.msi` o `dist/FoodCoreERP-5.8.0-windows-portable.zip`)
 ```powershell
 .\mvnw.cmd -B clean package -Prelease -DskipTests
 ```
@@ -36,9 +36,9 @@ O después de `mvn package`:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-release.ps1
 ```
-El instalador queda generado en `dist/FoodCoreERP-5.7.0.msi` junto con `dist/SHA256SUMS.txt`.
+El instalador/paquete queda generado en `dist/FoodCoreERP-5.8.0.msi` (si WiX Toolset está instalado) o `dist/FoodCoreERP-5.8.0-windows-portable.zip` junto con `dist/SHA256SUMS.txt`.
 
-### Linux (`dist/FoodCoreERP-5.7.0.deb`)
+### Linux (`dist/FoodCoreERP-5.8.0.deb`)
 ```bash
 ./mvnw -B clean package -DskipTests
 bash scripts/build-deb.sh

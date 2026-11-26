@@ -1,14 +1,16 @@
 package com.foodcore.security;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.events.OutboxRepository;
 import com.foodcore.model.OutboxEvento;
 import com.foodcore.model.dto.EventoKdsDTO;
 import com.foodcore.model.enums.TipoEventoKds;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
+import com.foodcore.util.JsonMapperProvider;
 import com.foodcore.util.ServidorSockets;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,60 +42,66 @@ class SocketsIntegracionTest {
 
     @Test
     @DisplayName("R-02.7 & R-14 (1/6): Handshake válido HELLO con KDS-01 -> WELCOME {sessionToken, sessionSecret, ttl} y RENEW extiende sesión")
-    void debeCompletarHandshakeValidoYRenovarSesionConTerminalActiva() {
-        JsonObject hello = new JsonObject();
-        hello.addProperty("type", "HELLO");
-        hello.addProperty("codigoTerminal", "KDS-01");
-        hello.addProperty("secreto", "Kds01#Secret2026!");
+    void debeCompletarHandshakeValidoYRenovarSesionConTerminalActiva() throws Exception {
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
 
-        JsonObject welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
+        ObjectNode hello = mapper.createObjectNode();
+        hello.put("type", "HELLO");
+        hello.put("codigoTerminal", "KDS-01");
+        hello.put("secreto", "Kds01#Secret2026!");
+
+        ObjectNode welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
         assertNotNull(welcome);
-        assertEquals("WELCOME", welcome.get("type").getAsString());
-        String sessionToken = welcome.get("sessionToken").getAsString();
-        String sessionSecret = welcome.get("sessionSecret").getAsString();
-        assertTrue(welcome.get("ttl").getAsLong() == TerminalAuthService.TTL_SEGUNDOS);
+        assertEquals("WELCOME", welcome.get("type").asText());
+        String sessionToken = welcome.get("sessionToken").asText();
+        String sessionSecret = welcome.get("sessionSecret").asText();
+        assertTrue(welcome.get("ttl").asLong() == TerminalAuthService.TTL_SEGUNDOS);
 
         // Probar RENEW
-        JsonObject renew = new JsonObject();
-        renew.addProperty("type", "RENEW");
-        renew.addProperty("sessionToken", sessionToken);
+        ObjectNode renew = mapper.createObjectNode();
+        renew.put("type", "RENEW");
+        renew.put("sessionToken", sessionToken);
 
-        JsonObject renewedWelcome = servidor.procesarTramaProtocolo(renew.toString(), null);
-        assertEquals("WELCOME", renewedWelcome.get("type").getAsString());
-        assertEquals(sessionToken, renewedWelcome.get("sessionToken").getAsString());
-        assertNotEquals(sessionSecret, renewedWelcome.get("sessionSecret").getAsString(),
+        ObjectNode renewedWelcome = servidor.procesarTramaProtocolo(renew.toString(), null);
+        assertEquals("WELCOME", renewedWelcome.get("type").asText());
+        assertEquals(sessionToken, renewedWelcome.get("sessionToken").asText());
+        assertNotEquals(sessionSecret, renewedWelcome.get("sessionSecret").asText(),
             "RENEW debe rotar el sessionSecret efímero en memoria");
     }
 
     @Test
     @DisplayName("R-02.7 & R-14 (2/6): Handshake con terminal inactiva (KDS-INACTIVA, activo=0) -> ERROR TerminalNoAutorizada")
-    void debeRechazarHandshakeDeTerminalInactivaConErrorTerminalNoAutorizada() {
-        JsonObject hello = new JsonObject();
-        hello.addProperty("type", "HELLO");
-        hello.addProperty("codigoTerminal", "KDS-INACTIVA");
-        hello.addProperty("secreto", "Kds01#Secret2026!");
+    void debeRechazarHandshakeDeTerminalInactivaConErrorTerminalNoAutorizada() throws Exception {
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
 
-        JsonObject respuesta = servidor.procesarTramaProtocolo(hello.toString(), null);
+        ObjectNode hello = mapper.createObjectNode();
+        hello.put("type", "HELLO");
+        hello.put("codigoTerminal", "KDS-INACTIVA");
+        hello.put("secreto", "Kds01#Secret2026!");
+
+        ObjectNode respuesta = servidor.procesarTramaProtocolo(hello.toString(), null);
         assertNotNull(respuesta);
-        assertEquals("ERROR", respuesta.get("type").getAsString());
-        assertEquals("TerminalNoAutorizada", respuesta.get("code").getAsString());
+        assertEquals("ERROR", respuesta.get("type").asText());
+        assertEquals("TerminalNoAutorizada", respuesta.get("code").asText());
     }
 
     @Test
     @DisplayName("R-02.7 (3/6): Trama EVENT con firma HMAC-SHA256 adulterada -> rechazada con ERROR HMAC_INVALIDO")
-    void debeRechazarTramaConHmacAdulterado() {
-        JsonObject hello = new JsonObject();
-        hello.addProperty("type", "HELLO");
-        hello.addProperty("codigoTerminal", "KDS-01");
-        hello.addProperty("secreto", "Kds01#Secret2026!");
-        JsonObject welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
+    void debeRechazarTramaConHmacAdulterado() throws Exception {
+            ObjectMapper mapper = JsonMapperProvider.getMapper();
 
-        String sessionToken = welcome.get("sessionToken").getAsString();
-        String sessionSecret = welcome.get("sessionSecret").getAsString();
+            ObjectNode hello = mapper.createObjectNode();
+            hello.put("type", "HELLO");
+            hello.put("codigoTerminal", "KDS-01");
+            hello.put("secreto", "Kds01#Secret2026!");
+            ObjectNode welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
 
-        JsonObject data = new JsonObject();
-        data.addProperty("idPedido", 100);
-        data.addProperty("mesa", "M01");
+            String sessionToken = welcome.get("sessionToken").asText();
+            String sessionSecret = welcome.get("sessionSecret").asText();
+
+            ObjectNode data = mapper.createObjectNode();
+            data.put("idPedido", 100);
+            data.put("mesa", "M01");
 
         EventoKdsDTO eventoLegitimo = EventoKdsDTO.crearFirmado(
             TipoEventoKds.COMANDA_NUEVA.name(),
@@ -103,16 +111,16 @@ class SocketsIntegracionTest {
         );
 
         // Adulterar el número de mesa después de firmado manteniendo la firma original
-        eventoLegitimo.getPayload().addProperty("mesa", "M99_ADULTERADA");
+        eventoLegitimo.getPayload().put("mesa", "M99_ADULTERADA");
 
-        JsonObject frameEvento = new JsonObject();
-        frameEvento.addProperty("type", "EVENT");
-        frameEvento.addProperty("sessionToken", sessionToken);
-        frameEvento.add("payload", JsonParser.parseString(eventoLegitimo.toJson()));
+                ObjectNode frameEvento = mapper.createObjectNode();
+                        frameEvento.put("type", "EVENT");
+                        frameEvento.put("sessionToken", sessionToken);
+                        frameEvento.set("payload", mapper.readTree(eventoLegitimo.toJson()));
 
-        JsonObject respuesta = servidor.procesarTramaProtocolo(frameEvento.toString(), null);
-        assertEquals("ERROR", respuesta.get("type").getAsString());
-        assertEquals("HMAC_INVALIDO", respuesta.get("code").getAsString());
+                        ObjectNode respuesta = servidor.procesarTramaProtocolo(frameEvento.toString(), null);
+                        assertEquals("ERROR", respuesta.get("type").asText());
+                        assertEquals("HMAC_INVALIDO", respuesta.get("code").asText());
     }
 
     @Test
@@ -123,29 +131,31 @@ class SocketsIntegracionTest {
             idEvento = outboxRepository.insertar(conn, "NUEVO_PEDIDO", "{\"idPedido\":77}");
         }
 
-        // 1. ACK sin sessionToken debe ser rechazado con TerminalNoAutorizada
-        JsonObject ackSinAuth = new JsonObject();
-        ackSinAuth.addProperty("type", "ACK");
-        ackSinAuth.addProperty("idEvento", idEvento);
-        JsonObject respNoAuth = servidor.procesarTramaProtocolo(ackSinAuth.toString(), null);
-        assertEquals("ERROR", respNoAuth.get("type").getAsString());
-        assertEquals("TerminalNoAutorizada", respNoAuth.get("code").getAsString());
+        ObjectMapper mapper = JsonMapperProvider.getMapper();
 
-        // 2. Autenticar terminal KDS-01 con HELLO y enviar ACK con sessionToken válido
-        JsonObject hello = new JsonObject();
-        hello.addProperty("type", "HELLO");
-        hello.addProperty("codigoTerminal", "KDS-01");
-        hello.addProperty("secreto", "Kds01#Secret2026!");
-        JsonObject welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
-        String sessionToken = welcome.get("sessionToken").getAsString();
+                // 1. ACK sin sessionToken debe ser rechazado con TerminalNoAutorizada
+                        ObjectNode ackSinAuth = mapper.createObjectNode();
+                        ackSinAuth.put("type", "ACK");
+                        ackSinAuth.put("idEvento", idEvento);
+                        ObjectNode respNoAuth = servidor.procesarTramaProtocolo(ackSinAuth.toString(), null);
+                        assertEquals("ERROR", respNoAuth.get("type").asText());
+                        assertEquals("TerminalNoAutorizada", respNoAuth.get("code").asText());
 
-        JsonObject ackFrame = new JsonObject();
-        ackFrame.addProperty("type", "ACK");
-        ackFrame.addProperty("sessionToken", sessionToken);
-        ackFrame.addProperty("idEvento", idEvento);
+                        // 2. Autenticar terminal KDS-01 con HELLO y enviar ACK con sessionToken válido
+                        ObjectNode hello = mapper.createObjectNode();
+                        hello.put("type", "HELLO");
+                        hello.put("codigoTerminal", "KDS-01");
+                        hello.put("secreto", "Kds01#Secret2026!");
+                        ObjectNode welcome = servidor.procesarTramaProtocolo(hello.toString(), null);
+                        String sessionToken = welcome.get("sessionToken").asText();
 
-        JsonObject resp = servidor.procesarTramaProtocolo(ackFrame.toString(), null);
-        assertEquals("ACK_CONFIRMED", resp.get("type").getAsString());
+                        ObjectNode ackFrame = mapper.createObjectNode();
+                        ackFrame.put("type", "ACK");
+                        ackFrame.put("sessionToken", sessionToken);
+                        ackFrame.put("idEvento", idEvento);
+
+                        ObjectNode resp = servidor.procesarTramaProtocolo(ackFrame.toString(), null);
+                        assertEquals("ACK_CONFIRMED", resp.get("type").asText());
 
         try (Connection conn = ConexionBD.getConnection()) {
             OutboxEvento actualizado = outboxRepository.obtenerPorId(conn, idEvento).orElseThrow();
@@ -155,25 +165,27 @@ class SocketsIntegracionTest {
 
     @Test
     @DisplayName("N2 (5/6): RENEW con token inexistente o expirado es rechazado con TerminalNoAutorizada")
-    void debeRechazarRenewConTokenInexistenteOExpirado() {
-        JsonObject renew = new JsonObject();
-        renew.addProperty("type", "RENEW");
-        renew.addProperty("sessionToken", "TOKEN_INVENTADO_O_EXPIRADO");
+    void debeRechazarRenewConTokenInexistenteOExpirado() throws Exception {
+            ObjectMapper mapper = JsonMapperProvider.getMapper();
 
-        JsonObject resp = servidor.procesarTramaProtocolo(renew.toString(), null);
-        assertNotNull(resp);
-        assertEquals("ERROR", resp.get("type").getAsString());
-        assertEquals("TerminalNoAutorizada", resp.get("code").getAsString());
-    }
+            ObjectNode renew = mapper.createObjectNode();
+            renew.put("type", "RENEW");
+            renew.put("sessionToken", "TOKEN_INVENTADO_O_EXPIRADO");
+
+            ObjectNode resp = servidor.procesarTramaProtocolo(renew.toString(), null);
+            assertNotNull(resp);
+            assertEquals("ERROR", resp.get("type").asText());
+            assertEquals("TerminalNoAutorizada", resp.get("code").asText());
+        }
 
     @Test
     @DisplayName("R-02.7 (6/6): Framing -> mensaje mayor a 1 MB (1048576 bytes) es rechazado inmediatamente")
     void debeRechazarMensajeMayorA1Megabyte() {
         String payloadGigante = "A".repeat(TerminalAuthService.MAX_FRAME_BYTES + 512);
-        JsonObject resp = servidor.procesarTramaProtocolo(payloadGigante, null);
+                JsonNode resp = servidor.procesarTramaProtocolo(payloadGigante, null);
 
-        assertNotNull(resp);
-        assertEquals("ERROR", resp.get("type").getAsString());
-        assertEquals("FRAME_TOO_LARGE", resp.get("code").getAsString());
+                        assertNotNull(resp);
+                        assertEquals("ERROR", resp.get("type").asText());
+                        assertEquals("FRAME_TOO_LARGE", resp.get("code").asText());
     }
 }

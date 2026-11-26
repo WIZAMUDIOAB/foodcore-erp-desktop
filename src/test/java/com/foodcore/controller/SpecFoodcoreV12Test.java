@@ -3,7 +3,7 @@ package com.foodcore.controller;
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Caja;
@@ -14,11 +14,14 @@ import com.foodcore.model.KardexMovimiento;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionUsuario;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.CajaService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
@@ -110,8 +113,8 @@ class SpecFoodcoreV12Test {
     @DisplayName("SPEC-FOODCORE-v1.2 §2, §3, §4, §5, §6 & §7: Flujo E2E Backoffice, Recetas, Split, Descuento RBAC, Merma, Gasto Caja y 5 Capturas")
     void testFlujoCompletoBackofficeOperacionesYCapturasV12(@TempDir Path tempDir) throws Exception {
         InsumoDAO insumoDAO = new InsumoDAOImpl();
-        CajaService cajaService = new CajaService();
-        VentaService ventaService = new VentaService();
+        CajaService cajaService = new CajaServiceImpl();
+        VentaService ventaService = new VentaServiceImpl();
         AutorizacionService authz = new AutorizacionService();
         Path archivoUploadCreado = null;
 
@@ -230,9 +233,9 @@ class SpecFoodcoreV12Test {
         ventaSplit.setIdempotencyKey(UUID.randomUUID().toString());
         ComprobantePago compSplit = new ComprobantePago(0, 0, "TICKET", "TCK", "000101", new BigDecimal("56.00"));
 
-        List<VentaService.PagoSplit> pagos = List.of(
-            new VentaService.PagoSplit("EFECTIVO", new BigDecimal("28.00")),
-            new VentaService.PagoSplit("TARJETA", new BigDecimal("28.00"))
+        List<PagoSplit> pagos = List.of(
+            new PagoSplit("EFECTIVO", new BigDecimal("28.00")),
+            new PagoSplit("TARJETA", new BigDecimal("28.00"))
         );
         Venta ventaRegistrada = ventaService.registrarVentaDividida(ventaSplit, List.of(detBurger), compSplit, pagos);
         assertTrue(ventaRegistrada.getIdVenta() > 0);
@@ -295,7 +298,12 @@ class SpecFoodcoreV12Test {
             }
         });
 
-        Thread.sleep(700);
+        JavaFxTestSupport.awaitCondition(() ->
+                invCtrl.getTodosLosInsumos().stream().anyMatch(i -> "INS-ACEITE-LT".equals(i.getCodigo()))
+                        && menuCtrl.getListaProductos().stream().anyMatch(p -> "HAM-FOTO-01".equals(p.getCodigo())),
+                5L,
+                "Inventario y Menú deben completar la recarga asíncrona desde BD"
+        );
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

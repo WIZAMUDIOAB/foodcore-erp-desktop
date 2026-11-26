@@ -17,11 +17,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Servicio criptográfico JWT HS256 para generación y validación real de firma y expiración.
  */
 public final class JwtService {
+
+    private static final Logger LOGGER = Logger.getLogger(JwtService.class.getName());
 
     private static final int MIN_SECRET_BYTES = 32;
     private static final long TOKEN_TTL_SECONDS = 28_800L;
@@ -91,7 +95,8 @@ public final class JwtService {
             if (is != null) {
                 target.load(is);
             }
-        } catch (java.io.IOException ignored) {
+        } catch (java.io.IOException ex) {
+            LOGGER.log(Level.FINE, "No se pudo leer recurso JWT opcional: " + path, ex);
         }
     }
 

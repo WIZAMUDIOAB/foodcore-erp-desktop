@@ -1,6 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
@@ -135,8 +136,7 @@ public class PersonalizacionProductoController {
             HBox fila = new HBox(10.0);
             fila.setAlignment(Pos.CENTER_LEFT);
             fila.setPadding(new Insets(8, 10, 8, 10));
-            fila.getStyleClass().add("surface-card-subtle");
-            fila.setStyle("-fx-cursor: hand; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+            fila.getStyleClass().add("fc-option-row-interactive");
 
             RadioButton rb = new RadioButton(var.getNombreVariante());
             rb.setId("rbVariante_" + var.getIdVariante());
@@ -171,8 +171,7 @@ public class PersonalizacionProductoController {
             HBox fila = new HBox(10.0);
             fila.setAlignment(Pos.CENTER_LEFT);
             fila.setPadding(new Insets(7, 10, 7, 10));
-            fila.getStyleClass().add("surface-card-subtle");
-            fila.setStyle("-fx-cursor: hand; -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-background-radius: 8;");
+            fila.getStyleClass().add("fc-option-row-interactive");
 
             CheckBox chk = new CheckBox(mod.getNombre());
             chk.setId("chkMod_" + mod.getIdModificador());
@@ -303,7 +302,7 @@ public class PersonalizacionProductoController {
                                                                   List<ProductoVariante> variantes,
                                                                   List<ProductoModificador> modificadores) {
         try {
-            FXMLLoader loader = new FXMLLoader(
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
                     PersonalizacionProductoController.class.getResource("/com/foodcore/view/PersonalizacionProductoView.fxml"));
             Parent root = loader.load();
             PersonalizacionProductoController ctrl = loader.getController();

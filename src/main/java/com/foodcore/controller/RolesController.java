@@ -1,11 +1,10 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.RolDAO;
-import com.foodcore.dao.impl.RolDAOImpl;
 import com.foodcore.model.Rol;
+import com.foodcore.service.RolGestionService;
 import com.foodcore.model.enums.Permiso;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -24,8 +23,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -56,7 +53,7 @@ public class RolesController {
 
     @FXML private VBox boxMatrizPermisos;
 
-    private final RolDAO rolDAO = new RolDAOImpl();
+    private final RolGestionService rolService = new RolGestionService();
     private final ObservableList<Rol> listaRoles = FXCollections.observableArrayList();
     private final Map<Permiso, CheckBox> mapCheckboxes = new HashMap<>();
     private Rol rolSeleccionadoActual;
@@ -83,7 +80,9 @@ public class RolesController {
     }
 
     public static String getPermisoLabel(Permiso permiso) {
-        if (permiso == null) return "";
+        if (permiso == null) {
+            return "";
+        }
         return switch (permiso) {
             case PEDIDO_CREAR -> "Crear Pedido y abrir mesa";
             case PEDIDO_ADICIONAR -> "Adicionar ítems a pedido";
@@ -147,14 +146,7 @@ public class RolesController {
     }
 
     public void cargarRolesSincrono() {
-        List<Rol> resultado = new ArrayList<>();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                resultado = rolDAO.listarTodos(conn);
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error cargando roles de BD sincrónicamente: " + e.getMessage());
-        }
+        List<Rol> resultado = rolService.listarTodos();
 
         listaRoles.setAll(resultado);
         if (!listaRoles.isEmpty()) {
@@ -164,21 +156,16 @@ public class RolesController {
     }
 
     public void seleccionarRolSincrono(Rol r) {
-        if (r == null) return;
+        if (r == null) {
+            return;
+        }
         this.rolSeleccionadoActual = r;
         lblRolSeleccionadoTitulo.setText("Permisos del Rol: " + r.getNombre() + " (" + r.getCodigo() + ")");
         lblRolDescripcion.setText(r.getDescripcion() != null ? r.getDescripcion() : "Sin descripción.");
 
         mapCheckboxes.values().forEach(chk -> chk.setSelected(false));
 
-        Set<Permiso> permisos = EnumSet.noneOf(Permiso.class);
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                permisos = rolDAO.obtenerPermisosPorRol(conn, r.getCodigo());
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Error cargando permisos del rol sincrónicamente: " + e.getMessage());
-        }
+        Set<Permiso> permisos = rolService.obtenerPermisosPorRol(r.getCodigo());
 
         for (Map.Entry<Permiso, CheckBox> entry : mapCheckboxes.entrySet()) {
             entry.getValue().setSelected(permisos.contains(entry.getKey()));
@@ -187,11 +174,7 @@ public class RolesController {
 
     public void cargarRolesDesdeBD() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return conn != null ? rolDAO.listarTodos(conn) : new ArrayList<Rol>();
-                }
-            },
+            rolService::listarTodos,
             roles -> {
                 listaRoles.setAll(roles);
                 if (!listaRoles.isEmpty()) {
@@ -215,11 +198,7 @@ public class RolesController {
 
         final String codigoRol = r.getCodigo();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return conn != null ? rolDAO.obtenerPermisosPorRol(conn, codigoRol) : EnumSet.noneOf(Permiso.class);
-                }
-            },
+            () -> rolService.obtenerPermisosPorRol(codigoRol),
             permsFinal -> {
                 for (Map.Entry<Permiso, CheckBox> entry : mapCheckboxes.entrySet()) {
                     entry.getValue().setSelected(permsFinal.contains(entry.getKey()));
@@ -249,11 +228,7 @@ public class RolesController {
             btnGuardarPermisos.setDisable(true);
         }
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    rolDAO.actualizarPermisosRol(conn, codigoRol, nuevosPermisos);
-                }
-            },
+            () -> rolService.actualizarPermisosRol(codigoRol, nuevosPermisos),
             () -> {
                 if (btnGuardarPermisos != null) {
                     btnGuardarPermisos.setDisable(false);
@@ -297,11 +272,7 @@ public class RolesController {
 
             btnGuardar.setDisable(true);
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        rolDAO.crearRol(conn, cod, nom, desc);
-                    }
-                },
+                () -> rolService.crearRol(cod, nom, desc),
                 () -> {
                     btnGuardar.setDisable(false);
                     rootRolesStack.getChildren().remove(backdrop);

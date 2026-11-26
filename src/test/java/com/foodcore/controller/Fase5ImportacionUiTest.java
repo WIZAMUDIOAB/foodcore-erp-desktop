@@ -162,17 +162,11 @@ class Fase5ImportacionUiTest {
     }
 
     private static void esperarLabelContiene(Label label, String expected, Duration timeout) throws Exception {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        String[] text = new String[1];
-        while (System.nanoTime() < deadline) {
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> text[0] = label.getText());
-            if (text[0] != null && text[0].contains(expected)) {
-                return;
-            }
-            Thread.sleep(50L);
-        }
-        assertTrue(text[0] != null && text[0].contains(expected),
-                "Se esperaba texto '" + expected + "' en label, actual: " + text[0]);
+        long timeoutSeconds = Math.max(1L, (long) Math.ceil(timeout.toMillis() / 1000.0));
+        JavaFxTestSupport.awaitCondition(() -> {
+            String current = label.getText();
+            return current != null && current.contains(expected);
+        }, timeoutSeconds, "Se esperaba texto '" + expected + "' en label");
     }
 
     private static void guardarSnapshot(Parent root, String filename) throws Exception {

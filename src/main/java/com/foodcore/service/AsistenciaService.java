@@ -27,6 +27,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.DayOfWeek;
@@ -300,10 +302,10 @@ public class AsistenciaService {
             }
 
             int rowIdx = 4;
-            double sumSueldoBase = 0;
-            double sumDescTardanza = 0;
-            double sumBonoExtra = 0;
-            double sumNeto = 0;
+            BigDecimal sumSueldoBase = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal sumDescTardanza = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal sumBonoExtra = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal sumNeto = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
             for (FilaPlanilla p : planilla) {
                 Row r = sheet.createRow(rowIdx++);
@@ -327,12 +329,19 @@ public class AsistenciaService {
                 cDias.setCellValue(p.getDiasTrabajados());
                 cDias.setCellStyle(styleData);
 
+                BigDecimal horasTot = normalizarMoneda(p.getHorasTotales());
+                BigDecimal horasExt = normalizarMoneda(p.getHorasExtra());
+                BigDecimal sueldoBase = normalizarMoneda(p.getSueldoBase());
+                BigDecimal descTardanza = normalizarMoneda(p.getDescuentoTardanza());
+                BigDecimal bonoExtra = normalizarMoneda(p.getBonoHorasExtra());
+                BigDecimal netoPagar = normalizarMoneda(p.getTotalNetoPagar());
+
                 Cell cHoras = r.createCell(5);
-                cHoras.setCellValue(p.getHorasTotales());
+                cHoras.setCellValue(horasTot.doubleValue());
                 cHoras.setCellStyle(styleData);
 
                 Cell cExt = r.createCell(6);
-                cExt.setCellValue(p.getHorasExtra());
+                cExt.setCellValue(horasExt.doubleValue());
                 cExt.setCellStyle(styleData);
 
                 Cell cTard = r.createCell(7);
@@ -340,25 +349,25 @@ public class AsistenciaService {
                 cTard.setCellStyle(styleData);
 
                 Cell cSb = r.createCell(8);
-                cSb.setCellValue(p.getSueldoBase());
+                cSb.setCellValue(sueldoBase.doubleValue());
                 cSb.setCellStyle(styleCurrency);
 
                 Cell cDesc = r.createCell(9);
-                cDesc.setCellValue(p.getDescuentoTardanza());
+                cDesc.setCellValue(descTardanza.doubleValue());
                 cDesc.setCellStyle(styleCurrency);
 
                 Cell cBono = r.createCell(10);
-                cBono.setCellValue(p.getBonoHorasExtra());
+                cBono.setCellValue(bonoExtra.doubleValue());
                 cBono.setCellStyle(styleCurrency);
 
                 Cell cNeto = r.createCell(11);
-                cNeto.setCellValue(p.getTotalNetoPagar());
+                cNeto.setCellValue(netoPagar.doubleValue());
                 cNeto.setCellStyle(styleCurrency);
 
-                sumSueldoBase += p.getSueldoBase();
-                sumDescTardanza += p.getDescuentoTardanza();
-                sumBonoExtra += p.getBonoHorasExtra();
-                sumNeto += p.getTotalNetoPagar();
+                sumSueldoBase = sumSueldoBase.add(sueldoBase).setScale(2, RoundingMode.HALF_UP);
+                sumDescTardanza = sumDescTardanza.add(descTardanza).setScale(2, RoundingMode.HALF_UP);
+                sumBonoExtra = sumBonoExtra.add(bonoExtra).setScale(2, RoundingMode.HALF_UP);
+                sumNeto = sumNeto.add(netoPagar).setScale(2, RoundingMode.HALF_UP);
             }
 
             // Fila de Totales
@@ -368,19 +377,19 @@ public class AsistenciaService {
             cTotLbl.setCellStyle(styleTotal);
 
             Cell cTotSb = rTot.createCell(8);
-            cTotSb.setCellValue(sumSueldoBase);
+            cTotSb.setCellValue(sumSueldoBase.doubleValue());
             cTotSb.setCellStyle(styleTotal);
 
             Cell cTotDesc = rTot.createCell(9);
-            cTotDesc.setCellValue(sumDescTardanza);
+            cTotDesc.setCellValue(sumDescTardanza.doubleValue());
             cTotDesc.setCellStyle(styleTotal);
 
             Cell cTotBono = rTot.createCell(10);
-            cTotBono.setCellValue(sumBonoExtra);
+            cTotBono.setCellValue(sumBonoExtra.doubleValue());
             cTotBono.setCellStyle(styleTotal);
 
             Cell cTotNeto = rTot.createCell(11);
-            cTotNeto.setCellValue(sumNeto);
+            cTotNeto.setCellValue(sumNeto.doubleValue());
             cTotNeto.setCellStyle(styleTotal);
 
             for (int i = 0; i < headers.length; i++) {
@@ -621,5 +630,11 @@ public class AsistenciaService {
             case SATURDAY -> "SABADO";
             case SUNDAY -> "DOMINGO";
         };
+    }
+
+    private static BigDecimal normalizarMoneda(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 }

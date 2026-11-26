@@ -9,6 +9,7 @@ import com.foodcore.model.Pedido;
 import com.foodcore.model.Promocion;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.PagoSplit;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AlertaService;
 import com.foodcore.service.AuthService;
@@ -18,6 +19,7 @@ import com.foodcore.service.FinanzasService;
 import com.foodcore.service.ImportacionMasivaService;
 import com.foodcore.service.PromocionService;
 import com.foodcore.service.VentaService;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.util.ExportFileChooserHelper;
 import com.foodcore.util.ImpresoraTermicaService;
 import com.foodcore.util.ToastService;
@@ -81,15 +83,15 @@ class HardeningFinanceUnitTest {
     void testValidacionesPreviasFinanzasYVenta() {
         FinanzasService fin = new FinanzasService();
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarPagoProveedor(1, Double.NaN, "EFECTIVO", null, 1, "NaN"));
+                () -> fin.registrarPagoProveedor(1, null, "EFECTIVO", null, 1, "Null"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarPagoProveedor(1, Double.POSITIVE_INFINITY, "EFECTIVO", null, 1, "Inf"));
+                () -> fin.registrarPagoProveedor(1, new BigDecimal("-10.00"), "EFECTIVO", null, 1, "Neg"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarCobroCliente(1, 0.0, "EFECTIVO", null, 1, "Zero"));
+                () -> fin.registrarCobroCliente(1, BigDecimal.ZERO, "EFECTIVO", null, 1, "Zero"));
         assertThrows(IllegalArgumentException.class,
-                () -> fin.registrarCambioPrecioConMotivo("PRODUCTO", 1, "P", 10.0, -5.0, 1, "Neg", null));
+                () -> fin.registrarCambioPrecioConMotivo("PRODUCTO", 1, "P", new BigDecimal("10.0000"), new BigDecimal("-5.0000"), 1, "Neg", null));
 
-        VentaService vs = new VentaService();
+        VentaService vs = new VentaServiceImpl();
         DetalleVenta d50 = new DetalleVenta(0, 0, 1, "Plato", 1, new BigDecimal("50.00"), new BigDecimal("50.00"));
         Venta spoof = new Venta();
         spoof.setIdUsuario(1);
@@ -104,8 +106,8 @@ class HardeningFinanceUnitTest {
 
         assertThrows(NegocioException.class, () -> vs.registrarVentaDividida(
                 vOk, List.of(d50), null,
-                List.of(new VentaService.PagoSplit("EFECTIVO", new BigDecimal("60.00")),
-                        new VentaService.PagoSplit("TARJETA", new BigDecimal("-10.00")))));
+                List.of(new PagoSplit("EFECTIVO", new BigDecimal("60.00")),
+                        new PagoSplit("TARJETA", new BigDecimal("-10.00")))));
     }
 
     @Test

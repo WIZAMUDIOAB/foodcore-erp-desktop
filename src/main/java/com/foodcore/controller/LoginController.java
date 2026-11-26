@@ -1,17 +1,15 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.impl.AuditoriaDAOImpl;
+import com.foodcore.config.AppContainer;
+import com.foodcore.controller.dashboard.LifecycleAwareController;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Usuario;
-import com.foodcore.model.enums.Permiso;
-import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.SesionManager;
-import com.foodcore.security.SesionUsuario;
 import com.foodcore.security.TotpService;
+import com.foodcore.service.AuditoriaConsultaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.OnboardingService;
-import com.foodcore.service.impl.AuthServiceImpl;
 import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.animation.Animation;
@@ -46,18 +44,15 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Controlador de la pantalla de inicio de sesión (§3 y §4 de UI-REDESIGN-SPEC-FOODCORE-v1.1).
  */
-public class LoginController {
+public class LoginController implements LifecycleAwareController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoginController.class);
     static final String MENSAJE_ERROR_BD_DESACTUALIZADA =
@@ -82,9 +77,9 @@ public class LoginController {
     @FXML private Button btnCancelarTotp;
 
     private final AuthService authService;
-    private final OnboardingService onboardingService = new OnboardingService();
-    private final TotpService totpService = new TotpService();
-    private final AuditoriaDAOImpl auditoriaDAO = new AuditoriaDAOImpl();
+    private final OnboardingService onboardingService;
+    private final TotpService totpService;
+    private final AuditoriaConsultaService auditoriaService;
     private Parent dialogoPasswordActivo;
     private PasswordChangeDialogController dialogoPasswordController;
     private Usuario usuarioPendiente2FA;
@@ -93,11 +88,31 @@ public class LoginController {
     private boolean autenticating = false;
 
     public LoginController() {
-        this(new AuthServiceImpl());
+        this(AppContainer.getDefault());
+    }
+
+    private LoginController(AppContainer container) {
+        this(container.authService(),
+                container.resolve(OnboardingService.class),
+                container.resolve(TotpService.class),
+                container.auditoriaConsultaService());
     }
 
     LoginController(AuthService authService) {
+        this(authService,
+                AppContainer.getDefault().resolve(OnboardingService.class),
+                AppContainer.getDefault().resolve(TotpService.class),
+                AppContainer.getDefault().auditoriaConsultaService());
+    }
+
+    public LoginController(AuthService authService,
+                           OnboardingService onboardingService,
+                           TotpService totpService,
+                           AuditoriaConsultaService auditoriaService) {
         this.authService = Objects.requireNonNull(authService, "authService no puede ser nulo");
+        this.onboardingService = Objects.requireNonNull(onboardingService, "onboardingService no puede ser nulo");
+        this.totpService = Objects.requireNonNull(totpService, "totpService no puede ser nulo");
+        this.auditoriaService = Objects.requireNonNull(auditoriaService, "auditoriaService no puede ser nulo");
     }
 
     @FXML
@@ -115,6 +130,7 @@ public class LoginController {
         if (auroraCanvas == null) {
             return;
         }
+        detenerAnimacionAurora();
         if (rootStackPane != null) {
             auroraCanvas.widthProperty().bind(rootStackPane.widthProperty());
             auroraCanvas.heightProperty().bind(rootStackPane.heightProperty());
@@ -172,6 +188,11 @@ public class LoginController {
         gc.fillRect(0, 0, w, h);
     }
 
+    @Override
+    public void detenerRecursos() {
+        detenerAnimacionAurora();
+    }
+
     /**
      * Detiene la línea de tiempo del fondo Aurora al abandonar la vista de Login.
      */
@@ -188,8 +209,6 @@ public class LoginController {
     public Canvas getAuroraCanvas() {
         return auroraCanvas;
     }
-
-    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     @FXML
     private void handleLogin() {
@@ -237,7 +256,7 @@ public class LoginController {
         }
         Usuario usuario = authService.login(user, pass);
         if (usuario != null && usuario.isTotpHabilitado()) {
-            AuthService.logout();
+            SesionManager.cerrarSesion();
         }
         return usuario;
     }
@@ -253,7 +272,7 @@ public class LoginController {
         // Si una subclase de prueba sobrescribe únicamente login(String, String), respetarla sin saltar el mock.
         boolean declaraLoginEnSubclase = false;
         boolean declaraStatelessEnSubclase = false;
-        if (clazz != AuthService.class && clazz != AuthServiceImpl.class) {
+        if (clazz.getSuperclass() != Object.class) {
             try {
                 clazz.getDeclaredMethod("login", String.class, String.class);
                 declaraLoginEnSubclase = true;
@@ -277,26 +296,7 @@ public class LoginController {
         if (usuario == null) {
             return;
         }
-        try {
-            Method m = authService.getClass().getMethod("establecerSesionActiva", Usuario.class);
-            m.invoke(authService, usuario);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // Fallback previo a merge con swarm/auth-api-sec
-        } catch (IllegalAccessException | InvocationTargetException ex) {
-            LOGGER.warn("No se pudo invocar AuthService.establecerSesionActiva; usando respaldo directo", ex);
-        }
-        Set<Permiso> permisos = AutorizacionService.permisosPorDefectoParaRol(usuario.getNombreRol());
-        SesionUsuario sesion = new SesionUsuario(
-                usuario.getIdUsuario(),
-                usuario.getNombreEmpleado() != null ? usuario.getNombreEmpleado() : usuario.getUsername(),
-                usuario.getNombreRol(),
-                permisos,
-                "POS-01",
-                LocalDateTime.now(ZONA_LIMA)
-        );
-        SesionManager.iniciarSesion(sesion, usuario.isCambioPasswordRequerido());
-        AuthService.setUsuarioSesionActual(usuario);
+        authService.establecerSesionActiva(usuario);
     }
 
     /**
@@ -311,7 +311,7 @@ public class LoginController {
             return;
         }
         if (usuario.isTotpHabilitado()) {
-            AuthService.logout();
+            SesionManager.cerrarSesion();
             abrirModalTotp(usuario);
             return;
         }
@@ -350,7 +350,7 @@ public class LoginController {
         }
         String codigo = txtTotpCodigo != null ? txtTotpCodigo.getText() : "";
         if (!totpService.verificarCodigo(usuarioPendiente2FA.getTotpSecret(), codigo)) {
-            auditoriaDAO.registrarEventoBestEffort(
+            auditoriaService.registrarEventoBestEffort(
                     usuarioPendiente2FA.getIdUsuario(),
                     "2FA_FALLIDO",
                     "USUARIO",
@@ -370,7 +370,7 @@ public class LoginController {
     @FXML
     public void handleCancelarTotp() {
         cerrarModalTotp();
-        AuthService.logout();
+        SesionManager.cerrarSesion();
         if (txtPassword != null) {
             txtPassword.clear();
             txtPassword.requestFocus();
@@ -478,7 +478,8 @@ public class LoginController {
     public void abrirDialogoCambioPassword(Usuario usuario) {
         try {
             cerrarDialogoCambioPassword();
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/PasswordChangeDialog.fxml"));
             Parent dialogRoot = loader.load();
             PasswordChangeDialogController ctrl = loader.getController();
 
@@ -530,14 +531,14 @@ public class LoginController {
         String vistaObjetivo = requiereOnboarding
                 ? "/com/foodcore/view/OnboardingWizardView.fxml"
                 : "/com/foodcore/view/MainLayout.fxml";
-        String rol = AuthService.getUsuarioSesionActual() != null
-                ? AuthService.getUsuarioSesionActual().getNombreRol()
+        String rol = SesionManager.getUsuarioActual() != null
+                ? SesionManager.getUsuarioActual().getNombreRol()
                 : "ADMIN";
         String titulo = requiereOnboarding
                 ? "FoodCore ERP v5.5 - Configuración Inicial (Onboarding)"
                 : "FoodCore ERP v3.0 - Panel Principal [" + rol + "]";
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource(vistaObjetivo));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(getClass().getResource(vistaObjetivo));
             Parent root = loader.load();
 
             Scene currentScene = rootStackPane != null ? rootStackPane.getScene() : null;

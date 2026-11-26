@@ -3,18 +3,14 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.HistorialPrecioDAO;
-import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.impl.HistorialPrecioDAOImpl;
+
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.HistorialPrecio;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
+import com.foodcore.service.HistorialPreciosService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -28,10 +24,13 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
+import java.util.Locale;
+
 import java.util.stream.Collectors;
 
 public class HistorialPreciosController {
@@ -62,12 +61,21 @@ public class HistorialPreciosController {
     @FXML private TextField txtModalMotivo;
     @FXML private Label lblModalAjusteError;
 
-    private final HistorialPrecioDAO historialDAO = new HistorialPrecioDAOImpl();
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final InsumoDAO insumoDAO = new InsumoDAOImpl();
-    private final FinanzasService finanzasService = new FinanzasService();
+    private final HistorialPreciosService historialPreciosService;
+    private final FinanzasService finanzasService;
 
     private final ObservableList<HistorialPrecio> listaHistorial = FXCollections.observableArrayList();
+
+    public HistorialPreciosController() {
+        this(AppContainer.getDefault().resolve(HistorialPreciosService.class),
+                AppContainer.getDefault().finanzasService());
+    }
+
+    public HistorialPreciosController(HistorialPreciosService historialPreciosService, FinanzasService finanzasService) {
+        this.historialPreciosService =
+                java.util.Objects.requireNonNull(historialPreciosService, "historialPreciosService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+    }
 
     @FXML
     public void initialize() {
@@ -81,12 +89,12 @@ public class HistorialPreciosController {
         colFecha.setCellValueFactory(h -> new SimpleStringProperty(h.getValue().getFechaCambio() != null ? h.getValue().getFechaCambio().format(dtf) : "-"));
         colTipo.setCellValueFactory(h -> new SimpleStringProperty(h.getValue().getTipoEntidad()));
         colEntidad.setCellValueFactory(h -> new SimpleStringProperty(h.getValue().getNombreEntidad()));
-        colPrecioAnt.setCellValueFactory(h -> new SimpleStringProperty(String.format("S/ %.2f", h.getValue().getPrecioAnterior())));
-        colPrecioNuevo.setCellValueFactory(h -> new SimpleStringProperty(String.format("S/ %.2f", h.getValue().getPrecioNuevo())));
+        colPrecioAnt.setCellValueFactory(h -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", h.getValue().getPrecioAnterior())));
+        colPrecioNuevo.setCellValueFactory(h -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", h.getValue().getPrecioNuevo())));
         colVariacion.setCellValueFactory(h -> {
-            double var = h.getValue().getVariacionPorcentual();
-            String prefix = var >= 0 ? "+" : "";
-            return new SimpleStringProperty(prefix + String.format("%.1f%%", var));
+            BigDecimal var = h.getValue().getVariacionPorcentual();
+            String prefix = var.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
+            return new SimpleStringProperty(prefix + String.format(Locale.US, "%.1f%%", var));
         });
         colUsuario.setCellValueFactory(h -> new SimpleStringProperty(h.getValue().getNombreUsuario()));
         colMotivo.setCellValueFactory(h -> new SimpleStringProperty(h.getValue().getMotivo()));
@@ -118,15 +126,13 @@ public class HistorialPreciosController {
         final String filtroTipo = cbFiltroTipo.getValue();
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    List<HistorialPrecio> todos = historialDAO.listarTodos(conn);
-                    if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
-                        return todos.stream()
-                            .filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad()))
-                            .collect(Collectors.toList());
-                    }
-                    return todos;
+                List<HistorialPrecio> todos = historialPreciosService.listarHistorial();
+                if (filtroTipo != null && !"TODOS".equals(filtroTipo)) {
+                    return todos.stream()
+                        .filter(h -> filtroTipo.equalsIgnoreCase(h.getTipoEntidad()))
+                        .collect(Collectors.toList());
                 }
+                return todos;
             },
             todos -> {
                 listaHistorial.setAll(todos);
@@ -172,19 +178,26 @@ public class HistorialPreciosController {
             return;
         }
 
-        double pAnt, pNuevo;
+        BigDecimal pAnt;
+        BigDecimal pNuevo;
         try {
-            pAnt = Double.parseDouble(txtModalPrecioAnt.getText().trim());
-            pNuevo = Double.parseDouble(txtModalPrecioNuevo.getText().trim());
-        } catch (Exception ex) {
+            String antTexto = txtModalPrecioAnt.getText() != null
+                    ? txtModalPrecioAnt.getText().trim().replace(',', '.')
+                    : "";
+            String nuevoTexto = txtModalPrecioNuevo.getText() != null
+                    ? txtModalPrecioNuevo.getText().trim().replace(',', '.')
+                    : "";
+            pAnt = new BigDecimal(antTexto).setScale(4, RoundingMode.HALF_UP);
+            pNuevo = new BigDecimal(nuevoTexto).setScale(4, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ex) {
             lblModalAjusteError.setText("Ingrese valores numéricos válidos para precios");
             return;
         }
 
         final String tipoFinal = tipo;
         final String nombreFinal = nombre;
-        final double pAntFinal = pAnt;
-        final double pNuevoFinal = pNuevo;
+        final BigDecimal pAntFinal = pAnt;
+        final BigDecimal pNuevoFinal = pNuevo;
         final String motivoFinal = motivo;
         final int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
         final String usuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getUsername() : "admin";
@@ -193,14 +206,14 @@ public class HistorialPreciosController {
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
                 int idEntidad = 1;
-                try (Connection conn = ConexionBD.getConnection()) {
+                try {
                     if ("PRODUCTO".equalsIgnoreCase(tipoFinal)) {
-                        List<Producto> prods = productoDAO.listarTodos(conn);
+                        List<Producto> prods = historialPreciosService.listarCatalogosPrecios().productos();
                         if (!prods.isEmpty()) {
                             idEntidad = prods.get(0).getIdProducto();
                         }
                     } else {
-                        List<Insumo> ins = insumoDAO.listarTodos(conn);
+                        List<Insumo> ins = historialPreciosService.listarCatalogosPrecios().insumos();
                         if (!ins.isEmpty()) {
                             idEntidad = (int) ins.get(0).getIdInsumo();
                         }

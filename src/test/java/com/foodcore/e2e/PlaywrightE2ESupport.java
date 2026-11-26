@@ -3,6 +3,7 @@ package com.foodcore.e2e;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodcore.api.ApiServer;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.support.TestSecuritySupport;
 import com.foodcore.util.ConexionBD;
@@ -124,12 +125,7 @@ public final class PlaywrightE2ESupport {
                 segundos = RETRY_AFTER_MAX_SEGUNDOS;
             }
         }
-        try {
-            Thread.sleep(segundos * 1000L);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Espera de Retry-After interrumpida", e);
-        }
+        AsyncTestSupport.pauseBounded(Duration.ofSeconds(segundos));
     }
 
     /**

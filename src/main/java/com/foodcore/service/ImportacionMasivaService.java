@@ -3,7 +3,7 @@ package com.foodcore.service;
 import com.foodcore.dao.CategoriaDAO;
 import com.foodcore.dao.CategoriaDAOImpl;
 import com.foodcore.dao.InsumoDAO;
-import com.foodcore.dao.InsumoDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
 import com.foodcore.dao.ProductoDAO;
 import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;

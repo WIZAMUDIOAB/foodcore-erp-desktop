@@ -1,8 +1,7 @@
 package com.foodcore.controller;
 
 import com.foodcore.App;
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.DetalleVenta;
 import com.foodcore.model.Pedido;
@@ -14,7 +13,6 @@ import com.foodcore.util.AnimationUtils;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
-import com.foodcore.util.ConexionBD;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
@@ -34,7 +32,6 @@ import javafx.stage.Stage;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -58,11 +55,24 @@ public class SalonMesasController {
 
     @FXML private FlowPane flowMesas;
 
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
-    private final SalonService salonService = new SalonService();
-    private final ReservasService reservasService = new ReservasService();
-    private final ImpresoraTermicaService impresoraService = new ImpresoraTermicaService();
+    private final SalonService salonService;
+    private final ReservasService reservasService;
+    private final ImpresoraTermicaService impresoraService;
     private final Map<String, Pedido> pedidosActivosPorMesa = new HashMap<>();
+
+    public SalonMesasController() {
+        this(AppContainer.getDefault().resolve(SalonService.class),
+                AppContainer.getDefault().resolve(ReservasService.class),
+                AppContainer.getDefault().resolve(ImpresoraTermicaService.class));
+    }
+
+    public SalonMesasController(SalonService salonService,
+                                ReservasService reservasService,
+                                ImpresoraTermicaService impresoraService) {
+        this.salonService = java.util.Objects.requireNonNull(salonService, "salonService");
+        this.reservasService = java.util.Objects.requireNonNull(reservasService, "reservasService");
+        this.impresoraService = java.util.Objects.requireNonNull(impresoraService, "impresoraService");
+    }
 
     @FXML
     public void initialize() {
@@ -74,13 +84,11 @@ public class SalonMesasController {
             return;
         }
         pedidosActivosPorMesa.clear();
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
-                for (Pedido p : activos) {
-                    if (p.getNumeroMesa() != null) {
-                        pedidosActivosPorMesa.put(p.getNumeroMesa(), p);
-                    }
+        try {
+            List<Pedido> activos = salonService.listarPedidosActivosConConexion();
+            for (Pedido p : activos) {
+                if (p.getNumeroMesa() != null) {
+                    pedidosActivosPorMesa.put(p.getNumeroMesa(), p);
                 }
             }
         } catch (Exception e) {
@@ -98,14 +106,10 @@ public class SalonMesasController {
         UiAsyncExecutor.ejecutarAsync(
             () -> {
                 Map<String, Pedido> nuevosPedidos = new HashMap<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    if (conn != null) {
-                        List<Pedido> activos = pedidoDAO.listarPedidosActivos(conn);
-                        for (Pedido p : activos) {
-                            if (p.getNumeroMesa() != null) {
-                                nuevosPedidos.put(p.getNumeroMesa(), p);
-                            }
-                        }
+                List<Pedido> activos = salonService.listarPedidosActivosConConexion();
+                for (Pedido p : activos) {
+                    if (p.getNumeroMesa() != null) {
+                        nuevosPedidos.put(p.getNumeroMesa(), p);
                     }
                 }
                 return nuevosPedidos;
@@ -182,17 +186,19 @@ public class SalonMesasController {
                         tieneReserva = true;
                         horaRes = resOpt.get().getHoraTexto();
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ex) {
+                    LOGGER.log(Level.WARNING, "No se pudo consultar reserva próxima para mesa " + numMesa, ex);
+                }
 
                 if (tieneReserva) {
                     btnMesa.getStyleClass().add("mesa-card-reservada");
                     lblBadge.setText("RESERVADA " + horaRes);
-                    lblBadge.setStyle("-fx-background-color: #FFFBEB; -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 2 8;");
+                    lblBadge.getStyleClass().add("fc-mesa-badge-warning");
                 } else {
                     btnMesa.getStyleClass().add("mesa-card-libre");
                     lblBadge.setText("LIBRE");
+                    lblBadge.getStyleClass().add("badge-pill-neutral");
                 }
-                lblBadge.getStyleClass().add("badge-pill-neutral");
                 lblTiempoOcupacion.setText("Disponible · 4 pax");
                 lblImporte.setText("S/ 0.00");
                 lblImporte.getStyleClass().setAll("text-mono-sm");
@@ -226,7 +232,8 @@ public class SalonMesasController {
 
     private void abrirTomaPedido(String mesa, Pedido pedidoExistente) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/MozoOrderView.fxml"));
             Parent root = loader.load();
 
             MozoOrderController controller = loader.getController();
@@ -364,11 +371,7 @@ public class SalonMesasController {
 
     public void emitirPreCuentaMesa(String mesa, Pedido pedido) {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-                }
-            },
+            () -> salonService.listarDetallesPedido(pedido.getIdPedido()),
             detalles -> {
                 if (detalles.isEmpty()) {
                     ToastService.mostrarAdvertencia("La comanda no tiene platos registrados.");
@@ -419,7 +422,8 @@ public class SalonMesasController {
     @FXML
     public void handleAbrirReservas() {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/ReservasView.fxml"));
+            FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/ReservasView.fxml"));
             Parent root = loader.load();
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
@@ -436,11 +440,7 @@ public class SalonMesasController {
 
     private void abrirLiquidacionFiscalMesa(String mesa, Pedido pedido) {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return pedidoDAO.listarDetallesPorPedido(conn, pedido.getIdPedido());
-                }
-            },
+            () -> salonService.listarDetallesPedido(pedido.getIdPedido()),
             detallesPed -> {
                 if (detallesPed.isEmpty()) {
                     ToastService.mostrarAdvertencia("El pedido no contiene ítems para facturar.");
@@ -463,7 +463,8 @@ public class SalonMesasController {
                 }
 
                 try {
-                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
+                    FXMLLoader loader = AppContainer.getDefault().createLoader(
+                            getClass().getResource("/com/foodcore/view/CobroModalView.fxml"));
                     Parent root = loader.load();
 
                     CobroModalController ctrl = loader.getController();

@@ -1,5 +1,8 @@
 package com.foodcore.e2e;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.foodcore.support.MySqlIntegrationTestSupport;
+import com.foodcore.util.ConexionBD;
 import com.microsoft.playwright.APIRequestContext;
 import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Browser;
@@ -14,6 +17,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class SubFaseDKdsE2ETest {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final List<Integer> PEDIDOS_SEMBRADOS = Collections.synchronizedList(new ArrayList<>());
+
     @BeforeAll
     static void setUpServer() {
         PlaywrightE2ESupport.asegurarServidorActivo();
@@ -37,6 +47,7 @@ public class SubFaseDKdsE2ETest {
     }
 
     private static void sembrarPedidosPendientesParaKds() {
+        PEDIDOS_SEMBRADOS.clear();
         try (Playwright playwright = PlaywrightE2ESupport.crearPlaywright()) {
             APIRequestContext mozoReq = PlaywrightE2ESupport.crearApiRequestContextAutenticado(playwright, "MOZO");
             crearPedidoKds(mozoReq, "04", 1, "KDS E2E - Hamburguesa Royal");
@@ -60,11 +71,48 @@ public class SubFaseDKdsE2ETest {
         assertTrue(resp.status() == 201 || resp.status() == 200,
                 "Debe crearse pedido real PENDIENTE para KDS en mesa " + mesa
                         + "; recibido " + resp.status() + ": " + resp.text());
+        try {
+            int idPedido = MAPPER.readTree(resp.text()).path("id_pedido").asInt(0);
+            if (idPedido > 0) {
+                PEDIDOS_SEMBRADOS.add(idPedido);
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo leer id_pedido de respuesta KDS: " + resp.text(), e);
+        }
     }
 
     @AfterAll
     static void tearDownServer() {
+        limpiarPedidosSembrados();
         PlaywrightE2ESupport.detenerServidorSiCorresponde();
+    }
+
+    private static void limpiarPedidosSembrados() {
+        List<Integer> ids;
+        synchronized (PEDIDOS_SEMBRADOS) {
+            ids = new ArrayList<>(PEDIDOS_SEMBRADOS);
+            PEDIDOS_SEMBRADOS.clear();
+        }
+        String activeJdbcUrl = MySqlIntegrationTestSupport.getActiveJdbcUrl();
+        if (ids.isEmpty() || activeJdbcUrl == null || activeJdbcUrl.isBlank()) {
+            return;
+        }
+        MySqlIntegrationTestSupport.validarEsquemaDePruebas(activeJdbcUrl);
+        try (Connection conn = ConexionBD.getConnection()) {
+            try (PreparedStatement psDel = conn.prepareStatement("DELETE FROM pedido WHERE id_pedido = ?")) {
+                for (Integer idPedido : ids) {
+                    psDel.setInt(1, idPedido);
+                    psDel.addBatch();
+                }
+                psDel.executeBatch();
+            }
+            try (PreparedStatement psMesas = conn.prepareStatement(
+                    "UPDATE mesa SET estado = 'LIBRE' WHERE numero IN ('04', '06', '08', '4', '6', '8')")) {
+                psMesas.executeUpdate();
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudieron limpiar pedidos sembrados por SubFaseDKdsE2ETest", e);
+        }
     }
 
     @Test

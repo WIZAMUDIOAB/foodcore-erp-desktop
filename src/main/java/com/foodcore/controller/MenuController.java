@@ -1,9 +1,6 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.CategoriaDAO;
-import com.foodcore.dao.CategoriaDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
+import com.foodcore.config.AppContainer;
 import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Combo;
@@ -11,17 +8,22 @@ import com.foodcore.model.ComboDetalle;
 import com.foodcore.model.Producto;
 import com.foodcore.model.ProductoModificador;
 import com.foodcore.model.ProductoVariante;
+import com.foodcore.controller.menu.DefaultMenuCrudPresenter;
+import com.foodcore.controller.menu.DefaultMenuComboCoordinator;
+import com.foodcore.controller.menu.DefaultMenuPersonalizacionCoordinator;
+import com.foodcore.controller.menu.LocalMenuImagenStorage;
+import com.foodcore.controller.menu.MenuComboCoordinator;
+import com.foodcore.controller.menu.MenuCrudPresenter;
+import com.foodcore.controller.menu.MenuImagenStorage;
+import com.foodcore.controller.menu.MenuPersonalizacionCoordinator;
+import com.foodcore.controller.menu.MenuTablaUiConfigurer;
 import com.foodcore.service.ComboService;
 import com.foodcore.service.ImportacionMasivaService;
+import com.foodcore.service.MenuGestionService;
 import com.foodcore.service.PersonalizacionProductoService;
-import com.foodcore.service.impl.ComboServiceImpl;
-import com.foodcore.service.impl.PersonalizacionProductoServiceImpl;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImportacionUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -29,13 +31,11 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
@@ -48,22 +48,14 @@ import javafx.stage.FileChooser;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 
 /**
  * Controlador de Gestión de Menú y Fotografías según SPEC-FOODCORE-v1.2 (§2.2):
@@ -75,6 +67,8 @@ public class MenuController {
 
     private static final Logger LOGGER = Logger.getLogger(MenuController.class.getName());
     public static final Path DIRECTORIO_UPLOADS = Path.of("uploads", "platillos");
+    private static final MenuImagenStorage IMAGEN_STORAGE_STATIC = new LocalMenuImagenStorage();
+    private static final MenuCrudPresenter CRUD_STATICS = new DefaultMenuCrudPresenter();
     private static final String MODO_PRECIO_FIJO = "Precio Fijo (S/)";
     private static final String MODO_PRECIO_ADICIONAL = "+ Adicional (S/)";
 
@@ -144,11 +138,10 @@ public class MenuController {
     @FXML private Button btnEliminarModificadorGlobal;
     @FXML private ListView<ProductoModificador> lstModificadoresGlobales;
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final CategoriaDAO categoriaDAO = new CategoriaDAOImpl();
-    private final ImportacionMasivaService importacionMasivaService = new ImportacionMasivaService();
-    private final PersonalizacionProductoService personalizacionService = new PersonalizacionProductoServiceImpl();
-    private final ComboService comboService = new ComboServiceImpl();
+    private final MenuGestionService menuGestionService;
+    private final ImportacionMasivaService importacionMasivaService;
+    private final PersonalizacionProductoService personalizacionService;
+    private final ComboService comboService;
     private final ObservableList<Producto> listaProductos = FXCollections.observableArrayList();
     private final ObservableList<Producto> listaProductosSimples = FXCollections.observableArrayList();
     private final ObservableList<Categoria> listaCategorias = FXCollections.observableArrayList();
@@ -160,6 +153,50 @@ public class MenuController {
     private Integer idComboEnEdicion;
     private Integer idComboProductoEnEdicion;
     private String rutaImagenRelativaActual;
+    private final MenuImagenStorage imagenStorage;
+    private final MenuCrudPresenter crudPresenter;
+    private final MenuPersonalizacionCoordinator personalizacionCoordinator;
+    private final MenuComboCoordinator comboCoordinator;
+    private final MenuTablaUiConfigurer tablaUiConfigurer;
+
+    public MenuController() {
+        this(AppContainer.getDefault().resolve(MenuGestionService.class),
+                AppContainer.getDefault().resolve(ImportacionMasivaService.class),
+                AppContainer.getDefault().personalizacionProductoService(),
+                AppContainer.getDefault().comboService());
+    }
+
+    public MenuController(MenuGestionService menuGestionService,
+                          ImportacionMasivaService importacionMasivaService,
+                          PersonalizacionProductoService personalizacionService,
+                          ComboService comboService) {
+        this.menuGestionService = java.util.Objects.requireNonNull(menuGestionService, "menuGestionService");
+        this.importacionMasivaService =
+                java.util.Objects.requireNonNull(importacionMasivaService, "importacionMasivaService");
+        this.personalizacionService =
+                java.util.Objects.requireNonNull(personalizacionService, "personalizacionService");
+        this.comboService = java.util.Objects.requireNonNull(comboService, "comboService");
+        this.imagenStorage = new LocalMenuImagenStorage();
+        this.crudPresenter = new DefaultMenuCrudPresenter(this.menuGestionService, this.personalizacionService);
+        this.personalizacionCoordinator = new DefaultMenuPersonalizacionCoordinator(this.personalizacionService);
+        this.comboCoordinator = new DefaultMenuComboCoordinator(this.comboService);
+        this.tablaUiConfigurer = new MenuTablaUiConfigurer();
+    }
+
+    public MenuController(MenuImagenStorage imagenStorage, MenuCrudPresenter crudPresenter,
+                          MenuPersonalizacionCoordinator personalizacionCoordinator,
+                          MenuComboCoordinator comboCoordinator, MenuTablaUiConfigurer tablaUiConfigurer) {
+        AppContainer c = AppContainer.getDefault();
+        this.imagenStorage = imagenStorage;
+        this.crudPresenter = crudPresenter;
+        this.personalizacionCoordinator = personalizacionCoordinator;
+        this.comboCoordinator = comboCoordinator;
+        this.tablaUiConfigurer = tablaUiConfigurer;
+        this.menuGestionService = c.resolve(MenuGestionService.class);
+        this.importacionMasivaService = c.resolve(ImportacionMasivaService.class);
+        this.personalizacionService = c.personalizacionProductoService();
+        this.comboService = c.comboService();
+    }
 
     @FXML
     public void initialize() {
@@ -187,197 +224,17 @@ public class MenuController {
     }
 
     private void configurarTabla() {
-        colImagen.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getImagenUrl()));
-        colNombre.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNombre()));
-        colCategoria.setCellValueFactory(c -> new SimpleStringProperty(
-            c.getValue().getNombreCategoria() != null ? c.getValue().getNombreCategoria() : "General"
-        ));
-        colPrecio.setCellValueFactory(c -> {
-            BigDecimal pr = c.getValue().getPrecioVenta() != null
-                ? c.getValue().getPrecioVenta().setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            return new SimpleStringProperty("S/ " + pr);
-        });
-        colEstado.setCellValueFactory(c -> new SimpleStringProperty(
-            c.getValue().isDisponible() ? "DISPONIBLE" : "AGOTADO"
-        ));
-        if (colMenuDia != null) {
-            colMenuDia.setCellValueFactory(c -> new SimpleStringProperty(
-                c.getValue().isEsMenuDelDia() ? "MENÚ DÍA" : "-"
-            ));
-        }
-        if (colOpciones != null) {
-            colOpciones.setCellValueFactory(c -> new SimpleStringProperty(
-                formatearResumenOpcionesProducto(c.getValue())
-            ));
-        }
-
-        colImagen.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                    setText(null);
-                    return;
-                }
-                Path rutaSegura = resolverImagenPlatilloSegura(item);
-                if (rutaSegura != null) {
-                    Image img = new Image(rutaSegura.toUri().toString(), 44, 34, true, true);
-                    ImageView iv = new ImageView(img);
-                    iv.setFitWidth(44);
-                    iv.setFitHeight(34);
-                    setGraphic(iv);
-                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                } else {
-                    Label badge = new Label(item != null && !item.isBlank() ? "FOTO" : "SIN FOTO");
-                    badge.getStyleClass().add(item != null && !item.isBlank() ? "badge-pill-accent" : "badge-pill-neutral");
-                    setGraphic(badge);
-                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                }
-            }
-        });
-
-        colNombre.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty ? null : item);
-                if (!empty) {
-                    getStyleClass().setAll("table-cell", "text-body-strong");
-                }
-            }
-        });
-
-        colCategoria.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty ? null : item);
-                if (!empty) {
-                    getStyleClass().setAll("table-cell", "text-caption");
-                }
-            }
-        });
-
-        colPrecio.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty ? null : item);
-                if (!empty) {
-                    getStyleClass().setAll("table-cell", "text-mono");
-                }
-            }
-        });
-
-        colEstado.setCellFactory(col -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setGraphic(null);
-                    setText(null);
-                } else {
-                    Label pill = new Label(item);
-                    pill.getStyleClass().add("DISPONIBLE".equalsIgnoreCase(item) ? "badge-pill-success" : "badge-pill-danger");
-                    setGraphic(pill);
-                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                }
-            }
-        });
-
-        if (colMenuDia != null) {
-            colMenuDia.setCellFactory(col -> new TableCell<>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null || "-".equals(item)) {
-                        setGraphic(null);
-                        setText(empty ? null : "-");
-                        if (!empty) {
-                            getStyleClass().setAll("table-cell", "text-caption-muted");
-                        }
-                    } else {
-                        Label pill = new Label("⭐ DÍA");
-                        pill.getStyleClass().add("badge-pill-accent");
-                        setGraphic(pill);
-                        setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                    }
-                }
-            });
-        }
-
-        if (colOpciones != null) {
-            colOpciones.setCellFactory(col -> new TableCell<>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null || "Estándar".equals(item)) {
-                        setGraphic(null);
-                        setText(empty ? null : "Estándar");
-                        if (!empty) {
-                            getStyleClass().setAll("table-cell", "text-caption-muted");
-                        }
-                    } else if ("COMBO".equalsIgnoreCase(item)) {
-                        Label pill = new Label("COMBO");
-                        pill.getStyleClass().add("badge-pill-accent");
-                        setGraphic(pill);
-                        setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                    } else {
-                        Label pill = new Label(item);
-                        pill.getStyleClass().add("badge-pill-success");
-                        setGraphic(pill);
-                        setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-                    }
-                }
-            });
-        }
-
-        tblMenu.setItems(listaProductos);
-        cmbCategoria.setItems(listaCategorias);
-        cmbCategoria.setEditable(true);
-        cmbCategoria.setConverter(new javafx.util.StringConverter<>() {
-            @Override
-            public String toString(Categoria c) {
-                return c != null ? c.getNombre() : "";
-            }
-
-            @Override
-            public Categoria fromString(String string) {
-                if (string == null || string.isBlank()) return null;
-                for (Categoria c : listaCategorias) {
-                    if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(string.trim())) {
-                        return c;
-                    }
-                }
-                return new Categoria(0, string.trim(), "Categoría autogenerada", true);
-            }
-        });
+        tablaUiConfigurer.configurarTablaMenu(tblMenu, colImagen, colNombre, colCategoria, colPrecio,
+                colEstado, colMenuDia, colOpciones, cmbCategoria, listaProductos, listaCategorias,
+                imagenStorage, DIRECTORIO_UPLOADS, MenuController::formatearResumenOpcionesProducto,
+                this::cargarEnFormulario, null, null);
     }
 
-    private record DatosMenuCarga(
-            List<Categoria> cats,
-            List<Producto> prods,
-            List<ProductoModificador> mods) {
-    }
 
     public void cargarDatosMenu() {
         final Set<Integer> seleccionadosPrevios = obtenerIdsModificadoresSeleccionadosSet();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                List<Categoria> cats = new ArrayList<>();
-                List<Producto> prods = new ArrayList<>();
-                List<ProductoModificador> modsGlobales = new ArrayList<>();
-                try (Connection conn = ConexionBD.getConnection()) {
-                    cats = productoDAO.listarCategorias(conn);
-                    prods = personalizacionService.listarTodosConOpciones(conn);
-                    modsGlobales = personalizacionService.listarModificadoresGlobales();
-                } catch (Exception e) {
-                    LOGGER.log(Level.FINE, "Error cargando menú desde BD", e);
-                }
-                return new DatosMenuCarga(cats, prods, modsGlobales);
-            },
+            crudPresenter::cargarDatosMenu,
             datos -> {
                 listaCategorias.setAll(datos.cats());
                 if (!listaCategorias.isEmpty() && cmbCategoria.getValue() == null) {
@@ -452,32 +309,21 @@ public class MenuController {
         }
 
         listaVariantesEnEdicion.setAll(p.getVariantes());
-        Set<Integer> idsAsociados = new LinkedHashSet<>();
-        for (ProductoModificador pm : p.getModificadores()) {
-            idsAsociados.add(pm.getIdModificador());
-        }
         if (listaModificadoresGlobales.isEmpty() && p.getIdProducto() > 0) {
             UiAsyncExecutor.ejecutarAsync(
                 () -> {
-                    List<ProductoModificador> globales = personalizacionService.listarModificadoresGlobales();
-                    List<ProductoVariante> vars = personalizacionService.listarVariantesPorProducto(p.getIdProducto());
-                    List<ProductoModificador> asoc = personalizacionService.listarModificadoresPorProducto(p.getIdProducto());
-                    return new Object[]{globales, vars, asoc};
+                    return personalizacionCoordinator.cargarOpcionesProducto(p.getIdProducto());
                 },
                 res -> {
                     if (productoEnEdicion == null || productoEnEdicion.getIdProducto() != p.getIdProducto()) {
                         return;
                     }
-                    @SuppressWarnings("unchecked")
-                    List<ProductoModificador> globales = (List<ProductoModificador>) res[0];
-                    @SuppressWarnings("unchecked")
-                    List<ProductoVariante> vars = (List<ProductoVariante>) res[1];
-                    @SuppressWarnings("unchecked")
-                    List<ProductoModificador> asoc = (List<ProductoModificador>) res[2];
-                    listaModificadoresGlobales.setAll(globales);
-                    listaVariantesEnEdicion.setAll(vars);
+                    MenuPersonalizacionCoordinator.OpcionesProductoCarga opciones =
+                            (MenuPersonalizacionCoordinator.OpcionesProductoCarga) res;
+                    listaModificadoresGlobales.setAll(opciones.globales());
+                    listaVariantesEnEdicion.setAll(opciones.variantes());
                     Set<Integer> ids = new LinkedHashSet<>();
-                    for (ProductoModificador pm : asoc) {
+                    for (ProductoModificador pm : opciones.asociados()) {
                         ids.add(pm.getIdModificador());
                     }
                     renderizarCheckboxesModificadores(ids);
@@ -486,7 +332,8 @@ public class MenuController {
                 ex -> LOGGER.log(Level.FINE, "Aviso cargando opciones de platillo #" + p.getIdProducto(), ex)
             );
         } else {
-            renderizarCheckboxesModificadores(idsAsociados);
+            renderizarCheckboxesModificadores(p.getModificadores().stream()
+                    .map(ProductoModificador::getIdModificador).collect(java.util.stream.Collectors.toSet()));
             actualizarBadgePersonalizacion();
         }
     }
@@ -497,46 +344,7 @@ public class MenuController {
      * o extensiones no permitidas.
      */
     public static Path resolverImagenPlatilloSegura(String imagenUrl) {
-        if (imagenUrl == null || imagenUrl.isBlank()) {
-            return null;
-        }
-        String limpio = imagenUrl.trim().replace('\\', '/');
-        if (limpio.startsWith("/")) {
-            limpio = limpio.substring(1);
-        }
-        String nombreArchivo;
-        if (limpio.startsWith("uploads/platillos/")) {
-            nombreArchivo = limpio.substring("uploads/platillos/".length());
-        } else if (!limpio.contains("/")) {
-            nombreArchivo = limpio;
-        } else {
-            return null;
-        }
-        if (nombreArchivo.contains("..")
-                || !nombreArchivo.matches("^[A-Za-z0-9._-]+\\.(?i)(png|jpg|jpeg|webp)$")) {
-            return null;
-        }
-        try {
-            Path baseDir = DIRECTORIO_UPLOADS.toAbsolutePath().normalize();
-            if (!Files.isDirectory(baseDir)) {
-                return null;
-            }
-            Path baseReal = baseDir.toRealPath();
-            try (Stream<Path> entradas = Files.list(baseReal)) {
-                Optional<Path> match = entradas
-                        .filter(p -> p.getFileName() != null && p.getFileName().toString().equals(nombreArchivo))
-                        .filter(Files::isRegularFile)
-                        .findFirst();
-                if (match.isEmpty()) {
-                    return null;
-                }
-                Path candidatoReal = match.get().toRealPath();
-                return candidatoReal.startsWith(baseReal) ? candidatoReal : null;
-            }
-        } catch (IOException ex) {
-            LOGGER.log(Level.FINE, "Imagen de platillo fuera de directorio permitido o inaccesible", ex);
-            return null;
-        }
+        return IMAGEN_STORAGE_STATIC.resolverImagenSegura(DIRECTORIO_UPLOADS, imagenUrl);
     }
 
     private void actualizarVistaPreviaImagen(String rutaRelativa) {
@@ -556,47 +364,13 @@ public class MenuController {
         }
     }
 
-    private static String resolverExtensionImagenSegura(String nombreArchivo) {
-        if (nombreArchivo == null) {
-            return null;
-        }
-        String lower = nombreArchivo.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".png")) {
-            return ".png";
-        }
-        if (lower.endsWith(".jpg")) {
-            return ".jpg";
-        }
-        if (lower.endsWith(".jpeg")) {
-            return ".jpeg";
-        }
-        if (lower.endsWith(".webp")) {
-            return ".webp";
-        }
-        return null;
-    }
 
     /**
      * Copia un archivo de imagen hacia {@code uploads/platillos/} con nombre aleatorio seguro
      * y devuelve la ruta relativa normalizada (§2.2).
      */
     public String copiarImagenAUploads(File archivoOrigen) throws IOException {
-        if (archivoOrigen == null || !archivoOrigen.exists() || !archivoOrigen.isFile()) {
-            throw new IOException("El archivo de imagen seleccionado no existe.");
-        }
-        String extSegura = resolverExtensionImagenSegura(archivoOrigen.getName());
-        if (extSegura == null) {
-            throw new IOException("Formato de imagen no permitido. Use PNG, JPG, JPEG o WEBP.");
-        }
-        Files.createDirectories(DIRECTORIO_UPLOADS);
-        Path baseReal = DIRECTORIO_UPLOADS.toAbsolutePath().normalize().toRealPath();
-        String nombreSeguro = "platillo_" + UUID.randomUUID() + extSegura;
-        Path destino = baseReal.resolve(nombreSeguro).normalize();
-        if (!destino.startsWith(baseReal)) {
-            throw new IOException("Ruta destino fuera del directorio permitido de platillos.");
-        }
-        Files.copy(archivoOrigen.toPath(), destino, StandardCopyOption.REPLACE_EXISTING);
-        String rutaRelativa = "uploads/platillos/" + nombreSeguro;
+        String rutaRelativa = imagenStorage.copiarImagen(DIRECTORIO_UPLOADS, archivoOrigen);
         this.rutaImagenRelativaActual = rutaRelativa;
         actualizarVistaPreviaImagen(rutaRelativa);
         return rutaRelativa;
@@ -612,23 +386,8 @@ public class MenuController {
                                         boolean disponible,
                                         boolean esMenuDelDia,
                                         String imagenUrl) throws SQLException {
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (productoEnEdicion != null && productoEnEdicion.getIdProducto() > 0) {
-                productoEnEdicion.setIdCategoria(idCategoria);
-                productoEnEdicion.setCodigo(codigo);
-                productoEnEdicion.setNombre(nombre);
-                productoEnEdicion.setPrecioVenta(precioVenta);
-                productoEnEdicion.setDisponible(disponible);
-                productoEnEdicion.setEsMenuDelDia(esMenuDelDia);
-                productoEnEdicion.setImagenUrl(imagenUrl);
-                productoDAO.actualizar(conn, productoEnEdicion);
-                return productoEnEdicion;
-            } else {
-                Producto nuevo = new Producto(0, idCategoria, codigo, nombre, "", precioVenta, BigDecimal.ZERO, disponible, imagenUrl, esMenuDelDia, esMenuDelDia ? java.time.LocalDate.now() : null);
-                productoDAO.crear(conn, nuevo);
-                return nuevo;
-            }
-        }
+        return crudPresenter.guardarPlatillo(productoEnEdicion, idCategoria, codigo, nombre, precioVenta,
+                disponible, esMenuDelDia, imagenUrl);
     }
 
     public Producto guardarPlatilloEnBDConOpciones(int idCategoria,
@@ -641,17 +400,8 @@ public class MenuController {
                                                    List<ProductoVariante> variantes,
                                                    List<Integer> idsModificadores)
             throws SQLException, NegocioException {
-        Producto guardado = guardarPlatilloEnBD(idCategoria, codigo, nombre, precioVenta, disponible, esMenuDelDia, imagenUrl);
-        if (guardado != null && guardado.getIdProducto() > 0) {
-            personalizacionService.guardarConfiguracionProducto(
-                    guardado.getIdProducto(),
-                    variantes != null ? variantes : List.of(),
-                    idsModificadores != null ? idsModificadores : List.of()
-            );
-            guardado.setVariantes(personalizacionService.listarVariantesPorProducto(guardado.getIdProducto()));
-            guardado.setModificadores(personalizacionService.listarModificadoresPorProducto(guardado.getIdProducto()));
-        }
-        return guardado;
+        return crudPresenter.guardarPlatilloConOpciones(productoEnEdicion, idCategoria, codigo, nombre,
+                precioVenta, disponible, esMenuDelDia, imagenUrl, variantes, idsModificadores);
     }
 
     public Producto guardarPlatilloEnBD(int idCategoria,
@@ -714,43 +464,16 @@ public class MenuController {
 
     @FXML
     public void handleGuardarPlatillo(ActionEvent event) {
-        String textoCat = null;
-        if (cmbCategoria.getEditor() != null && cmbCategoria.getEditor().getText() != null) {
-            textoCat = cmbCategoria.getEditor().getText().trim();
-        }
-        if ((textoCat == null || textoCat.isBlank()) && cmbCategoria.getValue() != null) {
-            textoCat = cmbCategoria.getValue().getNombre();
-        }
-        if (textoCat == null || textoCat.isBlank()) {
-            textoCat = "General";
-        }
-        final String categoriaNombre = textoCat;
-
-        Categoria catExistente = null;
-        for (Categoria c : listaCategorias) {
-            if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(categoriaNombre)) {
-                catExistente = c;
-                break;
-            }
-        }
-
-        String cod = txtCodigo.getText() != null ? txtCodigo.getText().trim() : ("PLT-" + (System.currentTimeMillis() % 10000));
-        String nom = txtNombre.getText() != null ? txtNombre.getText().trim() : "";
-        if (nom.isEmpty()) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre del platillo.", true);
-            return;
-        }
-        final BigDecimal precio;
-        try {
-            precio = new BigDecimal(txtPrecio.getText().trim()).setScale(2, RoundingMode.HALF_UP);
-        } catch (RuntimeException ex) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese un precio numérico válido.", true);
+        MenuCrudPresenter.ValidacionPlatillo validacion = crudPresenter.validarFormularioPlatillo(
+                cmbCategoria.getEditor() != null ? cmbCategoria.getEditor().getText() : null,
+                cmbCategoria.getValue(), listaCategorias, txtCodigo.getText(), txtNombre.getText(), txtPrecio.getText());
+        if (!validacion.valido()) {
+            AnimationUtils.mostrarToast(rootMenuStack, validacion.mensajeError(), true);
             return;
         }
         final boolean disp = (chkDisponible != null) ? chkDisponible.isSelected() : chkActivo.isSelected();
         final boolean menuDia = (chkMenuDelDia != null) && chkMenuDelDia.isSelected();
         final String imagenUrl = rutaImagenRelativaActual;
-        final Categoria catInicial = catExistente;
         final List<ProductoVariante> variantesSnapshot = new ArrayList<>(listaVariantesEnEdicion);
         final List<Integer> idsModificadoresSnapshot = new ArrayList<>(obtenerIdsModificadoresSeleccionadosSet());
 
@@ -758,39 +481,13 @@ public class MenuController {
             btnGuardarPlatillo.setDisable(true);
         }
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                int idCat;
-                Categoria nuevaCatCreada = null;
-                if (catInicial != null && catInicial.getIdCategoria() > 0) {
-                    idCat = catInicial.getIdCategoria();
-                } else {
-                    Categoria enListaBd = null;
-                    try (Connection conn = ConexionBD.getConnection()) {
-                        List<Categoria> enBD = categoriaDAO.listarTodas(conn);
-                        for (Categoria c : enBD) {
-                            if (c.getNombre() != null && c.getNombre().trim().equalsIgnoreCase(categoriaNombre)) {
-                                enListaBd = c;
-                                break;
-                            }
-                        }
-                        if (enListaBd != null && enListaBd.getIdCategoria() > 0) {
-                            idCat = enListaBd.getIdCategoria();
-                        } else {
-                            Categoria nuevaCat = new Categoria(0, categoriaNombre, "Categoría creada dinámicamente", true);
-                            idCat = categoriaDAO.crear(conn, nuevaCat);
-                            nuevaCatCreada = nuevaCat;
-                        }
-                    }
-                }
-                guardarPlatilloEnBDConOpciones(
-                        idCat, cod, nom, precio, disp, menuDia, imagenUrl,
-                        variantesSnapshot, idsModificadoresSnapshot);
-                return nuevaCatCreada;
-            },
-            nuevaCat -> {
+            () -> crudPresenter.guardarDesdeFormulario(validacion, productoEnEdicion, disp, menuDia,
+                    imagenUrl, variantesSnapshot, idsModificadoresSnapshot),
+            resultado -> {
                 if (btnGuardarPlatillo != null) {
                     btnGuardarPlatillo.setDisable(false);
                 }
+                Categoria nuevaCat = resultado.nuevaCategoriaCreada();
                 if (nuevaCat != null) {
                     listaCategorias.add(nuevaCat);
                     cmbCategoria.setValue(nuevaCat);
@@ -818,7 +515,8 @@ public class MenuController {
     @FXML
     public void handleAbrirMenuQr(ActionEvent event) {
         try {
-            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/MenuQrModalView.fxml"));
+            javafx.fxml.FXMLLoader loader = AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/MenuQrModalView.fxml"));
             javafx.scene.Parent root = loader.load();
             javafx.stage.Stage stage = new javafx.stage.Stage();
             stage.setTitle("FoodCore — Menú Digital QR");
@@ -859,74 +557,26 @@ public class MenuController {
     }
 
     private void configurarSeccionPersonalizacion() {
-        if (cmbModoVariante != null) {
-            cmbModoVariante.setItems(FXCollections.observableArrayList(MODO_PRECIO_FIJO, MODO_PRECIO_ADICIONAL));
-            cmbModoVariante.getSelectionModel().select(MODO_PRECIO_FIJO);
-        }
-        if (tblVariantes != null) {
-            colVarNombre.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNombreVariante()));
-            colVarModo.setCellValueFactory(c -> new SimpleStringProperty(
-                    c.getValue().esPrecioFijo() ? "Precio Fijo" : "+ Adicional"));
-            colVarPrecio.setCellValueFactory(c -> {
-                BigDecimal val = c.getValue().esPrecioFijo()
-                        ? c.getValue().getPrecioFijo()
-                        : c.getValue().getPrecioAdicional();
-                String pref = c.getValue().esPrecioFijo() ? "S/ " : "+S/ ";
-                return new SimpleStringProperty(pref + (val != null ? val.setScale(2, RoundingMode.HALF_UP) : "0.00"));
-            });
-            tblVariantes.setItems(listaVariantesEnEdicion);
-        }
-        if (lstModificadoresGlobales != null) {
-            lstModificadoresGlobales.setItems(listaModificadoresGlobales);
-        }
+        tablaUiConfigurer.configurarTablasPersonalizacion(tblVariantes, colVarNombre, colVarModo, colVarPrecio,
+                listaVariantesEnEdicion, cmbModoVariante, lstModificadoresGlobales, listaModificadoresGlobales);
         actualizarBadgePersonalizacion();
     }
 
     @FXML
     public void handleAgregarVariante(ActionEvent event) {
-        String nombreVar = txtNombreVariante != null && txtNombreVariante.getText() != null
-                ? txtNombreVariante.getText().trim() : "";
-        if (nombreVar.isEmpty()) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre de la variante (ej. Mediana, Familiar).", true);
-            return;
-        }
-        BigDecimal monto;
-        try {
-            String rawMonto = txtMontoVariante != null && txtMontoVariante.getText() != null
-                    ? txtMontoVariante.getText().trim() : "";
-            monto = new BigDecimal(rawMonto).setScale(2, RoundingMode.HALF_UP);
-            if (monto.compareTo(BigDecimal.ZERO) < 0) {
-                AnimationUtils.mostrarToast(rootMenuStack, "El monto de la variante no puede ser negativo.", true);
-                return;
-            }
-        } catch (RuntimeException ex) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese un monto numérico válido para la variante.", true);
-            return;
-        }
-
+        String nombreVar = txtNombreVariante != null ? txtNombreVariante.getText() : "";
+        String montoRaw = txtMontoVariante != null ? txtMontoVariante.getText() : "";
         boolean esFijo = cmbModoVariante == null || MODO_PRECIO_FIJO.equals(cmbModoVariante.getValue());
-        ProductoVariante existente = null;
-        for (ProductoVariante v : listaVariantesEnEdicion) {
-            if (v.getNombreVariante() != null && v.getNombreVariante().trim().equalsIgnoreCase(nombreVar)) {
-                existente = v;
-                break;
-            }
-        }
-
         int idProd = productoEnEdicion != null ? productoEnEdicion.getIdProducto() : 0;
-        if (existente != null) {
-            existente.setNombreVariante(nombreVar);
-            existente.setPrecioFijo(esFijo ? monto : null);
-            existente.setPrecioAdicional(esFijo ? BigDecimal.ZERO : monto);
-            if (tblVariantes != null) {
-                tblVariantes.refresh();
-            }
-        } else {
-            int orden = listaVariantesEnEdicion.size() + 1;
-            ProductoVariante nueva = esFijo
-                    ? ProductoVariante.conPrecioFijo(idProd, nombreVar, monto, orden)
-                    : ProductoVariante.conPrecioAdicional(idProd, nombreVar, monto, orden);
-            listaVariantesEnEdicion.add(nueva);
+        MenuPersonalizacionCoordinator.ResultadoVarianteUi resultado =
+                personalizacionCoordinator.agregarOActualizarVariante(listaVariantesEnEdicion, idProd,
+                        nombreVar, montoRaw, esFijo);
+        if (!resultado.ok()) {
+            AnimationUtils.mostrarToast(rootMenuStack, resultado.mensajeError(), true);
+            return;
+        }
+        if (resultado.actualizadoExistente() && tblVariantes != null) {
+            tblVariantes.refresh();
         }
 
         if (txtNombreVariante != null) {
@@ -954,43 +604,31 @@ public class MenuController {
 
     @FXML
     public void handleCrearModificadorGlobal(ActionEvent event) {
-        String nombre = txtNuevoModNombre != null && txtNuevoModNombre.getText() != null
-                ? txtNuevoModNombre.getText().trim() : "";
-        if (nombre.isEmpty()) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre del extra (ej. Extra Queso).", true);
+        MenuPersonalizacionCoordinator.ValidacionModificador validacion = personalizacionCoordinator
+                .validarNuevoModificador(txtNuevoModNombre != null ? txtNuevoModNombre.getText() : "",
+                        txtNuevoModPrecio != null ? txtNuevoModPrecio.getText() : "0");
+        if (!validacion.valido()) {
+            AnimationUtils.mostrarToast(rootMenuStack, validacion.mensajeError(), true);
             return;
         }
-        BigDecimal precio;
-        try {
-            String raw = txtNuevoModPrecio != null && txtNuevoModPrecio.getText() != null
-                    ? txtNuevoModPrecio.getText().trim() : "0";
-            precio = (raw.isEmpty() ? BigDecimal.ZERO : new BigDecimal(raw)).setScale(2, RoundingMode.HALF_UP);
-            if (precio.compareTo(BigDecimal.ZERO) < 0) {
-                AnimationUtils.mostrarToast(rootMenuStack, "El precio del extra no puede ser negativo.", true);
-                return;
-            }
-        } catch (RuntimeException ex) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese un precio válido para el extra.", true);
-            return;
-        }
-
+        String nombre = validacion.nombre();
+        BigDecimal precio = validacion.precio();
         final Set<Integer> seleccionados = obtenerIdsModificadoresSeleccionadosSet();
         if (btnCrearModificadorGlobal != null) {
             btnCrearModificadorGlobal.setDisable(true);
         }
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                ProductoModificador guardado = personalizacionService.guardarModificadorGlobal(nombre, precio);
-                List<ProductoModificador> globales = personalizacionService.listarModificadoresGlobales();
-                return new Object[]{guardado, globales};
+                return personalizacionCoordinator.crearModificadorGlobal(nombre, precio);
             },
             res -> {
                 if (btnCrearModificadorGlobal != null) {
                     btnCrearModificadorGlobal.setDisable(false);
                 }
-                ProductoModificador creado = (ProductoModificador) res[0];
-                @SuppressWarnings("unchecked")
-                List<ProductoModificador> globales = (List<ProductoModificador>) res[1];
+                MenuPersonalizacionCoordinator.ResultadoModificadores resultado =
+                        (MenuPersonalizacionCoordinator.ResultadoModificadores) res;
+                ProductoModificador creado = resultado.creado();
+                List<ProductoModificador> globales = resultado.globales();
                 listaModificadoresGlobales.setAll(globales);
                 if (creado != null && creado.getIdModificador() > 0) {
                     seleccionados.add(creado.getIdModificador());
@@ -1029,8 +667,7 @@ public class MenuController {
         seleccionados.remove(sel.getIdModificador());
         UiAsyncExecutor.ejecutarAsync(
             () -> {
-                personalizacionService.eliminarModificadorGlobal(sel.getIdModificador());
-                return personalizacionService.listarModificadoresGlobales();
+                return personalizacionCoordinator.eliminarModificadorGlobal(sel.getIdModificador());
             },
             globales -> {
                 listaModificadoresGlobales.setAll(globales);
@@ -1044,26 +681,8 @@ public class MenuController {
     }
 
     private void renderizarCheckboxesModificadores(Set<Integer> idsMarcados) {
-        if (vboxCheckboxesModificadores == null) {
-            return;
-        }
-        vboxCheckboxesModificadores.getChildren().clear();
-        checkboxesModificadores.clear();
-        if (listaModificadoresGlobales.isEmpty()) {
-            Label emptyLbl = new Label("Sin extras creados aún. Cree uno abajo.");
-            emptyLbl.getStyleClass().add("text-caption-muted");
-            vboxCheckboxesModificadores.getChildren().add(emptyLbl);
-            return;
-        }
-        for (ProductoModificador mod : listaModificadoresGlobales) {
-            CheckBox chk = new CheckBox(mod.formatearParaSelector());
-            chk.setId("chkMenuMod_" + mod.getIdModificador());
-            chk.setUserData(mod);
-            chk.setSelected(idsMarcados != null && idsMarcados.contains(mod.getIdModificador()));
-            chk.selectedProperty().addListener((obs, oldV, newV) -> actualizarBadgePersonalizacion());
-            checkboxesModificadores.add(chk);
-            vboxCheckboxesModificadores.getChildren().add(chk);
-        }
+        tablaUiConfigurer.renderizarCheckboxesModificadores(vboxCheckboxesModificadores,
+                listaModificadoresGlobales, idsMarcados, checkboxesModificadores, this::actualizarBadgePersonalizacion);
     }
 
     private Set<Integer> obtenerIdsModificadoresSeleccionadosSet() {
@@ -1092,7 +711,7 @@ public class MenuController {
         if (p.isEsCombo()) {
             return "COMBO";
         }
-        return formatearTextoOpciones(p.getVariantes().size(), p.getModificadores().size());
+        return CRUD_STATICS.formatearResumenOpcionesProducto(p);
     }
 
     private static String formatearTextoOpciones(int numVar, int numMods) {
@@ -1100,55 +719,13 @@ public class MenuController {
     }
 
     private void configurarSeccionCombos() {
-        if (tabPaneFichaPlatillo != null && tabCombo != null) {
-            tabPaneFichaPlatillo.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-                boolean enCombo = newTab == tabCombo;
-                if (btnGuardarPlatillo != null) {
-                    btnGuardarPlatillo.setVisible(!enCombo);
-                    btnGuardarPlatillo.setManaged(!enCombo);
-                }
-            });
-        }
-        if (cmbComboComponente != null) {
-            cmbComboComponente.setItems(listaProductosSimples);
-            cmbComboComponente.setConverter(new javafx.util.StringConverter<>() {
-                @Override
-                public String toString(Producto p) {
-                    if (p == null) {
-                        return "";
-                    }
-                    BigDecimal pr = p.getPrecioVenta() != null
-                            ? p.getPrecioVenta().setScale(2, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-                    return p.getNombre() + " (S/ " + pr + ")";
-                }
-
-                @Override
-                public Producto fromString(String s) {
-                    return null;
-                }
-            });
-        }
-        if (tblComboComponentes != null) {
-            colComboCompNombre.setCellValueFactory(c -> new SimpleStringProperty(
-                    c.getValue().getNombreProducto() != null
-                            ? c.getValue().getNombreProducto()
-                            : ("Producto #" + c.getValue().getIdProducto())));
-            colComboCompCantidad.setCellValueFactory(c -> new SimpleStringProperty(
-                    String.valueOf(Math.max(1, c.getValue().getCantidad()))));
-            tblComboComponentes.setItems(listaComboComponentesEnEdicion);
-        }
+        tablaUiConfigurer.configurarTablaCombo(cmbComboComponente, listaProductosSimples, tblComboComponentes,
+                colComboCompNombre, colComboCompCantidad, listaComboComponentesEnEdicion);
         actualizarResumenCombo();
     }
 
     private void actualizarListaProductosSimples() {
-        List<Producto> simples = new ArrayList<>();
-        for (Producto p : listaProductos) {
-            if (p != null && !p.isEsCombo()) {
-                simples.add(p);
-            }
-        }
-        listaProductosSimples.setAll(simples);
+        listaProductosSimples.setAll(crudPresenter.filtrarProductosSimples(listaProductos));
         if (cmbComboComponente != null && cmbComboComponente.getValue() == null && !listaProductosSimples.isEmpty()) {
             cmbComboComponente.getSelectionModel().selectFirst();
         }
@@ -1183,7 +760,7 @@ public class MenuController {
         if (p.getComboComponentes().isEmpty() && p.getIdProducto() > 0) {
             final int idProdTarget = p.getIdProducto();
             UiAsyncExecutor.ejecutarAsync(
-                () -> comboService.obtenerComboPorProducto(idProdTarget).orElse(null),
+                () -> comboCoordinator.obtenerComboPorProducto(idProdTarget).orElse(null),
                 combo -> {
                     if (combo != null && Integer.valueOf(idProdTarget).equals(this.idComboProductoEnEdicion)) {
                         this.idComboEnEdicion = combo.getIdCombo();
@@ -1243,36 +820,15 @@ public class MenuController {
             AnimationUtils.mostrarToast(rootMenuStack, "Seleccione un producto para incluir en el combo.", true);
             return;
         }
-        int qty;
-        try {
-            String raw = txtComboCantidad != null && txtComboCantidad.getText() != null
-                    ? txtComboCantidad.getText().trim() : "1";
-            qty = Integer.parseInt(raw.isEmpty() ? "1" : raw);
-            if (qty <= 0) {
-                AnimationUtils.mostrarToast(rootMenuStack, "La cantidad debe ser mayor a cero.", true);
-                return;
-            }
-        } catch (NumberFormatException ex) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese una cantidad entera válida.", true);
+        MenuComboCoordinator.ResultadoComponenteComboUi resultado = comboCoordinator.agregarComponenteACombo(
+                listaComboComponentesEnEdicion, seleccionado,
+                txtComboCantidad != null ? txtComboCantidad.getText() : "1");
+        if (!resultado.ok()) {
+            AnimationUtils.mostrarToast(rootMenuStack, resultado.mensajeError(), true);
             return;
         }
-        ComboDetalle existente = null;
-        for (ComboDetalle d : listaComboComponentesEnEdicion) {
-            if (d.getIdProducto() == seleccionado.getIdProducto()) {
-                existente = d;
-                break;
-            }
-        }
-        if (existente != null) {
-            existente.setCantidad(existente.getCantidad() + qty);
-            if (tblComboComponentes != null) {
-                tblComboComponentes.refresh();
-            }
-        } else {
-            ComboDetalle nuevo = new ComboDetalle(seleccionado.getIdProducto(), seleccionado.getNombre(), qty);
-            nuevo.setCodigoProducto(seleccionado.getCodigo());
-            nuevo.setPrecioUnitarioReferencia(seleccionado.getPrecioVenta());
-            listaComboComponentesEnEdicion.add(nuevo);
+        if (resultado.actualizadoExistente() && tblComboComponentes != null) {
+            tblComboComponentes.refresh();
         }
         if (txtComboCantidad != null) {
             txtComboCantidad.setText("1");
@@ -1296,32 +852,17 @@ public class MenuController {
 
     @FXML
     public void handleGuardarCombo(ActionEvent event) {
-        String nombre = txtComboNombre != null && txtComboNombre.getText() != null
-                ? txtComboNombre.getText().trim() : "";
-        if (nombre.isEmpty()) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese el nombre del combo (ej. Combo Duo Burger).", true);
+        MenuComboCoordinator.ValidacionCombo validacion = comboCoordinator.validarFormularioCombo(
+                txtComboCodigo != null ? txtComboCodigo.getText() : "",
+                txtComboNombre != null ? txtComboNombre.getText() : "",
+                txtComboPrecio != null ? txtComboPrecio.getText() : "", listaComboComponentesEnEdicion);
+        if (!validacion.valido()) {
+            AnimationUtils.mostrarToast(rootMenuStack, validacion.mensajeError(), true);
             return;
         }
-        BigDecimal precio;
-        try {
-            String raw = txtComboPrecio != null && txtComboPrecio.getText() != null
-                    ? txtComboPrecio.getText().trim() : "";
-            precio = new BigDecimal(raw).setScale(2, RoundingMode.HALF_UP);
-            if (precio.compareTo(BigDecimal.ZERO) <= 0) {
-                AnimationUtils.mostrarToast(rootMenuStack, "El precio del combo debe ser mayor a S/ 0.00.", true);
-                return;
-            }
-        } catch (RuntimeException ex) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Ingrese un precio válido para el combo.", true);
-            return;
-        }
-        if (listaComboComponentesEnEdicion.isEmpty()) {
-            AnimationUtils.mostrarToast(rootMenuStack, "Agregue al menos un producto componente al combo.", true);
-            return;
-        }
-
-        String codigo = txtComboCodigo != null && txtComboCodigo.getText() != null
-                ? txtComboCodigo.getText().trim() : "";
+        String codigo = validacion.codigo();
+        String nombre = validacion.nombre();
+        BigDecimal precio = validacion.precio();
         boolean activo = chkComboActivo == null || chkComboActivo.isSelected();
         List<ComboDetalle> snapshot = new ArrayList<>(listaComboComponentesEnEdicion);
         Integer idComboActual = this.idComboEnEdicion;
@@ -1358,21 +899,14 @@ public class MenuController {
                                   BigDecimal precioCombo,
                                   boolean activo,
                                   List<ComboDetalle> componentes) throws NegocioException, SQLException {
-        Combo combo = new Combo(idCombo != null ? idCombo : 0, idProducto, nombre, precioCombo, activo);
-        combo.setCodigo(codigo);
-        combo.setDetalles(componentes);
-        return comboService.guardarCombo(combo);
+        return comboCoordinator.guardarCombo(idCombo, idProducto, codigo, nombre, precioCombo, activo, componentes);
     }
 
     private void actualizarResumenCombo() {
         if (lblComboResumen == null) {
             return;
         }
-        int totalUnidades = 0;
-        for (ComboDetalle d : listaComboComponentesEnEdicion) {
-            totalUnidades += Math.max(1, d.getCantidad());
-        }
-        lblComboResumen.setText(listaComboComponentesEnEdicion.size() + " productos (" + totalUnidades + " uds.)");
+        lblComboResumen.setText(comboCoordinator.formatearResumenCombo(listaComboComponentesEnEdicion));
     }
 
     public ObservableList<ComboDetalle> getListaComboComponentesEnEdicion() {

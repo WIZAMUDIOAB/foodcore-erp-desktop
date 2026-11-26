@@ -12,6 +12,7 @@ import com.foodcore.util.ConexionBD;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,7 +106,7 @@ public class ExpedienteEmpleadoServiceImpl implements ExpedienteEmpleadoService 
     @Override
     public void guardarDatosLaborales(Usuario usuario) {
         validarUsuarioBase(usuario);
-        if (usuario.getSueldoBase() < 0) {
+        if (usuario.getSueldoBase() == null || usuario.getSueldoBase().compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("El sueldo base no puede ser negativo.");
         }
         String tipoContrato = normalizarRequerido(usuario.getTipoContrato(), "El tipo de contrato es obligatorio.");
@@ -254,10 +255,11 @@ public class ExpedienteEmpleadoServiceImpl implements ExpedienteEmpleadoService 
     }
 
     private String sanitizarNombreArchivo(String nombre) {
-        Path p = Paths.get(nombre).getFileName();
-        String base = (p != null) ? p.toString() : nombre;
+        String safe = nombre == null ? "" : nombre;
+        int lastSep = Math.max(safe.lastIndexOf('/'), safe.lastIndexOf('\\'));
+        String base = lastSep >= 0 ? safe.substring(lastSep + 1) : safe;
         String limpio = base.replaceAll("[^a-zA-Z0-9._-]", "_");
-        if (limpio.isBlank()) {
+        if (limpio.isBlank() || ".".equals(limpio) || "..".equals(limpio)) {
             return "documento.pdf";
         }
         return limpio;

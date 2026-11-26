@@ -206,8 +206,15 @@ class UiRedesignSpecTest {
             }
         });
 
-        // Esperar a que los hilos asíncronos de arranque publiquen en Platform.runLater
-        Thread.sleep(600);
+        // Forzar layout de TabPane/ScrollPane y esperar carga asíncrona del catálogo POS
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            posRootRef.get().applyCss();
+            posRootRef.get().layout();
+        });
+        JavaFxTestSupport.awaitCondition(() -> {
+            Node tile = posRootRef.get().lookup("#tileProductos");
+            return tile instanceof javafx.scene.layout.TilePane tp && !tp.getChildren().isEmpty();
+        }, 5L, "Las vistas POS/KDS/Caja/Kardex deben completar su sincronización inicial en JavaFX");
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

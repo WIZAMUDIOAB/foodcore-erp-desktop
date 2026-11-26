@@ -3,16 +3,12 @@ package com.foodcore.controller;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.foodcore.dao.CajaDAO;
-import com.foodcore.dao.CajaDAOImpl;
-import com.foodcore.dao.CuentaPorCobrarDAO;
-import com.foodcore.dao.impl.CuentaPorCobrarDAOImpl;
-import com.foodcore.model.Caja;
+import com.foodcore.config.AppContainer;
 import com.foodcore.model.CuentaPorCobrar;
 import com.foodcore.service.AuthService;
+import com.foodcore.service.CuentasPorCobrarService;
 import com.foodcore.service.ExportacionContableService;
 import com.foodcore.service.FinanzasService;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ExportFileChooserHelper.FormatoExportacion;
 import com.foodcore.util.ReporteExportUIHelper;
 import com.foodcore.util.UiAsyncExecutor;
@@ -28,11 +24,12 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 
-import java.sql.Connection;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Locale;
 
 public class CuentasPorCobrarController {
 
@@ -66,13 +63,27 @@ public class CuentasPorCobrarController {
     @FXML private TextField txtModalNota;
     @FXML private Label lblModalCobroError;
 
-    private final CuentaPorCobrarDAO cuentaPorCobrarDAO = new CuentaPorCobrarDAOImpl();
-    private final CajaDAO cajaDAO = new CajaDAOImpl();
-    private final FinanzasService finanzasService = new FinanzasService();
-    private final ExportacionContableService exportacionService = new ExportacionContableService();
+    private final CuentasPorCobrarService cuentasPorCobrarService;
+    private final FinanzasService finanzasService;
+    private final ExportacionContableService exportacionService;
 
     private final ObservableList<CuentaPorCobrar> listaCxc = FXCollections.observableArrayList();
     private CuentaPorCobrar cuentaSeleccionada = null;
+
+    public CuentasPorCobrarController() {
+        this(AppContainer.getDefault().resolve(CuentasPorCobrarService.class),
+                AppContainer.getDefault().finanzasService(),
+                AppContainer.getDefault().resolve(ExportacionContableService.class));
+    }
+
+    public CuentasPorCobrarController(CuentasPorCobrarService cuentasPorCobrarService,
+                                      FinanzasService finanzasService,
+                                      ExportacionContableService exportacionService) {
+        this.cuentasPorCobrarService =
+                java.util.Objects.requireNonNull(cuentasPorCobrarService, "cuentasPorCobrarService");
+        this.finanzasService = java.util.Objects.requireNonNull(finanzasService, "finanzasService");
+        this.exportacionService = java.util.Objects.requireNonNull(exportacionService, "exportacionService");
+    }
 
     @FXML
     public void initialize() {
@@ -86,9 +97,9 @@ public class CuentasPorCobrarController {
         colComprobante.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getNumeroComprobante()));
         colEmision.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaEmision() != null ? c.getValue().getFechaEmision().toString() : "-"));
         colVencimiento.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getFechaVencimiento() != null ? c.getValue().getFechaVencimiento().toString() : "-"));
-        colMontoTotal.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getMontoTotal())));
-        colMontoCobrado.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getMontoCobrado())));
-        colSaldo.setCellValueFactory(c -> new SimpleStringProperty(String.format("S/ %.2f", c.getValue().getSaldo())));
+        colMontoTotal.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getMontoTotal())));
+        colMontoCobrado.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getMontoCobrado())));
+        colSaldo.setCellValueFactory(c -> new SimpleStringProperty(String.format(Locale.US, "S/ %.2f", c.getValue().getSaldo())));
         colEstado.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getEstado()));
         tblCuentasPorCobrar.setItems(listaCxc);
 
@@ -109,20 +120,14 @@ public class CuentasPorCobrarController {
     public void cargarCuentasAsync() {
         final String filtro = cbFiltroEstado.getValue();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return (filtro == null || "TODAS".equals(filtro))
-                        ? cuentaPorCobrarDAO.listarTodas(conn)
-                        : cuentaPorCobrarDAO.listarPorEstado(conn, filtro);
-                }
-            },
+            () -> cuentasPorCobrarService.listarPorFiltro(filtro),
             cuentas -> {
                 listaCxc.setAll(cuentas);
-                double saldoTotal = 0.0;
+                BigDecimal saldoTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
                 int vencidas = 0;
                 for (CuentaPorCobrar c : cuentas) {
                     if (!"COBRADA".equalsIgnoreCase(c.getEstado())) {
-                        saldoTotal += c.getSaldo();
+                        saldoTotal = saldoTotal.add(c.getSaldo()).setScale(2, RoundingMode.HALF_UP);
                     }
                     if ("VENCIDA".equalsIgnoreCase(c.getEstado())) {
                         vencidas++;
@@ -131,7 +136,7 @@ public class CuentasPorCobrarController {
                 if (!cuentas.isEmpty()) {
                     tblCuentasPorCobrar.getSelectionModel().selectFirst();
                 }
-                lblSaldoTotal.setText(String.format("S/ %.2f", saldoTotal));
+                lblSaldoTotal.setText(String.format(Locale.US, "S/ %.2f", saldoTotal));
                 lblContadorCxc.setText(listaCxc.size() + " Comprobantes");
                 if (vencidas > 0) {
                     lblBadgeAlertaVencidas.setText(vencidas + " COMPROBANTES VENCIDOS");
@@ -151,15 +156,17 @@ public class CuentasPorCobrarController {
     @FXML
     public void handleAbrirModalCobro() {
         CuentaPorCobrar sel = tblCuentasPorCobrar.getSelectionModel().getSelectedItem();
-        if (sel == null) return;
+        if (sel == null) {
+            return;
+        }
         if ("COBRADA".equalsIgnoreCase(sel.getEstado())) {
             return;
         }
 
         this.cuentaSeleccionada = sel;
         lblModalDocInfo.setText(sel.getRazonSocialCliente() + " — Comprobante: " + sel.getNumeroComprobante());
-        lblModalSaldoPendiente.setText(String.format("S/ %.2f", sel.getSaldo()));
-        txtModalMontoCobrar.setText(String.format("%.2f", sel.getSaldo()));
+        lblModalSaldoPendiente.setText(String.format(Locale.US, "S/ %.2f", sel.getSaldo()));
+        txtModalMontoCobrar.setText(String.format(Locale.US, "%.2f", sel.getSaldo()));
         txtModalNota.setText("Cobro comprobante " + sel.getNumeroComprobante());
         lblModalCobroError.setText("");
         modalCobro.setVisible(true);
@@ -172,11 +179,16 @@ public class CuentasPorCobrarController {
 
     @FXML
     public void handleConfirmarCobro() {
-        if (cuentaSeleccionada == null) return;
-        double monto;
+        if (cuentaSeleccionada == null) {
+            return;
+        }
+        BigDecimal monto;
         try {
-            monto = Double.parseDouble(txtModalMontoCobrar.getText().trim());
-        } catch (Exception ex) {
+            String textoMonto = txtModalMontoCobrar.getText() != null
+                    ? txtModalMontoCobrar.getText().trim().replace(',', '.')
+                    : "";
+            monto = new BigDecimal(textoMonto).setScale(2, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ex) {
             lblModalCobroError.setText("Ingrese un importe numérico válido");
             return;
         }
@@ -186,22 +198,14 @@ public class CuentasPorCobrarController {
         int idUsuario = AuthService.getUsuarioSesionActual() != null ? AuthService.getUsuarioSesionActual().getIdUsuario() : 1;
 
         final int idCuenta = cuentaSeleccionada.getIdCuentaCobrar();
-        final double montoFinal = monto;
+        final BigDecimal montoFinal = monto;
         final String metodoFinal = metodo;
         final String notaFinal = nota;
         final int idUsrFinal = idUsuario;
 
         UiAsyncExecutor.ejecutarVoidAsync(
             () -> {
-                Integer idCaja = null;
-                try (Connection conn = ConexionBD.getConnection()) {
-                    Optional<Caja> cajaOpt = cajaDAO.obtenerCajaAbierta(conn);
-                    if (cajaOpt.isPresent()) {
-                        idCaja = cajaOpt.get().getIdCaja();
-                    }
-                } catch (java.sql.SQLException | RuntimeException ignored) {
-                    // Caja opcional para este flujo
-                }
+                Integer idCaja = cuentasPorCobrarService.obtenerIdCajaAbiertaOptional();
                 finanzasService.registrarCobroCliente(idCuenta, montoFinal, metodoFinal, idCaja, idUsrFinal, notaFinal);
             },
             () -> {
@@ -237,9 +241,9 @@ public class CuentasPorCobrarController {
                     c.getNumeroComprobante() != null ? c.getNumeroComprobante() : "",
                     c.getFechaEmision() != null ? c.getFechaEmision().toString() : "-",
                     c.getFechaVencimiento() != null ? c.getFechaVencimiento().toString() : "-",
-                    String.format("S/ %.2f", c.getMontoTotal()),
-                    String.format("S/ %.2f", c.getMontoCobrado()),
-                    String.format("S/ %.2f", c.getSaldo()),
+                    String.format(Locale.US, "S/ %.2f", c.getMontoTotal()),
+                    String.format(Locale.US, "S/ %.2f", c.getMontoCobrado()),
+                    String.format(Locale.US, "S/ %.2f", c.getSaldo()),
                     c.getEstado() != null ? c.getEstado() : ""
             ));
         }

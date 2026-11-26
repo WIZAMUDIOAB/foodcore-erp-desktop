@@ -1,10 +1,10 @@
 package com.foodcore.ops;
 
-import com.foodcore.dao.CajaDAOImpl;
-import com.foodcore.dao.InsumoDAOImpl;
-import com.foodcore.dao.PedidoDAOImpl;
+import com.foodcore.dao.impl.CajaDAOImpl;
+import com.foodcore.dao.impl.InsumoDAOImpl;
+import com.foodcore.dao.impl.PedidoDAOImpl;
 import com.foodcore.dao.ProductoDAOImpl;
-import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.dao.impl.AsistenciaDAOImpl;
 import com.foodcore.dao.impl.AuditoriaDAOImpl;
 import com.foodcore.dao.impl.CierreContableDAOImpl;
@@ -32,6 +32,8 @@ import com.foodcore.model.ReporteCumplimientoTurno;
 import com.foodcore.model.TurnoProgramado;
 import com.foodcore.model.Usuario;
 import com.foodcore.model.Venta;
+import com.foodcore.model.dto.ResultadoCierreConActa;
+import com.foodcore.model.dto.ResultadoDevolucionParcial;
 import com.foodcore.security.AutorizacionService;
 import com.foodcore.security.EncriptadorPassword;
 import com.foodcore.security.SesionUsuario;
@@ -44,7 +46,9 @@ import com.foodcore.service.InventarioFisicoService.ResultadoAjusteInventarioFis
 import com.foodcore.service.PedidoService;
 import com.foodcore.service.SupervisorAutorizacionService;
 import com.foodcore.service.VentaService;
-import com.foodcore.service.VentaService.ResultadoDevolucionParcial;
+import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.PedidoServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
 import com.foodcore.util.ImpresoraTermicaService;
@@ -55,10 +59,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
@@ -91,7 +92,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Suite de integración MySQL 8.0 real para Sub-Fase B: Operaciones Avanzadas (v5.2.0):
  * valida persistencia Flyway V23, DAOs, transacciones ACID y servicios para los 8 ítems.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SubFaseBOperacionesIT {
 
     private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
@@ -118,10 +118,10 @@ class SubFaseBOperacionesIT {
         MySqlIntegrationTestSupport.inicializarEntornoMySql();
         MySqlIntegrationTestSupport.reiniciarEsquemaConFlyway();
 
-        cajaService = new CajaService();
-        ventaService = new VentaService();
+        cajaService = new CajaServiceImpl();
+        ventaService = new VentaServiceImpl();
         inventarioFisicoService = new InventarioFisicoService();
-        pedidoService = new PedidoService();
+        pedidoService = new PedidoServiceImpl();
         cierreContableService = new CierreContableService();
         asistenciaService = new AsistenciaService();
         supervisorService = new SupervisorAutorizacionService();
@@ -151,7 +151,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(1)
     @DisplayName("Ítem 1 IT: CRUD configuracion_impresora y despacho simultáneo por categoría")
     void item1MultiplesImpresorasCrudYDespachoBd(@TempDir Path tempDir) throws Exception {
         int catCocina = asegurarCategoria("Cocina Caliente IT");
@@ -203,7 +202,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(2)
     @DisplayName("Ítem 2 IT: Toma de inventario físico ajusta stock y registra AJUSTE_INV en Kardex")
     void item2InventarioFisicoAjusteKardexYAuditoria() throws Exception {
         long idInsA = asegurarInsumoConCosto("INS-IT2-A", "Carne Molida Fina IT", "KG",
@@ -244,7 +242,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(3)
     @DisplayName("Ítem 3 IT: Modo Supervisor valida PIN ADMIN/SUPERVISOR, rechaza otros roles y registra auditoría")
     void item3ModoSupervisorPinAutorizaYRegistraAuditoria() throws Exception {
         int idCaja = asegurarCajaAbierta();
@@ -301,7 +298,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(4)
     @DisplayName("Ítem 4 IT: Devolución parcial de 1 de 3 ítems actualiza estado, Caja EGRESO y Kardex DEVOLUCION")
     void item4DevolucionParcialRevierteStockRegistraEgresoYBloqueaDobleDevolucion() throws Exception {
         asegurarCajaAbierta();
@@ -371,7 +367,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(5)
     @DisplayName("Ítem 5 IT: Priorización manual KDS persiste detalle_pedido.prioridad y ordena DESC")
     void item5KdsPrioridadManualPersisteOrdenYConsultaDesc() throws Exception {
         int idCat = asegurarCategoria("KDS Priority IT");
@@ -417,7 +412,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(6)
     @DisplayName("Ítem 6 IT: Cierre contable mensual bloquea ventas y gastos y luego libera período en finally")
     void item6CierreContableMensualBloqueaVentasYGastos() throws Exception {
         LocalDate hoy = LocalDate.now(ZONA_LIMA);
@@ -464,7 +458,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(7)
     @DisplayName("Ítem 7 IT: Cruce turnos programados vs asistencia calcula Atrasos/Faltas y exporta Excel")
     void item7TurnosProgramadosYAsistenciaCalculanAtrasosYFaltasExcel(@TempDir Path tempDir) throws Exception {
         LocalDate hoy = LocalDate.now(ZONA_LIMA);
@@ -541,7 +534,6 @@ class SubFaseBOperacionesIT {
     }
 
     @Test
-    @Order(8)
     @DisplayName("Ítem 8 IT: Cierre Z detecta insumos agotados/mínimos y emite Acta de Entrega PDF")
     void item8CierreCajaStockCriticoYActaEntregaPdf(@TempDir Path tempDir) throws Exception {
         long idAgotado = asegurarInsumoConCosto("INS-IT8-AGO", "Aceite Oliva Relevo IT8", "LT",
@@ -556,7 +548,7 @@ class SubFaseBOperacionesIT {
 
         int idCaja = asegurarCajaAbierta();
         File pdfFile = tempDir.resolve("Acta_Entrega_Relevo_IT8.pdf").toFile();
-        CajaService.ResultadoCierreConActa res = cajaService.cerrarTurnoConActaPdf(
+        ResultadoCierreConActa res = cajaService.cerrarTurnoConActaPdf(
                 idCaja, 1, new BigDecimal("300.00"),
                 "Administrador Saliente", "Supervisor Entrante", pdfFile);
 

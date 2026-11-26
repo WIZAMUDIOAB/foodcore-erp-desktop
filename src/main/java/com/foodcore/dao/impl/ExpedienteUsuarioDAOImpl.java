@@ -3,6 +3,8 @@ package com.foodcore.dao.impl;
 import com.foodcore.dao.ExpedienteUsuarioDAO;
 import com.foodcore.model.Usuario;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -119,7 +121,7 @@ public class ExpedienteUsuarioDAOImpl implements ExpedienteUsuarioDAO {
             } else {
                 ps.setNull(3, Types.DATE);
             }
-            ps.setDouble(4, usuario.getSueldoBase());
+            ps.setBigDecimal(4, normalizarSueldo(usuario.getSueldoBase()));
             ps.setString(5, usuario.getHorarioLaboral());
             if (usuario.getHoraEntradaProgramada() != null) {
                 ps.setTime(6, Time.valueOf(usuario.getHoraEntradaProgramada()));
@@ -173,7 +175,7 @@ public class ExpedienteUsuarioDAOImpl implements ExpedienteUsuarioDAO {
         if (fIng != null) {
             u.setFechaIngreso(fIng.toLocalDate());
         }
-        u.setSueldoBase(rs.getDouble("sueldo_base"));
+        u.setSueldoBase(normalizarSueldo(rs.getBigDecimal("sueldo_base")));
         u.setHorarioLaboral(rs.getString("horario_laboral"));
         Time tEnt = rs.getTime("hora_entrada_programada");
         if (tEnt != null) {
@@ -192,5 +194,11 @@ public class ExpedienteUsuarioDAOImpl implements ExpedienteUsuarioDAO {
             u.setFechaVencimientoCarnetSanidad(fCarn.toLocalDate());
         }
         return u;
+    }
+
+    private static BigDecimal normalizarSueldo(BigDecimal valor) {
+        return valor != null
+                ? valor.setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     }
 }

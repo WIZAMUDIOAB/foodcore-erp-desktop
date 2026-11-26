@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface PedidoDAO {
@@ -23,7 +24,9 @@ public interface PedidoDAO {
     List<Pedido> buscarPorEstadoYFechas(Connection conn, String estado, LocalDateTime desde, LocalDateTime hasta) throws SQLException;
     List<DetallePedido> listarDetallesPorPedido(Connection conn, int idPedido) throws SQLException;
     List<DetallePedido> listarItemsPendientesCocina(Connection conn) throws SQLException;
+    List<DetallePedido> listarItemsPendientesCocinaPorPedido(Connection conn, int idPedido) throws SQLException;
     boolean tieneItemsPendientesCocina(Connection conn, int idPedido) throws SQLException;
+    String obtenerEstadoCocinaDetalle(Connection conn, int idDetallePedido) throws SQLException;
     void actualizarEstadoPedido(Connection conn, int idPedido, String nuevoEstado) throws SQLException;
     void actualizarEstadoDetalleCocina(Connection conn, int idDetallePedido, String nuevoEstado) throws SQLException;
     void actualizarPrioridadesCocina(Connection conn, List<Integer> idsDetalleOrdenDescendente) throws SQLException;
@@ -35,4 +38,6 @@ public interface PedidoDAO {
     void moverPedidoAMesa(Connection conn, int idPedido, long idMesaDestino, String numeroMesaDestino) throws SQLException;
     Optional<String> obtenerNumeroMesaPorId(Connection conn, long idMesa) throws SQLException;
     void actualizarEstadoMesaDirecto(Connection conn, long idMesa, String estado, Integer idPedidoActual) throws SQLException;
+    Map<String, BigDecimal> obtenerTotalesPedidosActivosPorMesa(Connection conn) throws SQLException;
+    Map<Integer, List<DetallePedido>> listarDetallesPedidosActivosAgrupados(Connection conn) throws SQLException;
 }

@@ -7,7 +7,7 @@ import com.foodcore.api.security.JwtService;
 import com.foodcore.controller.LoginController;
 import com.foodcore.controller.UsuariosController;
 import com.foodcore.controller.UsuariosController.FilaUsuario;
-import com.foodcore.dao.UsuarioDAOImpl;
+import com.foodcore.dao.impl.UsuarioDAOImpl;
 import com.foodcore.model.Usuario;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;

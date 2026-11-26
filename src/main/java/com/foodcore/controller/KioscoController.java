@@ -1,15 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.dao.PedidoDAO;
-import com.foodcore.dao.PedidoDAOImpl;
-import com.foodcore.dao.ProductoDAO;
-import com.foodcore.dao.ProductoDAOImpl;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.DetallePedido;
 import com.foodcore.model.Pedido;
 import com.foodcore.model.Producto;
+import com.foodcore.service.KioscoOrdenService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleStringProperty;
@@ -32,7 +28,7 @@ import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.sql.Connection;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -59,8 +55,7 @@ public class KioscoController {
     @FXML private Label lblTotalKiosco;
     @FXML private Button btnConfirmarKiosco;
 
-    private final ProductoDAO productoDAO = new ProductoDAOImpl();
-    private final PedidoDAO pedidoDAO = new PedidoDAOImpl();
+    private final KioscoOrdenService kioscoOrdenService = new KioscoOrdenService();
 
     private final List<Producto> todosLosProductos = new ArrayList<>();
     private final ObservableList<DetallePedido> carritoItems = FXCollections.observableArrayList();
@@ -94,14 +89,8 @@ public class KioscoController {
                 box.setAlignment(Pos.CENTER);
                 btnMenos.getStyleClass().add("btn-kiosco-ajuste");
                 btnMas.getStyleClass().add("btn-kiosco-ajuste");
-                String btnCartStyle = "-fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px; "
-                        + "-fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px; "
-                        + "-fx-padding: 0; -fx-font-size: 16px; -fx-font-weight: 700; "
-                        + "-fx-background-color: #FFFFFF; -fx-text-fill: #374151; "
-                        + "-fx-border-color: #D1D5DB; -fx-border-radius: 6px; -fx-background-radius: 6px; "
-                        + "-fx-cursor: hand; -fx-alignment: center;";
-                btnMenos.setStyle(btnCartStyle);
-                btnMas.setStyle(btnCartStyle);
+                btnMenos.getStyleClass().add("fc-kiosk-qty-btn");
+                btnMas.getStyleClass().add("fc-kiosk-qty-btn");
                 btnMenos.setMinWidth(32);
                 btnMenos.setPrefWidth(32);
                 btnMas.setMinWidth(32);
@@ -131,7 +120,9 @@ public class KioscoController {
     }
 
     private void cargarCategorias() {
-        if (boxCategoriasKiosco == null) return;
+        if (boxCategoriasKiosco == null) {
+            return;
+        }
         boxCategoriasKiosco.getChildren().clear();
 
         Button btnTodos = new Button("Todos");
@@ -145,13 +136,7 @@ public class KioscoController {
         boxCategoriasKiosco.getChildren().add(btnTodos);
 
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarCategorias(conn);
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    return java.util.Collections.<Categoria>emptyList();
-                }
-            },
+            kioscoOrdenService::listarCategorias,
             cats -> {
                 if (cats != null && !cats.isEmpty()) {
                     for (Categoria c : cats) {
@@ -202,13 +187,7 @@ public class KioscoController {
     public void cargarCatalogo() {
         todosLosProductos.clear();
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    return productoDAO.listarProductosDisponibles(conn);
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    return java.util.Collections.<Producto>emptyList();
-                }
-            },
+            kioscoOrdenService::listarProductosDisponibles,
             lista -> {
                 todosLosProductos.clear();
                 if (lista != null && !lista.isEmpty()) {
@@ -237,7 +216,9 @@ public class KioscoController {
     }
 
     private void renderizarMosaicoProductos() {
-        if (flowProductosKiosco == null) return;
+        if (flowProductosKiosco == null) {
+            return;
+        }
         flowProductosKiosco.getChildren().clear();
 
         for (Producto p : todosLosProductos) {
@@ -354,7 +335,9 @@ public class KioscoController {
 
     @FXML
     public void handleConfirmarPedido() {
-        if (carritoItems.isEmpty()) return;
+        if (carritoItems.isEmpty()) {
+            return;
+        }
 
         BigDecimal total = BigDecimal.ZERO;
         for (DetallePedido item : carritoItems) {
@@ -377,23 +360,7 @@ public class KioscoController {
             btnConfirmarKiosco.setDisable(true);
         }
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection()) {
-                    int id = pedidoDAO.crearPedido(conn, ordenKiosco);
-                    ordenKiosco.setIdPedido(id);
-                    for (DetallePedido d : detallesSnapshot) {
-                        d.setIdPedido(id);
-                        try {
-                            pedidoDAO.insertarDetallePedido(conn, d);
-                        } catch (Exception ex) {
-                            LOGGER.log(Level.FINE, "Detalle guardado: {0}", ex.getMessage());
-                        }
-                    }
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    LOGGER.log(Level.WARNING, "Error al guardar orden de kiosco en BD: {0}", e.getMessage());
-                    ordenKiosco.setIdPedido(9100 + turnoPedido);
-                }
-            },
+            () -> kioscoOrdenService.registrarPedidoKiosco(ordenKiosco, detallesSnapshot),
             () -> {
                 if (btnConfirmarKiosco != null) {
                     btnConfirmarKiosco.setDisable(false);
@@ -445,7 +412,8 @@ public class KioscoController {
     @FXML
     public void handleExpandirVentana(javafx.event.ActionEvent event) {
         try {
-            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
+            javafx.fxml.FXMLLoader loader = com.foodcore.config.AppContainer.getDefault().createLoader(
+                    getClass().getResource("/com/foodcore/view/KioscoView.fxml"));
             javafx.scene.Parent root = loader.load();
             javafx.scene.Scene scene = new javafx.scene.Scene(root, 1280, 768);
             com.foodcore.App.applyStylesheets(scene);
@@ -475,7 +443,8 @@ public class KioscoController {
                 javafx.scene.Scene currentScene = btn.getScene();
                 if (currentScene != null && currentScene.lookup("#contentArea") instanceof javafx.scene.layout.StackPane contentArea) {
                     try {
-                        javafx.fxml.FXMLLoader l = new javafx.fxml.FXMLLoader(getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
+                        javafx.fxml.FXMLLoader l = com.foodcore.config.AppContainer.getDefault().createLoader(
+                                getClass().getResource("/com/foodcore/view/DashboardView.fxml"));
                         javafx.scene.Parent dash = l.load();
                         contentArea.getChildren().setAll(dash);
                     } catch (Exception ex) {

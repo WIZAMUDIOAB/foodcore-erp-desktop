@@ -25,6 +25,7 @@ import javafx.scene.image.WritableImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.testfx.util.WaitForAsyncUtils;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -315,7 +316,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -357,7 +358,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -390,7 +391,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -419,7 +420,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -457,7 +458,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(400);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -486,7 +487,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -515,7 +516,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -544,7 +545,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -570,7 +571,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -606,7 +607,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -647,7 +648,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -677,7 +678,7 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             }
         });
 
-        Thread.sleep(300);
+        sincronizarRenderFx(rootRef.get());
         guardarYPublicarSnapshot(rootRef.get(), filename);
     }
 
@@ -715,6 +716,17 @@ public class SpecFoodcoreV30RedesignScreenshotsTest {
             Path targetCopy = TARGET_SCREENSHOT_DIR.resolve(filename);
             Files.copy(targetFile.toPath(), targetCopy, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    private static void sincronizarRenderFx(Parent root) throws Exception {
+        WaitForAsyncUtils.waitForFxEvents();
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+            if (root != null) {
+                root.applyCss();
+                root.layout();
+            }
+        });
+        WaitForAsyncUtils.waitForFxEvents();
     }
 
     private void guardarYPublicarSnapshot(Parent node, String filename) throws Exception {

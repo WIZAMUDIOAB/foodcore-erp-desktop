@@ -1,13 +1,15 @@
 package com.foodcore.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.foodcore.events.OutboxRepository;
 import com.foodcore.exception.TerminalNoAutorizadaException;
 import com.foodcore.model.dto.EventoKdsDTO;
+import com.foodcore.model.dto.SocketFrameDTO;
+import com.foodcore.model.dto.SocketResponseDTO;
 import com.foodcore.security.TerminalAuthService;
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -48,11 +50,11 @@ import java.util.logging.Logger;
 public class ServidorSockets {
 
     private static final Logger LOGGER = Logger.getLogger(ServidorSockets.class.getName());
+    private static final ObjectMapper MAPPER = JsonMapperProvider.getMapper();
     public static final int PUERTO_TCP = 9090;
     public static final int MAX_FRAME_BYTES = TerminalAuthService.MAX_FRAME_BYTES; // 1 MB
     public static final int MAX_CLIENTES_CONCURRENTES = 20;
     public static final int SOCKET_READ_TIMEOUT_MS = 30_000;
-    private static final Gson GSON = new Gson();
 
     private static ServidorSockets instance;
     private final AtomicReference<ServerSocket> serverSocket = new AtomicReference<>();
@@ -62,7 +64,7 @@ public class ServidorSockets {
     private final Set<PrintWriter> clientesConectados = Collections.synchronizedSet(new HashSet<>());
     private final TerminalAuthService terminalAuthService = new TerminalAuthService();
     private final OutboxRepository outboxRepository = new OutboxRepository();
-    private volatile Consumer<JsonObject> mensajeListener;
+    private volatile Consumer<ObjectNode> mensajeListener;
     private volatile boolean corriendo = false;
     private int puertoActual = PUERTO_TCP;
 
@@ -209,7 +211,7 @@ public class ServidorSockets {
 
             String linea;
             while (corriendo && (linea = leerLineaAcotada(in, MAX_FRAME_BYTES)) != null) {
-                JsonObject respuesta = procesarTramaProtocolo(linea, out);
+                ObjectNode respuesta = procesarTramaProtocolo(linea, out);
                 if (respuesta != null) {
                     out.println(respuesta.toString());
                 }
@@ -266,7 +268,7 @@ public class ServidorSockets {
      * Procesa una trama del protocolo KDS (HELLO/AUTH_TERMINAL, RENEW, ACK autenticado, EVENT con HMAC-SHA256
      * y límite de 1 MB). Rechaza cualquier trama desconocida o sin sesión válida.
      */
-    public JsonObject procesarTramaProtocolo(String linea, PrintWriter remitente) {
+    public ObjectNode procesarTramaProtocolo(String linea, PrintWriter remitente) {
         if (linea == null || linea.isBlank()) {
             return crearError("EMPTY_FRAME", "Trama vacía");
         }
@@ -277,110 +279,106 @@ public class ServidorSockets {
         }
 
         try {
-            JsonElement parsed = JsonParser.parseString(linea);
-            if (!parsed.isJsonObject()) {
+            JsonNode parsed = MAPPER.readTree(linea);
+            if (parsed == null || !parsed.isObject()) {
                 return crearError("INVALID_JSON", "Mensaje JSON malformado");
             }
-            JsonObject json = parsed.getAsJsonObject();
-            String type = json.has("type") && !json.get("type").isJsonNull() ? json.get("type").getAsString() : "";
+            ObjectNode json = (ObjectNode) parsed;
+            SocketFrameDTO trama = MAPPER.convertValue(json, SocketFrameDTO.class);
+            String type = trama.getType() != null ? trama.getType() : "";
 
             if ("HELLO".equalsIgnoreCase(type) || "AUTH_TERMINAL".equalsIgnoreCase(type)) {
-                String codigoTerminal = json.has("codigoTerminal") && !json.get("codigoTerminal").isJsonNull()
-                        ? json.get("codigoTerminal").getAsString() : "";
-                String secreto = json.has("secreto") && !json.get("secreto").isJsonNull()
-                        ? json.get("secreto").getAsString() : "";
+                String codigoTerminal = trama.getCodigoTerminal() != null ? trama.getCodigoTerminal() : "";
+                String secreto = trama.getSecreto() != null ? trama.getSecreto() : "";
                 try {
                     TerminalAuthService.SesionTerminal sesion = terminalAuthService.autenticar(codigoTerminal, secreto);
                     if (remitente != null) {
                         clientesConectados.add(remitente);
                     }
-                    JsonObject welcome = new JsonObject();
-                    welcome.addProperty("type", "WELCOME");
-                    welcome.addProperty("sessionToken", sesion.getSessionToken());
-                    welcome.addProperty("sessionSecret", sesion.getSessionSecret());
-                    welcome.addProperty("ttl", sesion.getTtlSegundos());
-                    return welcome;
+                    SocketResponseDTO welcome = new SocketResponseDTO();
+                    welcome.setType("WELCOME");
+                    welcome.setSessionToken(sesion.getSessionToken());
+                    welcome.setSessionSecret(sesion.getSessionSecret());
+                    welcome.setTtl((long) sesion.getTtlSegundos());
+                    return welcome.toObjectNode();
                 } catch (TerminalNoAutorizadaException ex) {
                     return crearError("TerminalNoAutorizada", ex.getMessage());
                 }
             }
 
             if ("RENEW".equalsIgnoreCase(type)) {
-                String token = json.has("sessionToken") && !json.get("sessionToken").isJsonNull()
-                        ? json.get("sessionToken").getAsString() : "";
+                String token = trama.getSessionToken() != null ? trama.getSessionToken() : "";
                 try {
                     TerminalAuthService.SesionTerminal renovada = terminalAuthService.renovar(token);
                     if (remitente != null) {
                         clientesConectados.add(remitente);
                     }
-                    JsonObject welcome = new JsonObject();
-                    welcome.addProperty("type", "WELCOME");
-                    welcome.addProperty("sessionToken", renovada.getSessionToken());
-                    welcome.addProperty("sessionSecret", renovada.getSessionSecret());
-                    welcome.addProperty("ttl", renovada.getTtlSegundos());
-                    return welcome;
+                    SocketResponseDTO welcome = new SocketResponseDTO();
+                    welcome.setType("WELCOME");
+                    welcome.setSessionToken(renovada.getSessionToken());
+                    welcome.setSessionSecret(renovada.getSessionSecret());
+                    welcome.setTtl((long) renovada.getTtlSegundos());
+                    return welcome.toObjectNode();
                 } catch (TerminalNoAutorizadaException ex) {
                     return crearError("TerminalNoAutorizada", ex.getMessage());
                 }
             }
 
             if ("ACK".equalsIgnoreCase(type)) {
-                String sessionToken = json.has("sessionToken") && !json.get("sessionToken").isJsonNull()
-                        ? json.get("sessionToken").getAsString() : "";
+                String sessionToken = trama.getSessionToken() != null ? trama.getSessionToken() : "";
                 TerminalAuthService.SesionTerminal sesion = terminalAuthService.obtenerSesion(sessionToken);
                 if (sesion == null) {
                     return crearError("TerminalNoAutorizada", "Sesión no autenticada o expirada para ACK");
                 }
-                long idEvento = json.has("idEvento") && !json.get("idEvento").isJsonNull()
-                        ? json.get("idEvento").getAsLong() : 0L;
+                long idEvento = trama.getIdEvento();
                 if (idEvento > 0) {
                     try (Connection conn = ConexionBD.getConnection()) {
                         outboxRepository.marcarEnviado(conn, idEvento);
                     }
                 }
-                JsonObject ackOk = new JsonObject();
-                ackOk.addProperty("type", "ACK_CONFIRMED");
-                ackOk.addProperty("idEvento", idEvento);
-                return ackOk;
+                SocketResponseDTO ackOk = new SocketResponseDTO();
+                ackOk.setType("ACK_CONFIRMED");
+                ackOk.setIdEvento(idEvento);
+                return ackOk.toObjectNode();
             }
 
             if ("EVENT".equalsIgnoreCase(type)) {
-                String sessionToken = json.has("sessionToken") && !json.get("sessionToken").isJsonNull()
-                        ? json.get("sessionToken").getAsString() : "";
+                String sessionToken = trama.getSessionToken() != null ? trama.getSessionToken() : "";
                 TerminalAuthService.SesionTerminal sesion = terminalAuthService.obtenerSesion(sessionToken);
                 if (sesion == null) {
                     return crearError("TerminalNoAutorizada", "Sesión no autenticada o expirada");
                 }
-                if (!json.has("payload") || !json.get("payload").isJsonObject()) {
+                JsonNode payloadNode = json.get("payload");
+                if (payloadNode == null || !payloadNode.isObject()) {
                     return crearError("INVALID_PAYLOAD", "Payload de evento ausente o inválido");
                 }
-                EventoKdsDTO payload = EventoKdsDTO.fromJson(json.get("payload").toString());
+                EventoKdsDTO payload = EventoKdsDTO.fromJson(payloadNode.toString());
                 if (payload == null || !payload.verificarHmac(sesion.getSessionSecret())) {
                     return crearError("HMAC_INVALIDO", "Firma HMAC-SHA256 adulterada o expirada");
                 }
-                Consumer<JsonObject> listener = this.mensajeListener;
+                Consumer<ObjectNode> listener = this.mensajeListener;
                 if (listener != null) {
                     listener.accept(json);
                 }
                 transmitirATodos(linea, remitente);
-                JsonObject ack = new JsonObject();
-                ack.addProperty("type", "ACK");
-                ack.addProperty("eventId", payload.getEventId());
-                return ack;
+                SocketResponseDTO ack = new SocketResponseDTO();
+                ack.setType("ACK");
+                ack.setEventId(payload.getEventId());
+                return ack.toObjectNode();
             }
 
             return crearError("FRAME_NO_AUTORIZADO", "Tipo de trama desconocido o no autenticado");
-        } catch (SQLException | RuntimeException parseEx) {
+        } catch (JsonProcessingException | SQLException | RuntimeException parseEx) {
             return crearError("INVALID_JSON", "Mensaje JSON malformado");
         }
     }
 
-    private JsonObject crearError(String code, String message) {
-        JsonObject err = new JsonObject();
-        err.addProperty("type", "ERROR");
-        err.addProperty("code", code);
-        err.addProperty("message", message);
-        return err;
+    private ObjectNode crearError(String code, String message) {
+        SocketResponseDTO err = new SocketResponseDTO();
+        err.setType("ERROR");
+        err.setCode(code);
+        err.setMessage(message);
+        return err.toObjectNode();
     }
 
     public void transmitirATodos(String mensaje, PrintWriter remitente) {
@@ -401,15 +399,15 @@ public class ServidorSockets {
         if (jsonMensaje == null || jsonMensaje.isBlank()) {
             return;
         }
-        Consumer<JsonObject> listener = this.mensajeListener;
+        Consumer<ObjectNode> listener = this.mensajeListener;
         if (listener != null) {
             try {
-                JsonElement el = JsonParser.parseString(jsonMensaje);
-                if (el.isJsonObject()) {
-                    listener.accept(el.getAsJsonObject());
+                JsonNode el = MAPPER.readTree(jsonMensaje);
+                if (el != null && el.isObject()) {
+                    listener.accept((ObjectNode) el);
                 }
-            } catch (RuntimeException ex) {
-                LOGGER.log(Level.FINE, "Mensaje interno KDS no pudo parsearse como JsonObject", ex);
+            } catch (JsonProcessingException | RuntimeException ex) {
+                LOGGER.log(Level.FINE, "Mensaje interno KDS no pudo parsearse como ObjectNode", ex);
             }
         }
         synchronized (clientesConectados) {
@@ -419,14 +417,14 @@ public class ServidorSockets {
         }
     }
 
-    public void emitirMensaje(JsonObject mensaje) {
+    public void emitirMensaje(ObjectNode mensaje) {
         if (mensaje == null) {
             return;
         }
-        emitirMensajeInterno(GSON.toJson(mensaje));
+        emitirMensajeInterno(mensaje.toString());
     }
 
-    public void setMensajeListener(Consumer<JsonObject> listener) {
+    public void setMensajeListener(Consumer<ObjectNode> listener) {
         this.mensajeListener = listener;
     }
 

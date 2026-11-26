@@ -4,6 +4,7 @@ import com.foodcore.model.Asistencia;
 import com.foodcore.model.Empleado;
 import com.foodcore.model.Usuario;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalTime;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioDAO {
+    int MAX_INTENTOS_FALLIDOS = 5;
+
     Optional<Usuario> autenticar(Connection conn, String username, String password) throws SQLException;
     Optional<Usuario> buscarPorUsername(Connection conn, String username) throws SQLException;
     void registrarIntentoFallido(Connection conn, int idUsuario, int nuevosIntentos, boolean bloquear15Minutos) throws SQLException;
@@ -25,7 +28,7 @@ public interface UsuarioDAO {
     Optional<Usuario> buscarPorDniOPin(Connection conn, String credencial) throws SQLException;
     List<Usuario> listarTodosActivos(Connection conn) throws SQLException;
     boolean actualizarDatosLaborales(Connection conn, int idUsuario, String dni, String pin,
-                                     double sueldoBase, String horarioLaboral,
+                                     BigDecimal sueldoBase, String horarioLaboral,
                                      LocalTime horaEntrada, LocalTime horaSalida) throws SQLException;
     boolean actualizarPin(Connection conn, int idUsuario, String pinPlano, String pinHash) throws SQLException;
     Optional<Usuario> autenticarPorPin(Connection conn, int idUsuario, String pinPlano) throws SQLException;

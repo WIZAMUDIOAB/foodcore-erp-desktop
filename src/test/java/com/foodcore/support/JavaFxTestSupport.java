@@ -1,12 +1,15 @@
 package com.foodcore.support;
 
 import javafx.application.Platform;
+import org.testfx.util.WaitForAsyncUtils;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 /**
  * Soporte de ejecución en hilo JavaFX (con soporte Monocle Headless / TestFX)
@@ -97,5 +100,18 @@ public final class JavaFxTestSupport {
             action.run();
             return null;
         });
+    }
+
+    public static void awaitCondition(BooleanSupplier condition, long timeoutSeconds, String failureMessage)
+            throws Exception {
+        iniciarToolkit();
+        WaitForAsyncUtils.waitForFxEvents();
+        try {
+            WaitForAsyncUtils.waitFor(timeoutSeconds, TimeUnit.SECONDS,
+                    () -> runOnFxThreadAndWait(condition::getAsBoolean));
+        } catch (TimeoutException ex) {
+            throw new AssertionError(failureMessage, ex);
+        }
+        WaitForAsyncUtils.waitForFxEvents();
     }
 }

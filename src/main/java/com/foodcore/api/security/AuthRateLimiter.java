@@ -11,12 +11,16 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Limitador de tasa por ventana deslizante por IP para endpoints de autenticación,
  * con tope máximo de IPs rastreadas y depuración periódica de entradas vencidas.
  */
 public final class AuthRateLimiter {
+
+    private static final Logger LOGGER = Logger.getLogger(AuthRateLimiter.class.getName());
 
     public static final int DEFAULT_MAX_REQUESTS = 10;
     public static final long DEFAULT_WINDOW_MILLIS = 60_000L;
@@ -51,7 +55,8 @@ public final class AuthRateLimiter {
                 if (parsed > 0) {
                     limite = parsed;
                 }
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException ex) {
+                LOGGER.log(Level.FINE, "Valor inválido para límite rateLimit.max: " + configured, ex);
             }
         }
         return new AuthRateLimiter(limite, DEFAULT_WINDOW_MILLIS, System::currentTimeMillis, MAX_TRACKED_IPS);
@@ -62,7 +67,8 @@ public final class AuthRateLimiter {
             if (is != null) {
                 target.load(is);
             }
-        } catch (java.io.IOException ignored) {
+        } catch (java.io.IOException ex) {
+            LOGGER.log(Level.FINE, "No se pudo leer configuración opcional de rate limit: " + path, ex);
         }
     }
 

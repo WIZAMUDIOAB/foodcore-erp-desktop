@@ -1,5 +1,6 @@
 package com.foodcore.controller;
 
+import com.foodcore.controller.venta.ModalModoSupervisorHandle;
 import com.foodcore.exception.CodigoError;
 import com.foodcore.exception.PeriodoCerradoException;
 import com.foodcore.model.Asistencia;
@@ -20,6 +21,7 @@ import com.foodcore.service.ActaEntregaTurnoService;
 import com.foodcore.service.AsistenciaService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.PedidoService;
+import com.foodcore.service.impl.PedidoServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport;
 import com.foodcore.support.UiScreenshotTestSupport.VistaCargada;
@@ -212,7 +214,7 @@ class SubFaseBOperacionesUiTest {
                 assertFalse(ctrl.getBtnAnularVenta().isDisabled(),
                         "CAJERO debe tener Anular Venta habilitado para usar Modo Supervisor");
 
-                VentaController.ModalModoSupervisorHandle modal = ctrl.construirModalModoSupervisor(1042);
+                ModalModoSupervisorHandle modal = ctrl.construirModalModoSupervisor(1042);
                 modal.txtPinSupervisor().setText("4321");
                 modal.txtMotivo().setText("Error de digitación en medio de pago");
                 modal.chkPlatoPreparado().setSelected(false);
@@ -289,7 +291,7 @@ class SubFaseBOperacionesUiTest {
                 KitchenDisplayController ctrl = vista.controller();
                 ctrl.stopTimers();
 
-                PedidoService noOpPedidoService = new PedidoService(null, null, null) {
+                PedidoService noOpPedidoService = new PedidoServiceImpl(null, null, null) {
                     @Override
                     public void reordenarPrioridadKds(List<Integer> idsDetalleOrdenDescendente) {
                         // Sin BD en prueba unitaria UI

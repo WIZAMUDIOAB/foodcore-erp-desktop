@@ -1,7 +1,7 @@
 package com.foodcore.service;
 
 import com.foodcore.dao.CajaDAO;
-import com.foodcore.dao.CajaDAOImpl;
+import com.foodcore.dao.impl.CajaDAOImpl;
 import com.foodcore.dao.CompraDAO;
 import com.foodcore.dao.VentaDAO;
 import com.foodcore.dao.impl.CompraDAOImpl;
@@ -36,8 +36,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,8 +47,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ExportacionContableService {
+
+    private static final Logger LOGGER = Logger.getLogger(ExportacionContableService.class.getName());
 
     private final VentaDAO ventaDAO;
     private final CompraDAO compraDAO;
@@ -108,9 +114,9 @@ public class ExportacionContableService {
 
             for (VentaRegistroSunat r : registros) {
                 boolean anulada = !"1".equals(r.estado);
-                BigDecimal subFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.subtotalBd != null ? r.subtotalBd : BigDecimal.valueOf(r.subtotal));
-                BigDecimal igvFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.igvBd != null ? r.igvBd : BigDecimal.valueOf(r.igv));
-                BigDecimal totFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.totalBd != null ? r.totalBd : BigDecimal.valueOf(r.total));
+                BigDecimal subFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.subtotal);
+                BigDecimal igvFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.igv);
+                BigDecimal totFila = anulada ? BigDecimal.ZERO : normalizarMoneda(r.total);
 
                 Row row = sheet.createRow(rowIdx++);
                 row.createCell(0).setCellValue(sanitizarFormulaCelda(r.periodo));
@@ -198,9 +204,9 @@ public class ExportacionContableService {
 
             for (Compra c : compras) {
                 boolean anulada = "ANULADA".equalsIgnoreCase(c.getEstado());
-                BigDecimal baseBd = anulada ? BigDecimal.ZERO : normalizarMoneda(BigDecimal.valueOf(c.getBaseImponible()));
-                BigDecimal igvBd = anulada ? BigDecimal.ZERO : normalizarMoneda(BigDecimal.valueOf(c.getIgv()));
-                BigDecimal totBd = anulada ? BigDecimal.ZERO : normalizarMoneda(BigDecimal.valueOf(c.getTotal()));
+                BigDecimal baseBd = anulada ? BigDecimal.ZERO : normalizarMoneda(c.getBaseImponible());
+                BigDecimal igvBd = anulada ? BigDecimal.ZERO : normalizarMoneda(c.getIgv());
+                BigDecimal totBd = anulada ? BigDecimal.ZERO : normalizarMoneda(c.getTotal());
 
                 Row row = sheet.createRow(rowIdx++);
                 row.createCell(0).setCellValue(c.getFechaEmision() != null ? c.getFechaEmision().format(DateTimeFormatter.ofPattern("yyyyMM")) : "");
@@ -544,12 +550,9 @@ public class ExportacionContableService {
                     r.docCliente = (numDocRaw != null && !numDocRaw.isBlank()) ? numDocRaw.trim() : "00000000";
                     r.nombreCliente = rs.getString("nombre_cliente_final");
 
-                    r.subtotalBd = normalizarMoneda(rs.getBigDecimal("subtotal"));
-                    r.igvBd = normalizarMoneda(rs.getBigDecimal("igv"));
-                    r.totalBd = normalizarMoneda(rs.getBigDecimal("total"));
-                    r.subtotal = r.subtotalBd.doubleValue();
-                    r.igv = r.igvBd.doubleValue();
-                    r.total = r.totalBd.doubleValue();
+                    r.subtotal = normalizarMoneda(rs.getBigDecimal("subtotal"));
+                    r.igv = normalizarMoneda(rs.getBigDecimal("igv"));
+                    r.total = normalizarMoneda(rs.getBigDecimal("total"));
                     r.medioPago = rs.getString("metodo_pago");
                     r.estado = "COMPLETADA".equalsIgnoreCase(rs.getString("estado")) ? "1" : "2";
                     lista.add(r);
@@ -557,6 +560,88 @@ public class ExportacionContableService {
             }
         }
         return lista;
+    }
+
+    /**
+     * Consulta el resumen contable de un período: ventas registradas y acumulados de
+     * total, base imponible, IGV y compras.
+     *
+     * @param ini Fecha inicial del período (incluida).
+     * @param fin Fecha final del período (incluida).
+     * @return Resumen del período; ante error retorna ventas y acumulados en cero.
+     */
+    public PeriodoContableResumen consultarResumenPeriodoContable(LocalDate ini, LocalDate fin) {
+        List<VentaRegistroSunat> ventas = new ArrayList<>();
+        BigDecimal sumTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumBase = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumIgv = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal sumCompras = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        try (Connection conn = ConexionBD.getConnection()) {
+            String sqlVentas = "SELECT v.*, p.cliente_nombre "
+                    + "FROM venta v "
+                    + "LEFT JOIN pedido p ON v.id_pedido = p.id_pedido "
+                    + "WHERE DATE(v.fecha_hora) BETWEEN ? AND ? "
+                    + "ORDER BY v.fecha_hora DESC";
+
+            try (PreparedStatement ps = conn.prepareStatement(sqlVentas)) {
+                ps.setDate(1, Date.valueOf(ini));
+                ps.setDate(2, Date.valueOf(fin));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        VentaRegistroSunat r = new VentaRegistroSunat();
+                        r.idVenta = rs.getInt("id_venta");
+                        r.fechaEmision = rs.getTimestamp("fecha_hora").toLocalDateTime().toLocalDate().toString();
+                        r.serie = "B001";
+                        String cli = rs.getString("cliente_nombre");
+                        r.nombreCliente = (cli != null && !cli.isBlank()) ? cli : "CLIENTES VARIOS";
+                        r.subtotal = normalizarMoneda(rs.getBigDecimal("subtotal"));
+                        r.igv = normalizarMoneda(rs.getBigDecimal("igv"));
+                        r.total = normalizarMoneda(rs.getBigDecimal("total"));
+                        r.medioPago = rs.getString("metodo_pago");
+                        r.estado = "COMPLETADA".equalsIgnoreCase(rs.getString("estado")) ? "1" : "2";
+
+                        ventas.add(r);
+                        sumTotal = sumTotal.add(r.total).setScale(2, RoundingMode.HALF_UP);
+                        sumBase = sumBase.add(r.subtotal).setScale(2, RoundingMode.HALF_UP);
+                        sumIgv = sumIgv.add(r.igv).setScale(2, RoundingMode.HALF_UP);
+                    }
+                }
+            }
+
+            List<Compra> compras = compraDAO.listarPorRangoFecha(conn, ini, fin);
+            for (Compra c : compras) {
+                sumCompras = sumCompras.add(normalizarMoneda(c.getTotal())).setScale(2, RoundingMode.HALF_UP);
+            }
+        } catch (SQLException | RuntimeException ex) {
+            LOGGER.log(Level.WARNING, "Error al cargar datos contables", ex);
+        }
+
+        return new PeriodoContableResumen(ventas, sumTotal, sumBase, sumIgv, sumCompras);
+    }
+
+    /**
+     * Resumen contable de un período: ventas SUNAT y acumulados de total, base, IGV y compras.
+     *
+     * @param ventas     Ventas del período.
+     * @param sumTotal   Suma de totales de venta.
+     * @param sumBase    Suma de base imponible.
+     * @param sumIgv     Suma de IGV.
+     * @param sumCompras Suma de totales de compra.
+     */
+    public record PeriodoContableResumen(
+            List<VentaRegistroSunat> ventas,
+            BigDecimal sumTotal,
+            BigDecimal sumBase,
+            BigDecimal sumIgv,
+            BigDecimal sumCompras) {
+        public PeriodoContableResumen {
+            ventas = ventas != null ? List.copyOf(ventas) : List.of();
+            sumTotal = normalizarMoneda(sumTotal);
+            sumBase = normalizarMoneda(sumBase);
+            sumIgv = normalizarMoneda(sumIgv);
+            sumCompras = normalizarMoneda(sumCompras);
+        }
     }
 
     public static class VentaRegistroSunat {
@@ -570,12 +655,9 @@ public class ExportacionContableService {
         public String tipoDocCliente;
         public String docCliente;
         public String nombreCliente;
-        public double subtotal;
-        public double igv;
-        public double total;
-        public BigDecimal subtotalBd;
-        public BigDecimal igvBd;
-        public BigDecimal totalBd;
+        public BigDecimal subtotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        public BigDecimal igv = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        public BigDecimal total = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         public String medioPago;
         public String estado;
     }

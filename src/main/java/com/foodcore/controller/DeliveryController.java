@@ -1,11 +1,10 @@
 package com.foodcore.controller;
 
 import com.foodcore.model.Pedido;
+import com.foodcore.service.DeliveryGestionService;
 import com.foodcore.util.AnimationUtils;
-import com.foodcore.util.ConexionBD;
 import com.foodcore.util.DialogService;
 import com.foodcore.util.UiAsyncExecutor;
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -23,10 +22,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,6 +33,9 @@ import java.util.logging.Logger;
 public class DeliveryController {
 
     private static final Logger LOGGER = Logger.getLogger(DeliveryController.class.getName());
+    private static final int LIMITE_PEDIDOS_DELIVERY = 50;
+
+    private final DeliveryGestionService deliveryService = new DeliveryGestionService();
 
     @FXML private StackPane rootDeliveryStack;
     @FXML private Label lblContadorBadge;
@@ -124,31 +122,12 @@ public class DeliveryController {
     }
 
     public void cargarPedidosDeliverySincrono() {
-        List<Pedido> pedidos = new ArrayList<>();
-        String sql = "SELECT * FROM pedido WHERE tipo_pedido = 'DELIVERY' ORDER BY id_pedido DESC LIMIT 50";
-        try (Connection conn = ConexionBD.getConnection()) {
-            if (conn != null) {
-                try (PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        Pedido p = new Pedido();
-                        p.setIdPedido(rs.getInt("id_pedido"));
-                        p.setNumeroMesa(rs.getString("numero_mesa"));
-                        p.setTipoPedido("DELIVERY");
-                        p.setClienteNombre(rs.getString("cliente_nombre"));
-                        p.setClienteTelefono(rs.getString("cliente_telefono"));
-                        p.setClienteDireccion(rs.getString("cliente_direccion"));
-                        p.setClienteReferencia(rs.getString("cliente_referencia"));
-                        p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
-                        p.setTotal(rs.getBigDecimal("total"));
-                        p.setEstado(rs.getString("estado"));
-                        p.setRepartidor(rs.getString("repartidor"));
-                        pedidos.add(p);
-                    }
-                }
-            }
+        List<Pedido> pedidos;
+        try {
+            pedidos = deliveryService.listarPedidosDeliveryRecientes(LIMITE_PEDIDOS_DELIVERY);
         } catch (java.sql.SQLException | RuntimeException e) {
             LOGGER.log(Level.WARNING, "Error al cargar pedidos delivery sincrónicamente: " + e.getMessage());
+            pedidos = List.of();
         }
 
         listaPedidosDelivery.setAll(pedidos);
@@ -159,32 +138,7 @@ public class DeliveryController {
 
     public void cargarPedidosDelivery() {
         UiAsyncExecutor.ejecutarAsync(
-            () -> {
-                List<Pedido> pedidos = new ArrayList<>();
-                String sql = "SELECT * FROM pedido WHERE tipo_pedido = 'DELIVERY' ORDER BY id_pedido DESC LIMIT 50";
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql);
-                     ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        Pedido p = new Pedido();
-                        p.setIdPedido(rs.getInt("id_pedido"));
-                        p.setNumeroMesa(rs.getString("numero_mesa"));
-                        p.setTipoPedido("DELIVERY");
-                        p.setClienteNombre(rs.getString("cliente_nombre"));
-                        p.setClienteTelefono(rs.getString("cliente_telefono"));
-                        p.setClienteDireccion(rs.getString("cliente_direccion"));
-                        p.setClienteReferencia(rs.getString("cliente_referencia"));
-                        p.setCostoEnvio(rs.getBigDecimal("costo_envio"));
-                        p.setTotal(rs.getBigDecimal("total"));
-                        p.setEstado(rs.getString("estado"));
-                        p.setRepartidor(rs.getString("repartidor"));
-                        pedidos.add(p);
-                    }
-                } catch (java.sql.SQLException | RuntimeException e) {
-                    LOGGER.log(Level.FINE, "Error cargando pedidos delivery", e);
-                }
-                return pedidos;
-            },
+            () -> deliveryService.listarPedidosDeliveryRecientes(LIMITE_PEDIDOS_DELIVERY),
             pedidos -> {
                 listaPedidosDelivery.setAll(pedidos);
                 if (lblContadorBadge != null) {
@@ -233,22 +187,7 @@ public class DeliveryController {
             final String ref = txtRef.getText();
             btnGuardar.setDisable(true);
             UiAsyncExecutor.ejecutarVoidAsync(
-                () -> {
-                    try (Connection conn = ConexionBD.getConnection();
-                         PreparedStatement ps = conn.prepareStatement(
-                             "INSERT INTO pedido (id_usuario, numero_mesa, tipo_pedido, cliente_nombre, cliente_telefono, "
-                             + "cliente_direccion, cliente_referencia, costo_envio, total, estado, idempotency_key) "
-                             + "VALUES (1, ?, 'DELIVERY', ?, ?, ?, ?, ?, ?, 'EN_COCINA', UUID())")) {
-                        ps.setString(1, "DL-" + (System.currentTimeMillis() % 10000));
-                        ps.setString(2, nombre);
-                        ps.setString(3, tel);
-                        ps.setString(4, dir);
-                        ps.setString(5, ref);
-                        ps.setBigDecimal(6, envioVal);
-                        ps.setBigDecimal(7, totalVal);
-                        ps.executeUpdate();
-                    }
-                },
+                () -> deliveryService.registrarDeliveryRapido(nombre, tel, dir, ref, envioVal, totalVal),
                 () -> {
                     btnGuardar.setDisable(false);
                     rootDeliveryStack.getChildren().remove(backdrop);
@@ -319,16 +258,7 @@ public class DeliveryController {
     private void actualizarEstadoYRepartidor(int idPedido, String nuevoEstado, String repartidor) {
         final String repVal = repartidor != null ? repartidor : "";
         UiAsyncExecutor.ejecutarVoidAsync(
-            () -> {
-                try (Connection conn = ConexionBD.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(
-                         "UPDATE pedido SET estado = ?, repartidor = ? WHERE id_pedido = ?")) {
-                    ps.setString(1, nuevoEstado);
-                    ps.setString(2, repVal);
-                    ps.setInt(3, idPedido);
-                    ps.executeUpdate();
-                }
-            },
+            () -> deliveryService.actualizarEstadoYRepartidor(idPedido, nuevoEstado, repVal),
             () -> {
                 AnimationUtils.mostrarToast(rootDeliveryStack, "Pedido #" + idPedido + " actualizado a " + nuevoEstado, false);
                 cargarPedidosDelivery();

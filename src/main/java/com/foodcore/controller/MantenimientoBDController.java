@@ -1,12 +1,11 @@
 package com.foodcore.controller;
 
-import com.foodcore.exception.NegocioException;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Receta;
 import com.foodcore.service.MantenimientoService;
-import com.foodcore.util.ConexionBD;
+
 import com.foodcore.util.ToastService;
 import com.foodcore.util.UiAsyncExecutor;
 import javafx.beans.property.SimpleObjectProperty;
@@ -15,10 +14,15 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 
 import java.math.BigDecimal;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -344,7 +348,7 @@ public class MantenimientoBDController {
 
     @FXML
     public void handleRecargarPool(ActionEvent event) {
-        ConexionBD.inicializarPool();
+        service.inicializarPool();
         actualizarDiagnostico();
         mostrarAlerta("Pool Reiniciado", "El pool HikariCP ha sido reiniciado con database.properties.", Alert.AlertType.INFORMATION);
     }
@@ -352,14 +356,13 @@ public class MantenimientoBDController {
     private void actualizarDiagnostico() {
         boolean viva = service.verificarSaludBD();
         lblEstadoBD.setText(viva ? "MySQL: Conectado" : "MySQL: Desconectado");
-        lblEstadoBD.setStyle(viva
-            ? "-fx-background-color: #e6f4ea; -fx-text-fill: #2a9d8f; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold;"
-            : "-fx-background-color: #fee2e2; -fx-text-fill: #e63946; -fx-padding: 6px 14px; -fx-background-radius: 20px; -fx-font-weight: bold;"
-        );
+        lblEstadoBD.getStyleClass().removeAll("fc-bd-pill-ok", "fc-bd-pill-error");
+        lblEstadoBD.getStyleClass().add(viva ? "fc-bd-pill-ok" : "fc-bd-pill-error");
 
         lblDiagnosticoEstado.setText(viva ? "Activo, Saludable y Respondiendo" : "Sin Conexión con MySQL Server");
-        lblDiagnosticoEstado.setStyle(viva ? "-fx-text-fill: #2a9d8f; -fx-font-weight: bold;" : "-fx-text-fill: #e63946; -fx-font-weight: bold;");
-        lblDiagnosticoUrl.setText(ConexionBD.getJdbcUrlInfo());
+        lblDiagnosticoEstado.getStyleClass().removeAll("fc-text-success-bold", "fc-text-danger-bold");
+        lblDiagnosticoEstado.getStyleClass().add(viva ? "fc-text-success-bold" : "fc-text-danger-bold");
+        lblDiagnosticoUrl.setText(service.obtenerJdbcUrlInfo());
         lblDiagnosticoMetricas.setText(service.obtenerMetricasPool());
     }
 

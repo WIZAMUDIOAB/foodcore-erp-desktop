@@ -4,6 +4,8 @@ import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
 import com.foodcore.controller.ClientesController;
 import com.foodcore.controller.VentaController;
+import com.foodcore.controller.venta.DefaultVentaCobroCoordinator;
+import com.foodcore.controller.venta.FakeVentaPosInteractionPort;
 import com.foodcore.dao.ClienteDAO;
 import com.foodcore.dao.FidelizacionDAO;
 import com.foodcore.dao.impl.CajaDAOImpl;
@@ -16,9 +18,11 @@ import com.foodcore.model.HistorialPuntos;
 import com.foodcore.model.Insumo;
 import com.foodcore.model.Producto;
 import com.foodcore.model.Usuario;
+import com.foodcore.security.AutorizacionService;
 import com.foodcore.service.AuthService;
 import com.foodcore.service.FidelizacionService;
 import com.foodcore.service.impl.CajaServiceImpl;
+import com.foodcore.service.impl.VentaServiceImpl;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.tx.impl.JdbcTransactionManager;
@@ -52,6 +56,8 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -145,6 +151,26 @@ class CrmMinoristaV500IT {
         return idProd;
     }
 
+    private static FakeVentaPosInteractionPort crearPortCobroDirecto() {
+        FakeVentaPosInteractionPort port = new FakeVentaPosInteractionPort();
+        port.configurarCobroDirecto(new DefaultVentaCobroCoordinator(new VentaServiceImpl(), new AutorizacionService()));
+        port.setConfirmarCumpleanos(false);
+        return port;
+    }
+
+    private static Optional<Cliente> buscarYAsociarClienteAsync(VentaController ctrl, String criterio,
+            Boolean confirmarCumpleanos) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<Optional<Cliente>> resultadoRef = new AtomicReference<>(Optional.empty());
+        JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrl.buscarYAsociarClientePorCriterioAsync(
+                criterio, confirmarCumpleanos, res -> {
+                    resultadoRef.set(res);
+                    latch.countDown();
+                }));
+        assertTrue(latch.await(5, TimeUnit.SECONDS), "Timeout esperando búsqueda asíncrona de cliente " + criterio);
+        return resultadoRef.get();
+    }
+
     @Test
     @DisplayName("v5.0.0 Criterio 1 & 2: Registro rápido en POS/Backoffice, búsqueda por DNI/teléfono y acumulación S/ 50.00 = 50 puntos")
     void testRegistroRapidoYAcumulacionPuntosEnVentaPos() throws Exception {
@@ -152,54 +178,73 @@ class CrmMinoristaV500IT {
                 "Al wok", new BigDecimal("50.00"), new BigDecimal("100"), true);
 
         AtomicReference<Cliente> cliRef = new AtomicReference<>();
+        AtomicReference<VentaController> ctrlRef = new AtomicReference<>();
+        AtomicReference<Parent> rootRef = new AtomicReference<>();
 
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-                App.cargarFuentesSistema();
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
-                Parent root = loader.load();
-                Scene scene = new Scene(root, 1240, 780);
-                App.applyStylesheets(scene);
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+                    App.cargarFuentesSistema();
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                    Parent root = loader.load();
+                    Scene scene = new Scene(root, 1240, 780);
+                    App.applyStylesheets(scene);
 
-                VentaController ctrl = loader.getController();
-                ctrl.setModoCobroDirectoTest(true);
-                ctrl.setRespuestaAutomaticaCumpleanosTest(Boolean.FALSE);
-                ctrl.cargarCatalogoProductosSincrono();
+                    VentaController ctrl = loader.getController();
+                    ctrl.setInteractionPort(crearPortCobroDirecto());
+                    ctrl.cargarCatalogoProductosSincrono();
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
 
-                // 1. Registrar rápidamente cliente minorista desde el POS (Nombre + DNI)
-                Cliente nuevo = ctrl.registrarYAsociarClienteRapidoPos(
-                        "78901234", "Valeria Castro Ruiz", "999888777",
-                        LocalDate.now().minusYears(26));
-                assertNotNull(nuevo);
-                assertTrue(nuevo.getIdCliente() > 0);
-                assertEquals("MINORISTA", nuevo.getTipoCliente());
-                cliRef.set(nuevo);
+                    // 1. Registrar rápidamente cliente minorista desde el POS (Nombre + DNI)
+                    Cliente nuevo = ctrl.registrarYAsociarClienteRapidoPos(
+                            "78901234", "Valeria Castro Ruiz", "999888777",
+                            LocalDate.now().minusYears(26));
+                    assertNotNull(nuevo);
+                    assertTrue(nuevo.getIdCliente() > 0);
+                    assertEquals("MINORISTA", nuevo.getTipoCliente());
+                    cliRef.set(nuevo);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                // 2. Búsqueda por teléfono debe localizar al mismo cliente
-                Optional<Cliente> porTel = ctrl.buscarYAsociarClientePorCriterioSincrono("999888777", Boolean.FALSE);
-                assertTrue(porTel.isPresent());
-                assertEquals("78901234", porTel.get().getNumeroDocumento());
+            VentaController ctrl = ctrlRef.get();
+            Parent root = rootRef.get();
 
-                // 3. Agregar producto S/ 50.00 y capturar evidencia POS con cliente asociado antes de cobrar
+            // 2. Búsqueda asíncrona por teléfono debe localizar al mismo cliente
+            Optional<Cliente> porTel = buscarYAsociarClienteAsync(ctrl, "999888777", Boolean.FALSE);
+            assertTrue(porTel.isPresent());
+            assertEquals("78901234", porTel.get().getNumeroDocumento());
+
+            // 3. Agregar producto S/ 50.00
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 ctrl.agregarProductoAVenta(prod50);
                 Label lblTotal = (Label) root.lookup("#lblTotal");
                 assertEquals("S/ 50.00", lblTotal.getText());
                 HBox rowCli = (HBox) root.lookup("#rowClienteAsociadoPos");
                 assertTrue(rowCli.isVisible(), "Debe mostrar barra de cliente asociado en POS");
+            });
 
-                // Capturar POS acumulando puntos para cliente minorista no cumpleañero después o Lucía
-                ctrl.buscarYAsociarClientePorCriterioSincrono("74568901", Boolean.FALSE);
-                capturarNodo(root, "02_pos_acumular_puntos_v500.png");
+            // Capturar POS acumulando puntos para cliente minorista no cumpleañero (Carlos)
+            buscarYAsociarClienteAsync(ctrl, "74568901", Boolean.FALSE);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    capturarNodo(root, "02_pos_acumular_puntos_v500.png");
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                // Re-asociar Valeria (0 pts) y ejecutar cobro real de S/ 50.00
-                ctrl.buscarYAsociarClientePorCriterioSincrono("78901234", Boolean.FALSE);
-                ctrl.handleCobroEfectivo(null);
-                ctrl.stopTimeline();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            // Re-asociar Valeria (0 pts) y ejecutar cobro real de S/ 50.00
+            buscarYAsociarClienteAsync(ctrl, "78901234", Boolean.FALSE);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrl.handleCobroEfectivo(null));
+        } finally {
+            if (ctrlRef.get() != null) {
+                JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrlRef.get().stopTimeline());
             }
-        });
+        }
 
         int idCli = cliRef.get().getIdCliente();
         assertEquals(50, fidelizacionService.obtenerPuntosCliente(idCli),
@@ -220,56 +265,78 @@ class CrmMinoristaV500IT {
         Producto prod59 = new Producto(idProducto59, 1, "CRM-59", "Parrilla Personal Deluxe",
                 "Parrilla", new BigDecimal("59.00"), new BigDecimal("100"), true);
 
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-                App.cargarFuentesSistema();
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
-                Parent root = loader.load();
-                Scene scene = new Scene(root, 1240, 780);
-                App.applyStylesheets(scene);
+        AtomicReference<VentaController> ctrlRef = new AtomicReference<>();
+        AtomicReference<Parent> rootRef = new AtomicReference<>();
 
-                VentaController ctrl = loader.getController();
-                ctrl.setModoCobroDirectoTest(true);
-                ctrl.cargarCatalogoProductosSincrono();
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+                    App.cargarFuentesSistema();
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                    Parent root = loader.load();
+                    Scene scene = new Scene(root, 1240, 780);
+                    App.applyStylesheets(scene);
 
-                // Cliente seeded Carlos Ramírez Quispe (DNI 74568901, 220 pts, NO cumpleaños)
-                Optional<Cliente> optCar = ctrl.buscarYAsociarClientePorCriterioSincrono("74568901", Boolean.FALSE);
-                assertTrue(optCar.isPresent());
-                assertEquals(220, optCar.get().getPuntosAcumulados());
+                    VentaController ctrl = loader.getController();
+                    ctrl.setInteractionPort(crearPortCobroDirecto());
+                    ctrl.cargarCatalogoProductosSincrono();
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                ctrl.agregarProductoAVenta(prod59);
+            VentaController ctrl = ctrlRef.get();
+            Parent root = rootRef.get();
 
-                Label lblSub = (Label) root.lookup("#lblSubtotal");
-                Label lblIgv = (Label) root.lookup("#lblIgv");
-                Label lblTotal = (Label) root.lookup("#lblTotal");
-                Button btnCanjear = (Button) root.lookup("#btnCanjearPuntosPos");
+            // Cliente seeded Carlos Ramírez Quispe (DNI 74568901, 220 pts, NO cumpleaños)
+            Optional<Cliente> optCar = buscarYAsociarClienteAsync(ctrl, "74568901", Boolean.FALSE);
+            assertTrue(optCar.isPresent());
+            assertEquals(220, optCar.get().getPuntosAcumulados());
 
-                assertTrue(btnCanjear.isVisible() && !btnCanjear.isDisabled(),
-                        "El botón Canjear Puntos debe mostrarse activo cuando el cliente tiene >= 100 puntos");
-                assertEquals("S/ 50.00", lblSub.getText());
-                assertEquals("S/ 9.00", lblIgv.getText());
-                assertEquals("S/ 59.00", lblTotal.getText());
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    ctrl.agregarProductoAVenta(prod59);
 
-                // Canjear 1 bloque = 100 pts -> S/ 5.00 descuento
-                ctrl.handleCanjearPuntosPos();
+                    Label lblSub = (Label) root.lookup("#lblSubtotal");
+                    Label lblIgv = (Label) root.lookup("#lblIgv");
+                    Label lblTotal = (Label) root.lookup("#lblTotal");
+                    Button btnCanjear = (Button) root.lookup("#btnCanjearPuntosPos");
 
-                assertEquals("S/ 50.00", lblSub.getText(), "La base imponible no debe alterarse tras canjear puntos");
-                assertEquals("S/ 9.00", lblIgv.getText(), "El IGV NO debe verse afectado por el canje de puntos");
-                assertEquals("S/ 54.00", lblTotal.getText(), "El Total a Pagar debe reducirse en S/ 5.00");
+                    assertTrue(btnCanjear.isVisible() && !btnCanjear.isDisabled(),
+                            "El botón Canjear Puntos debe mostrarse activo cuando el cliente tiene >= 100 puntos");
+                    assertEquals("S/ 50.00", lblSub.getText());
+                    assertEquals("S/ 9.00", lblIgv.getText());
+                    assertEquals("S/ 59.00", lblTotal.getText());
 
-                HBox rowDescPts = (HBox) root.lookup("#rowDescuentoPuntos");
-                assertTrue(rowDescPts.isVisible());
-                assertEquals("-S/ 5.00", ((Label) root.lookup("#lblDescuentoPuntos")).getText());
+                    // Canjear 1 bloque = 100 pts -> S/ 5.00 descuento
+                    ctrl.handleCanjearPuntosPos();
 
-                capturarNodo(root, "03_pos_canjear_puntos_v500.png");
+                    assertEquals("S/ 50.00", lblSub.getText(),
+                            "La base imponible no debe alterarse tras canjear puntos");
+                    assertEquals("S/ 9.00", lblIgv.getText(),
+                            "El IGV NO debe verse afectado por el canje de puntos");
+                    assertEquals("S/ 54.00", lblTotal.getText(),
+                            "El Total a Pagar debe reducirse en S/ 5.00");
 
-                ctrl.handleCobroEfectivo(null);
-                ctrl.stopTimeline();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+                    HBox rowDescPts = (HBox) root.lookup("#rowDescuentoPuntos");
+                    assertTrue(rowDescPts.isVisible());
+                    assertEquals("-S/ 5.00", ((Label) root.lookup("#lblDescuentoPuntos")).getText());
+
+                    capturarNodo(root, "03_pos_canjear_puntos_v500.png");
+
+                    ctrl.handleCobroEfectivo(null);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } finally {
+            if (ctrlRef.get() != null) {
+                JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrlRef.get().stopTimeline());
             }
-        });
+        }
 
         try (Connection conn = ConexionBD.getConnection();
              PreparedStatement ps = conn.prepareStatement(
@@ -296,47 +363,67 @@ class CrmMinoristaV500IT {
         Producto prod50 = new Producto(idProducto50, 1, "CRM-50", "Lomo Saltado Clásico",
                 "Al wok", new BigDecimal("50.00"), new BigDecimal("100"), true);
 
+        AtomicReference<VentaController> ctrlRef = new AtomicReference<>();
+        AtomicReference<Parent> rootRef = new AtomicReference<>();
+
         // 1. Verificar Alerta de Cumpleaños + 10% descuento en POS para Lucía Fernández Torres (DNI 71234567)
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-            try {
-                Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-                App.cargarFuentesSistema();
-                FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
-                Parent root = loader.load();
-                Scene scene = new Scene(root, 1240, 780);
-                App.applyStylesheets(scene);
+        try {
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+                    App.cargarFuentesSistema();
+                    FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/foodcore/view/VentaPOSView.fxml"));
+                    Parent root = loader.load();
+                    Scene scene = new Scene(root, 1240, 780);
+                    App.applyStylesheets(scene);
 
-                VentaController ctrl = loader.getController();
-                ctrl.setModoCobroDirectoTest(true);
-                ctrl.cargarCatalogoProductosSincrono();
-                ctrl.agregarProductoAVenta(prod80);
+                    VentaController ctrl = loader.getController();
+                    ctrl.setInteractionPort(crearPortCobroDirecto());
+                    ctrl.cargarCatalogoProductosSincrono();
+                    ctrl.agregarProductoAVenta(prod80);
+                    ctrlRef.set(ctrl);
+                    rootRef.set(root);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-                // Asociar cliente cumpleañero aceptando descuento del 10%
-                Optional<Cliente> lucia = ctrl.buscarYAsociarClientePorCriterioSincrono("71234567", Boolean.TRUE);
-                assertTrue(lucia.isPresent());
-                assertEquals("¡Hoy es el cumpleaños de Lucía Fernández Torres! ¿Deseas aplicar un 10% de descuento?",
-                        ctrl.getUltimoMensajeAlertaCumpleanos());
+            VentaController ctrl = ctrlRef.get();
+            Parent root = rootRef.get();
 
-                HBox bannerCumple = (HBox) root.lookup("#rowAlertaCumplePos");
-                assertTrue(bannerCumple.isVisible(), "El banner de cumpleaños debe mostrarse en el POS");
-                assertEquals("-S/ 8.00", ((Label) root.lookup("#lblDescuento")).getText());
-                assertEquals("S/ 72.00", ((Label) root.lookup("#lblTotal")).getText());
+            // Asociar cliente cumpleañero aceptando descuento del 10%
+            Optional<Cliente> lucia = buscarYAsociarClienteAsync(ctrl, "71234567", Boolean.TRUE);
+            assertTrue(lucia.isPresent());
+            assertEquals("¡Hoy es el cumpleaños de Lucía Fernández Torres! ¿Deseas aplicar un 10% de descuento?",
+                    ctrl.getUltimoMensajeAlertaCumpleanos());
 
-                capturarNodo(root, "04_pos_cumpleanos_alerta_10pct_v500.png");
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                try {
+                    HBox bannerCumple = (HBox) root.lookup("#rowAlertaCumplePos");
+                    assertTrue(bannerCumple.isVisible(), "El banner de cumpleaños debe mostrarse en el POS");
+                    assertEquals("-S/ 8.00", ((Label) root.lookup("#lblDescuento")).getText());
+                    assertEquals("S/ 72.00", ((Label) root.lookup("#lblTotal")).getText());
 
-                ctrl.handleCobroEfectivo(null);
+                    capturarNodo(root, "04_pos_cumpleanos_alerta_10pct_v500.png");
 
-                // Registrar segunda compra rápida para validar el historial ordenado en Backoffice
-                ctrl.buscarYAsociarClientePorCriterioSincrono("71234567", Boolean.FALSE);
+                    ctrl.handleCobroEfectivo(null);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            // Registrar segunda compra rápida para validar el historial ordenado en Backoffice
+            buscarYAsociarClienteAsync(ctrl, "71234567", Boolean.FALSE);
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
                 ctrl.agregarProductoAVenta(prod50);
                 ctrl.handleCobroEfectivo(null);
-                ctrl.stopTimeline();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            });
+        } finally {
+            if (ctrlRef.get() != null) {
+                JavaFxTestSupport.runOnFxThreadAndWait(() -> ctrlRef.get().stopTimeline());
             }
-        });
+        }
 
-        // 2. Registrar 10 compras adicionales vía VentaController/Service? No, basta validar >10 límite si creamos 10 -> verificamos top 10
         // Ahora abrir Backoffice ClientesView.fxml, cambiar a Clientes Minoristas y verificar ficha + últimas compras
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

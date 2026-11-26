@@ -1,8 +1,12 @@
 package com.foodcore.model;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 public class Proveedor {
+    private static final BigDecimal CERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
     private int idProveedor;
     private String ruc;
     private String razonSocial;
@@ -15,7 +19,7 @@ public class Proveedor {
     private LocalDateTime fechaRegistro;
 
     // Métricas auxiliares para UI
-    private double deudaActual;
+    private BigDecimal deudaActual = CERO;
     private int facturasPendientes;
 
     public Proveedor() {
@@ -103,12 +107,14 @@ public class Proveedor {
         this.fechaRegistro = fechaRegistro;
     }
 
-    public double getDeudaActual() {
+    public BigDecimal getDeudaActual() {
         return deudaActual;
     }
 
-    public void setDeudaActual(double deudaActual) {
-        this.deudaActual = deudaActual;
+    public void setDeudaActual(BigDecimal deudaActual) {
+        this.deudaActual = deudaActual != null
+                ? deudaActual.setScale(2, RoundingMode.HALF_UP)
+                : CERO;
     }
 
     public int getFacturasPendientes() {
