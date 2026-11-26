@@ -29,8 +29,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.reflect.Proxy;
 import java.net.ServerSocket;
@@ -618,9 +620,13 @@ class HardeningAuthApiSecurityTest {
         int tcpPort = puertoLibre();
         servidor.iniciar(tcpPort);
         try (Socket rawClient = new Socket("127.0.0.1", tcpPort)) {
+            rawClient.setSoTimeout(3000);
             PrintWriter pw = new PrintWriter(rawClient.getOutputStream(), true, StandardCharsets.UTF_8);
+            BufferedReader br = new BufferedReader(new InputStreamReader(rawClient.getInputStream(), StandardCharsets.UTF_8));
             pw.println("{\"accion\":\"SIN_HELLO\"}");
-            Thread.sleep(100);
+            String respuestaRaw = br.readLine();
+            assertNotNull(respuestaRaw, "El servidor debe responder rechazo explícito a trama sin autenticación");
+            assertTrue(respuestaRaw.contains("FRAME_NO_AUTORIZADO") || respuestaRaw.contains("ERROR"));
             assertEquals(0, servidor.getCantidadClientesConectados(),
                     "Cliente TCP sin HELLO/AUTH_TERMINAL válido no debe registrarse en clientesConectados");
         } finally {

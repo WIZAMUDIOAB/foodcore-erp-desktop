@@ -101,16 +101,12 @@ class VentaPOSViewTest {
 
     private static void esperarHastaEnFx(BooleanSupplier condicionFx, Duration timeout, String mensajeFallo)
             throws Exception {
-        long deadline = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < deadline) {
-            AtomicBoolean cumplida = new AtomicBoolean(false);
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicionFx.getAsBoolean()));
-            if (cumplida.get()) {
-                return;
-            }
-            Thread.sleep(25);
-        }
-        throw new AssertionError("Timeout esperando condición asíncrona en FX: " + mensajeFallo);
+        long timeoutSeconds = Math.max(1L, (long) Math.ceil(timeout.toMillis() / 1000.0));
+        JavaFxTestSupport.awaitCondition(
+                condicionFx,
+                timeoutSeconds,
+                "Timeout esperando condición asíncrona en FX: " + mensajeFallo
+        );
     }
 
     @Test

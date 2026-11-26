@@ -2,6 +2,7 @@ package com.foodcore.controller;
 
 import atlantafx.base.theme.PrimerLight;
 import com.foodcore.App;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ExportFileChooserHelper;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -272,16 +274,14 @@ class Fase4ExportFileChooserTest {
         return new LoadedView<>(rootRef.get(), ctrlRef.get());
     }
 
-    private static void esperarArchivoConDatos(Path path, Duration timeout) throws Exception {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            if (Files.exists(path) && Files.size(path) > 0) {
-                return;
+    private static void esperarArchivoConDatos(Path path, Duration timeout) {
+        AsyncTestSupport.awaitUntil(() -> {
+            try {
+                return Files.exists(path) && Files.size(path) > 0;
+            } catch (IOException ex) {
+                return false;
             }
-            Thread.sleep(60L);
-        }
-        assertTrue(Files.exists(path) && Files.size(path) > 0,
-                "Se esperaba archivo exportado con contenido en: " + path);
+        }, timeout, Duration.ofMillis(25), "Se esperaba archivo exportado con contenido en: " + path);
     }
 
     private static void guardarSnapshot(Parent root, String filename) throws Exception {

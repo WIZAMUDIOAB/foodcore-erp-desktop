@@ -35,8 +35,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
@@ -164,7 +164,7 @@ class SubFaseCInfraestructuraTest {
         Path fakeGz = tempDir.resolve("foodcore_v530_test.sql.gz");
         Files.write(fakeGz, comprimirGzip("-- MySQL dump\nCREATE TABLE IF NOT EXISTS demo(id INT);"));
 
-        AtomicBoolean ejecutorInvocado = new AtomicBoolean(false);
+        CountDownLatch ejecutorLatch = new CountDownLatch(1);
         AtomicReference<Path> rutaRestaurada = new AtomicReference<>();
 
         Usuario admin = new Usuario(1, 1, 1, "admin", "hash", true);
@@ -190,15 +190,15 @@ class SubFaseCInfraestructuraTest {
 
                 ctrl.getTxtRutaBackupRestaurar().setText(fakeGz.toAbsolutePath().toString());
                 ctrl.setEjecutorRestauracion(path -> {
-                    ejecutorInvocado.set(true);
                     rutaRestaurada.set(path);
+                    ejecutorLatch.countDown();
                     return true;
                 });
 
                 // Caso 1: Usuario cancela confirmación previa
                 ctrl.setConfirmacionRestauracionSupplier(() -> false);
                 ctrl.handleRestaurarDesdeBackup(null);
-                assertFalse(ejecutorInvocado.get(), "Si cancela confirmación no debe restaurar");
+                assertEquals(1L, ejecutorLatch.getCount(), "Si cancela confirmación no debe restaurar");
                 assertTrue(ctrl.getLblEstadoRestauracion().getText().contains("cancelada"));
 
                 // Caso 2: Usuario confirma restauración
@@ -209,11 +209,7 @@ class SubFaseCInfraestructuraTest {
             }
         });
 
-        long deadline = System.currentTimeMillis() + 5000L;
-        while (!ejecutorInvocado.get() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(50);
-        }
-        assertTrue(ejecutorInvocado.get(), "Al confirmar debe invocar la restauración del backup");
+        assertTrue(ejecutorLatch.await(5, TimeUnit.SECONDS), "Al confirmar debe invocar la restauración del backup");
         assertEquals(fakeGz.toAbsolutePath().normalize(), rutaRestaurada.get().toAbsolutePath().normalize());
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {

@@ -188,20 +188,11 @@ class ModuloAExpedienteUiTest {
             }
         });
 
-        for (int i = 0; i < 30; i++) {
-            AtomicReference<String> badgeText = new AtomicReference<>("");
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-                javafx.scene.control.Label lbl = (javafx.scene.control.Label) rootRef.get()
-                        .lookup("#lblCountAlertasPersonal");
-                if (lbl != null) {
-                    badgeText.set(lbl.getText());
-                }
-            });
-            if (!badgeText.get().startsWith("0 ")) {
-                break;
-            }
-            Thread.sleep(150);
-        }
+        JavaFxTestSupport.awaitCondition(() -> {
+            javafx.scene.control.Label lbl = (javafx.scene.control.Label) rootRef.get()
+                    .lookup("#lblCountAlertasPersonal");
+            return lbl != null && lbl.getText() != null && !lbl.getText().startsWith("0 ");
+        }, 5L, "El contador de alertas de personal debe actualizarse desde BD");
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

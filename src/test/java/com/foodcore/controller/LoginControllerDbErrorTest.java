@@ -34,7 +34,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -99,17 +98,11 @@ class LoginControllerDbErrorTest {
                 }
             });
 
-            long deadline = System.currentTimeMillis() + Duration.ofSeconds(6).toMillis();
-            while (System.currentTimeMillis() < deadline) {
-                AtomicBoolean done = new AtomicBoolean(false);
-                JavaFxTestSupport.runOnFxThreadAndWait(() -> done.set(
-                        !btnRef.get().isDisable() && lblRef.get().isVisible()
-                ));
-                if (done.get()) {
-                    break;
-                }
-                Thread.sleep(25);
-            }
+            JavaFxTestSupport.awaitCondition(
+                    () -> !btnRef.get().isDisable() && lblRef.get().isVisible(),
+                    6L,
+                    "El botón de login debe reactivarse y mostrar mensaje amigable de error"
+            );
 
             AtomicReference<String> uiMsgRef = new AtomicReference<>();
             AtomicBoolean visibleRef = new AtomicBoolean(false);

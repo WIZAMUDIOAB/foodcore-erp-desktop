@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -60,16 +59,12 @@ class LoginViewTest {
 
     private static void esperarHastaEnFx(BooleanSupplier condicionFx, Duration timeout, String mensajeFallo)
             throws Exception {
-        long deadline = System.currentTimeMillis() + timeout.toMillis();
-        while (System.currentTimeMillis() < deadline) {
-            AtomicBoolean cumplida = new AtomicBoolean(false);
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicionFx.getAsBoolean()));
-            if (cumplida.get()) {
-                return;
-            }
-            Thread.sleep(25);
-        }
-        throw new AssertionError("Timeout esperando condición asíncrona: " + mensajeFallo);
+        long timeoutSeconds = Math.max(1L, (long) Math.ceil(timeout.toMillis() / 1000.0));
+        JavaFxTestSupport.awaitCondition(
+                condicionFx,
+                timeoutSeconds,
+                "Timeout esperando condición asíncrona: " + mensajeFallo
+        );
     }
 
     private static <T> T leerEnFx(Supplier<T> supplier) throws Exception {

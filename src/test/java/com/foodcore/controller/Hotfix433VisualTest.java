@@ -10,6 +10,7 @@ import com.foodcore.e2e.PlaywrightE2ESupport;
 import com.foodcore.model.Categoria;
 import com.foodcore.model.Cliente;
 import com.foodcore.model.Producto;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.JavaFxTestSupport;
 import com.foodcore.support.MySqlIntegrationTestSupport;
 import com.foodcore.util.ConexionBD;
@@ -48,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -150,17 +152,14 @@ public class Hotfix433VisualTest {
         // Esperar persistencia asíncrona fuera del hilo JavaFX
         CategoriaDAO catDAO = new CategoriaDAOImpl();
         ProductoDAO prodDAO = new ProductoDAOImpl();
-        long limite = System.currentTimeMillis() + 5000L;
-        while (System.currentTimeMillis() < limite) {
+        AsyncTestSupport.awaitUntil(() -> {
             try (Connection conn = ConexionBD.getConnection()) {
-                boolean platilloGuardado = prodDAO.listarTodos(conn).stream()
+                return prodDAO.listarTodos(conn).stream()
                         .anyMatch(p -> nuevoPlatillo.equalsIgnoreCase(p.getNombre()));
-                if (platilloGuardado) {
-                    break;
-                }
+            } catch (Exception ex) {
+                return false;
             }
-            Thread.sleep(25);
-        }
+        }, Duration.ofSeconds(5), Duration.ofMillis(25), "El platillo '" + nuevoPlatillo + "' no se persistió en BD");
         try (Connection conn = ConexionBD.getConnection()) {
             List<Categoria> cats = catDAO.listarTodas(conn);
             boolean catExiste = cats.stream().anyMatch(c -> nuevaCategoria.equalsIgnoreCase(c.getNombre()));

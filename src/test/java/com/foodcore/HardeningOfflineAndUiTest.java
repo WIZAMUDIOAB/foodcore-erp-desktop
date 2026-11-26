@@ -445,10 +445,11 @@ class HardeningOfflineAndUiTest {
             }
         });
 
-        long deadline = System.currentTimeMillis() + 5000L;
-        while (ctrlRef.get().getUltimaAlertaTitulo() == null && System.currentTimeMillis() < deadline) {
-            Thread.sleep(50);
-        }
+        JavaFxTestSupport.awaitCondition(
+                () -> ctrlRef.get().getUltimaAlertaTitulo() != null,
+                5L,
+                "Debe mostrar alerta de error al fallar el envío de comanda"
+        );
         assertEquals("Error al Enviar Comanda", ctrlRef.get().getUltimaAlertaTitulo(),
                 "Si registrarPedidoYEnviarComanda falla, debe mostrar error y nunca 'Comanda Enviada'");
         assertNull(ctrlRef.get().getPedidoActivoId(), "No debe asignar pedidoActivoId cuando falla el envío");

@@ -298,7 +298,12 @@ class SpecFoodcoreV12Test {
             }
         });
 
-        Thread.sleep(700);
+        JavaFxTestSupport.awaitCondition(() ->
+                invCtrl.getTodosLosInsumos().stream().anyMatch(i -> "INS-ACEITE-LT".equals(i.getCodigo()))
+                        && menuCtrl.getListaProductos().stream().anyMatch(p -> "HAM-FOTO-01".equals(p.getCodigo())),
+                5L,
+                "Inventario y Menú deben completar la recarga asíncrona desde BD"
+        );
 
         JavaFxTestSupport.runOnFxThreadAndWait(() -> {
             try {

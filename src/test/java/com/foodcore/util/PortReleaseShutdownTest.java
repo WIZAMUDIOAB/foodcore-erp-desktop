@@ -5,6 +5,7 @@ import com.foodcore.api.ApiServer;
 import com.foodcore.api.security.AuthRateLimiter;
 import com.foodcore.api.security.CorsPolicy;
 import com.foodcore.api.security.JwtService;
+import com.foodcore.support.AsyncTestSupport;
 import com.foodcore.support.TestSecuritySupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,7 +18,9 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -119,20 +122,21 @@ class PortReleaseShutdownTest {
     }
 
     private static void assertPuertoLiberado(int port) throws Exception {
-        long deadline = System.currentTimeMillis() + 1000L;
-        IOException lastEx = null;
-        while (System.currentTimeMillis() <= deadline) {
+        AtomicReference<IOException> lastEx = new AtomicReference<>();
+        boolean libre = AsyncTestSupport.awaitUntilQuiet(() -> {
             try (ServerSocket ss = new ServerSocket()) {
                 ss.setReuseAddress(true);
                 ss.bind(new InetSocketAddress(port));
                 assertTrue(ss.isBound(), "Puerto " + port + " debe quedar disponible");
-                return;
+                return true;
             } catch (IOException ex) {
-                lastEx = ex;
-                Thread.sleep(25);
+                lastEx.set(ex);
+                return false;
             }
+        }, Duration.ofMillis(1000), Duration.ofMillis(20));
+        if (!libre) {
+            throw lastEx.get() != null ? lastEx.get() : new IOException("Puerto " + port + " no liberado");
         }
-        throw lastEx != null ? lastEx : new IOException("Puerto " + port + " no liberado");
     }
 
     private static int[] reservarPuertosDistintos(int cantidad) throws IOException {

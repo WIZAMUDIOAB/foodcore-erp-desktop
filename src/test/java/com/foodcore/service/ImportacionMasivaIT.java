@@ -40,7 +40,6 @@ import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -241,19 +240,17 @@ class ImportacionMasivaIT {
             ProgressIndicator pb = assertInstanceOf(
                     ProgressIndicator.class, rootRef.get().lookup("#pbImportacionMenu"));
 
-            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            JavaFxTestSupport.awaitCondition(() -> {
+                String t = lblResumen.getText();
+                return t != null && t.startsWith("Importación completada:") && !pb.isVisible();
+            }, 10L, "Importación Excel debe completarse y ocultar ProgressIndicator");
+
             String[] text = new String[1];
             boolean[] visible = new boolean[1];
-            while (System.nanoTime() < deadline) {
-                JavaFxTestSupport.runOnFxThreadAndWait(() -> {
-                    text[0] = lblResumen.getText();
-                    visible[0] = pb.isVisible();
-                });
-                if (text[0] != null && text[0].startsWith("Importación completada:")) {
-                    break;
-                }
-                Thread.sleep(60L);
-            }
+            JavaFxTestSupport.runOnFxThreadAndWait(() -> {
+                text[0] = lblResumen.getText();
+                visible[0] = pb.isVisible();
+            });
 
             assertEquals("Importación completada: 1 productos creados, 0 actualizados, 0 errores.", text[0]);
             assertFalse(visible[0], "ProgressIndicator debe ocultarse al concluir");

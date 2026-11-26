@@ -58,7 +58,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
@@ -622,22 +621,7 @@ class FoodcoreV440FlowsTest {
     }
 
     private static void esperarHastaEnFx(BooleanSupplier condicion, long timeoutMs, String mensaje) throws Exception {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            AtomicBoolean cumplida = new AtomicBoolean(false);
-            JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplida.set(condicion.getAsBoolean()));
-            if (cumplida.get()) {
-                return;
-            }
-            try {
-                Thread.sleep(25);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        AtomicBoolean cumplidaFinal = new AtomicBoolean(false);
-        JavaFxTestSupport.runOnFxThreadAndWait(() -> cumplidaFinal.set(condicion.getAsBoolean()));
-        assertTrue(cumplidaFinal.get(), mensaje);
+        long timeoutSeconds = Math.max(1L, (long) Math.ceil(timeoutMs / 1000.0));
+        JavaFxTestSupport.awaitCondition(condicion, timeoutSeconds, mensaje);
     }
 }
